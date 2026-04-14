@@ -1,0 +1,128 @@
+---
+description: Testing conventions for the monorepo
+alwaysApply: true
+---
+
+# Testing Standards
+
+---
+
+## Test Runner
+
+- **Vitest** for unit and component tests (packages and desktop-media).
+- **Playwright** for E2E tests (`apps/desktop-media/tests/e2e/`).
+
+---
+
+## Test File Placement
+
+- Co-locate tests with source: `foo.ts` -> `foo.test.ts` (same directory).
+- For larger test suites, use a `__tests__/` subdirectory.
+- E2E tests live in `apps/desktop-media/tests/e2e/`.
+
+---
+
+## What to Test
+
+### Priority Levels
+
+| Priority | What | Type | Why |
+|---|---|---|---|
+| P0 | Pure utility functions | Unit | Easy to test, high reuse |
+| P0 | Zustand store slices | Unit | Core state logic |
+| P0 | Action registries | Unit | Automatable entry points |
+| P0 | Shared contract utilities | Unit | Foundation for all apps |
+| P1 | Shared UI components (`@emk/media-viewer`) | Component | Cross-platform correctness |
+| P1 | IPC handler logic (mocked) | Unit | Desktop reliability |
+| P1 | Metadata extraction/parsing | Unit | Data integrity |
+| P2 | Provider adapters (mocked) | Integration | Swappability verification |
+| P2 | SQLite DB modules | Integration | Data layer correctness |
+| P3 | E2E desktop flows | E2E (Playwright) | Desktop user journeys |
+
+### Every Refactoring Extraction Must Have Tests
+
+When extracting a module during refactoring (hook, utility, action registry), add at least:
+- 1 test for the happy path
+- 1 test for an edge case or error case
+
+---
+
+## Test Patterns
+
+### Zustand Slice Tests
+
+```ts
+import { describe, it, expect } from "vitest";
+import { createStore } from "zustand/vanilla";
+import { immer } from "zustand/middleware/immer";
+import { createMySlice, type MySlice } from "./my-slice";
+
+function createTestStore() {
+  return createStore<MySlice>()(immer(createMySlice));
+}
+
+describe("MySlice", () => {
+  it("has correct initial state", () => {
+    const store = createTestStore();
+    expect(store.getState().myValue).toBe("");
+  });
+
+  it("updates value", () => {
+    const store = createTestStore();
+    store.getState().setMyValue("test");
+    expect(store.getState().myValue).toBe("test");
+  });
+});
+```
+
+### Action Registry Tests
+
+```ts
+import { describe, it, expect, vi } from "vitest";
+import { createViewerActions } from "./viewer-actions";
+
+describe("ViewerActions", () => {
+  it("openViewer calls store action", () => {
+    const mockStore = { getState: vi.fn(() => ({ openItem: vi.fn() })) };
+    const actions = createViewerActions(mockStore);
+    actions.openViewer("item-1");
+    expect(mockStore.getState().openItem).toHaveBeenCalledWith("item-1");
+  });
+});
+```
+
+### Pure Utility Tests
+
+```ts
+import { describe, it, expect } from "vitest";
+import { formatTimeLeftCompact } from "./eta-formatting";
+
+describe("formatTimeLeftCompact", () => {
+  it("formats seconds under a minute", () => {
+    expect(formatTimeLeftCompact(45)).toBe("45sec");
+  });
+
+  it("formats minutes", () => {
+    expect(formatTimeLeftCompact(125)).toBe("2min");
+  });
+});
+```
+
+---
+
+## CI Integration
+
+- `pnpm test` runs all tests via Turbo.
+- Tests must pass before merge.
+- Coverage reports in `coverage/` directory (gitignored).
+- No flaky tests — if a test is flaky, fix or remove it.
+
+---
+
+## Rules for AI Agents
+
+- When creating a new utility, hook, or action registry, always create a corresponding `.test.ts` file.
+- When refactoring (extracting from a large file), add tests for the extracted module.
+- Do not add tests for trivial one-liner functions or simple type re-exports.
+- Prefer testing behavior over implementation details.
+- Mock external dependencies (IPC, database, network) — never call real services in unit tests.

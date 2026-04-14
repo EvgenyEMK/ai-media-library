@@ -1,0 +1,45 @@
+MIT License
+
+Copyright (c) Evgeny Mikheev [EMK], Switzerland
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+AI models and third-party model weights notice
+
+This software uses and/or can use third-party AI models and model weights. The
+application code is licensed under MIT as stated above, but each model and
+weight file has its own license terms from its original source.
+
+Current model sources used by the desktop app include:
+
+- RetinaFace face detection model (`retinaface_mv2.onnx`):
+  https://github.com/yakhyo/retinaface-pytorch/releases/download/v0.0.1/retinaface_mv2.onnx
+- ArcFace face embedding model (`w600k_r50.onnx`) mirrors:
+  https://huggingface.co/maze/faceX/resolve/main/w600k_r50.onnx
+  https://huggingface.co/ll00292007/easyphoto/resolve/main/w600k_r50.onnx
+- Nomic embedding models via Transformers.js:
+  https://huggingface.co/nomic-ai/nomic-embed-vision-v1.5
+  https://huggingface.co/nomic-ai/nomic-embed-text-v1.5
+
+The user is solely responsible for checking and complying with all applicable
+licenses, terms, and usage restrictions of those AI models and weights. While
+these models are open-source, some model licenses can restrict commercial use
+or impose additional obligations depending on distribution and usage scenario.

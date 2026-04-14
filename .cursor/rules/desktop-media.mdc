@@ -1,0 +1,115 @@
+---
+description: Conventions for the Electron desktop media app
+globs: apps/desktop-media/**
+alwaysApply: false
+---
+
+# Desktop Media App Rules
+
+These rules apply to `apps/desktop-media/` — the Electron desktop media library application.
+See also: `apps/desktop-media/AGENTS.md` for full conventions.
+
+---
+
+## Architecture
+
+### Main Process (`electron/`)
+
+- **Entry point (`main.ts`)** is a thin lifecycle orchestrator (~100 lines max). It calls module initializers and handler registrations.
+- **IPC handlers** are organized by feature domain in `electron/ipc/`:
+  - `folder-handlers.ts`, `analysis-handlers.ts`, `face-handlers.ts`, `metadata-handlers.ts`, `semantic-handlers.ts`, `settings-handlers.ts`
+  - `register-all.ts` — central registration that wires all handler groups
+- Each handler file exports a `register*Handlers(deps)` function receiving shared dependencies.
+
+### Renderer Process (`src/renderer/`)
+
+- **`App.tsx`** is a thin orchestrator (~200 lines max). It composes hooks and renders sub-components.
+- **Components** in `components/` — each under 300 lines, single responsibility.
+- **Hooks** in `hooks/` — each under 200 lines, one concern per hook.
+- **Utilities** in `lib/` — pure functions, formatters, constants.
+- **Types** in `types/` — desktop-specific type definitions.
+- **Action registries** in `actions/` — automatable, named action functions.
+
+### Store Composition
+
+- Desktop store = 11 shared slices from `@emk/media-store` + `DesktopSlice`.
+- Created in `stores/desktop-store.tsx` via `createDesktopStore()`.
+- `DesktopSlice` in `stores/desktop-slice.ts` manages desktop-only state.
+- Use `useDesktopStore(selector)` for reactive reads.
+- Use `useDesktopStoreApi()` for imperative access in action registries and IPC bindings.
+
+### Styling (renderer)
+
+- **Tailwind** is the primary styling method for `src/renderer/`. Prefer utilities on components over growing `styles.css`.
+- Use **theme tokens** (`bg-card`, `text-foreground`, `border-border`, etc.) aligned with `:root` HSL variables.
+- **No new large class blocks in `styles.css`** — keep that file to `@tailwind` directives, design tokens, `@layer base`, and rare unpurgeable CSS.
+- Use **`cn()`** from `src/renderer/lib/cn.ts` (`clsx` + `tailwind-merge`) for conditional classes.
+
+---
+
+## IPC Patterns
+
+- All channel names are defined in `src/shared/ipc.ts` (`IPC_CHANNELS`).
+- Types for all IPC payloads are co-located in `src/shared/ipc.ts`.
+- Main process handlers use `ipcMain.handle()` for request/response and `webContents.send()` for push events.
+- Renderer accesses IPC via `window.desktopApi` (defined in `electron/preload.ts`).
+
+---
+
+## SQLite Database
+
+- Database modules in `electron/db/` — one file per domain.
+- Client initialization in `electron/db/client.ts` (`getDesktopDatabase()`, `initDesktopDatabase()`).
+- Use parameterized queries — never interpolate user input into SQL.
+- Vector search via `SQLiteVectorStoreAdapter` in `electron/db/vector-store.ts`.
+
+---
+
+## Provider Adapters
+
+Desktop implements the shared adapter interfaces from `@emk/shared-contracts`. When adding or swapping a provider, create a new adapter class that implements the relevant interface.
+
+| Interface | Desktop Adapter | Location |
+|---|---|---|
+| `VectorStoreAdapter` | `SQLiteVectorStoreAdapter` | `electron/db/vector-store.ts` |
+| `EmbeddingProviderAdapter` | `OllamaEmbeddingAdapter` | `electron/adapters/ollama-embedding-adapter.ts` |
+| `AiProviderAdapter` | Ollama (wrap when needed) | `electron/photo-analysis.ts` |
+| `FaceDetectionProviderAdapter` | RetinaFace sidecar (wrap when needed) | `electron/face-detection.ts` |
+
+---
+
+## AI Pipelines
+
+- All AI operations go through adapter interfaces from `@emk/shared-contracts`.
+- Photo analysis: `photo-analysis.ts` (model) + `photo-analysis-pipeline.ts` (orchestrator).
+- Face detection: calls RetinaFace sidecar API.
+- Face embedding: CLIP embeddings via Ollama.
+- Semantic search: multimodal embeddings via Ollama (`OllamaEmbeddingAdapter`).
+- Product UX docs: `docs/PRODUCT-FEATURES/AI/`
+
+---
+
+## Automatable Actions
+
+- All user-facing operations MUST be exposed as named functions in `src/renderer/actions/`.
+- Actions receive explicit parameters (no React state dependencies).
+- UI components and automation scripts call the same action functions.
+- Organize by domain: `viewer-actions.ts`, `folder-actions.ts`, `analysis-actions.ts`, `search-actions.ts`.
+
+---
+
+## Dependencies
+
+| Package | Purpose |
+|---|---|
+| `@emk/media-metadata-core` | Metadata types, EXIF/XMP helpers |
+| `@emk/media-store` | Shared Zustand slices |
+| `@emk/media-viewer` | Shared UI components |
+| `@emk/shared-contracts` | Domain types, adapter interfaces |
+| `@emk/sdk-media-api` | Sync API client |
+| `better-sqlite3` | SQLite driver |
+| `jimp` | Image manipulation |
+| `exifreader` | EXIF metadata |
+| `zustand` + `immer` | State management |
+| `electron` | Desktop framework |
+| `vite` | Build tooling |

@@ -1,0 +1,218 @@
+import path from "node:path";
+import { randomUUID } from "node:crypto";
+import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import {
+  IPC_CHANNELS,
+  type AppSettings,
+  type FolderAnalysisStatus,
+} from "../../src/shared/ipc";
+import { listFolderImages, readFolderChildren, streamFolderImages } from "../fs-media";
+import { readSettings, writeSettings } from "../storage";
+import { getFolderAnalysisStatuses } from "../db/folder-analysis-status";
+import { emitFolderImagesProgress } from "./progress-emitters";
+import { runMetadataScanJob } from "./metadata-scan-handlers";
+import { runningMetadataScanJobs } from "./state";
+import { getModelsDirectory } from "../native-face/model-manager";
+import { resolveCacheRoot } from "../app-paths";
+
+function ts(): string {
+  return new Date().toISOString();
+}
+function isDebugEnabled(): boolean {
+  return process.env.EMK_DEBUG_PHOTO_AI === "1";
+}
+
+export function registerFsHandlers(): void {
+  ipcMain.handle(IPC_CHANNELS.selectLibraryFolder, async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ["openDirectory"],
+      title: "Select media library folder",
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+
+    return result.filePaths[0];
+  });
+
+  ipcMain.handle(IPC_CHANNELS.readFolderChildren, async (_event, folderPath: string) => {
+    return readFolderChildren(folderPath);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.revealItemInFolder, async (_event, filePath: string) => {
+    const trimmed = typeof filePath === "string" ? filePath.trim() : "";
+    if (!trimmed) {
+      return { success: false, error: "File path is required." };
+    }
+    try {
+      shell.showItemInFolder(trimmed);
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not reveal file in folder.";
+      return { success: false, error: message };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.listFolderImages, async (_event, folderPath: string) => {
+    const images = await listFolderImages(folderPath);
+    const knownImageEntries = images.map((image) => ({
+      folderPath,
+      path: image.path,
+      name: image.name,
+    }));
+    const settings = await readSettings(app.getPath("userData"));
+    if (images.length < settings.folderScanning.autoMetadataScanOnSelectMaxFiles) {
+      void runMetadataScanJob({
+        folderPath,
+        recursive: false,
+        knownImageEntries,
+      }).catch(() => undefined);
+    }
+    return images;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.startFolderImagesStream, async (event, folderPath: string) => {
+    const normalizedFolderPath = folderPath?.trim();
+    if (!normalizedFolderPath) {
+      throw new Error("Folder path is required for image streaming");
+    }
+
+    const browserWindow = BrowserWindow.fromWebContents(event.sender);
+    if (!browserWindow) {
+      throw new Error("Unable to locate image streaming window");
+    }
+
+    const requestId = randomUUID();
+    if (isDebugEnabled()) {
+      console.log(
+        `[folder-stream][main][${ts()}] start requestId=${requestId} folder="${normalizedFolderPath}"`,
+      );
+    }
+    setTimeout(() => {
+      void runFolderImagesStream(browserWindow, requestId, normalizedFolderPath);
+    }, 0);
+    return { requestId };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.getSettings, async () => {
+    return readSettings(app.getPath("userData"));
+  });
+
+  ipcMain.handle(IPC_CHANNELS.getDatabaseLocation, async () => {
+    const userDataPath = app.getPath("userData");
+    const appDataPath = app.getPath("appData");
+    return {
+      appDataPath,
+      userDataPath,
+      dbFileName: "desktop-media.db",
+      dbPath: path.join(userDataPath, "desktop-media.db"),
+      modelsPath: getModelsDirectory(),
+      cachePath: resolveCacheRoot(app),
+    };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.saveSettings, async (_event, settings: AppSettings) => {
+    await writeSettings(app.getPath("userData"), settings);
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.getFolderAnalysisStatuses,
+    async (): Promise<Record<string, FolderAnalysisStatus>> => {
+      return getFolderAnalysisStatuses();
+    },
+  );
+}
+
+async function runFolderImagesStream(
+  browserWindow: BrowserWindow,
+  requestId: string,
+  folderPath: string,
+): Promise<void> {
+  let loaded = 0;
+  const observedPaths: string[] = [];
+  const startedAt = Date.now();
+
+  emitFolderImagesProgress(browserWindow, {
+    type: "started",
+    requestId,
+    folderPath,
+    total: null,
+    loaded,
+  });
+
+  try {
+    const result = await streamFolderImages(
+      folderPath,
+      async (items) => {
+        loaded += items.length;
+        if ((loaded === items.length || loaded % 500 === 0) && isDebugEnabled()) {
+          console.log(
+            `[folder-stream][main][${ts()}] batch requestId=${requestId} loaded=${loaded} (+${items.length}) folder="${folderPath}"`,
+          );
+        }
+        observedPaths.push(...items.map((item) => item.path));
+        emitFolderImagesProgress(browserWindow, {
+          type: "batch",
+          requestId,
+          folderPath,
+          total: null,
+          loaded,
+          items,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      },
+      // Smaller batches improve time-to-first-thumbnail for large folders.
+      { batchSize: 24 },
+    );
+
+    emitFolderImagesProgress(browserWindow, {
+      type: "completed",
+      requestId,
+      folderPath,
+      total: result.loaded,
+      loaded: result.loaded,
+    });
+    if (isDebugEnabled()) {
+      console.log(
+        `[folder-stream][main][${ts()}] completed requestId=${requestId} folder="${folderPath}" loaded=${result.loaded} durationMs=${Date.now() - startedAt}`,
+      );
+    }
+
+    for (const job of runningMetadataScanJobs.values()) {
+      job.cancelled = true;
+    }
+
+    const knownImageEntries = observedPaths.map((p) => ({
+      folderPath,
+      path: p,
+      name: path.basename(p),
+    }));
+    const settings = await readSettings(app.getPath("userData"));
+    if (result.loaded < settings.folderScanning.autoMetadataScanOnSelectMaxFiles) {
+      // Delay scan start so the renderer can complete its pending
+      // getMediaItemsByPaths calls for the final stream batches before the
+      // scan's synchronous DB work starts competing for the main thread.
+      setTimeout(() => {
+        void runMetadataScanJob({
+          folderPath,
+          recursive: false,
+          knownImageEntries,
+        }).catch(() => undefined);
+      }, 300);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to stream folder images";
+    emitFolderImagesProgress(browserWindow, {
+      type: "failed",
+      requestId,
+      folderPath,
+      error: message,
+    });
+    if (isDebugEnabled()) {
+      console.log(
+        `[folder-stream][main][${ts()}][error] failed requestId=${requestId} folder="${folderPath}" loaded=${loaded} durationMs=${Date.now() - startedAt} error="${message}"`,
+      );
+    }
+  }
+}

@@ -1,0 +1,401 @@
+import { randomUUID } from "node:crypto";
+import { app, ipcMain } from "electron";
+import {
+  IPC_CHANNELS,
+  type MetadataScanItemState,
+} from "../../src/shared/ipc";
+import { listFolderImages } from "../fs-media";
+import {
+  getMediaItemMetadataByPaths,
+  upsertMediaItemFromFilePath,
+} from "../db/media-item-metadata";
+import { runPathExtractionForMediaItem } from "../db/media-item-path-extraction";
+import { getObservedFileStateByPaths, observeFiles } from "../db/file-identity";
+import { reconcileFolder, purgeDeletedMediaItems } from "../db/media-item-reconciliation";
+import { DEFAULT_LIBRARY_ID } from "../db/folder-analysis-status";
+import { readSettings } from "../storage";
+import { emitMetadataScanProgress } from "./progress-emitters";
+import { runningMetadataScanJobs } from "./state";
+import type { RunningMetadataScanJob } from "./types";
+import { collectFoldersRecursively, collectImageEntriesForFolders } from "./folder-utils";
+import { acquirePowerSave, releasePowerSave } from "./power-save-manager";
+import { isGeocoderReady, initGeocoder, reverseGeocodeBatch } from "../geocoder/reverse-geocoder";
+import { getMediaItemsNeedingGpsGeocoding, updateMediaItemLocationFromGps } from "../db/media-item-geocoding";
+
+export function registerMetadataScanHandlers(): void {
+  ipcMain.handle(
+    IPC_CHANNELS.scanFolderMetadata,
+    async (
+      _event,
+      request: { folderPath: string; recursive?: boolean },
+    ): Promise<{ jobId: string; total: number }> => {
+      const folderPath = request.folderPath?.trim();
+      if (!folderPath) {
+        throw new Error("Folder path is required for metadata scan");
+      }
+      return runMetadataScanJob({
+        folderPath,
+        recursive: request.recursive === true,
+      });
+    },
+  );
+
+  ipcMain.handle(IPC_CHANNELS.cancelMetadataScan, async (_event, jobId: string) => {
+    const target = runningMetadataScanJobs.get(jobId);
+    const totalJobs = runningMetadataScanJobs.size;
+    for (const job of runningMetadataScanJobs.values()) {
+      job.cancelled = true;
+      if (job.powerSaveToken) {
+        releasePowerSave(job.powerSaveToken);
+        job.powerSaveToken = undefined;
+      }
+    }
+    console.log(`[metadata-scan][${new Date().toISOString()}] cancel requested jobId=${jobId} targetFound=${target != null} totalJobsCancelled=${totalJobs}`);
+    return target != null;
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.getMediaItemsByPaths,
+    async (_event, paths: string[]): Promise<ReturnType<typeof getMediaItemMetadataByPaths>> => {
+      return getMediaItemMetadataByPaths(paths);
+    },
+  );
+
+  ipcMain.handle(IPC_CHANNELS.purgeDeletedMediaItems, async () => {
+    return purgeDeletedMediaItems();
+  });
+}
+
+export async function runMetadataScanJob(params: {
+  folderPath: string;
+  recursive: boolean;
+  knownImageEntries?: Array<{ folderPath: string; path: string; name: string }>;
+}): Promise<{ jobId: string; total: number }> {
+  const jobId = randomUUID();
+  const job: RunningMetadataScanJob = { cancelled: false };
+  job.powerSaveToken = acquirePowerSave(`metadata-scan:${params.folderPath}`);
+  runningMetadataScanJobs.set(jobId, job);
+
+  let imageEntries: Array<{ folderPath: string; path: string; name: string }>;
+
+  if (params.knownImageEntries) {
+    imageEntries = params.knownImageEntries;
+  } else {
+    const folders = params.recursive
+      ? await collectFoldersRecursively(params.folderPath)
+      : [params.folderPath];
+    imageEntries = await collectImageEntriesForFolders(folders);
+  }
+
+  const items: MetadataScanItemState[] = imageEntries.map((entry) => ({
+    path: entry.path,
+    name: entry.name,
+    status: "pending",
+  }));
+
+  emitMetadataScanProgress({
+    type: "job-started",
+    jobId,
+    folderPath: params.folderPath,
+    recursive: params.recursive,
+    total: items.length,
+    items,
+  });
+
+  const scanT0 = Date.now();
+  const scanTs = () => `${new Date().toISOString()} +${Date.now() - scanT0}ms`;
+  console.log(`[metadata-scan][${scanTs()}] job-started jobId=${jobId} total=${imageEntries.length}`);
+
+  emitMetadataScanProgress({
+    type: "phase-updated",
+    jobId,
+    phase: "preparing",
+    processed: 0,
+    total: imageEntries.length,
+  });
+
+  const PHASE_THROTTLE = 10;
+  const YIELD_INTERVAL = 5;
+  const entriesByFolder = new Map<string, string[]>();
+  for (const entry of imageEntries) {
+    const current = entriesByFolder.get(entry.folderPath);
+    if (current) {
+      current.push(entry.path);
+    } else {
+      entriesByFolder.set(entry.folderPath, [entry.path]);
+    }
+  }
+
+  let preparingProcessed = 0;
+  let lastEmittedPreparing = 0;
+  const preparingTotal = imageEntries.length;
+  for (const [folderPath, paths] of entriesByFolder.entries()) {
+    if (job.cancelled) break;
+    await observeFiles(
+      paths,
+      folderPath,
+      DEFAULT_LIBRARY_ID,
+      (folderProcessed) => {
+        const current = preparingProcessed + folderProcessed;
+        if (current - lastEmittedPreparing >= PHASE_THROTTLE || current === preparingTotal) {
+          lastEmittedPreparing = current;
+          emitMetadataScanProgress({
+            type: "phase-updated",
+            jobId,
+            phase: "preparing",
+            processed: current,
+            total: preparingTotal,
+          });
+        }
+      },
+      () => job.cancelled,
+    );
+    if (job.cancelled) {
+      console.log(`[metadata-scan][${scanTs()}] preparing CANCELLED after observeFiles jobId=${jobId} processed=${preparingProcessed}/${preparingTotal}`);
+      break;
+    }
+    preparingProcessed += paths.length;
+  }
+
+  let created = 0;
+  let updated = 0;
+  let unchanged = 0;
+  let failed = 0;
+  let cancelled = 0;
+  let scanningProcessed = 0;
+  let filesNeedingAiPipelineFollowUp = 0;
+  const folderTouchMap = new Map<
+    string,
+    { created: number; updated: number; needsAiFollowUp: number }
+  >();
+
+  let pathExtractionEnabled = true;
+  let gpsGeocodingEnabled = false;
+  try {
+    const appSettings = await readSettings(app.getPath("userData"));
+    pathExtractionEnabled = appSettings.pathExtraction.extractDates || appSettings.pathExtraction.extractLocation;
+    gpsGeocodingEnabled = appSettings.folderScanning.detectLocationFromGps;
+  } catch {
+    // Settings read failure — keep path extraction enabled as default
+  }
+
+  try {
+    if (!job.cancelled) {
+      console.log(`[metadata-scan][${scanTs()}] scanning phase START total=${imageEntries.length}`);
+      emitMetadataScanProgress({
+        type: "phase-updated",
+        jobId,
+        phase: "scanning",
+        processed: 0,
+        total: imageEntries.length,
+      });
+
+      const observedByPath = getObservedFileStateByPaths(imageEntries.map((entry) => entry.path));
+
+      for (const entry of imageEntries) {
+        if (job.cancelled) {
+          cancelled += imageEntries.length - scanningProcessed;
+          break;
+        }
+
+        const upsert = await upsertMediaItemFromFilePath({
+          filePath: entry.path,
+          observedState: observedByPath[entry.path],
+        });
+
+        if (upsert.status === "failed") {
+          failed += 1;
+        } else if (upsert.status === "created") {
+          created += 1;
+          const fp = entry.folderPath;
+          const cur = folderTouchMap.get(fp) ?? { created: 0, updated: 0, needsAiFollowUp: 0 };
+          cur.created += 1;
+          if (upsert.needsAiPipelineFollowUp === true) {
+            cur.needsAiFollowUp += 1;
+            filesNeedingAiPipelineFollowUp += 1;
+          }
+          folderTouchMap.set(fp, cur);
+        } else if (upsert.status === "updated") {
+          updated += 1;
+          const fp = entry.folderPath;
+          const cur = folderTouchMap.get(fp) ?? { created: 0, updated: 0, needsAiFollowUp: 0 };
+          cur.updated += 1;
+          if (upsert.needsAiPipelineFollowUp === true) {
+            cur.needsAiFollowUp += 1;
+            filesNeedingAiPipelineFollowUp += 1;
+          }
+          folderTouchMap.set(fp, cur);
+        } else {
+          unchanged += 1;
+        }
+
+        if (pathExtractionEnabled && upsert.mediaItemId && upsert.status !== "failed" && upsert.status !== "unchanged") {
+          try {
+            runPathExtractionForMediaItem({
+              filePath: entry.path,
+              mediaItemId: upsert.mediaItemId,
+              photoTakenAt: upsert.photoTakenAt ?? null,
+              photoTakenPrecision: (upsert.photoTakenPrecision as "year" | "month" | "day" | "instant") ?? null,
+              fileCreatedAt: upsert.fileCreatedAt ?? null,
+            });
+          } catch {
+            // Path extraction is best-effort; never block the scan pipeline
+          }
+        }
+        scanningProcessed += 1;
+
+        if (scanningProcessed % YIELD_INTERVAL === 0) {
+          await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        }
+
+        if (upsert.status !== "unchanged") {
+          emitMetadataScanProgress({
+            type: "item-updated",
+            jobId,
+            currentFolderPath: entry.folderPath,
+            item: {
+              path: entry.path,
+              name: entry.name,
+              status: upsert.status === "failed" ? "failed" : "success",
+              action:
+                upsert.status === "failed"
+                  ? "failed"
+                  : upsert.status === "created"
+                    ? "created"
+                    : upsert.status === "updated"
+                      ? "updated"
+                      : "unchanged",
+              mediaItemId: upsert.mediaItemId,
+              error: upsert.error,
+            },
+          });
+        }
+
+        if (scanningProcessed % PHASE_THROTTLE === 0 || scanningProcessed === imageEntries.length) {
+          emitMetadataScanProgress({
+            type: "phase-updated",
+            jobId,
+            phase: "scanning",
+            processed: scanningProcessed,
+            total: imageEntries.length,
+          });
+        }
+      }
+    } else {
+      cancelled = imageEntries.length;
+      console.log(`[metadata-scan][${scanTs()}] scanning phase SKIPPED (cancelled) jobId=${jobId} total=${imageEntries.length}`);
+    }
+    // --- GPS reverse geocoding phase ---
+    // Include every cataloged item in the scanned paths, not only created/updated rows,
+    // so turning on "detect location from GPS" after an earlier scan still backfills country/city.
+    if (!job.cancelled && gpsGeocodingEnabled && imageEntries.length > 0) {
+      try {
+        if (!isGeocoderReady()) {
+          console.log(`[metadata-scan][${scanTs()}] geocoder not ready, initializing…`);
+          await initGeocoder(app.getPath("userData"));
+        }
+        if (isGeocoderReady()) {
+          const GPS_BATCH_SIZE = 500;
+          const scannedPaths = imageEntries.map((e) => e.path);
+          const metaByPath = getMediaItemMetadataByPaths(scannedPaths);
+          const scannedMediaItemIds = Object.values(metaByPath).map((m) => m.id);
+          const itemsToGeocode = getMediaItemsNeedingGpsGeocoding(scannedMediaItemIds);
+          if (itemsToGeocode.length > 0) {
+            console.log(`[metadata-scan][${scanTs()}] geocoding ${itemsToGeocode.length} items with GPS coordinates`);
+            emitMetadataScanProgress({
+              type: "phase-updated",
+              jobId,
+              phase: "scanning",
+              processed: scanningProcessed,
+              total: imageEntries.length,
+            });
+
+            for (let i = 0; i < itemsToGeocode.length; i += GPS_BATCH_SIZE) {
+              if (job.cancelled) break;
+              const batch = itemsToGeocode.slice(i, i + GPS_BATCH_SIZE);
+              const points = batch.map((r) => ({ latitude: r.latitude, longitude: r.longitude }));
+              const results = await reverseGeocodeBatch(points);
+              for (let j = 0; j < batch.length; j++) {
+                const loc = results[j];
+                if (loc) {
+                  updateMediaItemLocationFromGps(batch[j].id, loc);
+                  // Per-file geocode debug (re-enable when needed) — use return value (>0 rows updated):
+                  // const changed = updateMediaItemLocationFromGps(batch[j].id, loc);
+                  // if (changed > 0) {
+                  //   const geoParts = [loc.countryName, loc.admin1Name, loc.cityName].filter(
+                  //     (s): s is string => typeof s === "string" && s.trim().length > 0,
+                  //   );
+                  //   console.log(
+                  //     `[metadata-scan][geocode-updated] ${geoParts.join(" | ")} | ${batch[j].source_path}`,
+                  //   );
+                  // }
+                }
+              }
+            }
+            console.log(`[metadata-scan][${scanTs()}] geocoding complete`);
+          }
+        }
+      } catch (geocodeErr) {
+        console.error(`[metadata-scan][${scanTs()}] geocoding phase error:`, geocodeErr);
+      }
+    }
+
+    if (!job.cancelled) {
+      const observedByFolder = new Map<string, Set<string>>();
+      for (const entry of imageEntries) {
+        const current = observedByFolder.get(entry.folderPath);
+        if (current) {
+          current.add(entry.path);
+        } else {
+          observedByFolder.set(entry.folderPath, new Set([entry.path]));
+        }
+      }
+      let totalSoftDeleted = 0;
+      let totalResurrected = 0;
+      for (const [folder, paths] of observedByFolder.entries()) {
+        const result = reconcileFolder(folder, paths);
+        totalSoftDeleted += result.softDeleted;
+        totalResurrected += result.resurrected;
+      }
+      if (totalSoftDeleted > 0 || totalResurrected > 0) {
+        console.log(
+          `[metadata-scan][${scanTs()}] reconciliation softDeleted=${totalSoftDeleted} resurrected=${totalResurrected}`,
+        );
+      }
+    }
+  } finally {
+    if (job.powerSaveToken) {
+      releasePowerSave(job.powerSaveToken);
+      job.powerSaveToken = undefined;
+    }
+    console.log(
+      `[metadata-scan][${scanTs()}] job-completed jobId=${jobId} created=${created} updated=${updated} unchanged=${unchanged} failed=${failed} cancelled=${cancelled} needsAiFollowUp=${filesNeedingAiPipelineFollowUp}`,
+    );
+    const foldersTouched = Array.from(folderTouchMap.entries())
+      .map(([folderPath, counts]) => ({
+        folderPath,
+        created: counts.created,
+        updated: counts.updated,
+        needsAiFollowUp: counts.needsAiFollowUp,
+      }))
+      .sort((a, b) => a.folderPath.localeCompare(b.folderPath));
+
+    emitMetadataScanProgress({
+      type: "job-completed",
+      jobId,
+      folderPath: params.folderPath,
+      recursive: params.recursive,
+      total: imageEntries.length,
+      created,
+      updated,
+      unchanged,
+      failed,
+      cancelled,
+      filesNeedingAiPipelineFollowUp,
+      foldersTouched,
+    });
+    runningMetadataScanJobs.delete(jobId);
+  }
+
+  return { jobId, total: imageEntries.length };
+}

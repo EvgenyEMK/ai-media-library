@@ -1,0 +1,7 @@
+.media-swiper-theme,
+.media-swiper-theme .swiper,
+.media-swiper-theme .swiper-wrapper,
+.media-swiper-theme .swiper-slide {
+  background: #020617;
+  background: hsl(var(--background, 222 47% 11%) / 1);
+}

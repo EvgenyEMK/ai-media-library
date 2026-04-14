@@ -1,0 +1,333 @@
+import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { MediaSwiperViewer } from "@emk/media-viewer";
+import {
+  DEFAULT_THUMBNAIL_QUICK_FILTERS,
+  type ThumbnailQuickFilterState,
+} from "@emk/media-metadata-core";
+import type { DesktopMediaItemMetadata } from "../shared/ipc";
+import { supportsThinkingMode } from "../shared/photo-analysis-prompt";
+import { DesktopAppMain } from "./components/DesktopAppMain";
+import { DesktopAppSidebar } from "./components/DesktopAppSidebar";
+import { DesktopSwiperInfoPanel } from "./components/DesktopSwiperInfoPanel";
+import { useAppStoreSideEffects } from "./hooks/use-app-store-side-effects";
+import { useDescEmbedBackfill } from "./hooks/use-desc-embed-backfill";
+import { useDesktopPipelineHandlers } from "./hooks/use-desktop-pipeline-handlers";
+import { useDesktopViewerBridge } from "./hooks/use-desktop-viewer-bridge";
+import { useFolderImagesStream } from "./hooks/use-folder-images-stream";
+import { useFolderMetadataMerge } from "./hooks/use-folder-metadata-merge";
+import { useFolderTreeHandlers } from "./hooks/use-folder-tree-handlers";
+import { useMainPaneMenus } from "./hooks/use-main-pane-menus";
+import {
+  useDesktopFaceServicePolling,
+  useDesktopInitialization,
+  useDesktopIpcBindings,
+  useDesktopSettingsPersistence,
+} from "./hooks/useDesktopIpcBindings";
+import { useFilteredMediaItems } from "./hooks/use-filtered-media-items";
+import { lookupMediaMetadataByItemId } from "./lib/media-metadata-lookup";
+import { useAnalysisEta, useFaceDetectionEta, useMetadataProgress, useSemanticIndexEta } from "./hooks/use-eta-tracking";
+import { UI_TEXT } from "./lib/ui-text";
+import { cn } from "./lib/cn";
+import { useDesktopStore, useDesktopStoreApi } from "./stores/desktop-store";
+import type { MainPaneViewMode, SidebarSectionId } from "./types/app-types";
+import type { DesktopViewerItem } from "./types/viewer-types";
+
+export function App(): ReactElement {
+  const store = useDesktopStoreApi();
+
+  useDesktopIpcBindings();
+  useDesktopInitialization();
+  useDesktopFaceServicePolling();
+  useDesktopSettingsPersistence();
+
+  const libraryRoots = useDesktopStore((s) => s.libraryRoots);
+  const sidebarCollapsed = useDesktopStore((s) => s.sidebarCollapsed);
+  const expandedFolders = useDesktopStore((s) => s.expandedFolders);
+  const selectedFolder = useDesktopStore((s) => s.selectedFolder);
+  const childrenByPath = useDesktopStore((s) => s.childrenByPath);
+  const folderAnalysisByPath = useDesktopStore((s) => s.folderAnalysisByPath);
+  const folderRollupByPath = useDesktopStore((s) => s.folderRollupByPath);
+  const foldersWithCatalogChanges = useDesktopStore((s) => s.foldersWithCatalogChanges);
+  const metadataScanFollowUp = useDesktopStore((s) => s.metadataScanFollowUp);
+  const isFolderLoading = useDesktopStore((s) => s.isFolderLoading);
+  const mediaItems = useDesktopStore((s) => s.mediaItems);
+  const mediaMetadataByItemId = useDesktopStore((s) => s.mediaMetadataByItemId);
+  const viewMode = useDesktopStore((s) => s.viewMode);
+  const viewerOpen = useDesktopStore((s) => s.viewerOpen);
+  const viewerCurrentIndex = useDesktopStore((s) => s.viewerCurrentIndex);
+  const viewerShowInfoPanel = useDesktopStore((s) => s.viewerShowInfoPanel);
+  const aiStatus = useDesktopStore((s) => s.aiStatus);
+  const aiJobId = useDesktopStore((s) => s.aiJobId);
+  const aiSelectedModel = useDesktopStore((s) => s.aiSelectedModel);
+  const aiThinkingEnabled = useDesktopStore((s) => s.aiThinkingEnabled);
+  const faceStatus = useDesktopStore((s) => s.faceStatus);
+  const faceJobId = useDesktopStore((s) => s.faceJobId);
+  const faceDetectionSettings = useDesktopStore((s) => s.faceDetectionSettings);
+  const photoAnalysisSettings = useDesktopStore((s) => s.photoAnalysisSettings);
+  const folderScanningSettings = useDesktopStore((s) => s.folderScanningSettings);
+  const aiImageSearchSettings = useDesktopStore((s) => s.aiImageSearchSettings);
+  const pathExtractionSettings = useDesktopStore((s) => s.pathExtractionSettings);
+  const semanticQuery = useDesktopStore((s) => s.semanticQuery);
+  const semanticResults = useDesktopStore((s) => s.semanticResults);
+  const semanticPanelOpen = useDesktopStore((s) => s.semanticPanelOpen);
+  const semanticIndexJobId = useDesktopStore((s) => s.semanticIndexJobId);
+  const metadataJobId = useDesktopStore((s) => s.metadataJobId);
+  const metadataPanelVisible = useDesktopStore((s) => s.metadataPanelVisible);
+  const metadataStatus = useDesktopStore((s) => s.metadataStatus);
+  const semanticIndexStatus = useDesktopStore((s) => s.semanticIndexStatus);
+  const pathAnalysisStatus = useDesktopStore((s) => s.pathAnalysisStatus);
+  const pathAnalysisJobId = useDesktopStore((s) => s.pathAnalysisJobId);
+  const faceModelDownload = useDesktopStore((s) => s.faceModelDownload);
+
+  const [quickFilters, setQuickFilters] = useState<ThumbnailQuickFilterState>(DEFAULT_THUMBNAIL_QUICK_FILTERS);
+  const {
+    filteredMediaItems,
+    displaySemanticResults,
+    filteredDisplaySemanticResults,
+    filteredSemanticListItems,
+    viewerItems,
+    imageEditSuggestionItems,
+    quickFiltersActiveCount,
+  } = useFilteredMediaItems(quickFilters);
+  const analysisEta = useAnalysisEta();
+  const faceEta = useFaceDetectionEta();
+  const metadataProgress = useMetadataProgress();
+  const semanticIndexEta = useSemanticIndexEta();
+
+  const [progressPanelCollapsed, setProgressPanelCollapsed] = useState(false);
+  const [activeSidebarSection, setActiveSidebarSection] = useState<SidebarSectionId>("folders");
+  const [expandedSidebarSection, setExpandedSidebarSection] = useState<SidebarSectionId | null>("folders");
+  const [mainPaneViewMode, setMainPaneViewMode] = useState<MainPaneViewMode>("media");
+
+  const {
+    actionsMenuOpen,
+    setActionsMenuOpen,
+    quickFiltersMenuOpen,
+    setQuickFiltersMenuOpen,
+    actionsMenuWrapRef,
+    quickFiltersMenuWrapRef,
+  } = useMainPaneMenus();
+
+  const {
+    descEmbedBackfill,
+    setDescEmbedBackfill,
+    handleIndexDescEmbeddings,
+    handleCancelDescEmbedBackfill,
+  } = useDescEmbedBackfill(setProgressPanelCollapsed);
+
+  const descEmbedHandlers = useMemo(
+    () => ({ handleIndexDescEmbeddings, handleCancelDescEmbedBackfill }),
+    [handleIndexDescEmbeddings, handleCancelDescEmbedBackfill],
+  );
+
+  const activeFolderRequestIdRef = useRef<string | null>(null);
+  const lastCompletedFolderRequestIdRef = useRef<string | null>(null);
+  const { mergeMetadataForPaths, refreshMetadataByPath } = useFolderMetadataMerge(
+    activeFolderRequestIdRef,
+    lastCompletedFolderRequestIdRef,
+    store,
+  );
+  const { folderLoadProgress, setFolderLoadProgress } = useFolderImagesStream(
+    store,
+    mergeMetadataForPaths,
+    activeFolderRequestIdRef,
+    lastCompletedFolderRequestIdRef,
+  );
+
+  const folderTree = useFolderTreeHandlers({
+    store,
+    expandedFolders,
+    activeFolderRequestIdRef,
+    lastCompletedFolderRequestIdRef,
+    setFolderLoadProgress,
+    setMainPaneViewMode,
+  });
+
+  const pipeline = useDesktopPipelineHandlers({
+    store,
+    selectedFolder,
+    photoAnalysisSettings,
+    aiSelectedModel,
+    aiThinkingEnabled,
+    aiJobId,
+    faceDetectionSettings,
+    faceJobId,
+    metadataJobId,
+    semanticQuery,
+    semanticResults,
+    semanticIndexJobId,
+    quickFilters,
+    descEmbedHandlers,
+    setProgressPanelCollapsed,
+  });
+
+  const { openFolderViewerById, openFacePhotoInViewer } = useDesktopViewerBridge({
+    store,
+    mediaItems,
+    refreshMetadataByPath,
+  });
+
+  const semanticModeActive = semanticResults.length > 0;
+
+  const prevSemanticModeActiveRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    const prev = prevSemanticModeActiveRef.current;
+    prevSemanticModeActiveRef.current = semanticModeActive;
+    if (prev === null) {
+      return;
+    }
+    if (prev !== semanticModeActive) {
+      setQuickFilters(DEFAULT_THUMBNAIL_QUICK_FILTERS);
+    }
+  }, [semanticModeActive]);
+  const selectedFolderLabel = useMemo(() => selectedFolder ?? UI_TEXT.noFolder, [selectedFolder]);
+  const selectedModelSupportsThinking = useMemo(() => supportsThinkingMode(aiSelectedModel), [aiSelectedModel]);
+
+  const aiPipelineStripRefreshKey = useMemo(
+    () =>
+      [
+        selectedFolder ?? "",
+        aiStatus,
+        faceStatus,
+        semanticIndexStatus,
+        metadataStatus,
+        metadataJobId ?? "",
+        pathAnalysisStatus,
+        pathAnalysisJobId ?? "",
+      ].join("|"),
+    [
+      selectedFolder,
+      aiStatus,
+      faceStatus,
+      semanticIndexStatus,
+      metadataStatus,
+      metadataJobId,
+      pathAnalysisStatus,
+      pathAnalysisJobId,
+    ],
+  );
+
+  useAppStoreSideEffects({
+    store,
+    photoAnalysisSettingsModel: photoAnalysisSettings.model,
+    metadataPanelVisible,
+    setProgressPanelCollapsed,
+    selectedModelSupportsThinking,
+    aiThinkingEnabled,
+    sidebarCollapsed,
+    setExpandedSidebarSection,
+  });
+
+  const renderViewerInfoPanel = (item: DesktopViewerItem): ReactElement => {
+    const metadata = lookupMediaMetadataByItemId<DesktopMediaItemMetadata>(item.sourcePath, mediaMetadataByItemId);
+    return (
+      <DesktopSwiperInfoPanel item={item} metadata={metadata} onRefreshMetadata={refreshMetadataByPath} />
+    );
+  };
+
+  const handleSidebarSectionToggle = (sectionId: string): void => {
+    if (sectionId === "folders" || sectionId === "albums" || sectionId === "people" || sectionId === "settings") {
+      setActiveSidebarSection(sectionId);
+      if (sidebarCollapsed) {
+        setExpandedSidebarSection(null);
+        return;
+      }
+      setExpandedSidebarSection((current) => (current === sectionId ? null : sectionId));
+    }
+  };
+
+  const isPeopleSectionOpen = activeSidebarSection === "people";
+  const isSettingsSectionOpen = activeSidebarSection === "settings";
+
+  return (
+    <div
+      className={cn(
+        "grid h-screen",
+        sidebarCollapsed ? "grid-cols-[84px_1fr]" : "grid-cols-[320px_1fr]",
+      )}
+    >
+      <DesktopAppSidebar
+        store={store}
+        sidebarCollapsed={sidebarCollapsed}
+        expandedSidebarSection={expandedSidebarSection}
+        onSectionToggle={handleSidebarSectionToggle}
+        libraryRoots={libraryRoots}
+        selectedFolder={selectedFolder}
+        expandedFolders={expandedFolders}
+        childrenByPath={childrenByPath}
+        folderAnalysisByPath={folderAnalysisByPath}
+        folderRollupByPath={folderRollupByPath}
+        foldersWithCatalogChanges={foldersWithCatalogChanges}
+        descEmbedBackfillRunning={descEmbedBackfill.status === "running"}
+        pipeline={pipeline}
+        folderTree={folderTree}
+      />
+
+      <DesktopAppMain
+        store={store}
+        isPeopleSectionOpen={isPeopleSectionOpen}
+        isSettingsSectionOpen={isSettingsSectionOpen}
+        openFacePhotoInViewer={openFacePhotoInViewer}
+        faceDetectionSettings={faceDetectionSettings}
+        photoAnalysisSettings={photoAnalysisSettings}
+        folderScanningSettings={folderScanningSettings}
+        aiImageSearchSettings={aiImageSearchSettings}
+        pathExtractionSettings={pathExtractionSettings}
+        selectedFolderLabel={selectedFolderLabel}
+        quickFiltersActiveCount={quickFiltersActiveCount}
+        mediaItemsLength={mediaItems.length}
+        filteredMediaItemsLength={filteredMediaItems.length}
+        semanticModeActive={semanticModeActive}
+        displaySemanticResultsCount={displaySemanticResults.length}
+        filteredDisplaySemanticResultsCount={filteredDisplaySemanticResults.length}
+        selectedFolder={selectedFolder}
+        aiPipelineStripRefreshKey={aiPipelineStripRefreshKey}
+        semanticPanelOpen={semanticPanelOpen}
+        quickFiltersMenuOpen={quickFiltersMenuOpen}
+        setQuickFiltersMenuOpen={setQuickFiltersMenuOpen}
+        quickFiltersMenuWrapRef={quickFiltersMenuWrapRef}
+        quickFilters={quickFilters}
+        setQuickFilters={setQuickFilters}
+        viewMode={viewMode}
+        actionsMenuOpen={actionsMenuOpen}
+        setActionsMenuOpen={setActionsMenuOpen}
+        actionsMenuWrapRef={actionsMenuWrapRef}
+        mainPaneViewMode={mainPaneViewMode}
+        setMainPaneViewMode={setMainPaneViewMode}
+        pipeline={pipeline}
+        descEmbedBackfillRunning={descEmbedBackfill.status === "running"}
+        metadataScanFollowUp={metadataScanFollowUp}
+        faceModelDownload={faceModelDownload}
+        handleOpenFolderAiSummary={folderTree.handleOpenFolderAiSummary}
+        imageEditSuggestionItems={imageEditSuggestionItems}
+        isFolderLoading={isFolderLoading}
+        folderLoadProgress={folderLoadProgress}
+        filteredMediaItems={filteredMediaItems}
+        semanticResults={semanticResults}
+        displaySemanticResults={displaySemanticResults}
+        filteredDisplaySemanticResults={filteredDisplaySemanticResults}
+        filteredSemanticListItems={filteredSemanticListItems}
+        openFolderViewerById={openFolderViewerById}
+        progressPanelCollapsed={progressPanelCollapsed}
+        setProgressPanelCollapsed={setProgressPanelCollapsed}
+        analysisEta={analysisEta}
+        faceEta={faceEta}
+        metadataProgress={metadataProgress}
+        semanticIndexEta={semanticIndexEta}
+        descEmbedBackfill={descEmbedBackfill}
+        setDescEmbedBackfill={setDescEmbedBackfill}
+      />
+
+      <MediaSwiperViewer
+        isOpen={viewerOpen}
+        items={viewerItems}
+        currentIndex={viewerCurrentIndex}
+        onIndexChange={(index) => store.getState().setViewerCurrentIndex(index)}
+        onClose={() => store.getState().closeViewer()}
+        renderInfoPanel={renderViewerInfoPanel}
+        infoPanelOpen={viewerShowInfoPanel}
+        onInfoPanelOpenChange={(open) => store.getState().setViewerShowInfoPanel(open)}
+      />
+    </div>
+  );
+}

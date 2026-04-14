@@ -1,0 +1,18 @@
+{
+  "name": "@emk/sdk-media-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@emk/shared-contracts": "workspace:*"
+  },
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "build": "echo SDK package is source-only"
+  },
+  "devDependencies": {
+    "typescript": "^5"
+  }
+}

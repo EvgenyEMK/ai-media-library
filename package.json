@@ -1,0 +1,22 @@
+{
+  "private": true,
+  "packageManager": "pnpm@10.16.1",
+  "scripts": {
+    "dev": "pnpm dev:desktop",
+    "dev:desktop": "node kill-stale-desktop-dev.mjs && node kill-stale-dev-ports.mjs && turbo run dev --filter=@emk/desktop-media",
+    "dev:desktop:clean": "node kill-stale-desktop-dev.mjs && pnpm dev:desktop",
+    "dev:desktop:clean:dry": "node kill-stale-desktop-dev.mjs --dry-run",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:e2e": "pnpm --filter @emk/desktop-media test:e2e",
+    "test:all": "pnpm test && pnpm test:e2e"
+  },
+  "devDependencies": {
+    "turbo": "^2.8.14",
+    "typescript": "^5"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["electron", "better-sqlite3"]
+  }
+}

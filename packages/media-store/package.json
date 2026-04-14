@@ -1,0 +1,30 @@
+{
+  "name": "@emk/media-store",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "zustand": "^5.0.11"
+  },
+  "dependencies": {
+    "immer": "^10.2.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "build": "echo Media store package is source-only",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "typescript": "^5",
+    "vitest": "^4.1.0",
+    "zustand": "^5.0.11"
+  }
+}

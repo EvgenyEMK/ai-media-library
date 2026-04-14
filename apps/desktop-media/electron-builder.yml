@@ -1,0 +1,43 @@
+# Windows packaging (Phase 1). See AGENTS.md / root docs for release process.
+# https://www.electron.build/configuration/configuration
+
+appId: com.emk.desktopmedia
+productName: EMK Desktop Media
+copyright: Copyright © EMK contributors
+
+directories:
+  output: release
+  buildResources: build-resources
+
+# Native addons are rebuilt for Electron in `pnpm run rebuild:native` before packaging.
+npmRebuild: false
+
+files:
+  - dist-electron/**/*
+  - dist-renderer/**/*
+  - package.json
+
+asar: true
+asarUnpack:
+  - "**/*.node"
+  - "**/node_modules/exiftool-vendored/**/*"
+  - "**/node_modules/better-sqlite3/**/*"
+  - "**/node_modules/onnxruntime-node/**/*"
+
+win:
+  # Unsigned builds: avoids winCodeSign bundle extraction (symlinks require admin on Windows).
+  signAndEditExecutable: false
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: "${productName}-${version}-Windows-${arch}.${ext}"
+
+forceCodeSigning: false
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  deleteAppDataOnUninstall: false
+  include: build-resources/installer-user-data.nsh

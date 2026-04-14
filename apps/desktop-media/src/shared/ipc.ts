@@ -1,0 +1,1381 @@
+import type {
+  CanonicalBoundingBox,
+  FaceBeingBoundingBox,
+  ProviderRawBoundingBoxReference,
+} from "@emk/shared-contracts";
+import type { SemanticSearchSignalMode } from "@emk/media-store";
+
+export const IMAGE_EXTENSIONS = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".bmp",
+  ".webp",
+  ".tif",
+  ".tiff",
+]);
+
+export const IPC_CHANNELS = {
+  selectLibraryFolder: "media:select-library-folder",
+  readFolderChildren: "media:read-folder-children",
+  /** Opens the OS file manager with the given file selected (Electron `shell.showItemInFolder`). */
+  revealItemInFolder: "media:reveal-item-in-folder",
+  listFolderImages: "media:list-folder-images",
+  startFolderImagesStream: "media:start-folder-images-stream",
+  folderImagesProgress: "media:folder-images-progress",
+  getSettings: "media:get-settings",
+  getDatabaseLocation: "media:get-database-location",
+  saveSettings: "media:save-settings",
+  getFolderAnalysisStatuses: "media:get-folder-analysis-statuses",
+  analyzeFolderPhotos: "media:analyze-folder-photos",
+  cancelPhotoAnalysis: "media:cancel-photo-analysis",
+  photoAnalysisProgress: "media:photo-analysis-progress",
+  detectFolderFaces: "media:detect-folder-faces",
+  cancelFaceDetection: "media:cancel-face-detection",
+  faceDetectionProgress: "media:face-detection-progress",
+  getFaceDetectionServiceStatus: "media:get-face-detection-service-status",
+  indexFolderSemanticEmbeddings: "media:index-folder-semantic-embeddings",
+  indexDescriptionEmbeddings: "media:index-description-embeddings",
+  // TEMPORARY: description embedding backfill — remove after migration
+  descEmbedBackfillProgress: "media:desc-embed-backfill-progress",
+  cancelDescEmbedBackfill: "media:cancel-desc-embed-backfill",
+  semanticSearchPhotos: "media:semantic-search-photos",
+  cancelSemanticEmbeddingIndex: "media:cancel-semantic-embedding-index",
+  getSemanticEmbeddingStatus: "media:get-semantic-embedding-status",
+  semanticIndexProgress: "media:semantic-index-progress",
+  scanFolderMetadata: "media:scan-folder-metadata",
+  cancelMetadataScan: "media:cancel-metadata-scan",
+  metadataScanProgress: "media:metadata-scan-progress",
+  getMediaItemsByPaths: "media:get-media-items-by-paths",
+  setMediaItemStarRating: "media:set-media-item-star-rating",
+  /** Pushed from main → renderer after a background file-metadata write refreshes the catalog row. */
+  mediaItemMetadataRefreshed: "media:media-item-metadata-refreshed",
+  listPersonTags: "media:list-person-tags",
+  listPersonTagsWithFaceCounts: "media:list-person-tags-with-face-counts",
+  listPersonGroups: "media:list-person-groups",
+  createPersonGroup: "media:create-person-group",
+  setPersonTagGroups: "media:set-person-tag-groups",
+  getPersonTagGroupsForTagIds: "media:get-person-tag-groups-for-tag-ids",
+  updatePersonGroupName: "media:update-person-group-name",
+  deletePersonGroup: "media:delete-person-group",
+  listPersonTagsInGroup: "media:list-person-tags-in-group",
+  getClusterPersonMatchStatsBatch: "media:get-cluster-person-match-stats-batch",
+  getClusterMemberFaceIdsForPersonSimilarityFilter:
+    "media:get-cluster-member-face-ids-for-person-similarity-filter",
+  getSimilarUntaggedFaceCountsForTags: "media:get-similar-untagged-face-counts-for-tags",
+  startSimilarUntaggedFaceCountsJob: "media:start-similar-untagged-face-counts-job",
+  cancelSimilarUntaggedFaceCountsJob: "media:cancel-similar-untagged-face-counts-job",
+  similarUntaggedCountsProgress: "media:similar-untagged-counts-progress",
+  createPersonTag: "media:create-person-tag",
+  updatePersonTagLabel: "media:update-person-tag-label",
+  setPersonTagPinned: "media:set-person-tag-pinned",
+  listFaceInstancesForMediaItem: "media:list-face-instances-for-media-item",
+  assignPersonTagToFace: "media:assign-person-tag-to-face",
+  assignPersonTagsToFaces: "media:assign-person-tags-to-faces",
+  refreshPersonSuggestionsForTag: "media:refresh-person-suggestions-for-tag",
+  recomputePersonCentroid: "media:recompute-person-centroid",
+  clearPersonTagFromFace: "media:clear-person-tag-from-face",
+  deleteFaceInstance: "media:delete-face-instance",
+  detectFacesForMediaItem: "media:detect-faces-for-media-item",
+  embedFolderFaces: "media:embed-folder-faces",
+  cancelFaceEmbedding: "media:cancel-face-embedding",
+  faceEmbeddingProgress: "media:face-embedding-progress",
+  getEmbeddingModelStatus: "media:get-embedding-model-status",
+  getEmbeddingStats: "media:get-embedding-stats",
+  searchSimilarFaces: "media:search-similar-faces",
+  suggestPersonTagForFace: "media:suggest-person-tag-for-face",
+  findPersonMatches: "media:find-person-matches",
+  getFaceClusters: "media:get-face-clusters",
+  listClusterFaceIds: "media:list-cluster-face-ids",
+  runFaceClustering: "media:run-face-clustering",
+  cancelFaceClustering: "media:cancel-face-clustering",
+  faceClusteringProgress: "media:face-clustering-progress",
+  assignClusterToPerson: "media:assign-cluster-to-person",
+  suggestPersonTagForCluster: "media:suggest-person-tag-for-cluster",
+  suggestPersonTagsForClusters: "media:suggest-person-tags-for-clusters",
+  getFaceCropPaths: "media:get-face-crop-paths",
+  listFacesForPerson: "media:list-faces-for-person",
+  reprocessFaceCropsAndEmbeddings: "media:reprocess-face-crops-embeddings",
+  getFaceInfoByIds: "media:get-face-info-by-ids",
+  getFaceToPersonCentroidSimilarities: "media:get-face-to-person-centroid-similarities",
+  refreshPersonSuggestions: "media:refresh-person-suggestions",
+  purgeDeletedMediaItems: "media:purge-deleted-media-items",
+  getFolderAiSummaryReport: "media:get-folder-ai-summary-report",
+  getFolderAiCoverage: "media:get-folder-ai-coverage",
+  getFolderAiRollupsBatch: "media:get-folder-ai-rollups-batch",
+  faceModelDownloadProgress: "media:face-model-download-progress",
+  getActiveJobStatuses: "media:get-active-job-statuses",
+  analyzeFolderPathMetadata: "media:analyze-folder-path-metadata",
+  cancelPathAnalysis: "media:cancel-path-analysis",
+  pathAnalysisProgress: "media:path-analysis-progress",
+  initGeocoder: "media:init-geocoder",
+  geocoderInitProgress: "media:geocoder-init-progress",
+} as const;
+
+export interface AppSettings {
+  libraryRoots: string[];
+  sidebarCollapsed: boolean;
+  faceDetection: FaceDetectionSettings;
+  photoAnalysis: PhotoAnalysisSettings;
+  folderScanning: FolderScanningSettings;
+  aiImageSearch: AiImageSearchSettings;
+  pathExtraction: PathExtractionSettings;
+  clientId: string;
+}
+
+export interface DatabaseLocationInfo {
+  appDataPath: string;
+  userDataPath: string;
+  dbFileName: string;
+  dbPath: string;
+  modelsPath: string;
+  cachePath: string;
+}
+
+export interface PathExtractionSettings {
+  extractDates: boolean;
+  extractLocation: boolean;
+  useLlm: boolean;
+  llmModel: string;
+}
+
+export interface FaceDetectionSettings {
+  minConfidenceThreshold: number;
+  minFaceBoxShortSideRatio: number;
+  faceBoxOverlapMergeRatio: number;
+  /**
+   * Minimum cosine similarity between an untagged face embedding and a person centroid
+   * to write a row to `media_item_person_suggestions` (unconfirmed similar faces).
+   */
+  faceRecognitionSimilarityThreshold: number;
+  /**
+   * Minimum cosine similarity between two untagged face embeddings required to link them
+   * into the same provisional group when running “Find groups” (People → Untagged faces).
+   */
+  faceGroupPairwiseSimilarityThreshold: number;
+  /**
+   * Minimum number of faces in a provisional group after “Find groups”; smaller groups are discarded.
+   */
+  faceGroupMinSize: number;
+}
+
+export interface PhotoAnalysisSettings {
+  /** Default vision model to use for folder Image AI analysis runs. */
+  model: string;
+  analysisTimeoutPerImageSec: number;
+  enableTwoPassRotationConsistency: boolean;
+  useFaceFeaturesForRotation: boolean;
+  extractInvoiceData: boolean;
+}
+
+/** Single-folder image count threshold for automatic metadata scan after folder selection. */
+export interface FolderScanningSettings {
+  /** Run automatic scan only when image count in the selected folder (non-recursive) is strictly less than this. */
+  autoMetadataScanOnSelectMaxFiles: number;
+  /**
+   * When true, propagate rating (and future title/description) edits into embedded file metadata via ExifTool.
+   * Default off so the catalog can diverge from files until the user opts in.
+   */
+  writeEmbeddedMetadataOnUserEdit: boolean;
+  /**
+   * When true, reverse-geocode GPS coordinates (latitude/longitude) during metadata scan
+   * to populate country, state/province, and city fields.
+   * Default off — first enable triggers a ~2 GB GeoNames data download.
+   */
+  detectLocationFromGps: boolean;
+}
+
+export interface AiImageSearchSettings {
+  /**
+   * Hide grid items when both VLM (image) and AI-description cosine scores are strictly
+   * below their respective thresholds (see `hideResultsBelowDescriptionSimilarity`).
+   */
+  hideResultsBelowVlmSimilarity: number;
+  /** Cosine similarity vs AI title+description text embedding; paired with VLM threshold for display filter. */
+  hideResultsBelowDescriptionSimilarity: number;
+  /**
+   * When true, the AI image search panel shows the VLM / description matching-method selector.
+   * Default off (comparison testing only).
+   */
+  showMatchingMethodSelector: boolean;
+  /**
+   * When true, Advanced search re-orders results using LLM keyword hits (after RRF).
+   * When false, keyword thresholds below are ignored and re-ranking is skipped.
+   */
+  keywordMatchReranking: boolean;
+  /**
+   * Min cosine similarity for counting a keyword hit against the image **VLM** embedding (Advanced search re-rank).
+   * **0** disables the VLM limb for keyword hits (description may still apply in hybrid).
+   */
+  keywordMatchThresholdVlm: number;
+  /**
+   * Min cosine similarity for counting a keyword hit against the **AI description** embedding (Advanced search re-rank).
+   * **0** disables the description limb for keyword hits.
+   */
+  keywordMatchThresholdDescription: number;
+}
+
+export const DEFAULT_FACE_DETECTION_SETTINGS: FaceDetectionSettings = {
+  minConfidenceThreshold: 0.75,
+  minFaceBoxShortSideRatio: 0.05,
+  faceBoxOverlapMergeRatio: 0.5,
+  faceRecognitionSimilarityThreshold: 0.38,
+  faceGroupPairwiseSimilarityThreshold: 0.55,
+  faceGroupMinSize: 4,
+};
+
+export const DEFAULT_PHOTO_ANALYSIS_SETTINGS: PhotoAnalysisSettings = {
+  model: "qwen3.5:9b",
+  analysisTimeoutPerImageSec: 120,
+  enableTwoPassRotationConsistency: true,
+  useFaceFeaturesForRotation: true,
+  extractInvoiceData: true,
+};
+
+export const DEFAULT_FOLDER_SCANNING_SETTINGS: FolderScanningSettings = {
+  autoMetadataScanOnSelectMaxFiles: 100,
+  writeEmbeddedMetadataOnUserEdit: false,
+  detectLocationFromGps: false,
+};
+
+export const DEFAULT_AI_IMAGE_SEARCH_SETTINGS: AiImageSearchSettings = {
+  hideResultsBelowVlmSimilarity: 0.04,
+  hideResultsBelowDescriptionSimilarity: 0.6,
+  showMatchingMethodSelector: false,
+  keywordMatchReranking: false,
+  keywordMatchThresholdVlm: 0.05,
+  keywordMatchThresholdDescription: 0.5,
+};
+
+export const DEFAULT_PATH_EXTRACTION_SETTINGS: PathExtractionSettings = {
+  extractDates: true,
+  extractLocation: true,
+  useLlm: false,
+  /** Empty: main process picks first installed Qwen via /api/tags (same as AI search query understanding). */
+  llmModel: "",
+};
+
+export const DEFAULT_APP_SETTINGS: Omit<AppSettings, "clientId"> = {
+  libraryRoots: [],
+  sidebarCollapsed: false,
+  faceDetection: DEFAULT_FACE_DETECTION_SETTINGS,
+  photoAnalysis: DEFAULT_PHOTO_ANALYSIS_SETTINGS,
+  folderScanning: DEFAULT_FOLDER_SCANNING_SETTINGS,
+  aiImageSearch: DEFAULT_AI_IMAGE_SEARCH_SETTINGS,
+  pathExtraction: DEFAULT_PATH_EXTRACTION_SETTINGS,
+};
+
+export interface FolderNode {
+  path: string;
+  name: string;
+  hasSubdirectories: boolean;
+}
+
+export interface MediaImageItem {
+  path: string;
+  name: string;
+  url: string;
+}
+
+export type FolderImagesProgressEvent =
+  | {
+      type: "started";
+      requestId: string;
+      folderPath: string;
+      total: number | null;
+      loaded: number;
+    }
+  | {
+      type: "batch";
+      requestId: string;
+      folderPath: string;
+      total: number | null;
+      loaded: number;
+      items: MediaImageItem[];
+    }
+  | {
+      type: "completed";
+      requestId: string;
+      folderPath: string;
+      total: number | null;
+      loaded: number;
+    }
+  | {
+      type: "failed";
+      requestId: string;
+      folderPath: string;
+      error: string;
+    };
+
+export type FolderImagesProgressListener = (event: FolderImagesProgressEvent) => void;
+
+export type DesktopPhotoTakenPrecision = "year" | "month" | "day" | "instant";
+
+export interface DesktopMediaItemMetadata {
+  id: string;
+  sourcePath: string;
+  filename: string;
+  mimeType: string | null;
+  width: number | null;
+  height: number | null;
+  byteSize: number | null;
+  fileMtimeMs: number | null;
+  orientation: number | null;
+  fileCreatedAt: string | null;
+  photoTakenAt: string | null;
+  photoTakenPrecision: DesktopPhotoTakenPrecision | null;
+  /** Resolved event window from path/EXIF/catalog (ISO date strings). */
+  eventDateStart: string | null;
+  eventDateEnd: string | null;
+  embeddedTitle: string | null;
+  embeddedDescription: string | null;
+  embeddedLocation: string | null;
+  /** XMP / Windows EXIF: -1 rejected, 0 unrated, 1–5 stars (see `docs/UX/media-library/FILE-STAR-RATING.md`). */
+  starRating: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  /** Denormalized location fields for search and quick filters. */
+  country: string | null;
+  city: string | null;
+  locationArea: string | null;
+  locationPlace: string | null;
+  locationName: string | null;
+  displayTitle: string | null;
+  checksumSha256: string | null;
+  contentHash: string | null;
+  duplicateGroupId: string | null;
+  metadataExtractedAt: string | null;
+  metadataVersion: string | null;
+  metadataError: string | null;
+  cameraMake: string | null;
+  cameraModel: string | null;
+  lensModel: string | null;
+  focalLengthMm: number | null;
+  fNumber: number | null;
+  exposureTime: string | null;
+  iso: number | null;
+  faceConfidences: Array<number | null>;
+  sourceCount: number;
+  updatedAt: string;
+  aiMetadata: unknown | null;
+}
+
+export interface SetMediaItemStarRatingRequest {
+  sourcePath: string;
+  /** Integer 0–5 (0 = unrated / clear). */
+  starRating: number;
+}
+
+export interface SetMediaItemStarRatingResult {
+  success: boolean;
+  error?: string;
+  /** Populated when ExifTool / refresh failed after DB update. */
+  fileWriteError?: string;
+  metadata?: DesktopMediaItemMetadata;
+}
+
+export type FolderAnalysisState = "not_scanned" | "in_progress" | "analyzed";
+
+export interface FolderAnalysisStatus {
+  state: FolderAnalysisState;
+  photoAnalyzedAt: string | null;
+  faceAnalyzedAt: string | null;
+  semanticIndexedAt: string | null;
+  lastUpdatedAt: string | null;
+}
+
+export type FolderAiPipelineLabel = "empty" | "done" | "not_done" | "partial";
+
+/** Subtree rollup for sidebar folder health (from DB aggregates, recursive). */
+export type FolderAiSidebarRollup = "empty" | "all_done" | "partial" | "not_done";
+
+export interface FolderAiPipelineCounts {
+  doneCount: number;
+  failedCount: number;
+  totalImages: number;
+  label: FolderAiPipelineLabel;
+}
+
+export interface FolderAiCoverageReport {
+  folderPath: string;
+  recursive: boolean;
+  totalImages: number;
+  photo: FolderAiPipelineCounts;
+  face: FolderAiPipelineCounts;
+  semantic: FolderAiPipelineCounts;
+}
+
+export interface FolderAiSummaryReport {
+  selectedWithSubfolders: FolderAiCoverageReport;
+  selectedDirectOnly: FolderAiCoverageReport;
+  subfolders: Array<{
+    folderPath: string;
+    name: string;
+    coverage: FolderAiCoverageReport;
+  }>;
+}
+
+export interface PhotoAnalysisModelInfo {
+  model: string;
+  promptVersion: string;
+  timestamp: string;
+}
+
+export interface PhotoAnalysisPerson {
+  person_category?: "adult" | "child" | "baby" | null;
+  gender?: "male" | "female" | "unknown" | "other" | null;
+  average_age?: number | null;
+}
+
+export interface DocumentData {
+  invoice_issuer?: string | null;
+  invoice_number?: string | null;
+  invoice_date?: string | null;
+  client_number?: string | null;
+  invoice_total_amount?: number | null;
+  invoice_total_amount_currency?: string | null;
+  vat_percent?: number | null;
+  vat_amount?: number | null;
+}
+
+export type PhotoEditType =
+  | "rotate"
+  | "crop"
+  | "straighten"
+  | "exposure_fix"
+  | "contrast_fix"
+  | "white_balance_fix"
+  | "denoise"
+  | "sharpen";
+
+export interface RelativeCropBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface PhotoEditSuggestion {
+  edit_type: PhotoEditType;
+  priority?: "high" | "medium" | "low" | null;
+  reason?: string | null;
+  confidence?: number | null;
+  auto_apply_safe?: boolean | null;
+  rotation?: {
+    observed_orientation?:
+      | "upright"
+      | "rotated_90_cw"
+      | "rotated_180"
+      | "rotated_270_cw"
+      | "uncertain"
+      | null;
+    confidence_orientation?: number | null;
+    angle_degrees_clockwise?: 90 | 180 | 270 | null;
+  } | null;
+  crop_rel?: RelativeCropBox | null;
+  crop_target?: "document" | "subject" | "horizon_fix" | "other" | null;
+  straighten?: {
+    angle_degrees?: number | null;
+  } | null;
+  exposure_fix?: {
+    ev_delta?: number | null;
+  } | null;
+  white_balance_fix?: {
+    temperature_delta?: number | null;
+    tint_delta?: number | null;
+  } | null;
+  contrast_fix?: {
+    contrast_delta?: number | null;
+  } | null;
+  denoise?: {
+    strength_0_1?: number | null;
+  } | null;
+  sharpen?: {
+    strength_0_1?: number | null;
+  } | null;
+}
+
+export interface PhotoAnalysisOutput {
+  image_category: string;
+  title: string;
+  description: string;
+  number_of_people?: number | null;
+  has_children?: boolean | null;
+  has_child_or_children?: boolean | null;
+  people?: PhotoAnalysisPerson[];
+  location?: string | null;
+  date?: string | null;
+  time?: string | null;
+  weather?: string | null;
+  daytime?: string | null;
+  photo_estetic_quality?: number | null;
+  photo_star_rating_1_5?: number | null;
+  is_low_quality?: boolean | null;
+  quality_issues?: string[] | null;
+  edit_suggestions?: PhotoEditSuggestion[] | null;
+  document_data?: DocumentData | null;
+  [key: string]: unknown;
+  modelInfo: PhotoAnalysisModelInfo;
+}
+
+export type PhotoAnalysisItemStatus =
+  | "pending"
+  | "running"
+  | "success"
+  | "failed"
+  | "cancelled";
+
+export interface PhotoAnalysisItemState {
+  path: string;
+  name: string;
+  status: PhotoAnalysisItemStatus;
+  elapsedSeconds?: number;
+  result?: PhotoAnalysisOutput;
+  error?: string;
+}
+
+export interface AnalyzeFolderPhotosRequest {
+  folderPath: string;
+  model?: string;
+  think?: boolean;
+  timeoutMsPerImage?: number;
+  enableTwoPassRotationConsistency?: boolean;
+  useFaceFeaturesForRotation?: boolean;
+  extractInvoiceData?: boolean;
+  mode?: "missing" | "all";
+  recursive?: boolean;
+  concurrency?: number;
+}
+
+export interface AnalyzeFolderPhotosResult {
+  jobId: string;
+  total: number;
+}
+
+export type PhotoAnalysisProgressEvent =
+  | {
+      type: "job-started";
+      jobId: string;
+      folderPath: string;
+      total: number;
+      items: PhotoAnalysisItemState[];
+    }
+  | {
+      type: "phase-updated";
+      jobId: string;
+      phase: "initializing-model" | "analyzing";
+    }
+  | {
+      type: "item-updated";
+      jobId: string;
+      item: PhotoAnalysisItemState;
+      currentFolderPath?: string;
+    }
+  | {
+      type: "job-completed";
+      jobId: string;
+      folderPath: string;
+      completed: number;
+      failed: number;
+      cancelled: number;
+      averageSecondsPerFile: number;
+    };
+
+export type PhotoAnalysisProgressListener = (
+  event: PhotoAnalysisProgressEvent,
+) => void;
+
+export interface FaceDetectionBox {
+  bbox_xyxy: [number, number, number, number];
+  score: number;
+  landmarks_5: Array<[number, number]>;
+}
+
+export type { CanonicalBoundingBox, FaceBeingBoundingBox, ProviderRawBoundingBoxReference };
+
+export interface FaceDetectionModelInfo {
+  service: string;
+  modelName: string;
+  modelPath?: string | null;
+  timestamp: string;
+}
+
+export interface FaceDetectionOutput {
+  faceCount: number;
+  faces: FaceDetectionBox[];
+  peopleBoundingBoxes: FaceBeingBoundingBox[];
+  imageSizeForBoundingBoxes: { width: number; height: number } | null;
+  modelInfo: FaceDetectionModelInfo;
+}
+
+export interface FaceDetectionServiceStatus {
+  healthy: boolean;
+  running: boolean;
+  autoStarted: boolean;
+  endpoint: string;
+  modelName?: string | null;
+  modelPath?: string | null;
+  error?: string | null;
+}
+
+export type FaceDetectionItemStatus = PhotoAnalysisItemStatus;
+
+export interface FaceDetectionItemState {
+  path: string;
+  name: string;
+  status: FaceDetectionItemStatus;
+  elapsedSeconds?: number;
+  result?: FaceDetectionOutput;
+  error?: string;
+}
+
+export interface DetectFolderFacesRequest {
+  folderPath: string;
+  mode?: "missing" | "all";
+  recursive?: boolean;
+  concurrency?: number;
+  faceDetectionSettings?: FaceDetectionSettings;
+}
+
+export interface DetectFolderFacesResult {
+  jobId: string;
+  total: number;
+}
+
+export type FaceDetectionProgressEvent =
+  | {
+      type: "job-started";
+      jobId: string;
+      folderPath: string;
+      total: number;
+      items: FaceDetectionItemState[];
+    }
+  | {
+      type: "item-updated";
+      jobId: string;
+      item: FaceDetectionItemState;
+      currentFolderPath?: string;
+    }
+  | {
+      type: "job-completed";
+      jobId: string;
+      folderPath: string;
+      completed: number;
+      failed: number;
+      cancelled: number;
+      averageSecondsPerFile: number;
+    };
+
+export type FaceDetectionProgressListener = (
+  event: FaceDetectionProgressEvent,
+) => void;
+
+export type MetadataScanItemStatus = "pending" | "running" | "success" | "failed" | "cancelled";
+export type MetadataScanItemAction = "created" | "updated" | "unchanged" | "failed";
+
+export interface MetadataScanItemState {
+  path: string;
+  name: string;
+  status: MetadataScanItemStatus;
+  action?: MetadataScanItemAction;
+  mediaItemId?: string | null;
+  error?: string;
+}
+
+export interface ScanFolderMetadataRequest {
+  folderPath: string;
+  recursive?: boolean;
+}
+
+export interface ScanFolderMetadataResult {
+  jobId: string;
+  total: number;
+}
+
+export type MetadataScanPhase = "preparing" | "scanning";
+
+export type MetadataScanProgressEvent =
+  | {
+      type: "job-started";
+      jobId: string;
+      folderPath: string;
+      recursive: boolean;
+      total: number;
+      items: MetadataScanItemState[];
+    }
+  | {
+      type: "phase-updated";
+      jobId: string;
+      phase: MetadataScanPhase;
+      processed: number;
+      total: number;
+    }
+  | {
+      type: "item-updated";
+      jobId: string;
+      item: MetadataScanItemState;
+      currentFolderPath?: string;
+    }
+  | {
+      type: "job-completed";
+      jobId: string;
+      folderPath: string;
+      recursive: boolean;
+      total: number;
+      created: number;
+      updated: number;
+      unchanged: number;
+      failed: number;
+      cancelled: number;
+      /**
+       * Files where AI should run or re-run: new catalog rows plus updates that
+       * invalidated AI (not metadata-only catalog sync).
+       */
+      filesNeedingAiPipelineFollowUp: number;
+      /** Per-folder catalog activity; `needsAiFollowUp` counts AI-invalidating / new rows only. */
+      foldersTouched: Array<{
+        folderPath: string;
+        created: number;
+        updated: number;
+        needsAiFollowUp: number;
+      }>;
+    };
+
+export type MetadataScanProgressListener = (event: MetadataScanProgressEvent) => void;
+
+export type PathAnalysisProgressEvent =
+  | {
+      type: "job-started";
+      jobId: string;
+      folderPath: string;
+      total: number;
+    }
+  | {
+      type: "progress";
+      jobId: string;
+      processed: number;
+      total: number;
+    }
+  | {
+      type: "job-completed";
+      jobId: string;
+      folderPath: string;
+      total: number;
+      processed: number;
+      failed: number;
+    }
+  | {
+      type: "job-cancelled";
+      jobId: string;
+      folderPath: string;
+    };
+
+export type PathAnalysisProgressListener = (event: PathAnalysisProgressEvent) => void;
+
+export type GeocoderInitStatus = "idle" | "downloading" | "parsing" | "ready" | "error";
+
+export type GeocoderInitProgressEvent = {
+  status: GeocoderInitStatus;
+  error?: string;
+};
+
+export interface DesktopPersonTag {
+  id: string;
+  label: string;
+  /** When true, shown first in people lists and as quick chips in AI image search. */
+  pinned: boolean;
+}
+
+export type FaceEmbeddingStatus = "pending" | "indexing" | "ready" | "failed";
+
+export interface DesktopFaceInstance {
+  id: string;
+  media_item_id: string;
+  face_index: number;
+  type: "auto";
+  confidence: number | null;
+  tag_id: string | null;
+  tag: DesktopPersonTag | null;
+  bounding_box: {
+    x: number | null;
+    y: number | null;
+    width: number | null;
+    height: number | null;
+  };
+  /** Same space as People thumbnails: detection / bbox_ref vs media_items. */
+  ref_image_width: number | null;
+  ref_image_height: number | null;
+  landmarks_5: Array<[number, number]> | null;
+  embedding_status: FaceEmbeddingStatus | null;
+  cluster_id: string | null;
+  crop_path: string | null;
+}
+
+export interface EmbedFolderFacesRequest {
+  folderPath: string;
+  mode?: "missing" | "all";
+  concurrency?: number;
+}
+
+export interface EmbedFolderFacesResult {
+  jobId: string;
+  total: number;
+}
+
+export type FaceEmbeddingItemStatus = "pending" | "running" | "success" | "failed" | "cancelled";
+
+export interface FaceEmbeddingItemState {
+  faceInstanceId: string;
+  mediaItemId: string;
+  sourcePath: string;
+  status: FaceEmbeddingItemStatus;
+  error?: string;
+}
+
+export type FaceEmbeddingProgressEvent =
+  | {
+      type: "job-started";
+      jobId: string;
+      folderPath: string;
+      total: number;
+    }
+  | {
+      type: "item-updated";
+      jobId: string;
+      faceInstanceId: string;
+      status: FaceEmbeddingItemStatus;
+      error?: string;
+    }
+  | {
+      type: "job-completed";
+      jobId: string;
+      folderPath: string;
+      embedded: number;
+      failed: number;
+      cancelled: number;
+    };
+
+export type FaceEmbeddingProgressListener = (event: FaceEmbeddingProgressEvent) => void;
+
+export type FaceClusteringProgressPhase = "loading" | "clustering" | "persisting";
+
+export type FaceClusteringProgressEvent =
+  | {
+      type: "job-started";
+      jobId: string;
+      totalFaces: number;
+    }
+  | {
+      type: "progress";
+      jobId: string;
+      phase: FaceClusteringProgressPhase;
+      processed: number;
+      total: number;
+    }
+  | {
+      type: "job-completed";
+      jobId: string;
+      clusterCount: number;
+    }
+  | {
+      type: "job-failed";
+      jobId: string;
+      error: string;
+    }
+  | {
+      type: "job-cancelled";
+      jobId: string;
+    };
+
+export type FaceClusteringProgressListener = (event: FaceClusteringProgressEvent) => void;
+
+export type SimilarUntaggedCountsProgressEvent =
+  | {
+      type: "job-started";
+      jobId: string;
+      total: number;
+      tagIds: string[];
+    }
+  | {
+      type: "progress";
+      jobId: string;
+      processed: number;
+      total: number;
+      counts: Record<string, number>;
+    }
+  | { type: "job-completed"; jobId: string; counts: Record<string, number> }
+  | { type: "job-failed"; jobId: string; error: string }
+  | { type: "job-cancelled"; jobId: string };
+
+export type SimilarUntaggedCountsProgressListener = (
+  event: SimilarUntaggedCountsProgressEvent,
+) => void;
+
+// TEMPORARY: description embedding backfill — remove after migration
+export type DescEmbedBackfillProgressEvent =
+  | { type: "started"; jobId: string; total: number }
+  | { type: "progress"; jobId: string; processed: number; total: number; indexed: number; skipped: number; failed: number }
+  | { type: "completed"; jobId: string; indexed: number; skipped: number; failed: number }
+  | { type: "failed"; jobId: string; error: string }
+  | { type: "cancelled"; jobId: string };
+
+export type DescEmbedBackfillProgressListener = (event: DescEmbedBackfillProgressEvent) => void;
+
+export type SemanticIndexItemStatus = "pending" | "running" | "success" | "failed" | "cancelled";
+
+export interface SemanticIndexItemState {
+  path: string;
+  name: string;
+  status: SemanticIndexItemStatus;
+  elapsedSeconds?: number;
+  error?: string;
+}
+
+export interface IndexFolderSemanticRequest {
+  folderPath: string;
+  mode?: "missing" | "all";
+  recursive?: boolean;
+}
+
+export interface IndexFolderSemanticResult {
+  jobId: string;
+  total: number;
+}
+
+export type SemanticIndexProgressEvent =
+  | {
+      type: "job-started";
+      jobId: string;
+      folderPath: string;
+      total: number;
+      items: SemanticIndexItemState[];
+    }
+  | {
+      type: "phase-updated";
+      jobId: string;
+      phase: "indexing";
+    }
+  | {
+      type: "item-updated";
+      jobId: string;
+      item: SemanticIndexItemState;
+      currentFolderPath?: string;
+    }
+  | {
+      type: "job-completed";
+      jobId: string;
+      folderPath: string;
+      completed: number;
+      failed: number;
+      cancelled: number;
+      averageSecondsPerFile: number;
+    };
+
+export type SemanticIndexProgressListener = (event: SemanticIndexProgressEvent) => void;
+
+export type FaceModelDownloadProgressEvent =
+  | {
+      type: "started";
+      filename: string | null;
+      message: string;
+      startedAtIso: string;
+    }
+  | {
+      type: "progress";
+      filename: string;
+      downloadedBytes: number;
+      totalBytes: number | null;
+      percent: number | null;
+      message: string;
+    }
+  | {
+      type: "completed";
+      durationMs: number;
+      message: string;
+    }
+  | {
+      type: "failed";
+      durationMs: number;
+      error: string;
+      message: string;
+    };
+
+export type FaceModelDownloadProgressListener = (
+  event: FaceModelDownloadProgressEvent,
+) => void;
+
+export interface ActiveJobSummary {
+  jobId: string;
+  folderPath: string;
+}
+
+export interface ActiveJobStatuses {
+  photoAnalysis: ActiveJobSummary | null;
+  faceDetection: ActiveJobSummary | null;
+  semanticIndex: ActiveJobSummary | null;
+  metadataScan: ActiveJobSummary | null;
+  pathAnalysis: ActiveJobSummary | null;
+}
+
+export interface SimilarFaceSearchResult {
+  faceInstanceId: string;
+  mediaItemId: string;
+  sourcePath: string;
+  tagId: string | null;
+  tagLabel: string | null;
+  score: number;
+  bboxX: number;
+  bboxY: number;
+  bboxWidth: number;
+  bboxHeight: number;
+  imageWidth: number | null;
+  imageHeight: number | null;
+}
+
+/** Best matching existing person tag for an unassigned face (embedding similarity). */
+export interface DesktopFacePersonTagSuggestion {
+  tagId: string;
+  tagLabel: string;
+  score: number;
+}
+
+export interface DesktopPersonGroup {
+  id: string;
+  name: string;
+}
+
+/** Per untagged cluster: embedding member count vs centroid matches (same metric as findPersonMatches). */
+export interface ClusterPersonCentroidMatchStats {
+  memberCount: number;
+  /** Cosine similarity >= threshold (high band). */
+  matchingCount: number;
+  /** lowThreshold <= similarity < threshold (10 percentage points below threshold, floored at 0). */
+  midBandCount: number;
+  /** Similarity < lowThreshold or unusable embedding. */
+  belowMidCount: number;
+}
+
+export interface DesktopPersonTagWithFaceCount {
+  id: string;
+  label: string;
+  pinned: boolean;
+  taggedFaceCount: number;
+  similarFaceCount: number;
+}
+
+export interface FaceClusterFaceInfo {
+  faceInstanceId: string;
+  sourcePath: string;
+  bboxX: number;
+  bboxY: number;
+  bboxWidth: number;
+  bboxHeight: number;
+  imageWidth: number | null;
+  imageHeight: number | null;
+}
+
+export interface FaceClusterInfo {
+  clusterId: string;
+  representativeFace: FaceClusterFaceInfo | null;
+  memberCount: number;
+  /** Loaded lazily per cluster via `listClusterFaceIds`; omitted on summary fetch. */
+  faceIds?: string[];
+}
+
+export interface FaceClustersPageResult {
+  clusters: FaceClusterInfo[];
+  totalCount: number;
+}
+
+export interface FaceClusterTagSuggestion {
+  tagId: string;
+  tagLabel: string;
+  score: number;
+  sampleCount: number;
+}
+
+export interface TaggedFaceInfo {
+  faceInstanceId: string;
+  mediaItemId: string;
+  sourcePath: string;
+  confidence: number | null;
+  bboxX: number;
+  bboxY: number;
+  bboxWidth: number;
+  bboxHeight: number;
+  imageWidth: number | null;
+  imageHeight: number | null;
+}
+
+export interface EmbeddingModelStatus {
+  modelName: string | null;
+  dimension: number | null;
+  loaded: boolean;
+}
+
+export interface FaceEmbeddingStats {
+  totalFaces: number;
+  withEmbeddings: number;
+  withLandmarks: number;
+  pending: number;
+}
+
+export interface DesktopApi {
+  selectLibraryFolder: () => Promise<string | null>;
+  readFolderChildren: (folderPath: string) => Promise<FolderNode[]>;
+  revealItemInFolder: (filePath: string) => Promise<{ success: boolean; error?: string }>;
+  listFolderImages: (folderPath: string) => Promise<MediaImageItem[]>;
+  startFolderImagesStream: (folderPath: string) => Promise<{ requestId: string }>;
+  onFolderImagesProgress: (listener: FolderImagesProgressListener) => () => void;
+  getSettings: () => Promise<AppSettings>;
+  getDatabaseLocation: () => Promise<DatabaseLocationInfo>;
+  saveSettings: (settings: AppSettings) => Promise<void>;
+  getFolderAnalysisStatuses: () => Promise<Record<string, FolderAnalysisStatus>>;
+  getFolderAiSummaryReport: (folderPath: string) => Promise<FolderAiSummaryReport>;
+  getFolderAiCoverage: (folderPath: string, recursive: boolean) => Promise<FolderAiCoverageReport>;
+  getFolderAiRollupsBatch: (folderPaths: string[]) => Promise<Record<string, FolderAiSidebarRollup>>;
+  analyzeFolderPhotos: (
+    request: AnalyzeFolderPhotosRequest,
+  ) => Promise<AnalyzeFolderPhotosResult>;
+  cancelPhotoAnalysis: (jobId: string) => Promise<boolean>;
+  onPhotoAnalysisProgress: (
+    listener: PhotoAnalysisProgressListener,
+  ) => () => void;
+  detectFolderFaces: (
+    request: DetectFolderFacesRequest,
+  ) => Promise<DetectFolderFacesResult>;
+  cancelFaceDetection: (jobId: string) => Promise<boolean>;
+  onFaceDetectionProgress: (
+    listener: FaceDetectionProgressListener,
+  ) => () => void;
+  getFaceDetectionServiceStatus: () => Promise<FaceDetectionServiceStatus>;
+  indexFolderSemanticEmbeddings: (request: IndexFolderSemanticRequest) => Promise<IndexFolderSemanticResult>;
+  cancelSemanticEmbeddingIndex: (jobId: string) => Promise<boolean>;
+  onSemanticIndexProgress: (listener: SemanticIndexProgressListener) => () => void;
+  onFaceModelDownloadProgress: (
+    listener: FaceModelDownloadProgressListener,
+  ) => () => void;
+  getSemanticEmbeddingStatus: () => Promise<{
+    model: string;
+    textEmbeddingReady: boolean;
+    onnxTextEmbeddingReady: boolean;
+    visionModelReady: boolean;
+    visionOnnxReady: boolean;
+    lastProbeError: string | null;
+    vectorBackend: "classic" | "sqlite-vec";
+    vectorBackendError: string | null;
+    indexingInProgress: boolean;
+    currentJobId: string | null;
+    currentFolderPath: string | null;
+  }>;
+  semanticSearchPhotos: (request: {
+    query: string;
+    limit?: number;
+    folderPath?: string;
+    recursive?: boolean;
+    personTagIds?: string[];
+    includeUnconfirmedFaces?: boolean;
+    /** ISO date string lower bound (e.g. catalog event / path extraction). */
+    eventDateStart?: string;
+    /** ISO date string upper bound. */
+    eventDateEnd?: string;
+    /** Case-insensitive substring match across country, city, area, place, location name. */
+    locationQuery?: string;
+    advancedSearch?: boolean;
+    /** Grid visibility: min VLM cosine (`hideResultsBelowVlmSimilarity`). */
+    vlmSimilarityThreshold?: number;
+    /** Grid visibility: min AI-description cosine (`hideResultsBelowDescriptionSimilarity`). */
+    descriptionSimilarityThreshold?: number;
+    /** When true, run keyword-based re-ranking after RRF. See `AiImageSearchSettings.keywordMatchReranking`. */
+    keywordMatchReranking?: boolean;
+    /** Advanced search keyword hit floor for VLM embeddings. See `AiImageSearchSettings.keywordMatchThresholdVlm`. */
+    keywordMatchThresholdVlm?: number;
+    /** Advanced search keyword hit floor for AI description embeddings. */
+    keywordMatchThresholdDescription?: number;
+    /** Rank / fuse / gate by VLM + description (default), VLM only, or description only. */
+    signalMode?: SemanticSearchSignalMode;
+  }) => Promise<{
+    results: Array<{
+      mediaItemId: string;
+      path: string;
+      name: string;
+      url: string;
+      /** RRF fusion score (VLM + AI description ranks); unchanged when keyword re-rank runs (order only). */
+      score: number;
+      /** Cosine similarity vs image embedding; undefined if not in vision candidate set. */
+      vlmSimilarity?: number;
+      /** Cosine similarity vs AI text embedding; undefined if not in description candidate set. */
+      descriptionSimilarity?: number;
+      city: string | null;
+      country: string | null;
+      peopleDetected: number | null;
+      ageMin: number | null;
+      ageMax: number | null;
+    }>;
+    queryAnalysis?: {
+      originalLanguage: string;
+      translated: boolean;
+      englishQuery: string;
+      keywords: string[];
+    };
+  }>;
+  scanFolderMetadata: (
+    request: ScanFolderMetadataRequest,
+  ) => Promise<ScanFolderMetadataResult>;
+  cancelMetadataScan: (jobId: string) => Promise<boolean>;
+  onMetadataScanProgress: (listener: MetadataScanProgressListener) => () => void;
+  getMediaItemsByPaths: (paths: string[]) => Promise<Record<string, DesktopMediaItemMetadata>>;
+  setMediaItemStarRating: (
+    request: SetMediaItemStarRatingRequest,
+  ) => Promise<SetMediaItemStarRatingResult>;
+  onMediaItemMetadataRefreshed: (
+    listener: (byPath: Record<string, DesktopMediaItemMetadata>) => void,
+  ) => () => void;
+  listPersonTags: () => Promise<DesktopPersonTag[]>;
+  listPersonTagsWithFaceCounts: () => Promise<DesktopPersonTagWithFaceCount[]>;
+  listPersonGroups: () => Promise<DesktopPersonGroup[]>;
+  createPersonGroup: (name: string) => Promise<DesktopPersonGroup>;
+  setPersonTagGroups: (tagId: string, groupIds: string[]) => Promise<void>;
+  getPersonTagGroupsForTagIds: (
+    tagIds: string[],
+  ) => Promise<Record<string, DesktopPersonGroup[]>>;
+  updatePersonGroupName: (groupId: string, name: string) => Promise<DesktopPersonGroup>;
+  deletePersonGroup: (groupId: string) => Promise<void>;
+  listPersonTagsInGroup: (groupId: string) => Promise<DesktopPersonTag[]>;
+  getClusterPersonMatchStatsBatch: (
+    items: Array<{ clusterId: string; tagId: string }>,
+    threshold?: number,
+  ) => Promise<Record<string, ClusterPersonCentroidMatchStats>>;
+  getClusterMemberFaceIdsForPersonSimilarityFilter: (
+    clusterId: string,
+    tagId: string,
+    mode: "matching" | "mid" | "below",
+    threshold?: number,
+  ) => Promise<string[]>;
+  getSimilarUntaggedFaceCountsForTags: (
+    tagIds: string[],
+    threshold?: number,
+  ) => Promise<Record<string, number>>;
+  startSimilarUntaggedFaceCountsJob: (request: {
+    tagIds: string[];
+    threshold?: number;
+  }) => Promise<{ jobId: string }>;
+  cancelSimilarUntaggedFaceCountsJob: (jobId: string) => Promise<boolean>;
+  onSimilarUntaggedCountsProgress: (
+    listener: SimilarUntaggedCountsProgressListener,
+  ) => () => void;
+  createPersonTag: (label: string) => Promise<DesktopPersonTag>;
+  updatePersonTagLabel: (tagId: string, label: string) => Promise<DesktopPersonTag>;
+  setPersonTagPinned: (tagId: string, pinned: boolean) => Promise<DesktopPersonTag>;
+  listFaceInstancesForMediaItem: (mediaItemId: string) => Promise<DesktopFaceInstance[]>;
+  assignPersonTagToFace: (faceInstanceId: string, tagId: string) => Promise<DesktopFaceInstance | null>;
+  assignPersonTagsToFaces: (
+    faceInstanceIds: string[],
+    tagId: string,
+  ) => Promise<{ assignedCount: number }>;
+  refreshPersonSuggestionsForTag: (tagId: string) => Promise<{ count: number }>;
+  recomputePersonCentroid: (
+    tagId: string,
+  ) => Promise<{ success: true } | { success: false; error: string }>;
+  clearPersonTagFromFace: (faceInstanceId: string) => Promise<DesktopFaceInstance | null>;
+  deleteFaceInstance: (faceInstanceId: string) => Promise<boolean>;
+  detectFacesForMediaItem: (
+    sourcePath: string,
+    faceDetectionSettings?: FaceDetectionSettings,
+  ) => Promise<{ success: boolean; faceCount: number }>;
+  embedFolderFaces: (
+    request: EmbedFolderFacesRequest,
+  ) => Promise<EmbedFolderFacesResult>;
+  cancelFaceEmbedding: (jobId: string) => Promise<boolean>;
+  onFaceEmbeddingProgress: (listener: FaceEmbeddingProgressListener) => () => void;
+  getEmbeddingModelStatus: () => Promise<EmbeddingModelStatus>;
+  getEmbeddingStats: () => Promise<FaceEmbeddingStats>;
+  searchSimilarFaces: (request: {
+    faceInstanceId: string;
+    threshold?: number;
+    limit?: number;
+    /** When true, only compare against faces that already have a person tag. */
+    taggedOnly?: boolean;
+  }) => Promise<SimilarFaceSearchResult[]>;
+  suggestPersonTagForFace: (request: {
+    faceInstanceId: string;
+    threshold?: number;
+  }) => Promise<DesktopFacePersonTagSuggestion | null>;
+  findPersonMatches: (request: {
+    tagId: string;
+    threshold?: number;
+    limit?: number;
+  }) => Promise<SimilarFaceSearchResult[]>;
+  getFaceClusters: (request?: {
+    offset?: number;
+    limit?: number;
+  }) => Promise<FaceClustersPageResult>;
+  listClusterFaceIds: (
+    clusterId: string,
+    options?: { offset?: number; limit?: number },
+  ) => Promise<string[]>;
+  runFaceClustering: (options?: {
+    similarityThreshold?: number;
+    minClusterSize?: number;
+  }) => Promise<{ jobId: string }>;
+  cancelFaceClustering: (jobId: string) => Promise<boolean>;
+  onFaceClusteringProgress: (listener: FaceClusteringProgressListener) => () => void;
+  assignClusterToPerson: (
+    clusterId: string,
+    tagId: string,
+  ) => Promise<{ assignedCount: number }>;
+  suggestPersonTagForCluster: (
+    clusterId: string,
+    threshold?: number,
+  ) => Promise<FaceClusterTagSuggestion | null>;
+  suggestPersonTagsForClusters: (
+    clusterIds: string[],
+    threshold?: number,
+  ) => Promise<Record<string, FaceClusterTagSuggestion | null>>;
+  getFaceCropPaths: (
+    faceInstanceIds: string[],
+  ) => Promise<Record<string, string | null>>;
+  getFaceInfoByIds: (
+    faceInstanceIds: string[],
+  ) => Promise<Record<string, FaceClusterFaceInfo | null>>;
+  getFaceToPersonCentroidSimilarities: (
+    faceInstanceIds: string[],
+    tagId: string,
+  ) => Promise<Record<string, number>>;
+  refreshPersonSuggestions: () => Promise<{ count: number }>;
+  listFacesForPerson: (
+    tagId: string,
+  ) => Promise<TaggedFaceInfo[]>;
+  reprocessFaceCropsAndEmbeddings: () => Promise<{
+    totalCropsNeeded: number;
+    totalEmbeddingsNeeded: number;
+  }>;
+  purgeDeletedMediaItems: () => Promise<{
+    purgedMediaItems: number;
+    purgedFaceInstances: number;
+    purgedEmbeddings: number;
+    purgedAlbumItems: number;
+    purgedItemTags: number;
+    purgedFsObjects: number;
+    purgedSources: number;
+  }>;
+  getActiveJobStatuses: () => Promise<ActiveJobStatuses>;
+  analyzeFolderPathMetadata: (request: {
+    folderPath: string;
+    recursive?: boolean;
+    model?: string;
+  }) => Promise<{ jobId: string; total: number }>;
+  cancelPathAnalysis: (jobId: string) => Promise<boolean>;
+  onPathAnalysisProgress: (listener: PathAnalysisProgressListener) => () => void;
+  initGeocoder: () => Promise<void>;
+  onGeocoderInitProgress: (listener: (event: GeocoderInitProgressEvent) => void) => () => void;
+  // TEMPORARY: description embedding backfill — remove after migration
+  indexDescriptionEmbeddings: (request: {
+    folderPath: string;
+    recursive: boolean;
+  }) => Promise<{ jobId: string }>;
+  cancelDescEmbedBackfill: (jobId: string) => Promise<boolean>;
+  onDescEmbedBackfillProgress: (listener: DescEmbedBackfillProgressListener) => () => void;
+  _logToMain: (msg: string) => void;
+}

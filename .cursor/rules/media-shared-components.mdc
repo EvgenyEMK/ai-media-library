@@ -1,0 +1,34 @@
+---
+description: Enforce shared UI components, business logic, and automatable actions across media apps
+globs: apps/desktop-media/**,packages/media-viewer/**,packages/media-store/**
+alwaysApply: false
+---
+
+# Shared Media Components
+
+Desktop and (future) web apps MUST use the same shared UI components from `@emk/media-viewer` (`packages/media-viewer/`). Do NOT create platform-specific duplicates.
+
+## Shared components (in `packages/media-viewer/src/`)
+
+- `MediaSwiperViewer` — photo viewer (swiper-based)
+- `MediaItemGridCard` — thumbnail card with hover effects
+- `MediaItemActionsMenu` — per-item action dropdown
+- `MediaThumbnailGrid` — grid layout for thumbnails
+- Inline SVG icon components in `swiper-viewer.tsx`
+
+## Rules
+
+1. **Same visual controls**: Both apps must render identical icon-button controls (SVG icons, sizing, placement). Never use emoji or text fallbacks.
+2. **Shared business logic**: Extract reusable logic (slideshow, fullscreen, index tracking, autoplay) into the shared package. Platform-specific adapters (e.g. `file://` URLs for Electron) belong in each app's wrapper, not in the shared component.
+3. **Configurable behavior**: Use props (e.g. `showActionsMenu`, `renderInfoPanel`, `disableAnalyzeAction`) to toggle platform-specific features — do NOT fork the component.
+4. **No web-only dependencies in shared package**: `@emk/media-viewer` must NOT depend on `lucide-react`, `next/image`, or shadcn `Button`. Use inline SVGs for icons.
+5. **Grid + Viewer pairing**: The non-swiper grid (`MediaThumbnailGrid`) opens the swiper-based photo viewer. Do NOT use the swiper-based grid view (marked `OLD DO NOT USE`).
+6. **Automatable component APIs**: Viewer and grid components should expose imperative handles or callback props that allow programmatic control (navigate to slide, toggle fullscreen, etc.) for automation support.
+7. **Shared state in `@emk/media-store`**: Platform-agnostic state logic lives in shared Zustand slices. Only desktop-specific state (library roots, folder tree, analysis settings) goes in `DesktopSlice`.
+
+## Promoting Components to Shared Package
+
+Before creating a new component in an app, check if it should live in `@emk/media-viewer`:
+- Is the same visual element or logic needed in both web and desktop? -> Shared package.
+- Does it depend on Electron APIs? -> App-specific wrapper that delegates to shared component.
+- Is it purely presentational with no platform deps? -> Strong candidate for shared package.

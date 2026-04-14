@@ -1,0 +1,18 @@
+{
+  "name": "@emk/media-metadata-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "build": "echo @emk/media-metadata-core is source-only"
+  },
+  "dependencies": {
+    "@xmldom/xmldom": "0.9.4"
+  },
+  "devDependencies": {
+    "typescript": "^5"
+  }
+}

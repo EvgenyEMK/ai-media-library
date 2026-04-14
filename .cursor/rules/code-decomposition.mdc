@@ -1,0 +1,109 @@
+---
+description: File size limits, decomposition patterns, and automatable actions architecture
+alwaysApply: true
+---
+
+# Code Decomposition and File Size Rules
+
+These rules enforce readable, maintainable file sizes and clear separation of concerns.
+
+---
+
+## File Size Limits
+
+| Category | Max lines | Action when exceeded |
+|---|---|---|
+| React component file | 300 | Extract sub-components or hooks |
+| Custom hook file | 200 | Split into focused hooks |
+| Utility / helper file | 150 | Split by domain |
+| Type definitions file | 200 | Split by domain |
+| IPC handler group (Electron) | 200 | Split by feature |
+| Electron main entry | 100 | Delegate to modules |
+
+Before creating or modifying a file, check its current line count. If your change would push it beyond the limit, refactor first.
+
+---
+
+## Separation of Concerns
+
+**One concern per file:**
+- A component file renders UI and delegates logic to hooks.
+- A hook file manages state, effects, or derived data.
+- A utility file exports pure functions with no side effects.
+- A types file exports only types and interfaces.
+- An action registry file exports named action functions.
+
+**Extraction triggers:**
+- Inline handler exceeding ~15 lines: extract to named function or hook.
+- JSX block exceeding ~50 lines with self-contained logic: extract to sub-component.
+- 3+ `useState`/`useEffect` hooks serving the same feature: extract to custom hook.
+- Utility function used by 2+ files: extract to shared utility module.
+
+---
+
+## Naming Conventions
+
+| Type | Pattern | Example |
+|---|---|---|
+| React component | PascalCase `.tsx` | `DesktopProgressDock.tsx` |
+| Custom hook | `use-` prefix, kebab-case `.ts` | `use-folder-actions.ts` |
+| Utility module | kebab-case `.ts` | `label-formatters.ts` |
+| Types file | kebab-case `.ts` | `viewer-types.ts` |
+| Action registry | kebab-case `.ts` | `viewer-actions.ts` |
+| Constants | kebab-case `.ts` | `ui-text.ts` |
+| Test file | `*.test.ts` or `*.test.tsx` | `label-formatters.test.ts` |
+
+---
+
+## Automatable Actions Architecture
+
+All user-facing actions must be designed to be invokable **both** by direct user interaction **and** by programmatic automation.
+
+**Rules:**
+1. Define each discrete user action as a **named, typed function** with explicit parameters.
+2. Group related actions into an **action registry** (typed object or module).
+3. Action functions must NOT depend on React component state. They receive parameters and call store actions or IPC/API.
+4. UI components call action functions via props or imported registries.
+5. Automation scripts (AI intent translation, tests) call the same functions.
+6. Action functions should be idempotent where possible.
+7. Apply this pattern to all new code. Migrate existing code during refactoring.
+
+**Structure:**
+
+```
+src/renderer/actions/     # Desktop action registries
+  viewer-actions.ts       # openViewer, closeViewer, setFullscreen, ...
+  folder-actions.ts       # addLibrary, selectFolder, expandFolder, ...
+  analysis-actions.ts     # startAnalysis, cancelAnalysis, ...
+  search-actions.ts       # semanticSearch, applyFilters, ...
+  index.ts                # Combined AppActions type and factory
+```
+
+---
+
+## Component Decomposition Checklist
+
+When a component grows beyond 300 lines, extract in this order:
+
+1. **Types** -> `types/` directory
+2. **Constants and text** -> `lib/` directory
+3. **Pure utility functions** -> `lib/` directory
+4. **Custom hooks** (state + effects) -> `hooks/` directory
+5. **Sub-components** (self-contained JSX blocks) -> `components/` directory
+6. **Action functions** -> `actions/` directory
+
+After extraction, the original component should be a thin orchestrator that:
+- Imports and composes hooks
+- Renders sub-components with props from hooks
+- Contains minimal inline logic
+
+---
+
+## Import Organization
+
+Maintain consistent import ordering within files:
+
+1. External libraries (`react`, `zustand`, third-party)
+2. Internal packages (`@emk/media-store`, `@emk/media-viewer`, `@emk/shared-contracts`, `@emk/media-metadata-core`)
+3. Relative imports (`./hooks/...`, `../types/...`)
+4. Type-only imports (`import type { ... }`)

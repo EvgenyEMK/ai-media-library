@@ -1,0 +1,9 @@
+/* Bottom panel baseline styles */
+.bottom-panel-spinner {
+  animation: bottom-panel-spin 1s linear infinite;
+}
+
+@keyframes bottom-panel-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

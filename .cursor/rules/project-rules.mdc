@@ -1,0 +1,88 @@
+---
+description: Core project rules for the ai-media-library monorepo
+alwaysApply: true
+---
+
+# AI Media Library — Project Rules
+
+## Overview
+
+Desktop-first AI media library monorepo. Main app is `apps/desktop-media` (Electron + Vite + React 19 + Tailwind + SQLite + Zustand). Shared packages provide cross-platform reusable state, UI, types, and metadata utilities.
+
+For full coding rules, see `CLAUDE.md` at the repo root and `AGENTS.md` files at root and in each app/package.
+
+---
+
+## General Architecture Rules
+
+### TypeScript
+
+* Enforce `strict`, `noImplicitAny`, and `isolatedModules`.
+* **NEVER use the TypeScript `any` type.** Always use proper types, `unknown`, or type assertions when necessary.
+* All components and functions must have typed props and explicit return types.
+* **DO NOT add `import React from 'react';`** — JSX transform handles it automatically.
+
+### Tailwind + Theming
+
+* Tailwind is the primary styling method for the desktop renderer.
+* Use theme tokens: `primary`, `secondary`, `background`, `foreground`, `muted`, `accent`, `destructive`.
+* Dark mode via `darkMode: ["class"]` with `class="dark"` on `<html>`.
+* Desktop renderer uses `src/renderer/lib/cn.ts` (`clsx` + `tailwind-merge`) for conditional classes.
+* `@emk/media-viewer` must NOT use `lucide-react`, `next/image`, or shadcn. Use inline SVGs.
+
+### Zustand State Management
+
+* Zustand 5 with Immer middleware is the standard for client-side state.
+* Shared media slices live in `packages/media-store` (11 slices).
+* Desktop composes shared slices + `DesktopSlice` in `apps/desktop-media/src/renderer/stores/`.
+* Keep slices small and modular — one file per concern, max 150 lines per slice.
+* Use Immer's `set((state) => { state.x = y; })` pattern for mutations.
+* Do not put side-effects (IPC, API calls) in slices — use hooks or action registries instead.
+
+---
+
+## Related Rule Files
+
+* **Code Decomposition**: See `code-decomposition.mdc` for file size limits, extraction patterns, and automatable actions.
+* **Testing Standards**: See `testing-standards.mdc` for test conventions, priorities, and patterns.
+* **Desktop Media**: See `desktop-media.mdc` for Electron/IPC/SQLite conventions (scoped to `apps/desktop-media/**`).
+* **Media Shared Components**: See `media-shared-components.mdc` for cross-platform UI component rules.
+
+---
+
+## DRY (Don't Repeat Yourself) & Reusable Components
+
+* **Always apply the DRY principle** — avoid duplicating code, logic, or styling.
+* **Create reusable components** when the same pattern appears 2+ times.
+* **Share types/interfaces** — define once in shared type files, import where needed.
+* Check `packages/media-viewer`, `packages/media-store`, `packages/shared-contracts`, and `packages/media-metadata-core` before creating new utilities.
+
+---
+
+## Documentation
+
+Project documentation lives in `docs/`:
+* **`END-USER-GUIDE/`** — non-technical user docs (overview, install)
+* **`PRODUCT-FEATURES/`** — product/UX specs by module (`AI/`, `media-library/`, `installer/`, `metadata/`)
+* **`IMPLEMENTATION-LOG/`** — feature, bug, and refactoring records
+* **`ROADMAP/`** — planned features
+* **`ARCHITECTURE/`** — technical architecture docs
+
+---
+
+## Cursor Generation Rules
+
+* Default to typed, small, reusable functions.
+* Never expose environment secrets.
+* **Always follow DRY principles** — create reusable components instead of duplicating code.
+* Ensure imports follow alias structure (e.g. `@emk/media-store`, `@emk/shared-contracts`).
+* **Check for existing reusable components** before creating new ones.
+
+---
+
+## Testing & Linting
+
+* ESLint must be configured.
+* Vitest for unit and component tests. Playwright for E2E.
+* Every extracted module from refactoring must have at least basic unit tests.
+* See `testing-standards.mdc` for full testing conventions.

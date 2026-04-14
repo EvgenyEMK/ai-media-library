@@ -1,0 +1,227 @@
+/* Styles for ImageEditSuggestionsView (consumed by web-media and desktop-media). */
+
+.image-edit-suggestions-view {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.image-edit-suggestions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #2e374d;
+  border-radius: 10px;
+  background: #121a2a;
+  padding: 12px 14px;
+}
+
+.image-edit-suggestions-header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.image-edit-suggestions-header p {
+  margin: 6px 0 0;
+  color: #a5b5d6;
+  font-size: 13px;
+}
+
+.image-edit-suggestions-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.image-edit-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 360px) 1fr;
+  gap: 14px;
+  border: 1px solid #2e374d;
+  border-radius: 10px;
+  background: #151c2d;
+  padding: 12px;
+}
+
+.image-edit-original-column,
+.image-edit-details-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.image-edit-original-column h4,
+.image-edit-preview-card h4,
+.image-edit-suggestions-section h4 {
+  margin: 0;
+  font-size: 13px;
+  color: #c5d3ef;
+}
+
+.image-edit-original-column img,
+.image-edit-preview-card img {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #2e374d;
+  background: #0f1115;
+  object-fit: contain;
+  max-height: 320px;
+}
+
+.image-edit-photo-title {
+  font-size: 12px;
+  color: #a5b5d6;
+  word-break: break-word;
+}
+
+.image-edit-preview-card {
+  border: 1px solid #2e374d;
+  border-radius: 8px;
+  padding: 10px;
+  background: #121a2a;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.image-edit-preview-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.image-edit-preview-tag {
+  border-radius: 999px;
+  border: 1px solid #44506a;
+  background: #1a2236;
+  color: #c5d3ef;
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.image-edit-preview-tag-active {
+  border-color: hsl(var(--success));
+  background: hsl(var(--success) / 0.2);
+  color: hsl(var(--success-foreground));
+}
+
+.image-edit-preview-tag-inactive {
+  border-color: #3d475f;
+  background: #121928;
+  color: #7f8ca8;
+}
+
+.image-edit-preview-icon-btn {
+  border-radius: 999px;
+  border: 1px solid #44506a;
+  background: #1a2236;
+  color: #c5d3ef;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-edit-preview-icon-btn-active {
+  border-color: hsl(var(--success));
+  background: hsl(var(--success) / 0.2);
+  color: hsl(var(--success-foreground));
+}
+
+.image-edit-preview-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.image-edit-preview-placeholder {
+  border: 1px dashed #404a63;
+  border-radius: 8px;
+  padding: 14px;
+  color: #a5b5d6;
+  font-size: 13px;
+}
+
+.image-edit-cta-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.image-edit-cta-row span {
+  color: #8f9ebe;
+  font-size: 12px;
+}
+
+.image-edit-apply-button {
+  white-space: nowrap;
+}
+
+.image-edit-suggestions-section {
+  border: 1px solid #2e374d;
+  border-radius: 8px;
+  padding: 10px;
+  background: #121a2a;
+}
+
+.image-edit-suggestions-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.image-edit-suggestion-item {
+  border: 1px solid #2e374d;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #0f1524;
+}
+
+.image-edit-suggestion-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.image-edit-suggestion-item p {
+  margin: 6px 0 0;
+  color: #d8e0f3;
+  font-size: 13px;
+}
+
+.image-edit-priority-chip {
+  border-radius: 999px;
+  border: 1px solid #44506a;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: #c5d3ef;
+  background: #1a2236;
+  white-space: nowrap;
+}
+
+.image-edit-priority-chip.priority-high {
+  border-color: #7a4f1f;
+  background: #2b2114;
+  color: #ffd9a8;
+}
+
+.image-edit-suggestion-preview-flag {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #9bc4ff;
+}
+
+@media (max-width: 1100px) {
+  .image-edit-row {
+    grid-template-columns: 1fr;
+  }
+}

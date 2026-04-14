@@ -1,0 +1,382 @@
+import type { StateCreator } from "zustand";
+import {
+  DEFAULT_AI_IMAGE_SEARCH_SETTINGS,
+  DEFAULT_FACE_DETECTION_SETTINGS,
+  DEFAULT_FOLDER_SCANNING_SETTINGS,
+  DEFAULT_PATH_EXTRACTION_SETTINGS,
+  DEFAULT_PHOTO_ANALYSIS_SETTINGS,
+  type AiImageSearchSettings,
+  type FaceDetectionSettings,
+  type FolderAiSidebarRollup,
+  type FolderAnalysisStatus,
+  type FolderNode,
+  type FolderScanningSettings,
+  type GeocoderInitStatus,
+  type PathExtractionSettings,
+  type PhotoAnalysisSettings,
+} from "../../shared/ipc";
+
+export interface DesktopSlice {
+  clientId: string;
+  libraryRoots: string[];
+  expandedFolders: Set<string>;
+  selectedFolder: string | null;
+  childrenByPath: Record<string, FolderNode[]>;
+  folderAnalysisByPath: Record<string, FolderAnalysisStatus>;
+  /** Subtree AI rollup per folder path (sidebar icons). */
+  folderRollupByPath: Record<string, FolderAiSidebarRollup>;
+  /** After metadata scan, prompt when new or AI-invalidated files need pipeline runs. */
+  metadataScanFollowUp: null | {
+    scanRootFolderPath: string;
+    filesNeedingAiPipelineFollowUp: number;
+    foldersNeedingAiFollowUpCount: number;
+  };
+  /** Folder paths where catalog rows were created/updated (sidebar highlight). */
+  foldersWithCatalogChanges: Record<string, boolean>;
+
+  isFolderLoading: boolean;
+  faceDetectionSettings: FaceDetectionSettings;
+  photoAnalysisSettings: PhotoAnalysisSettings;
+  folderScanningSettings: FolderScanningSettings;
+  aiImageSearchSettings: AiImageSearchSettings;
+  pathExtractionSettings: PathExtractionSettings;
+  faceModelDownload: {
+    visible: boolean;
+    message: string;
+    filename: string | null;
+    percent: number | null;
+    downloadedBytes: number | null;
+    totalBytes: number | null;
+    status: "idle" | "running" | "completed" | "failed";
+    error: string | null;
+    durationMs: number | null;
+  };
+
+  /** LLM path metadata extraction (folder menu). */
+  pathAnalysisJobId: string | null;
+  pathAnalysisStatus: "idle" | "running";
+  pathAnalysisProcessed: number;
+  pathAnalysisTotal: number;
+  pathAnalysisFolderPath: string | null;
+  pathAnalysisPanelVisible: boolean;
+  pathAnalysisError: string | null;
+
+  geocoderInitStatus: GeocoderInitStatus;
+  geocoderInitError: string | null;
+  geocoderInitPanelVisible: boolean;
+
+  /** Background job: live similar-untyped face counts for People list (paginated tags). */
+  similarUntaggedCountsJobId: string | null;
+  similarUntaggedCountsStatus: "idle" | "running" | "completed" | "cancelled" | "failed";
+  similarUntaggedCountsProcessed: number;
+  similarUntaggedCountsTotal: number;
+  similarUntaggedCountsByTagId: Record<string, number>;
+  similarUntaggedCountsError: string | null;
+  similarUntaggedCountsPanelVisible: boolean;
+
+  setLibraryRoots: (roots: string[]) => void;
+  addLibraryRoot: (root: string) => void;
+  removeLibraryRoot: (root: string) => void;
+  setExpandedFolders: (folders: Set<string>) => void;
+  toggleFolderExpand: (path: string) => void;
+  selectFolder: (path: string | null) => void;
+  setChildrenByPath: (path: string, children: FolderNode[]) => void;
+  setFolderAnalysisByPath: (statuses: Record<string, FolderAnalysisStatus>) => void;
+  updateFolderAnalysis: (path: string, status: FolderAnalysisStatus) => void;
+  setMetadataScanFollowUp: (payload: {
+    scanRootFolderPath: string;
+    filesNeedingAiPipelineFollowUp: number;
+    foldersNeedingAiFollowUpCount: number;
+  }) => void;
+  clearMetadataScanFollowUp: () => void;
+  mergeFoldersWithCatalogChanges: (
+    folders: Array<{ folderPath: string; created?: number; updated?: number }>,
+  ) => void;
+  clearFoldersWithCatalogChanges: () => void;
+  setFolderLoading: (loading: boolean) => void;
+  setFaceDetectionSettings: (settings: FaceDetectionSettings) => void;
+  updateFaceDetectionSetting: <K extends keyof FaceDetectionSettings>(
+    key: K,
+    value: FaceDetectionSettings[K],
+  ) => void;
+  resetFaceDetectionOnlySettings: () => void;
+  resetFaceRecognitionOnlySettings: () => void;
+  setPhotoAnalysisSettings: (settings: PhotoAnalysisSettings) => void;
+  updatePhotoAnalysisSetting: <K extends keyof PhotoAnalysisSettings>(
+    key: K,
+    value: PhotoAnalysisSettings[K],
+  ) => void;
+  resetPhotoAnalysisSettings: () => void;
+  setFolderScanningSettings: (settings: FolderScanningSettings) => void;
+  updateFolderScanningSetting: <K extends keyof FolderScanningSettings>(
+    key: K,
+    value: FolderScanningSettings[K],
+  ) => void;
+  resetFolderScanningSettings: () => void;
+  setAiImageSearchSettings: (settings: AiImageSearchSettings) => void;
+  updateAiImageSearchSetting: <K extends keyof AiImageSearchSettings>(
+    key: K,
+    value: AiImageSearchSettings[K],
+  ) => void;
+  resetAiImageSearchSettings: () => void;
+  setPathExtractionSettings: (settings: PathExtractionSettings) => void;
+  updatePathExtractionSetting: <K extends keyof PathExtractionSettings>(
+    key: K,
+    value: PathExtractionSettings[K],
+  ) => void;
+  resetPathExtractionSettings: () => void;
+
+  setGeocoderInitStatus: (status: GeocoderInitStatus, error?: string) => void;
+  setGeocoderInitPanelVisible: (visible: boolean) => void;
+
+  resetSimilarUntaggedCountsJob: () => void;
+  setSimilarUntaggedCountsPanelVisible: (visible: boolean) => void;
+}
+
+export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", never]]> = (set) => ({
+  clientId: "",
+  libraryRoots: [],
+  expandedFolders: new Set<string>(),
+  selectedFolder: null,
+  childrenByPath: {},
+  folderAnalysisByPath: {},
+  folderRollupByPath: {},
+  metadataScanFollowUp: null,
+  foldersWithCatalogChanges: {},
+  isFolderLoading: false,
+  faceDetectionSettings: { ...DEFAULT_FACE_DETECTION_SETTINGS },
+  photoAnalysisSettings: { ...DEFAULT_PHOTO_ANALYSIS_SETTINGS },
+  folderScanningSettings: { ...DEFAULT_FOLDER_SCANNING_SETTINGS },
+  aiImageSearchSettings: { ...DEFAULT_AI_IMAGE_SEARCH_SETTINGS },
+  pathExtractionSettings: { ...DEFAULT_PATH_EXTRACTION_SETTINGS },
+  faceModelDownload: {
+    visible: false,
+    message: "",
+    filename: null,
+    percent: null,
+    downloadedBytes: null,
+    totalBytes: null,
+    status: "idle",
+    error: null,
+    durationMs: null,
+  },
+
+  pathAnalysisJobId: null,
+  pathAnalysisStatus: "idle",
+  pathAnalysisProcessed: 0,
+  pathAnalysisTotal: 0,
+  pathAnalysisFolderPath: null,
+  pathAnalysisPanelVisible: false,
+  pathAnalysisError: null,
+
+  geocoderInitStatus: "idle",
+  geocoderInitError: null,
+  geocoderInitPanelVisible: false,
+
+  similarUntaggedCountsJobId: null,
+  similarUntaggedCountsStatus: "idle",
+  similarUntaggedCountsProcessed: 0,
+  similarUntaggedCountsTotal: 0,
+  similarUntaggedCountsByTagId: {},
+  similarUntaggedCountsError: null,
+  similarUntaggedCountsPanelVisible: false,
+
+  setLibraryRoots: (roots) =>
+    set((state) => {
+      state.libraryRoots = roots;
+    }),
+
+  addLibraryRoot: (root) =>
+    set((state) => {
+      if (!state.libraryRoots.includes(root)) {
+        state.libraryRoots.push(root);
+      }
+    }),
+
+  removeLibraryRoot: (root) =>
+    set((state) => {
+      state.libraryRoots = state.libraryRoots.filter((libraryRoot) => libraryRoot !== root);
+    }),
+
+  setExpandedFolders: (folders) =>
+    set((state) => {
+      state.expandedFolders = folders;
+    }),
+
+  toggleFolderExpand: (path) =>
+    set((state) => {
+      if (state.expandedFolders.has(path)) {
+        state.expandedFolders.delete(path);
+      } else {
+        state.expandedFolders.add(path);
+      }
+    }),
+
+  selectFolder: (path) =>
+    set((state) => {
+      state.selectedFolder = path;
+    }),
+
+  setChildrenByPath: (path, children) =>
+    set((state) => {
+      state.childrenByPath[path] = children;
+    }),
+
+  setFolderAnalysisByPath: (statuses) =>
+    set((state) => {
+      state.folderAnalysisByPath = statuses;
+    }),
+
+  updateFolderAnalysis: (path, status) =>
+    set((state) => {
+      state.folderAnalysisByPath[path] = status;
+    }),
+
+  setMetadataScanFollowUp: (payload) =>
+    set((state) => {
+      state.metadataScanFollowUp = payload;
+    }),
+
+  clearMetadataScanFollowUp: () =>
+    set((state) => {
+      state.metadataScanFollowUp = null;
+      state.foldersWithCatalogChanges = {};
+    }),
+
+  mergeFoldersWithCatalogChanges: (folders) =>
+    set((state) => {
+      for (const f of folders) {
+        if (f.folderPath) {
+          state.foldersWithCatalogChanges[f.folderPath] = true;
+        }
+      }
+    }),
+
+  clearFoldersWithCatalogChanges: () =>
+    set((state) => {
+      state.foldersWithCatalogChanges = {};
+    }),
+
+  setFolderLoading: (loading) =>
+    set((state) => {
+      state.isFolderLoading = loading;
+    }),
+
+  setFaceDetectionSettings: (settings) =>
+    set((state) => {
+      state.faceDetectionSettings = settings;
+    }),
+
+  updateFaceDetectionSetting: (key, value) =>
+    set((state) => {
+      state.faceDetectionSettings[key] = value;
+    }),
+
+  resetFaceDetectionOnlySettings: () =>
+    set((state) => {
+      state.faceDetectionSettings.minConfidenceThreshold =
+        DEFAULT_FACE_DETECTION_SETTINGS.minConfidenceThreshold;
+      state.faceDetectionSettings.minFaceBoxShortSideRatio =
+        DEFAULT_FACE_DETECTION_SETTINGS.minFaceBoxShortSideRatio;
+      state.faceDetectionSettings.faceBoxOverlapMergeRatio =
+        DEFAULT_FACE_DETECTION_SETTINGS.faceBoxOverlapMergeRatio;
+    }),
+
+  resetFaceRecognitionOnlySettings: () =>
+    set((state) => {
+      state.faceDetectionSettings.faceRecognitionSimilarityThreshold =
+        DEFAULT_FACE_DETECTION_SETTINGS.faceRecognitionSimilarityThreshold;
+      state.faceDetectionSettings.faceGroupPairwiseSimilarityThreshold =
+        DEFAULT_FACE_DETECTION_SETTINGS.faceGroupPairwiseSimilarityThreshold;
+      state.faceDetectionSettings.faceGroupMinSize =
+        DEFAULT_FACE_DETECTION_SETTINGS.faceGroupMinSize;
+    }),
+
+  setPhotoAnalysisSettings: (settings) =>
+    set((state) => {
+      state.photoAnalysisSettings = settings;
+    }),
+
+  updatePhotoAnalysisSetting: (key, value) =>
+    set((state) => {
+      state.photoAnalysisSettings[key] = value;
+    }),
+
+  resetPhotoAnalysisSettings: () =>
+    set((state) => {
+      state.photoAnalysisSettings = { ...DEFAULT_PHOTO_ANALYSIS_SETTINGS };
+    }),
+
+  setFolderScanningSettings: (settings) =>
+    set((state) => {
+      state.folderScanningSettings = settings;
+    }),
+
+  updateFolderScanningSetting: (key, value) =>
+    set((state) => {
+      state.folderScanningSettings[key] = value;
+    }),
+
+  resetFolderScanningSettings: () =>
+    set((state) => {
+      state.folderScanningSettings = { ...DEFAULT_FOLDER_SCANNING_SETTINGS };
+    }),
+
+  setAiImageSearchSettings: (settings) =>
+    set((state) => {
+      state.aiImageSearchSettings = settings;
+    }),
+
+  updateAiImageSearchSetting: (key, value) =>
+    set((state) => {
+      state.aiImageSearchSettings[key] = value;
+    }),
+
+  resetAiImageSearchSettings: () =>
+    set((state) => {
+      state.aiImageSearchSettings = { ...DEFAULT_AI_IMAGE_SEARCH_SETTINGS };
+    }),
+
+  setPathExtractionSettings: (settings) =>
+    set((state) => {
+      state.pathExtractionSettings = settings;
+    }),
+
+  updatePathExtractionSetting: (key, value) =>
+    set((state) => {
+      state.pathExtractionSettings[key] = value;
+    }),
+
+  resetPathExtractionSettings: () =>
+    set((state) => {
+      state.pathExtractionSettings = { ...DEFAULT_PATH_EXTRACTION_SETTINGS };
+    }),
+
+  resetSimilarUntaggedCountsJob: () =>
+    set((state) => {
+      state.similarUntaggedCountsJobId = null;
+      state.similarUntaggedCountsStatus = "idle";
+      state.similarUntaggedCountsProcessed = 0;
+      state.similarUntaggedCountsTotal = 0;
+      state.similarUntaggedCountsError = null;
+    }),
+
+  setSimilarUntaggedCountsPanelVisible: (visible) =>
+    set((state) => {
+      state.similarUntaggedCountsPanelVisible = visible;
+    }),
+
+  setGeocoderInitStatus: (status, error) =>
+    set((state) => {
+      state.geocoderInitStatus = status;
+      state.geocoderInitError = error ?? null;
+      if (status === "downloading" || status === "parsing") {
+        state.geocoderInitPanelVisible = true;
+      }
+    }),
+
+  setGeocoderInitPanelVisible: (visible) =>
+    set((state) => {
+      state.geocoderInitPanelVisible = visible;
+    }),
+});

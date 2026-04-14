@@ -1,0 +1,97 @@
+"use client";
+
+import type { ReactElement, ReactNode } from "react";
+
+function joinClasses(...values: Array<string | false | null | undefined>): string {
+  return values.filter(Boolean).join(" ");
+}
+
+export interface MainAppSidebarSection {
+  id: string;
+  label: string;
+  icon: ReactNode;
+  content?: ReactNode;
+}
+
+interface MainAppSidebarProps {
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+  expandLabel: string;
+  collapseLabel: string;
+  expandIcon: ReactNode;
+  collapseIcon: ReactNode;
+  sections: MainAppSidebarSection[];
+  bottomSections?: MainAppSidebarSection[];
+  expandedSectionId: string | null;
+  onSectionToggle: (sectionId: string) => void;
+}
+
+export function MainAppSidebar({
+  collapsed,
+  onToggleCollapsed,
+  expandLabel,
+  collapseLabel,
+  expandIcon,
+  collapseIcon,
+  sections,
+  bottomSections = [],
+  expandedSectionId,
+  onSectionToggle,
+}: MainAppSidebarProps): ReactElement {
+  const collapseTitle = collapsed ? expandLabel : collapseLabel;
+  const renderSection = (section: MainAppSidebarSection): ReactElement => {
+    const isExpanded = !collapsed && section.id === expandedSectionId;
+    return (
+      <div key={section.id} className="space-y-1">
+        <button
+          type="button"
+          onClick={() => onSectionToggle(section.id)}
+          title={section.label}
+          aria-label={section.label}
+          aria-expanded={isExpanded}
+          className={joinClasses(
+            "inline-flex h-9 w-full items-center rounded-md border px-2 text-sm",
+            collapsed ? "justify-center" : "justify-start",
+            isExpanded ? "border-primary bg-primary/10 text-foreground" : "border-border",
+          )}
+        >
+          <span className={collapsed ? "" : "mr-2"} aria-hidden="true">
+            {section.icon}
+          </span>
+          {!collapsed ? section.label : null}
+        </button>
+        {isExpanded && section.content ? (
+          <div className="min-h-0 max-h-[60vh] overflow-auto rounded-md border border-border/70 p-2">
+            {section.content}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex h-full min-h-0 flex-col gap-3">
+      <button
+        type="button"
+        onClick={onToggleCollapsed}
+        title={collapseTitle}
+        aria-label={collapseTitle}
+        className={joinClasses(
+          "inline-flex h-9 w-full items-center border-0 bg-transparent p-0 text-foreground shadow-none outline-none",
+          collapsed ? "justify-center" : "justify-start",
+        )}
+      >
+        {collapsed ? expandIcon : collapseIcon}
+      </button>
+
+      <nav className="flex min-h-0 flex-1 flex-col gap-1">
+        {sections.map(renderSection)}
+        {bottomSections.length > 0 ? (
+          <div className="mt-auto space-y-1 border-t border-border/60 pt-2">
+            {bottomSections.map(renderSection)}
+          </div>
+        ) : null}
+      </nav>
+    </div>
+  );
+}
