@@ -23,6 +23,7 @@
 
 # production
 /build
+apps/desktop-media/dist/
 apps/desktop-media/dist-electron/
 apps/desktop-media/dist-renderer/
 apps/desktop-media/release/
