@@ -6,12 +6,14 @@ import {
   DEFAULT_APP_SETTINGS,
   DEFAULT_FACE_DETECTION_SETTINGS,
   DEFAULT_FOLDER_SCANNING_SETTINGS,
+  DEFAULT_MEDIA_VIEWER_SETTINGS,
   DEFAULT_PATH_EXTRACTION_SETTINGS,
   DEFAULT_PHOTO_ANALYSIS_SETTINGS,
   type AiImageSearchSettings,
   type AppSettings,
   type FaceDetectionSettings,
   type FolderScanningSettings,
+  type MediaViewerSettings,
   type PathExtractionSettings,
   type PhotoAnalysisSettings,
 } from "../src/shared/ipc";
@@ -44,6 +46,7 @@ export async function readSettings(userDataPath: string): Promise<AppSettings> {
     photoAnalysis: sanitizePhotoAnalysisSettings(parsed.photoAnalysis),
     folderScanning: sanitizeFolderScanningSettings(parsed.folderScanning),
     aiImageSearch: sanitizeAiImageSearchSettings(parsed.aiImageSearch),
+    mediaViewer: sanitizeMediaViewerSettings(parsed.mediaViewer),
     pathExtraction: sanitizePathExtractionSettings(parsed.pathExtraction),
     clientId,
   };
@@ -53,6 +56,20 @@ export async function readSettings(userDataPath: string): Promise<AppSettings> {
   }
 
   return settings;
+}
+
+function sanitizeMediaViewerSettings(candidate: unknown): MediaViewerSettings {
+  const value = isRecord(candidate) ? candidate : {};
+  return {
+    autoPlayVideoOnOpen:
+      typeof value.autoPlayVideoOnOpen === "boolean"
+        ? value.autoPlayVideoOnOpen
+        : DEFAULT_MEDIA_VIEWER_SETTINGS.autoPlayVideoOnOpen,
+    skipVideosInSlideshow:
+      typeof value.skipVideosInSlideshow === "boolean"
+        ? value.skipVideosInSlideshow
+        : DEFAULT_MEDIA_VIEWER_SETTINGS.skipVideosInSlideshow,
+  };
 }
 
 export async function writeSettings(

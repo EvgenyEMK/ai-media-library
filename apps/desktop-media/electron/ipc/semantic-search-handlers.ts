@@ -49,8 +49,16 @@ import type { RunningSemanticIndexJob } from "./types";
 import { collectFoldersRecursively, collectImageEntriesForFolders, ensureCatalogForImages, ensureMetadataForImage } from "./folder-utils";
 import { emitSemanticIndexProgress } from "./progress-emitters";
 import { acquirePowerSave, releasePowerSave } from "./power-save-manager";
+import { isVerboseElectronLogsEnabled } from "../verbose-electron-logs";
 import { getFaceRecognitionSimilarityThreshold } from "../face-recognition-threshold";
 import type { SemanticSearchSignalMode } from "@emk/media-store";
+
+const consoleLog = console.log.bind(console);
+
+function logVerbose(...args: Parameters<typeof console.log>): void {
+  if (!isVerboseElectronLogsEnabled()) return;
+  consoleLog(...args);
+}
 
 function formatKeywordRerankHitScores(r: ReRankedRow): string {
   const scores = r.keywordHitScores;
@@ -230,7 +238,7 @@ export function registerSemanticSearchHandlers(): void {
         Number.isFinite(request.keywordMatchThresholdDescription)
           ? Math.max(0, Math.min(1, request.keywordMatchThresholdDescription))
           : DEFAULT_AI_IMAGE_SEARCH_SETTINGS.keywordMatchThresholdDescription;
-      console.log(
+      logVerbose(
         `[semantic-search][main][${new Date().toISOString()}] search START query="${query}" advanced=${!!request.advancedSearch} signalMode=${signalMode} kwRerank=${keywordMatchReranking} kwVlmTh=${keywordMatchThresholdVlm} kwDescTh=${keywordMatchThresholdDescription}`,
       );
 
@@ -252,10 +260,10 @@ export function registerSemanticSearchHandlers(): void {
           if (eq.length > 0) {
             embeddingQuery = eq;
           }
-          console.log(
+          logVerbose(
             `[semantic-search][main][+${Date.now() - searchT0}ms] query analysis done (model: ${analysisModel})`,
           );
-          console.log(
+          logVerbose(
             "[semantic-search][main][advanced] LLM structured (copy-paste):",
             JSON.stringify(
               {
@@ -269,19 +277,19 @@ export function registerSemanticSearchHandlers(): void {
             ),
           );
         } else {
-          console.log(
+          logVerbose(
             `[semantic-search][main][+${Date.now() - searchT0}ms] query analysis failed or unavailable, using raw query for embedding`,
           );
         }
       }
 
       if (request.advancedSearch) {
-        console.log(
+        logVerbose(
           `[semantic-search][main][advanced] text passed to embedTextDirect: ${JSON.stringify(embeddingQuery)} (user query was: ${JSON.stringify(query)})`,
         );
       }
       const queryVector = await embedTextDirect(embeddingQuery);
-      console.log(`[semantic-search][main][+${Date.now() - searchT0}ms] embedTextDirect done`);
+      logVerbose(`[semantic-search][main][+${Date.now() - searchT0}ms] embedTextDirect done`);
 
       const hasPersonFilter = request.personTagIds && request.personTagIds.length > 0;
       const wantUnconfirmed = hasPersonFilter && request.includeUnconfirmedFaces === true;
@@ -293,7 +301,7 @@ export function registerSemanticSearchHandlers(): void {
           threshold: suggestionThreshold,
         });
         if (refreshed > 0) {
-          console.log(`[semantic-search][main] lazy-populated ${refreshed} person suggestion(s)`);
+          logVerbose(`[semantic-search][main] lazy-populated ${refreshed} person suggestion(s)`);
         }
       }
 
@@ -328,7 +336,7 @@ export function registerSemanticSearchHandlers(): void {
         eventDateEnd,
         locationQuery,
       };
-      console.log(`[semantic-search][main] filters: ${JSON.stringify({ folderPath: filters.folderPath, recursive: filters.recursive, personTagIds: filters.personTagIds, includeUnconfirmedFaces: filters.includeUnconfirmedFaces })}`);
+      logVerbose(`[semantic-search][main] filters: ${JSON.stringify({ folderPath: filters.folderPath, recursive: filters.recursive, personTagIds: filters.personTagIds, includeUnconfirmedFaces: filters.includeUnconfirmedFaces })}`);
       const effectiveLimit = Math.max(1, request.limit ?? 100);
       const candidateCount = Math.max(effectiveLimit, 100);
 
@@ -338,7 +346,7 @@ export function registerSemanticSearchHandlers(): void {
         Promise.resolve(searchByKeyword(searchQuery, kwFilters, candidateCount)),
         searchByDescriptionVector(queryVector, filters, candidateCount),
       ]);
-      console.log(
+      logVerbose(
         `[semantic-search][main][+${Date.now() - searchT0}ms] vision=${vectorRows.length} keyword=${keywordRows.length} description=${descriptionRows.length}`,
       );
 
@@ -385,19 +393,19 @@ export function registerSemanticSearchHandlers(): void {
 
       if (request.advancedSearch) {
         if (!queryAnalysis) {
-          console.log(
+          logVerbose(
             "[semantic-search][main][advanced] keyword re-rank skipped: no queryAnalysis (LLM failed or Ollama unavailable)",
           );
         } else if (!queryAnalysis.keywords.length) {
-          console.log(
+          logVerbose(
             "[semantic-search][main][advanced] keyword re-rank skipped: keywords array empty after LLM parse",
           );
         } else if (!keywordMatchReranking) {
-          console.log(
+          logVerbose(
             "[semantic-search][main][advanced] keyword re-rank skipped: keyword match reranking is off in settings",
           );
         } else if (keywordMatchThresholdVlm <= 0 && keywordMatchThresholdDescription <= 0) {
-          console.log(
+          logVerbose(
             "[semantic-search][main][advanced] keyword re-rank skipped: both keyword match thresholds are 0",
           );
         }
@@ -409,11 +417,11 @@ export function registerSemanticSearchHandlers(): void {
           score: r.score,
           mediaItemId: r.mediaItemId,
         }));
-        console.log(
+        logVerbose(
           `[semantic-search][main][advanced] ===== RRF order BEFORE keyword re-rank (top ${Math.min(beforeSnapshot.length, 25)}, copy-paste) =====`,
         );
         for (const row of beforeSnapshot.slice(0, 25)) {
-          console.log(
+          logVerbose(
             `  ${row.rank}. score=${row.score.toFixed(6)} ${row.name}`,
           );
         }
@@ -429,17 +437,17 @@ export function registerSemanticSearchHandlers(): void {
             hitSignalMode: signalMode,
           },
         );
-        console.log(
+        logVerbose(
           `[semantic-search][main][+${Date.now() - searchT0}ms] keyword re-ranking done (${queryAnalysis.keywords.length} keywords, ${reRanked.length} rows, kwVlmTh=${keywordMatchThresholdVlm} kwDescTh=${keywordMatchThresholdDescription})`,
         );
 
-        console.log(
+        logVerbose(
           "[semantic-search][main][advanced] ===== FULL order AFTER keyword re-rank (copy-paste) =====",
         );
         for (let i = 0; i < reRanked.length; i++) {
           const r = reRanked[i];
           const hitPart = formatKeywordRerankHitScores(r);
-          console.log(
+          logVerbose(
             `  ${i + 1}. score=${r.score.toFixed(6)} coverage=${r.keywordCoverage.toFixed(4)} hits=${r.keywordHits}/${queryAnalysis.keywords.length} ${hitPart} ${r.name}`,
           );
         }
@@ -447,7 +455,7 @@ export function registerSemanticSearchHandlers(): void {
         for (let i = 0; i < Math.min(reRanked.length, 10); i++) {
           const r = reRanked[i];
           const hitPart = formatKeywordRerankHitScores(r);
-          console.log(
+          logVerbose(
             `${SEMANTIC_SEARCH_SCORE_LOG_INDENT}${i + 1}. ${r.name} — coverage=${r.keywordCoverage.toFixed(3)} hits=${r.keywordHits}/${queryAnalysis.keywords.length} ${hitPart}`,
           );
         }
@@ -460,13 +468,13 @@ export function registerSemanticSearchHandlers(): void {
           : signalMode === "vlm-only"
             ? "VLM only"
             : "description only";
-      console.log(
+      logVerbose(
         `[semantic-search][main][+${Date.now() - searchT0}ms] returning ${rows.length} results (RRF: ${rrfLabel}${
           canKeywordRerank ? " + keyword rerank" : ""
         })`,
       );
-      console.log("[semantic-search][main] query:", searchQuery);
-      console.log(
+      logVerbose("[semantic-search][main] query:", searchQuery);
+      logVerbose(
         "[semantic-search][main] summary:",
         JSON.stringify({
           vectorCandidates: vectorRows.length,
@@ -481,17 +489,17 @@ export function registerSemanticSearchHandlers(): void {
       if (wantUnconfirmed && hasPersonFilter) {
         const personTagIds = request.personTagIds!;
         const annotation = annotateConfirmedVsUnconfirmed(rows, personTagIds);
-        console.log(
+        logVerbose(
           `[semantic-search][main] --- IMAGES WITH ASSIGNED FACE TAGS (${annotation.confirmed.length}) ---`,
         );
         for (const entry of annotation.confirmed) {
-          console.log(`  ${entry.score.toFixed(6)} - ${entry.name}`);
+          logVerbose(`  ${entry.score.toFixed(6)} - ${entry.name}`);
         }
-        console.log(
+        logVerbose(
           `[semantic-search][main] --- IMAGES WITH SIMILAR FACES (${annotation.unconfirmed.length}) ---`,
         );
         for (const entry of annotation.unconfirmed) {
-          console.log(`  ${entry.score.toFixed(6)} - ${entry.name}`);
+          logVerbose(`  ${entry.score.toFixed(6)} - ${entry.name}`);
         }
       }
 
@@ -712,10 +720,10 @@ async function runSemanticIndexJob(
   // Warm up the vision pipeline before processing any images so that
   // model download / ONNX init completes before the first item.
   try {
-    console.log("[semantic-index] warming up vision pipeline...");
+    logVerbose("[semantic-index] warming up vision pipeline...");
     const t0 = Date.now();
     await warmupVisionPipeline();
-    console.log(`[semantic-index] vision pipeline ready (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
+    logVerbose(`[semantic-index] vision pipeline ready (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     console.error(`[semantic-index] vision pipeline warmup failed: ${reason}`);
@@ -809,7 +817,7 @@ async function runSemanticIndexJob(
       try {
         const vector = await embedImageDirect(img.path, controller.signal);
         const embeddingSource: import("@emk/shared-contracts").EmbeddingSource = "direct_vision";
-        console.log(`[semantic-index] ${img.name}: direct vision embedding (${vector.length}-dim)`);
+        logVerbose(`[semantic-index] ${img.name}: direct vision embedding (${vector.length}-dim)`);
 
         vectorStore.upsertEmbedding({
           mediaItemId,
@@ -824,7 +832,7 @@ async function runSemanticIndexJob(
       }
     } catch (error) {
       itemError = error instanceof Error ? error.message : "Embedding failed";
-      console.log(`[semantic-index] ${img.name}: FAILED - ${itemError}`);
+      logVerbose(`[semantic-index] ${img.name}: FAILED - ${itemError}`);
       vectorStore.markEmbeddingFailed({
         mediaItemId,
         embeddingType: "image",
@@ -916,17 +924,17 @@ function logSemanticSearchTopScoreBreakdown(
     const vlm = vlmScoreById.get(row.mediaItemId);
     const desc = descriptionScoreById.get(row.mediaItemId);
     const kw = keywordScoreById.get(row.mediaItemId);
-    console.log(`${idx + 1} - ${row.name}`);
-    console.log(
+    logVerbose(`${idx + 1} - ${row.name}`);
+    logVerbose(
       `${SEMANTIC_SEARCH_SCORE_LOG_INDENT}${row.score.toFixed(6)} - Overall`,
     );
-    console.log(
+    logVerbose(
       `${SEMANTIC_SEARCH_SCORE_LOG_INDENT}${vlm !== undefined ? vlm.toFixed(6) : "—"} - VLM match`,
     );
-    console.log(
+    logVerbose(
       `${SEMANTIC_SEARCH_SCORE_LOG_INDENT}${desc !== undefined ? desc.toFixed(6) : "—"} - AI description match`,
     );
-    console.log(
+    logVerbose(
       `${SEMANTIC_SEARCH_SCORE_LOG_INDENT}${kw !== undefined ? kw.toFixed(6) : "—"} - Keywords match`,
     );
   }

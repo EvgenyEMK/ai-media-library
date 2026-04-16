@@ -131,11 +131,11 @@ export function useFolderTreeHandlers(opts: {
         s.semanticSearching = false;
       });
       try {
-        const { requestId } = await window.desktopApi.startFolderImagesStream(folderPath);
+        const { requestId } = await window.desktopApi.startFolderMediaStream(folderPath);
         activeFolderRequestIdRef.current = requestId;
         if (DEBUG_PHOTO_AI) {
           console.log(
-            `[folder-stream][renderer][${nowIso()}] startFolderImagesStream folder="${folderPath}" requestId=${requestId}`,
+            `[folder-stream][renderer][${nowIso()}] startFolderMediaStream folder="${folderPath}" requestId=${requestId}`,
           );
         }
       } catch {
@@ -143,7 +143,7 @@ export function useFolderTreeHandlers(opts: {
         store.getState().setFolderLoading(false);
         if (DEBUG_PHOTO_AI) {
           console.log(
-            `[folder-stream][renderer][${nowIso()}][error] startFolderImagesStream failed folder="${folderPath}"`,
+            `[folder-stream][renderer][${nowIso()}][error] startFolderMediaStream failed folder="${folderPath}"`,
           );
         }
       }

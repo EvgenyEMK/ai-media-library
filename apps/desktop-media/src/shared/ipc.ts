@@ -16,6 +16,17 @@ export const IMAGE_EXTENSIONS = new Set([
   ".tiff",
 ]);
 
+export const VIDEO_EXTENSIONS = new Set([
+  ".mp4",
+  ".mov",
+  ".m4v",
+  ".webm",
+  ".mkv",
+  ".avi",
+]);
+
+export type MediaKind = "image" | "video";
+
 export const IPC_CHANNELS = {
   selectLibraryFolder: "media:select-library-folder",
   readFolderChildren: "media:read-folder-children",
@@ -24,6 +35,9 @@ export const IPC_CHANNELS = {
   listFolderImages: "media:list-folder-images",
   startFolderImagesStream: "media:start-folder-images-stream",
   folderImagesProgress: "media:folder-images-progress",
+  listFolderMedia: "media:list-folder-media",
+  startFolderMediaStream: "media:start-folder-media-stream",
+  folderMediaProgress: "media:folder-media-progress",
   getSettings: "media:get-settings",
   getDatabaseLocation: "media:get-database-location",
   saveSettings: "media:save-settings",
@@ -120,8 +134,16 @@ export interface AppSettings {
   photoAnalysis: PhotoAnalysisSettings;
   folderScanning: FolderScanningSettings;
   aiImageSearch: AiImageSearchSettings;
+  mediaViewer: MediaViewerSettings;
   pathExtraction: PathExtractionSettings;
   clientId: string;
+}
+
+export interface MediaViewerSettings {
+  /** Start playback automatically when a video is selected in viewer (open, strip click, prev/next). */
+  autoPlayVideoOnOpen: boolean;
+  /** In slideshow mode, skip video slides instead of playing them to completion. */
+  skipVideosInSlideshow: boolean;
 }
 
 export interface DatabaseLocationInfo {
@@ -256,6 +278,11 @@ export const DEFAULT_PATH_EXTRACTION_SETTINGS: PathExtractionSettings = {
   llmModel: "",
 };
 
+export const DEFAULT_MEDIA_VIEWER_SETTINGS: MediaViewerSettings = {
+  autoPlayVideoOnOpen: true,
+  skipVideosInSlideshow: false,
+};
+
 export const DEFAULT_APP_SETTINGS: Omit<AppSettings, "clientId"> = {
   libraryRoots: [],
   sidebarCollapsed: false,
@@ -263,6 +290,7 @@ export const DEFAULT_APP_SETTINGS: Omit<AppSettings, "clientId"> = {
   photoAnalysis: DEFAULT_PHOTO_ANALYSIS_SETTINGS,
   folderScanning: DEFAULT_FOLDER_SCANNING_SETTINGS,
   aiImageSearch: DEFAULT_AI_IMAGE_SEARCH_SETTINGS,
+  mediaViewer: DEFAULT_MEDIA_VIEWER_SETTINGS,
   pathExtraction: DEFAULT_PATH_EXTRACTION_SETTINGS,
 };
 
@@ -276,6 +304,13 @@ export interface MediaImageItem {
   path: string;
   name: string;
   url: string;
+}
+
+export interface MediaLibraryItem {
+  path: string;
+  name: string;
+  url: string;
+  mediaKind: MediaKind;
 }
 
 export type FolderImagesProgressEvent =
@@ -309,6 +344,38 @@ export type FolderImagesProgressEvent =
     };
 
 export type FolderImagesProgressListener = (event: FolderImagesProgressEvent) => void;
+
+export type FolderMediaProgressEvent =
+  | {
+      type: "started";
+      requestId: string;
+      folderPath: string;
+      total: number | null;
+      loaded: number;
+    }
+  | {
+      type: "batch";
+      requestId: string;
+      folderPath: string;
+      total: number | null;
+      loaded: number;
+      items: MediaLibraryItem[];
+    }
+  | {
+      type: "completed";
+      requestId: string;
+      folderPath: string;
+      total: number | null;
+      loaded: number;
+    }
+  | {
+      type: "failed";
+      requestId: string;
+      folderPath: string;
+      error: string;
+    };
+
+export type FolderMediaProgressListener = (event: FolderMediaProgressEvent) => void;
 
 export type DesktopPhotoTakenPrecision = "year" | "month" | "day" | "instant";
 
@@ -1128,6 +1195,9 @@ export interface DesktopApi {
   listFolderImages: (folderPath: string) => Promise<MediaImageItem[]>;
   startFolderImagesStream: (folderPath: string) => Promise<{ requestId: string }>;
   onFolderImagesProgress: (listener: FolderImagesProgressListener) => () => void;
+  listFolderMedia: (folderPath: string) => Promise<MediaLibraryItem[]>;
+  startFolderMediaStream: (folderPath: string) => Promise<{ requestId: string }>;
+  onFolderMediaProgress: (listener: FolderMediaProgressListener) => () => void;
   getSettings: () => Promise<AppSettings>;
   getDatabaseLocation: () => Promise<DatabaseLocationInfo>;
   saveSettings: (settings: AppSettings) => Promise<void>;

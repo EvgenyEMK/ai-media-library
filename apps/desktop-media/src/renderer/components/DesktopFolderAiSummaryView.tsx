@@ -142,13 +142,13 @@ function SummaryRow({
         <span className="font-semibold text-foreground">{formatGroupedInt(coverage.totalImages)}</span>
       </td>
       <td className="border-b border-border px-3 py-2.5 text-left align-top">
+        <PipelineStatusCell pipeline={coverage.semantic} />
+      </td>
+      <td className="border-b border-border px-3 py-2.5 text-left align-top">
         <PipelineStatusCell pipeline={coverage.face} />
       </td>
       <td className="border-b border-border px-3 py-2.5 text-left align-top">
         <PipelineStatusCell pipeline={coverage.photo} />
-      </td>
-      <td className="border-b border-border px-3 py-2.5 text-left align-top">
-        <PipelineStatusCell pipeline={coverage.semantic} />
       </td>
     </tr>
   );
@@ -234,13 +234,13 @@ export function DesktopFolderAiSummaryView({
                   {UI_TEXT.folderAiSummaryColumnImages}
                 </th>
                 <th className="sticky top-0 z-[2] border-b border-border bg-[#151d2e] px-3 py-2.5 text-left text-xs font-semibold tracking-wide text-foreground shadow-[0_1px_0_#2a3040]">
+                  {UI_TEXT.folderAiSummaryColumnSemantic}
+                </th>
+                <th className="sticky top-0 z-[2] border-b border-border bg-[#151d2e] px-3 py-2.5 text-left text-xs font-semibold tracking-wide text-foreground shadow-[0_1px_0_#2a3040]">
                   {UI_TEXT.folderAiSummaryColumnFace}
                 </th>
                 <th className="sticky top-0 z-[2] border-b border-border bg-[#151d2e] px-3 py-2.5 text-left text-xs font-semibold tracking-wide text-foreground shadow-[0_1px_0_#2a3040]">
                   {UI_TEXT.folderAiSummaryColumnPhoto}
-                </th>
-                <th className="sticky top-0 z-[2] border-b border-border bg-[#151d2e] px-3 py-2.5 text-left text-xs font-semibold tracking-wide text-foreground shadow-[0_1px_0_#2a3040]">
-                  {UI_TEXT.folderAiSummaryColumnSemantic}
                 </th>
               </tr>
             </thead>

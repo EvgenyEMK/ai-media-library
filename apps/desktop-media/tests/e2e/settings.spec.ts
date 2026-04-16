@@ -10,6 +10,6 @@ test.describe("Settings", () => {
     await expect(settingsArea).toBeVisible();
 
     // Settings should no longer show the empty folder state
-    await expect(mainWindow.getByText("Select a folder to view photos")).not.toBeVisible();
+    await expect(mainWindow.getByText("Select a folder to view media")).not.toBeVisible();
   });
 });

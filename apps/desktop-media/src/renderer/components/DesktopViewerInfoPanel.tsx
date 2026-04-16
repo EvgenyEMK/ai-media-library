@@ -58,6 +58,7 @@ function buildInfoSections(metadata: DesktopMediaItemMetadata): {
   aiQualityFields: DesktopInfoField[];
   invoiceReceiptDataFields: DesktopInfoField[];
   invoiceReceiptHasSignal: boolean;
+  videoDataFields: DesktopInfoField[];
 } {
   const normalized = normalizeMetadata(metadata.aiMetadata ?? null);
   const ai = normalized.ai;
@@ -237,6 +238,26 @@ function buildInfoSections(metadata: DesktopMediaItemMetadata): {
     { label: "VAT amount", value: documentData?.vat_amount ?? null },
   ];
 
+  const videoDurationSecondsRaw = extras.video_duration_seconds ?? extras.duration_seconds;
+  const videoDurationSeconds = typeof videoDurationSecondsRaw === "number"
+    ? videoDurationSecondsRaw
+    : null;
+  const videoDataFields: DesktopInfoField[] = [
+    {
+      label: "Duration",
+      value: typeof videoDurationSeconds === "number" ? `${videoDurationSeconds.toFixed(1)} sec` : null,
+    },
+    { label: "FPS", value: typeof extras.video_fps === "number" ? extras.video_fps : null },
+    {
+      label: "Codec",
+      value: typeof extras.video_codec === "string" ? extras.video_codec : null,
+    },
+    {
+      label: "Container",
+      value: typeof extras.video_container === "string" ? extras.video_container : null,
+    },
+  ];
+
   return {
     fileDataFields,
     captureDataFields,
@@ -246,6 +267,7 @@ function buildInfoSections(metadata: DesktopMediaItemMetadata): {
     invoiceReceiptHasSignal: invoiceReceiptDataFields.some((field) =>
       hasVisibleFieldValue(field.value),
     ),
+    videoDataFields,
   };
 }
 
@@ -274,6 +296,7 @@ export function DesktopViewerInfoPanel({
   peopleBoundingBoxes,
   onRefreshMetadata,
 }: DesktopViewerInfoPanelProps): ReactElement {
+  const isVideo = item.mediaType === "video";
   const viewerActiveInfoTab = useDesktopStore((s) => s.viewerActiveInfoTab);
   const [activeTabId, setActiveTabId] = useState("info");
   const [selectedFaceIndex, setSelectedFaceIndex] = useState<number | null>(null);
@@ -321,6 +344,9 @@ export function DesktopViewerInfoPanel({
   }, [peopleBoundingBoxes]);
 
   useEffect(() => {
+    if (isVideo) {
+      return;
+    }
     let cancelled = false;
     void (async () => {
       const refreshed = await onRefreshMetadata(item.sourcePath);
@@ -346,9 +372,10 @@ export function DesktopViewerInfoPanel({
     return () => {
       cancelled = true;
     };
-  }, [item.sourcePath, item.id, item.mediaItemId, onRefreshMetadata]);
+  }, [item.sourcePath, item.id, item.mediaItemId, onRefreshMetadata, isVideo]);
 
   useEffect(() => {
+    if (isVideo) return;
     const img = imageRef.current;
     if (!img) return;
     if (img.complete) {
@@ -357,9 +384,10 @@ export function DesktopViewerInfoPanel({
     }
     img.addEventListener("load", updateImageInfo);
     return () => img.removeEventListener("load", updateImageInfo);
-  }, [updateImageInfo, item.id]);
+  }, [updateImageInfo, item.id, isVideo]);
 
   useEffect(() => {
+    if (isVideo) return;
     const observer = new ResizeObserver(() => updateImageInfo());
     if (imageRef.current) observer.observe(imageRef.current);
     if (imageContainerRef.current) observer.observe(imageContainerRef.current);
@@ -368,7 +396,7 @@ export function DesktopViewerInfoPanel({
       observer.disconnect();
       window.removeEventListener("resize", updateImageInfo);
     };
-  }, [updateImageInfo, item.id]);
+  }, [updateImageInfo, item.id, isVideo]);
 
   const infoSections = metadata ? buildInfoSections(metadata) : null;
 
@@ -399,14 +427,24 @@ export function DesktopViewerInfoPanel({
             overflow: "hidden",
           }}
         >
-          <img
-            ref={imageRef}
-            src={item.storage_url}
-            alt={item.title}
-            style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
-            onLoad={updateImageInfo}
-          />
-          {activeTabId === "tags" && imageInfo && sortedFaceOverlayBoxes.length > 0 ? (
+          {isVideo ? (
+            <video
+              src={item.storage_url}
+              controls
+              preload="metadata"
+              playsInline
+              style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+            />
+          ) : (
+            <img
+              ref={imageRef}
+              src={item.storage_url}
+              alt={item.title}
+              style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+              onLoad={updateImageInfo}
+            />
+          )}
+          {!isVideo && activeTabId === "tags" && imageInfo && sortedFaceOverlayBoxes.length > 0 ? (
             <FaceBoundingBoxOverlay
               boundingBoxes={sortedFaceOverlayBoxes}
               imageInfo={imageInfo}
@@ -441,12 +479,19 @@ export function DesktopViewerInfoPanel({
                 );
               })()}
               <DesktopInfoSection
-                title="Image file data"
+                title={isVideo ? "Media file data" : "Image file data"}
                 fields={infoSections?.fileDataFields ?? []}
                 emptyStateMessage="No file-level metadata available."
               />
+              {isVideo ? (
+                <DesktopInfoSection
+                  title="Video data"
+                  fields={infoSections?.videoDataFields ?? []}
+                  emptyStateMessage="No video-specific metadata available."
+                />
+              ) : null}
               <DesktopInfoSection
-                title="Image capture data"
+                title={isVideo ? "Capture data" : "Image capture data"}
                 fields={infoSections?.captureDataFields ?? []}
                 emptyStateMessage="No EXIF capture data available."
               />
@@ -481,30 +526,36 @@ export function DesktopViewerInfoPanel({
           badgeCount: currentBoundingBoxes.length > 0 ? currentBoundingBoxes.length : undefined,
           content: (
             <div className="grid gap-3">
-              <DesktopFaceTagsTabContent
-                mediaItemId={item.mediaItemId ?? metadata?.id ?? null}
-                sourcePath={item.sourcePath}
-                imageWidth={metadata?.width ?? null}
-                imageHeight={metadata?.height ?? null}
-                boundingBoxes={currentBoundingBoxes}
-                faceDisplayOrder={faceDisplayOrder}
-                selectedIndex={selectedFaceIndex}
-                onSelectIndex={(index) =>
-                  setSelectedFaceIndex((current) => (current === index ? null : index))
-                }
-                onBoundingBoxesReplace={(boxes) => {
-                  setCurrentBoundingBoxes(boxes);
-                  setSelectedFaceIndex((current) =>
-                    current !== null && current >= boxes.length ? null : current,
-                  );
-                }}
-                onRefreshMetadataBoxes={async () => {
-                  const refreshed = await onRefreshMetadata(item.sourcePath);
-                  const boxes = getPeopleBoundingBoxes(refreshed?.aiMetadata ?? null);
-                  setCurrentBoundingBoxes(boxes);
-                  return boxes;
-                }}
-              />
+              {isVideo ? (
+                <p className="m-0 text-sm text-muted-foreground">
+                  Face tags are available for images only.
+                </p>
+              ) : (
+                <DesktopFaceTagsTabContent
+                  mediaItemId={item.mediaItemId ?? metadata?.id ?? null}
+                  sourcePath={item.sourcePath}
+                  imageWidth={metadata?.width ?? null}
+                  imageHeight={metadata?.height ?? null}
+                  boundingBoxes={currentBoundingBoxes}
+                  faceDisplayOrder={faceDisplayOrder}
+                  selectedIndex={selectedFaceIndex}
+                  onSelectIndex={(index) =>
+                    setSelectedFaceIndex((current) => (current === index ? null : index))
+                  }
+                  onBoundingBoxesReplace={(boxes) => {
+                    setCurrentBoundingBoxes(boxes);
+                    setSelectedFaceIndex((current) =>
+                      current !== null && current >= boxes.length ? null : current,
+                    );
+                  }}
+                  onRefreshMetadataBoxes={async () => {
+                    const refreshed = await onRefreshMetadata(item.sourcePath);
+                    const boxes = getPeopleBoundingBoxes(refreshed?.aiMetadata ?? null);
+                    setCurrentBoundingBoxes(boxes);
+                    return boxes;
+                  }}
+                />
+              )}
             </div>
           ),
         },

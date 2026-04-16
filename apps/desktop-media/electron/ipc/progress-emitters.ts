@@ -4,6 +4,7 @@ import {
   type FaceClusteringProgressEvent,
   type FaceDetectionProgressEvent,
   type FaceEmbeddingProgressEvent,
+  type FolderMediaProgressEvent,
   type FolderImagesProgressEvent,
   type GeocoderInitProgressEvent,
   type MetadataScanProgressEvent,
@@ -75,6 +76,13 @@ export function emitFolderImagesProgress(
   payload: FolderImagesProgressEvent,
 ): void {
   safeSend(browserWindow, IPC_CHANNELS.folderImagesProgress, payload);
+}
+
+export function emitFolderMediaProgress(
+  browserWindow: BrowserWindow,
+  payload: FolderMediaProgressEvent,
+): void {
+  safeSend(browserWindow, IPC_CHANNELS.folderMediaProgress, payload);
 }
 
 export function emitSemanticIndexProgress(

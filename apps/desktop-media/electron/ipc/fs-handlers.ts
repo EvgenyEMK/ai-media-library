@@ -6,10 +6,10 @@ import {
   type AppSettings,
   type FolderAnalysisStatus,
 } from "../../src/shared/ipc";
-import { listFolderImages, readFolderChildren, streamFolderImages } from "../fs-media";
+import { listFolderImages, listFolderMedia, readFolderChildren, streamFolderImages, streamFolderMedia } from "../fs-media";
 import { readSettings, writeSettings } from "../storage";
 import { getFolderAnalysisStatuses } from "../db/folder-analysis-status";
-import { emitFolderImagesProgress } from "./progress-emitters";
+import { emitFolderImagesProgress, emitFolderMediaProgress } from "./progress-emitters";
 import { runMetadataScanJob } from "./metadata-scan-handlers";
 import { runningMetadataScanJobs } from "./state";
 import { getModelsDirectory } from "../native-face/model-manager";
@@ -95,6 +95,33 @@ export function registerFsHandlers(): void {
     return { requestId };
   });
 
+  ipcMain.handle(IPC_CHANNELS.listFolderMedia, async (_event, folderPath: string) => {
+    return listFolderMedia(folderPath);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.startFolderMediaStream, async (event, folderPath: string) => {
+    const normalizedFolderPath = folderPath?.trim();
+    if (!normalizedFolderPath) {
+      throw new Error("Folder path is required for media streaming");
+    }
+
+    const browserWindow = BrowserWindow.fromWebContents(event.sender);
+    if (!browserWindow) {
+      throw new Error("Unable to locate media streaming window");
+    }
+
+    const requestId = randomUUID();
+    if (isDebugEnabled()) {
+      console.log(
+        `[folder-stream][main][${ts()}] start-media requestId=${requestId} folder="${normalizedFolderPath}"`,
+      );
+    }
+    setTimeout(() => {
+      void runFolderMediaStream(browserWindow, requestId, normalizedFolderPath);
+    }, 0);
+    return { requestId };
+  });
+
   ipcMain.handle(IPC_CHANNELS.getSettings, async () => {
     return readSettings(app.getPath("userData"));
   });
@@ -122,6 +149,96 @@ export function registerFsHandlers(): void {
       return getFolderAnalysisStatuses();
     },
   );
+}
+
+async function runFolderMediaStream(
+  browserWindow: BrowserWindow,
+  requestId: string,
+  folderPath: string,
+): Promise<void> {
+  let loaded = 0;
+  const observedImagePaths: string[] = [];
+  const startedAt = Date.now();
+
+  emitFolderMediaProgress(browserWindow, {
+    type: "started",
+    requestId,
+    folderPath,
+    total: null,
+    loaded,
+  });
+
+  try {
+    const result = await streamFolderMedia(
+      folderPath,
+      async (items) => {
+        loaded += items.length;
+        if ((loaded === items.length || loaded % 500 === 0) && isDebugEnabled()) {
+          console.log(
+            `[folder-stream][main][${ts()}] media-batch requestId=${requestId} loaded=${loaded} (+${items.length}) folder="${folderPath}"`,
+          );
+        }
+        observedImagePaths.push(
+          ...items.filter((item) => item.mediaKind === "image").map((item) => item.path),
+        );
+        emitFolderMediaProgress(browserWindow, {
+          type: "batch",
+          requestId,
+          folderPath,
+          total: null,
+          loaded,
+          items,
+        });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      },
+      { batchSize: 24 },
+    );
+
+    emitFolderMediaProgress(browserWindow, {
+      type: "completed",
+      requestId,
+      folderPath,
+      total: result.loaded,
+      loaded: result.loaded,
+    });
+    if (isDebugEnabled()) {
+      console.log(
+        `[folder-stream][main][${ts()}] media-completed requestId=${requestId} folder="${folderPath}" loaded=${result.loaded} durationMs=${Date.now() - startedAt}`,
+      );
+    }
+
+    for (const job of runningMetadataScanJobs.values()) {
+      job.cancelled = true;
+    }
+    const knownImageEntries = observedImagePaths.map((p) => ({
+      folderPath,
+      path: p,
+      name: path.basename(p),
+    }));
+    const settings = await readSettings(app.getPath("userData"));
+    if (knownImageEntries.length < settings.folderScanning.autoMetadataScanOnSelectMaxFiles) {
+      setTimeout(() => {
+        void runMetadataScanJob({
+          folderPath,
+          recursive: false,
+          knownImageEntries,
+        }).catch(() => undefined);
+      }, 300);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to stream folder media";
+    emitFolderMediaProgress(browserWindow, {
+      type: "failed",
+      requestId,
+      folderPath,
+      error: message,
+    });
+    if (isDebugEnabled()) {
+      console.log(
+        `[folder-stream][main][${ts()}][error] media-failed requestId=${requestId} folder="${folderPath}" loaded=${loaded} durationMs=${Date.now() - startedAt} error="${message}"`,
+      );
+    }
+  }
 }
 
 async function runFolderImagesStream(

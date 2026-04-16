@@ -7,6 +7,7 @@ export interface MediaSwiperViewerItem {
   thumbnail_path?: string | null;
   width?: number | null;
   height?: number | null;
+  mediaType?: "image" | "video";
 }
 
 export interface MediaThumbnailGridItem {
@@ -19,4 +20,5 @@ export interface MediaThumbnailGridItem {
   onStarRatingChange?: (next: number) => void;
   /** Show rejected (-1) badge when star rating UI gains that mode. */
   starRatingShowRejected?: boolean;
+  mediaType?: "image" | "video";
 }

@@ -27,6 +27,42 @@ import type { MainPaneViewMode } from "../types/app-types";
 /** Future: surface Adobe-style rejected (-1) in grid/list; kept off until pick/reject UX ships. */
 const STAR_RATING_SHOW_REJECTED_UI = false;
 
+function renderListThumbnail(
+  imageUrl: string | null | undefined,
+  title: string,
+  mediaType: "image" | "video",
+): ReactElement {
+  if (!imageUrl) {
+    return (
+      <div className="flex h-36 w-36 shrink-0 items-center justify-center rounded bg-muted text-center text-xs text-muted-foreground">
+        Preview unavailable
+      </div>
+    );
+  }
+
+  if (mediaType === "video") {
+    return (
+      <video
+        className="h-36 w-36 shrink-0 rounded object-cover"
+        src={imageUrl}
+        muted
+        preload="metadata"
+        playsInline
+      />
+    );
+  }
+
+  return (
+    <img
+      className="h-36 w-36 shrink-0 rounded object-cover"
+      src={imageUrl}
+      alt={title}
+      loading="lazy"
+      decoding="async"
+    />
+  );
+}
+
 interface DesktopMediaWorkspaceProps {
   store: DesktopStore;
   mainPaneViewMode: MainPaneViewMode;
@@ -74,7 +110,7 @@ export function DesktopMediaWorkspace({
   filteredDisplaySemanticResults,
   filteredSemanticListItems,
   quickFiltersActiveCount,
-  openFolderViewerById,
+  openFolderViewerById: _openFolderViewerById,
 }: DesktopMediaWorkspaceProps): ReactElement {
   const mediaMetadataByItemId = useDesktopStore((s) => s.mediaMetadataByItemId);
   const commitStarRating = useMediaItemStarRatingChange();
@@ -83,6 +119,37 @@ export function DesktopMediaWorkspace({
       void commitStarRating(path, next);
     },
     [commitStarRating],
+  );
+  const openFilteredItemInViewer = useCallback(
+    (itemId: string) => {
+      const allItems = store.getState().mediaItems;
+      const sourceIndex = allItems.findIndex((entry) => entry.id === itemId);
+      if (sourceIndex >= 0) {
+        const item = allItems[sourceIndex];
+        store.getState().openViewer(sourceIndex, "folder", {
+          autoPlayInitialVideo: item?.mediaType === "video",
+        });
+        return;
+      }
+      const fallback = filteredMediaItems.find((entry) => entry.id === itemId);
+      if (!fallback || !fallback.imageUrl) {
+        return;
+      }
+      store.getState().openViewer(0, "folder", {
+        autoPlayInitialVideo: fallback.mediaType === "video",
+        itemListOverride: [
+          {
+            id: fallback.id,
+            sourcePath: fallback.id,
+            title: fallback.title,
+            storage_url: fallback.imageUrl,
+            thumbnail_url: fallback.imageUrl,
+            mediaType: fallback.mediaType,
+          },
+        ],
+      });
+    },
+    [filteredMediaItems, store],
   );
 
   return (
@@ -174,13 +241,16 @@ export function DesktopMediaWorkspace({
                     starRating: image.starRating,
                     onStarRatingChange: onStarRatingChangeForPath(image.id),
                     starRatingShowRejected: STAR_RATING_SHOW_REJECTED_UI,
+                    mediaType: image.mediaType,
                   }))}
                   onItemClick={(index) => {
                     const item = filteredMediaItems[index];
-                    if (item) openFolderViewerById(item.id);
+                    if (item) openFilteredItemInViewer(item.id);
                   }}
                   showActionsMenu={false}
-                  renderActions={(item) => <DesktopMediaItemActionsMenu filePath={item.id} />}
+                  renderActions={(item) => (
+                    <DesktopMediaItemActionsMenu filePath={item.id} mediaType={item.mediaType} />
+                  )}
                   priorityCount={24}
                   scrollable={false}
                 />
@@ -202,6 +272,7 @@ export function DesktopMediaWorkspace({
                       starRating: typeof meta?.starRating === "number" ? meta.starRating : null,
                       onStarRatingChange: onStarRatingChangeForPath(image.id),
                       starRatingShowRejected: STAR_RATING_SHOW_REJECTED_UI,
+                      mediaType: "image",
                     };
                   })}
                   onItemClick={(index) => store.getState().openViewer(index, "search")}
@@ -227,27 +298,14 @@ export function DesktopMediaWorkspace({
                   <DesktopMediaItemListRow
                     key={image.id}
                     title={image.title}
-                    onRowClick={() => openFolderViewerById(image.id)}
+                    onRowClick={() => openFilteredItemInViewer(image.id)}
                     metadataLine={image.photoTakenDisplay}
                     filePath={image.id}
+                    mediaType={image.mediaType}
                     starRating={image.starRating}
                     onStarRatingChange={onStarRatingChangeForPath(image.id)}
                     starRatingShowRejected={STAR_RATING_SHOW_REJECTED_UI}
-                    thumbnail={
-                      image.imageUrl ? (
-                        <img
-                          className="h-36 w-36 shrink-0 rounded object-cover"
-                          src={image.imageUrl}
-                          alt={image.title}
-                          loading="lazy"
-                          decoding="async"
-                        />
-                      ) : (
-                        <div className="flex h-36 w-36 shrink-0 items-center justify-center rounded bg-muted text-center text-xs text-muted-foreground">
-                          Preview unavailable
-                        </div>
-                      )
-                    }
+                    thumbnail={renderListThumbnail(image.imageUrl, image.title, image.mediaType)}
                   />
                 ))}
               </div>
@@ -262,24 +320,11 @@ export function DesktopMediaWorkspace({
                     metadataLine={image.photoTakenDisplay}
                     folderLine={image.subtitle}
                     filePath={image.id}
+                    mediaType="image"
                     starRating={image.starRating}
                     onStarRatingChange={onStarRatingChangeForPath(image.id)}
                     starRatingShowRejected={STAR_RATING_SHOW_REJECTED_UI}
-                    thumbnail={
-                      image.imageUrl ? (
-                        <img
-                          className="h-36 w-36 shrink-0 rounded object-cover"
-                          src={image.imageUrl}
-                          alt={image.title}
-                          loading="lazy"
-                          decoding="async"
-                        />
-                      ) : (
-                        <div className="flex h-36 w-36 shrink-0 items-center justify-center rounded bg-muted text-center text-xs text-muted-foreground">
-                          Preview unavailable
-                        </div>
-                      )
-                    }
+                    thumbnail={renderListThumbnail(image.imageUrl, image.title, "image")}
                   />
                 ))}
               </div>

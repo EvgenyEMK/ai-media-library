@@ -3,6 +3,7 @@ import {
   DEFAULT_AI_IMAGE_SEARCH_SETTINGS,
   DEFAULT_FACE_DETECTION_SETTINGS,
   DEFAULT_FOLDER_SCANNING_SETTINGS,
+  DEFAULT_MEDIA_VIEWER_SETTINGS,
   DEFAULT_PATH_EXTRACTION_SETTINGS,
   DEFAULT_PHOTO_ANALYSIS_SETTINGS,
   type AiImageSearchSettings,
@@ -11,6 +12,7 @@ import {
   type FolderAnalysisStatus,
   type FolderNode,
   type FolderScanningSettings,
+  type MediaViewerSettings,
   type GeocoderInitStatus,
   type PathExtractionSettings,
   type PhotoAnalysisSettings,
@@ -39,6 +41,7 @@ export interface DesktopSlice {
   photoAnalysisSettings: PhotoAnalysisSettings;
   folderScanningSettings: FolderScanningSettings;
   aiImageSearchSettings: AiImageSearchSettings;
+  mediaViewerSettings: MediaViewerSettings;
   pathExtractionSettings: PathExtractionSettings;
   faceModelDownload: {
     visible: boolean;
@@ -119,6 +122,12 @@ export interface DesktopSlice {
     value: AiImageSearchSettings[K],
   ) => void;
   resetAiImageSearchSettings: () => void;
+  setMediaViewerSettings: (settings: MediaViewerSettings) => void;
+  updateMediaViewerSetting: <K extends keyof MediaViewerSettings>(
+    key: K,
+    value: MediaViewerSettings[K],
+  ) => void;
+  resetMediaViewerSettings: () => void;
   setPathExtractionSettings: (settings: PathExtractionSettings) => void;
   updatePathExtractionSetting: <K extends keyof PathExtractionSettings>(
     key: K,
@@ -148,6 +157,7 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   photoAnalysisSettings: { ...DEFAULT_PHOTO_ANALYSIS_SETTINGS },
   folderScanningSettings: { ...DEFAULT_FOLDER_SCANNING_SETTINGS },
   aiImageSearchSettings: { ...DEFAULT_AI_IMAGE_SEARCH_SETTINGS },
+  mediaViewerSettings: { ...DEFAULT_MEDIA_VIEWER_SETTINGS },
   pathExtractionSettings: { ...DEFAULT_PATH_EXTRACTION_SETTINGS },
   faceModelDownload: {
     visible: false,
@@ -335,6 +345,21 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   resetAiImageSearchSettings: () =>
     set((state) => {
       state.aiImageSearchSettings = { ...DEFAULT_AI_IMAGE_SEARCH_SETTINGS };
+    }),
+
+  setMediaViewerSettings: (settings) =>
+    set((state) => {
+      state.mediaViewerSettings = settings;
+    }),
+
+  updateMediaViewerSetting: (key, value) =>
+    set((state) => {
+      state.mediaViewerSettings[key] = value;
+    }),
+
+  resetMediaViewerSettings: () =>
+    set((state) => {
+      state.mediaViewerSettings = { ...DEFAULT_MEDIA_VIEWER_SETTINGS };
     }),
 
   setPathExtractionSettings: (settings) =>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type CSSProperties, type ReactElement, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactElement, type ReactNode } from "react";
 import { MediaItemStarRating } from "./media-item-star-rating";
 
 interface MediaItemGridCardProps {
@@ -14,6 +14,7 @@ interface MediaItemGridCardProps {
   onStarRatingChange?: (next: number) => void;
   /** When true, surface a distinct rejected (-1) badge; desktop defaults off until pick/reject UX ships. */
   starRatingShowRejected?: boolean;
+  mediaType?: "image" | "video";
 }
 
 const styles: Record<string, CSSProperties> = {
@@ -75,6 +76,22 @@ const styles: Record<string, CSSProperties> = {
     fontSize: 12,
     opacity: 0.9,
   },
+  mediaBadge: {
+    position: "absolute",
+    left: 8,
+    bottom: 8,
+    zIndex: 12,
+    width: 24,
+    height: 24,
+    borderRadius: 999,
+    background: "rgba(15, 23, 42, 0.82)",
+    border: "1px solid rgba(148, 163, 184, 0.5)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#f8fafc",
+    boxShadow: "0 2px 6px rgba(2, 6, 23, 0.45)",
+  },
 };
 
 export function MediaItemGridCard({
@@ -87,11 +104,35 @@ export function MediaItemGridCard({
   starRating,
   onStarRatingChange,
   starRatingShowRejected = false,
+  mediaType = "image",
 }: MediaItemGridCardProps): ReactElement {
   const cardRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
   const [ratingFocused, setRatingFocused] = useState(false);
+  const [videoVisible, setVideoVisible] = useState(priority);
   const ratingExpanded = Boolean(onStarRatingChange) && (isHovered || ratingFocused);
+
+  useEffect(() => {
+    if (mediaType !== "video" || priority) {
+      setVideoVisible(true);
+      return;
+    }
+    const root = cardRef.current;
+    if (!root) {
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setVideoVisible(true);
+          observer.disconnect();
+        }
+      },
+      { root: null, rootMargin: "240px 0px" },
+    );
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [mediaType, priority]);
 
   const collapseRatingChrome = (): void => {
     setRatingFocused(false);
@@ -115,19 +156,58 @@ export function MediaItemGridCard({
     >
       <div style={styles.imageWrap}>
         {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={title}
-            loading={priority ? "eager" : "lazy"}
-            decoding="async"
-            style={{
-              ...styles.image,
-              ...(isHovered ? { transform: "scale(1.1)" } : {}),
-            }}
-          />
+          mediaType === "video" ? (
+            videoVisible ? (
+              <video
+                src={imageUrl}
+                muted
+                preload="metadata"
+                playsInline
+                onClick={onClick}
+                style={{
+                  ...styles.image,
+                  ...(isHovered ? { transform: "scale(1.1)" } : {}),
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  ...styles.image,
+                  background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#e2e8f0",
+                  fontSize: 14,
+                }}
+                onClick={onClick}
+              >
+                Video
+              </div>
+            )
+          ) : (
+            <img
+              src={imageUrl}
+              alt={title}
+              loading={priority ? "eager" : "lazy"}
+              decoding="async"
+              onClick={onClick}
+              style={{
+                ...styles.image,
+                ...(isHovered ? { transform: "scale(1.1)" } : {}),
+              }}
+            />
+          )
         ) : (
           <div style={styles.placeholder}>Preview unavailable</div>
         )}
+        {mediaType === "video" ? (
+          <div style={styles.mediaBadge} aria-label="Video item" title="Video">
+            <svg width="13" height="13" viewBox="0 0 10 10" aria-hidden="true">
+              <path d="M2 1.5L8 5L2 8.5V1.5Z" fill="currentColor" />
+            </svg>
+          </div>
+        ) : null}
         {starRating !== undefined || onStarRatingChange ? (
           <div
             style={{

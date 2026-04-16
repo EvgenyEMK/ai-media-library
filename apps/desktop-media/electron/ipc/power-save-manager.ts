@@ -1,6 +1,14 @@
 import { powerSaveBlocker } from "electron";
+import { isVerboseElectronLogsEnabled } from "../verbose-electron-logs";
 
 type PowerSaveToken = string;
+
+const consoleLog = console.log.bind(console);
+
+function logPowerSave(...args: Parameters<typeof console.log>): void {
+  if (!isVerboseElectronLogsEnabled()) return;
+  consoleLog(...args);
+}
 
 const activeTokens = new Map<PowerSaveToken, string>();
 let blockerId: number | null = null;
@@ -10,7 +18,7 @@ function ensureBlockerStarted(): void {
     return;
   }
   blockerId = powerSaveBlocker.start("prevent-app-suspension");
-  console.log(`[power-save] blocker started id=${blockerId}`);
+  logPowerSave(`[power-save] blocker started id=${blockerId}`);
 }
 
 function ensureBlockerStopped(): void {
@@ -18,7 +26,7 @@ function ensureBlockerStopped(): void {
     return;
   }
   const stopped = powerSaveBlocker.stop(blockerId);
-  console.log(`[power-save] blocker stop requested id=${blockerId} stopped=${stopped}`);
+  logPowerSave(`[power-save] blocker stop requested id=${blockerId} stopped=${stopped}`);
   blockerId = null;
 }
 
@@ -28,7 +36,7 @@ export function acquirePowerSave(reason: string): PowerSaveToken {
   if (activeTokens.size === 1) {
     ensureBlockerStarted();
   }
-  console.log(
+  logPowerSave(
     `[power-save] acquire token=${token} reason=${JSON.stringify(reason)} holders=${activeTokens.size}`,
   );
   return token;
@@ -41,7 +49,7 @@ export function releasePowerSave(token: PowerSaveToken): void {
     return;
   }
   activeTokens.delete(token);
-  console.log(
+  logPowerSave(
     `[power-save] release token=${token} reason=${JSON.stringify(reason)} holders=${activeTokens.size}`,
   );
   if (activeTokens.size === 0) {
@@ -51,7 +59,7 @@ export function releasePowerSave(token: PowerSaveToken): void {
 
 export function releaseAllPowerSave(): void {
   if (activeTokens.size > 0) {
-    console.log(`[power-save] releasing all holders count=${activeTokens.size}`);
+    logPowerSave(`[power-save] releasing all holders count=${activeTokens.size}`);
   }
   activeTokens.clear();
   ensureBlockerStopped();

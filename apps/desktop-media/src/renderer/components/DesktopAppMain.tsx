@@ -37,10 +37,13 @@ interface DesktopAppMainProps {
   photoAnalysisSettings: DesktopStoreState["photoAnalysisSettings"];
   folderScanningSettings: DesktopStoreState["folderScanningSettings"];
   aiImageSearchSettings: DesktopStoreState["aiImageSearchSettings"];
+  mediaViewerSettings: DesktopStoreState["mediaViewerSettings"];
   pathExtractionSettings: PathExtractionSettings;
   selectedFolderLabel: string;
   quickFiltersActiveCount: number;
   mediaItemsLength: number;
+  mediaImagesCount: number;
+  mediaVideosCount: number;
   filteredMediaItemsLength: number;
   semanticModeActive: boolean;
   displaySemanticResultsCount: number;
@@ -92,10 +95,13 @@ export function DesktopAppMain({
   photoAnalysisSettings,
   folderScanningSettings,
     aiImageSearchSettings,
+  mediaViewerSettings,
     pathExtractionSettings,
   selectedFolderLabel,
   quickFiltersActiveCount,
   mediaItemsLength,
+  mediaImagesCount,
+  mediaVideosCount,
   filteredMediaItemsLength,
   semanticModeActive,
   displaySemanticResultsCount,
@@ -150,6 +156,7 @@ export function DesktopAppMain({
             photoAnalysisSettings={photoAnalysisSettings}
             folderScanningSettings={folderScanningSettings}
             aiImageSearchSettings={aiImageSearchSettings}
+            mediaViewerSettings={mediaViewerSettings}
             onFaceDetectionSettingChange={(key, value) => store.getState().updateFaceDetectionSetting(key, value)}
             onResetFaceDetectionOnlySettings={() => store.getState().resetFaceDetectionOnlySettings()}
             onResetFaceRecognitionOnlySettings={() => store.getState().resetFaceRecognitionOnlySettings()}
@@ -163,6 +170,10 @@ export function DesktopAppMain({
               store.getState().updateAiImageSearchSetting(key, value)
             }
             onResetAiImageSearchSettings={() => store.getState().resetAiImageSearchSettings()}
+            onMediaViewerSettingChange={(key, value) =>
+              store.getState().updateMediaViewerSetting(key, value)
+            }
+            onResetMediaViewerSettings={() => store.getState().resetMediaViewerSettings()}
             pathExtractionSettings={pathExtractionSettings}
             onPathExtractionSettingChange={(key, value) =>
               store.getState().updatePathExtractionSetting(key, value)
@@ -177,6 +188,8 @@ export function DesktopAppMain({
             selectedFolderLabel={selectedFolderLabel}
             quickFiltersActiveCount={quickFiltersActiveCount}
             mediaItemsLength={mediaItemsLength}
+            mediaImagesCount={mediaImagesCount}
+            mediaVideosCount={mediaVideosCount}
             filteredMediaItemsLength={filteredMediaItemsLength}
             semanticModeActive={semanticModeActive}
             displaySemanticResultsCount={displaySemanticResultsCount}

@@ -47,6 +47,7 @@ export type DesktopFilteredMediaItem = {
   subtitle?: string;
   photoTakenDisplay: string;
   starRating: number | null;
+  mediaType: "image" | "video";
 };
 
 export type DesktopSemanticListItem = SemanticSearchResult & {
@@ -104,6 +105,7 @@ export function useFilteredMediaItems(quickFilters: ThumbnailQuickFilterState): 
           metadata?.photoTakenPrecision ?? null,
         ),
         starRating: typeof metadata?.starRating === "number" ? metadata.starRating : null,
+        mediaType: item.mediaType === "video" ? "video" : "image",
       };
     });
   }, [mediaItems, mediaMetadataByItemId]);
@@ -162,6 +164,7 @@ export function useFilteredMediaItems(quickFilters: ThumbnailQuickFilterState): 
         width: entry.width ?? null,
         height: entry.height ?? null,
         sourcePath: entry.sourcePath,
+        mediaType: entry.mediaType === "video" ? "video" : "image",
       }));
     }
     const images = viewerSource === "search" ? filteredDisplaySemanticResults : mediaItems;
@@ -176,6 +179,7 @@ export function useFilteredMediaItems(quickFilters: ThumbnailQuickFilterState): 
         width: metadata?.width ?? null,
         height: metadata?.height ?? null,
         sourcePath: image.id,
+        mediaType: image.mediaType === "video" ? "video" : "image",
       };
     });
   }, [
@@ -187,7 +191,9 @@ export function useFilteredMediaItems(quickFilters: ThumbnailQuickFilterState): 
   ]);
 
   const imageEditSuggestionItems = useMemo((): ImageEditSuggestionsItem[] => {
-    return mediaItems.map((item) => {
+    return mediaItems
+      .filter((item) => item.mediaType !== "video")
+      .map((item) => {
       const metadata = lookupMediaMetadataByItemId<DesktopMediaItemMetadata>(item.id, mediaMetadataByItemId);
       const extras = getAdditionalTopLevelFields(metadata?.aiMetadata ?? null);
       const suggestions = Array.isArray(extras.edit_suggestions)
@@ -242,7 +248,7 @@ export function useFilteredMediaItems(quickFilters: ThumbnailQuickFilterState): 
         imageUrl: item.imageUrl,
         suggestions,
       };
-    });
+      });
   }, [mediaItems, mediaMetadataByItemId]);
 
   return {

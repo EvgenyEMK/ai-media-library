@@ -21,6 +21,8 @@ interface DesktopMainToolbarProps {
   displaySemanticResultsCount: number;
   filteredDisplaySemanticResultsCount: number;
   selectedFolder: string | null;
+  mediaImagesCount: number;
+  mediaVideosCount: number;
   aiPipelineStripRefreshKey: string;
   semanticPanelOpen: boolean;
   quickFiltersMenuOpen: boolean;
@@ -47,6 +49,8 @@ export function DesktopMainToolbar({
   displaySemanticResultsCount,
   filteredDisplaySemanticResultsCount,
   selectedFolder,
+  mediaImagesCount,
+  mediaVideosCount,
   aiPipelineStripRefreshKey,
   semanticPanelOpen,
   quickFiltersMenuOpen,
@@ -78,7 +82,12 @@ export function DesktopMainToolbar({
             </span>
           ) : null}
         </div>
-        <DesktopFolderAiPipelineStrip folderPath={selectedFolder} refreshKey={aiPipelineStripRefreshKey} />
+        <DesktopFolderAiPipelineStrip
+          folderPath={selectedFolder}
+          refreshKey={aiPipelineStripRefreshKey}
+          imagesCount={mediaImagesCount}
+          videosCount={mediaVideosCount}
+        />
       </div>
       <div className="relative flex gap-2">
         <ToolbarIconButton
