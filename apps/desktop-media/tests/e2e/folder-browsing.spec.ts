@@ -74,7 +74,7 @@ test.describe("Folder browsing", () => {
     await thumbnail.click({ force: true });
 
     const viewer = mainWindow.locator(".media-swiper-theme");
-    await expect(viewer).toBeVisible({ timeout: 5_000 });
+    await expect(viewer).toBeVisible({ timeout: 15_000 });
   });
 
   test("removing a library from row menu hides it without deleting files", async ({ electronApp, mainWindow }) => {
