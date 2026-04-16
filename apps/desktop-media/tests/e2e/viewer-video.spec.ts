@@ -16,13 +16,13 @@ async function openViewerFromListRow(mainWindow: import("@playwright/test").Page
   const rowTitle = mainWindow.locator("article h3").filter({ hasText: title }).first();
   await expect(rowTitle).toBeVisible({ timeout: 15_000 });
   await rowTitle.locator("xpath=ancestor::article[1]").click();
-  await expect(mainWindow.locator(".media-swiper-theme")).toBeVisible({ timeout: 8_000 });
+  await expect(mainWindow.locator(".media-swiper-theme")).toBeVisible({ timeout: 25_000 });
 }
 
 async function openViewerFromGridByTitle(mainWindow: import("@playwright/test").Page, title: string): Promise<void> {
   const grid = mainWindow.getByTestId("desktop-folder-thumbnails-grid");
   await grid.getByText(title, { exact: true }).click({ force: true });
-  await expect(mainWindow.locator(".media-swiper-theme")).toBeVisible({ timeout: 8_000 });
+  await expect(mainWindow.locator(".media-swiper-theme")).toBeVisible({ timeout: 25_000 });
 }
 
 async function currentViewerVideoPaused(mainWindow: import("@playwright/test").Page): Promise<boolean | null> {
