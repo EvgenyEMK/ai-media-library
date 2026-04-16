@@ -12,9 +12,9 @@ const e2ePhotosDir =
   configuredAssetsDir && configuredAssetsDir.length > 0 ? configuredAssetsDir : defaultAssetsDir;
 
 const REQUIRED_FILTER_FILES = [
-  "20210701_163111.jpg",
-  "20210730_085853.jpg",
-  "20210702_134329.jpg",
+  "mock_invoice_01_gemini.png",
+  "receipt-mock-02-french.jpg",
+  "Dutch_identity_card_front_specimen_issued_9_March_2014.jpg",
   "20191013_142053.jpg",
   "20200910_151932.jpg",
   "20200821_101037.jpg",
@@ -84,8 +84,8 @@ test.describe("Quick filters (e2e-photos)", () => {
     await mainWindow.getByTestId("quick-filter-documents-checkbox").click();
     await pickCustomSelectOption(mainWindow, "quick-filter-documents-select", /Invoices \/ receipts/);
     await expect(mainWindow.getByTestId("desktop-folder-thumbnails-grid")).toBeVisible();
-    await expect(mainWindow.getByAltText("20210701_163111.jpg")).toBeVisible();
-    await expect(mainWindow.getByAltText("20210730_085853.jpg")).toBeVisible();
+    await expect(mainWindow.getByAltText("mock_invoice_01_gemini.png")).toBeVisible();
+    await expect(mainWindow.getByAltText("receipt-mock-02-french.jpg")).toBeVisible();
     await expect(mainWindow.getByAltText("20191013_142053.jpg")).not.toBeVisible();
 
     await openQuickFiltersMenu(mainWindow);
@@ -93,8 +93,8 @@ test.describe("Quick filters (e2e-photos)", () => {
 
     await mainWindow.getByTestId("quick-filter-documents-checkbox").click();
     await pickCustomSelectOption(mainWindow, "quick-filter-documents-select", /^IDs$/);
-    await expect(mainWindow.getByAltText("20210702_134329.jpg")).toBeVisible();
-    await expect(mainWindow.getByAltText("20210701_163111.jpg")).not.toBeVisible();
+    await expect(mainWindow.getByAltText("Dutch_identity_card_front_specimen_issued_9_March_2014.jpg")).toBeVisible();
+    await expect(mainWindow.getByAltText("mock_invoice_01_gemini.png")).not.toBeVisible();
 
     await openQuickFiltersMenu(mainWindow);
     await mainWindow.getByTestId("quick-filter-clear-all").click();
@@ -102,7 +102,7 @@ test.describe("Quick filters (e2e-photos)", () => {
     await mainWindow.getByTestId("quick-filter-people-checkbox").click();
     await pickCustomSelectOption(mainWindow, "quick-filter-people-select", /^≥ 1$/);
     await expect(mainWindow.getByAltText("20191013_142053.jpg")).toBeVisible();
-    await expect(mainWindow.getByAltText("20210701_163111.jpg")).not.toBeVisible();
+    await expect(mainWindow.getByAltText("mock_invoice_01_gemini.png")).not.toBeVisible();
   });
 
   test("AI Rating filter narrows folder thumbnails by AI esthetic score", async ({ electronApp, mainWindow }) => {
@@ -128,7 +128,7 @@ test.describe("Quick filters (e2e-photos)", () => {
     await expect(mainWindow.getByAltText("20200910_151932.jpg")).toBeVisible();
     await expect(mainWindow.getByAltText("20200821_101037.jpg")).toBeVisible();
     await expect(mainWindow.getByAltText("20191013_142053.jpg")).not.toBeVisible();
-    await expect(mainWindow.getByAltText("20210701_163111.jpg")).not.toBeVisible();
+    await expect(mainWindow.getByAltText("mock_invoice_01_gemini.png")).not.toBeVisible();
   });
 
   test("Categories filter uses checkbox + select (sports and nature)", async ({ electronApp, mainWindow }) => {
