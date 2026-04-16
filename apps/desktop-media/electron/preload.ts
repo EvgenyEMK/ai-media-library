@@ -23,6 +23,22 @@ const api: DesktopApi = {
       ipcRenderer.removeListener(IPC_CHANNELS.folderImagesProgress, wrapped);
     };
   },
+  listFolderMedia: (folderPath) =>
+    ipcRenderer.invoke(IPC_CHANNELS.listFolderMedia, folderPath),
+  startFolderMediaStream: (folderPath) =>
+    ipcRenderer.invoke(IPC_CHANNELS.startFolderMediaStream, folderPath),
+  onFolderMediaProgress: (listener) => {
+    const wrapped = (
+      _event: Electron.IpcRendererEvent,
+      payload: Parameters<typeof listener>[0],
+    ) => {
+      listener(payload);
+    };
+    ipcRenderer.on(IPC_CHANNELS.folderMediaProgress, wrapped);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.folderMediaProgress, wrapped);
+    };
+  },
   getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.getSettings),
   getDatabaseLocation: () => ipcRenderer.invoke(IPC_CHANNELS.getDatabaseLocation),
   saveSettings: (settings) => ipcRenderer.invoke(IPC_CHANNELS.saveSettings, settings),

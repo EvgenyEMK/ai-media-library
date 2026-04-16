@@ -4,11 +4,13 @@ import {
   DEFAULT_AI_IMAGE_SEARCH_SETTINGS,
   DEFAULT_FACE_DETECTION_SETTINGS,
   DEFAULT_FOLDER_SCANNING_SETTINGS,
+  DEFAULT_MEDIA_VIEWER_SETTINGS,
   DEFAULT_PATH_EXTRACTION_SETTINGS,
   DEFAULT_PHOTO_ANALYSIS_SETTINGS,
   type AiImageSearchSettings,
   type FaceDetectionSettings,
   type FolderScanningSettings,
+  type MediaViewerSettings,
   type PathExtractionSettings,
   type PhotoAnalysisSettings,
 } from "../../shared/ipc";
@@ -25,6 +27,7 @@ interface DesktopSettingsSectionProps {
   photoAnalysisSettings: PhotoAnalysisSettings;
   folderScanningSettings: FolderScanningSettings;
   aiImageSearchSettings: AiImageSearchSettings;
+  mediaViewerSettings: MediaViewerSettings;
   onFaceDetectionSettingChange: <K extends keyof FaceDetectionSettings>(
     key: K,
     value: FaceDetectionSettings[K],
@@ -46,6 +49,11 @@ interface DesktopSettingsSectionProps {
     value: AiImageSearchSettings[K],
   ) => void;
   onResetAiImageSearchSettings: () => void;
+  onMediaViewerSettingChange: <K extends keyof MediaViewerSettings>(
+    key: K,
+    value: MediaViewerSettings[K],
+  ) => void;
+  onResetMediaViewerSettings: () => void;
   pathExtractionSettings: PathExtractionSettings;
   onPathExtractionSettingChange: <K extends keyof PathExtractionSettings>(
     key: K,
@@ -83,6 +91,7 @@ How: When enabled, the folder context menu offers “Extract path metadata (LLM)
   faceRecognition: "Face recognition",
   photoAnalysis: "Image analysis",
   aiImageSearch: "AI image search",
+  mediaViewer: "Image / Video viewer",
   folderScanWithoutSubfoldersNote: "Without sub-folders",
   photoAnalysisPromptTitle: "Prompt used",
   invoicePromptTitle: "Invoice extraction prompt",
@@ -112,6 +121,12 @@ How: During metadata scan, reverse-geocode GPS lat/lon using offline GeoNames da
   gpsLocationDetectionConfirmCancel: "Cancel",
   /** Single label for all section reset buttons (one i18n key). */
   resetToDefaults: "Reset to defaults",
+  autoPlayVideoOnSelectionTitle: "Automatically start playback on video selection",
+  autoPlayVideoOnSelectionDescription:
+    "Automatically starts video playback when a video is selected in the viewer (opening a video, using previous/next, or clicking a strip thumbnail).",
+  skipVideosInSlideshowModeTitle: "Skip videos in album auto-playback mode",
+  skipVideosInSlideshowModeDescription:
+    "Skips videos during album playback mode if the album includes mix of images and videos.",
 };
 
 /** ~1.2× smaller than the prior 26px settings checkbox; aligns with title row. */
@@ -123,6 +138,7 @@ export function DesktopSettingsSection({
   photoAnalysisSettings,
   folderScanningSettings,
   aiImageSearchSettings,
+  mediaViewerSettings,
   onFaceDetectionSettingChange,
   onResetFaceDetectionOnlySettings,
   onResetFaceRecognitionOnlySettings,
@@ -132,6 +148,8 @@ export function DesktopSettingsSection({
   onResetFolderScanningSettings,
   onAiImageSearchSettingChange,
   onResetAiImageSearchSettings,
+  onMediaViewerSettingChange,
+  onResetMediaViewerSettings,
   pathExtractionSettings,
   onPathExtractionSettingChange,
   onResetPathExtractionSettings,
@@ -186,6 +204,40 @@ export function DesktopSettingsSection({
   return (
     <div className="mx-auto w-full max-w-7xl space-y-3 px-4 py-6 md:px-8">
       <h1 className="m-0 text-3xl font-bold text-foreground md:text-4xl">{UI_TEXT.title}</h1>
+
+      <SettingsSectionCard title={UI_TEXT.mediaViewer}>
+        <div className="space-y-3">
+          <SettingsCheckboxField
+            title={UI_TEXT.autoPlayVideoOnSelectionTitle}
+            description={UI_TEXT.autoPlayVideoOnSelectionDescription}
+            checked={mediaViewerSettings.autoPlayVideoOnOpen}
+            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+            onChange={(next) => onMediaViewerSettingChange("autoPlayVideoOnOpen", next)}
+          />
+          <SettingsCheckboxField
+            title={UI_TEXT.skipVideosInSlideshowModeTitle}
+            description={UI_TEXT.skipVideosInSlideshowModeDescription}
+            checked={mediaViewerSettings.skipVideosInSlideshow}
+            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+            onChange={(next) => onMediaViewerSettingChange("skipVideosInSlideshow", next)}
+          />
+          <div className="pt-1">
+            <button
+              type="button"
+              className="inline-flex h-10 items-center rounded-md border border-border px-3 text-base"
+              onClick={onResetMediaViewerSettings}
+              disabled={
+                mediaViewerSettings.autoPlayVideoOnOpen ===
+                  DEFAULT_MEDIA_VIEWER_SETTINGS.autoPlayVideoOnOpen &&
+                mediaViewerSettings.skipVideosInSlideshow ===
+                  DEFAULT_MEDIA_VIEWER_SETTINGS.skipVideosInSlideshow
+              }
+            >
+              {UI_TEXT.resetToDefaults}
+            </button>
+          </div>
+        </div>
+      </SettingsSectionCard>
 
       <SettingsSectionCard title={UI_TEXT.fileMetadataManagement}>
         <div className="space-y-3">

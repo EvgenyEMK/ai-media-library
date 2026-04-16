@@ -11,12 +11,15 @@ export interface ViewerItemListEntry {
   width?: number | null;
   height?: number | null;
   mediaItemId?: string | null;
+  mediaType?: "image" | "video";
 }
 
 export interface OpenViewerOptions {
   showInfoPanel?: boolean;
   activeInfoTab?: string | null;
   itemListOverride?: ViewerItemListEntry[] | null;
+  /** True only when opening viewer from folder thumbnail click on video. */
+  autoPlayInitialVideo?: boolean;
 }
 
 export interface ViewerSlice {
@@ -27,6 +30,7 @@ export interface ViewerSlice {
   viewerActiveInfoTab: string | null;
   viewerSelectedFaceIndex: number | null;
   viewerItemsOverride: ViewerItemListEntry[] | null;
+  viewerAutoPlayInitialVideo: boolean;
 
   openViewer: (index: number, source: ViewerSource, options?: OpenViewerOptions) => void;
   closeViewer: () => void;
@@ -45,6 +49,7 @@ export const createViewerSlice: StateCreator<ViewerSlice, [["zustand/immer", nev
   viewerActiveInfoTab: null,
   viewerSelectedFaceIndex: null,
   viewerItemsOverride: null,
+  viewerAutoPlayInitialVideo: false,
 
   openViewer: (index, source, options) =>
     set((state) => {
@@ -57,6 +62,7 @@ export const createViewerSlice: StateCreator<ViewerSlice, [["zustand/immer", nev
       } else {
         state.viewerItemsOverride = null;
       }
+      state.viewerAutoPlayInitialVideo = Boolean(options?.autoPlayInitialVideo);
       if (options?.showInfoPanel !== undefined) {
         state.viewerShowInfoPanel = options.showInfoPanel;
       } else {
@@ -72,6 +78,7 @@ export const createViewerSlice: StateCreator<ViewerSlice, [["zustand/immer", nev
       state.viewerShowInfoPanel = false;
       state.viewerActiveInfoTab = null;
       state.viewerItemsOverride = null;
+      state.viewerAutoPlayInitialVideo = false;
     }),
 
   setViewerCurrentIndex: (index) =>

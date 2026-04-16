@@ -8,6 +8,7 @@ interface DesktopMediaItemListRowProps {
   metadataLine?: string;
   folderLine?: string;
   filePath: string;
+  mediaType?: "image" | "video";
   thumbnail: ReactNode;
   starRating?: number | null;
   onStarRatingChange?: (next: number) => void;
@@ -20,6 +21,7 @@ export function DesktopMediaItemListRow({
   metadataLine,
   folderLine,
   filePath,
+  mediaType = "image",
   thumbnail,
   starRating,
   onStarRatingChange,
@@ -38,7 +40,13 @@ export function DesktopMediaItemListRow({
       starRatingShowRejected={starRatingShowRejected}
       forceShowActions={menuOpen}
       thumbnail={thumbnail}
-      actions={<DesktopMediaItemActionsMenu filePath={filePath} onOpenChange={setMenuOpen} />}
+      actions={(
+        <DesktopMediaItemActionsMenu
+          filePath={filePath}
+          mediaType={mediaType}
+          onOpenChange={setMenuOpen}
+        />
+      )}
     />
   );
 }

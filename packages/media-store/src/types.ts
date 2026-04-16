@@ -27,6 +27,7 @@ export interface MediaStoreItem {
   title: string;
   imageUrl?: string | null;
   subtitle?: string;
+  mediaType?: "image" | "video";
 }
 
 // ── Album (platform-agnostic minimal shape) ─────────────────────

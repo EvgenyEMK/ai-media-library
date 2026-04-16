@@ -95,6 +95,6 @@ test.describe("Folder browsing", () => {
     await expect(sidebar.getByRole("button", { name: normalizedTemp, exact: true })).toBeHidden({
       timeout: 5_000,
     });
-    await expect(mainWindow.locator(".empty-state")).toContainText("Select a folder to view photos");
+    await expect(mainWindow.locator(".empty-state")).toContainText("Select a folder to view media");
   });
 });

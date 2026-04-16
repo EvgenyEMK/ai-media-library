@@ -56,6 +56,7 @@ export function App(): ReactElement {
   const viewerOpen = useDesktopStore((s) => s.viewerOpen);
   const viewerCurrentIndex = useDesktopStore((s) => s.viewerCurrentIndex);
   const viewerShowInfoPanel = useDesktopStore((s) => s.viewerShowInfoPanel);
+  const viewerAutoPlayInitialVideo = useDesktopStore((s) => s.viewerAutoPlayInitialVideo);
   const aiStatus = useDesktopStore((s) => s.aiStatus);
   const aiJobId = useDesktopStore((s) => s.aiJobId);
   const aiSelectedModel = useDesktopStore((s) => s.aiSelectedModel);
@@ -66,6 +67,7 @@ export function App(): ReactElement {
   const photoAnalysisSettings = useDesktopStore((s) => s.photoAnalysisSettings);
   const folderScanningSettings = useDesktopStore((s) => s.folderScanningSettings);
   const aiImageSearchSettings = useDesktopStore((s) => s.aiImageSearchSettings);
+  const mediaViewerSettings = useDesktopStore((s) => s.mediaViewerSettings);
   const pathExtractionSettings = useDesktopStore((s) => s.pathExtractionSettings);
   const semanticQuery = useDesktopStore((s) => s.semanticQuery);
   const semanticResults = useDesktopStore((s) => s.semanticResults);
@@ -168,6 +170,14 @@ export function App(): ReactElement {
   });
 
   const semanticModeActive = semanticResults.length > 0;
+  const mediaImagesCount = useMemo(
+    () => mediaItems.filter((item) => item.mediaType !== "video").length,
+    [mediaItems],
+  );
+  const mediaVideosCount = useMemo(
+    () => mediaItems.filter((item) => item.mediaType === "video").length,
+    [mediaItems],
+  );
 
   const prevSemanticModeActiveRef = useRef<boolean | null>(null);
   useEffect(() => {
@@ -272,10 +282,13 @@ export function App(): ReactElement {
         photoAnalysisSettings={photoAnalysisSettings}
         folderScanningSettings={folderScanningSettings}
         aiImageSearchSettings={aiImageSearchSettings}
+        mediaViewerSettings={mediaViewerSettings}
         pathExtractionSettings={pathExtractionSettings}
         selectedFolderLabel={selectedFolderLabel}
         quickFiltersActiveCount={quickFiltersActiveCount}
         mediaItemsLength={mediaItems.length}
+        mediaImagesCount={mediaImagesCount}
+        mediaVideosCount={mediaVideosCount}
         filteredMediaItemsLength={filteredMediaItems.length}
         semanticModeActive={semanticModeActive}
         displaySemanticResultsCount={displaySemanticResults.length}
@@ -327,6 +340,9 @@ export function App(): ReactElement {
         renderInfoPanel={renderViewerInfoPanel}
         infoPanelOpen={viewerShowInfoPanel}
         onInfoPanelOpenChange={(open) => store.getState().setViewerShowInfoPanel(open)}
+        autoPlayInitialVideo={viewerAutoPlayInitialVideo && mediaViewerSettings.autoPlayVideoOnOpen}
+        autoPlayVideoOnSelection={mediaViewerSettings.autoPlayVideoOnOpen}
+        skipVideosInSlideshow={mediaViewerSettings.skipVideosInSlideshow}
       />
     </div>
   );

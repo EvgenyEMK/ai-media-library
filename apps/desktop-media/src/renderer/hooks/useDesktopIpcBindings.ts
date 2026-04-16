@@ -111,6 +111,7 @@ export function useDesktopInitialization(): void {
           }
           s.folderScanningSettings = settings.folderScanning;
           s.aiImageSearchSettings = settings.aiImageSearch;
+          s.mediaViewerSettings = settings.mediaViewer;
           s.pathExtractionSettings = settings.pathExtraction;
         });
       })
@@ -271,6 +272,10 @@ export function useDesktopSettingsPersistence(): void {
             prev.aiImageSearchSettings.keywordMatchThresholdVlm ||
           state.aiImageSearchSettings.keywordMatchThresholdDescription !==
             prev.aiImageSearchSettings.keywordMatchThresholdDescription ||
+          state.mediaViewerSettings.autoPlayVideoOnOpen !==
+            prev.mediaViewerSettings.autoPlayVideoOnOpen ||
+          state.mediaViewerSettings.skipVideosInSlideshow !==
+            prev.mediaViewerSettings.skipVideosInSlideshow ||
           state.pathExtractionSettings.extractDates !==
             prev.pathExtractionSettings.extractDates ||
           state.pathExtractionSettings.extractLocation !==
@@ -288,6 +293,7 @@ export function useDesktopSettingsPersistence(): void {
             photoAnalysis: state.photoAnalysisSettings,
             folderScanning: state.folderScanningSettings,
             aiImageSearch: state.aiImageSearchSettings,
+            mediaViewer: state.mediaViewerSettings,
             pathExtraction: state.pathExtractionSettings,
           });
         }

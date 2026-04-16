@@ -100,6 +100,7 @@ export function MediaThumbnailGrid({
           starRating={item.starRating}
           onStarRatingChange={item.onStarRatingChange}
           starRatingShowRejected={item.starRatingShowRejected}
+          mediaType={item.mediaType}
           onClick={() => onItemClick(index)}
           priority={index < priorityCount}
           actions={

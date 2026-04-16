@@ -4,6 +4,7 @@ import type { DesktopMediaItemMetadata } from "../../shared/ipc";
 export interface DesktopViewerItem {
   id: string;
   mediaItemId?: string | null;
+  mediaType?: "image" | "video";
   title: string;
   storage_url: string;
   thumbnail_url: string;

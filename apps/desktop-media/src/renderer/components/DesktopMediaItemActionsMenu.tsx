@@ -4,13 +4,25 @@ import { UI_TEXT } from "../lib/ui-text";
 
 interface DesktopMediaItemActionsMenuProps {
   filePath: string;
+  mediaType?: "image" | "video";
   onOpenChange?: (open: boolean) => void;
 }
 
 export function DesktopMediaItemActionsMenu({
   filePath,
+  mediaType = "image",
   onOpenChange,
 }: DesktopMediaItemActionsMenuProps): ReactElement {
+  const videoOnlyNoticeAction = mediaType === "video"
+    ? [
+        {
+          id: "video-ai-unavailable",
+          label: UI_TEXT.videoAiUnavailable,
+          disabled: true,
+        },
+      ]
+    : [];
+
   return (
     <MediaItemActionsMenu
       onOpenChange={onOpenChange}
@@ -33,6 +45,7 @@ export function DesktopMediaItemActionsMenu({
             void navigator.clipboard.writeText(filePath);
           },
         },
+        ...videoOnlyNoticeAction,
       ]}
     />
   );

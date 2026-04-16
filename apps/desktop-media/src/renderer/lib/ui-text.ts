@@ -6,8 +6,8 @@ export const UI_TEXT = {
   sectionAlbums: "Albums",
   sectionPeople: "People",
   sectionSettings: "Settings",
-  noFolder: "Select a folder to view photos",
-  noPhotos: "No photos found in selected folder",
+  noFolder: "Select a folder to view media",
+  noPhotos: "No images or videos found in selected folder",
   analyzePhotos: "Analyze photos",
   analysisPanelTitle: "Local AI analysis",
   faceDetectionPanelTitle: "Local face detection",
@@ -64,6 +64,7 @@ export const UI_TEXT = {
   folderAiSummaryStatusPartial: "Partial",
   folderAiSummaryStatusFailed: "Failed",
   folderAiPipelineStripLabel: "AI pipeline status for this folder (direct images only)",
+  folderAiPipelineStripImagesOnlyHint: "AI status (images only)",
   folderAiPipelineStripLoading: "Updating AI status…",
   folderAiPipelineStripUnavailable: "AI status unavailable",
   metadataScanFollowUpTitle: "Catalog update detected",
@@ -131,6 +132,7 @@ export const UI_TEXT = {
   similarUntaggedCountsClose: "Close similar face counts status",
   revealInFileExplorer: "Show in File Explorer",
   copyFilePath: "Copy file path",
+  videoAiUnavailable: "AI analysis is not available for videos yet",
   gpsLocationDetectionTitle: "Detect Country / City from GPS coordinates",
   gpsLocationDetectionDescription: `When enabled, photos with GPS coordinates are reverse-geocoded during metadata scan to fill in Country, State/Province, and City. This data is used in search filters, folder/album views, and smart albums.
 

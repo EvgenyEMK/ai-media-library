@@ -1,5 +1,5 @@
 import { useEffect, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
-import type { MediaImageItem } from "../../shared/ipc";
+import type { MediaLibraryItem } from "../../shared/ipc";
 import type { DesktopStore } from "../stores/desktop-store";
 
 const DEBUG_PHOTO_AI =
@@ -24,7 +24,7 @@ export function useFolderImagesStream(
   }>({ loaded: 0, total: null });
 
   useEffect(() => {
-    const pendingItemsByRequest = new Map<string, MediaImageItem[]>();
+    const pendingItemsByRequest = new Map<string, MediaLibraryItem[]>();
     const pendingMetadataPathsByRequest = new Map<string, string[]>();
     const pendingLoadedByRequest = new Map<string, { loaded: number; total: number | null }>();
     const flushTimersByRequest = new Map<string, ReturnType<typeof setTimeout>>();
@@ -46,10 +46,11 @@ export function useFolderImagesStream(
       if (pendingItems && pendingItems.length > 0) {
         store.setState((s) => {
           s.mediaItems.push(
-            ...pendingItems.map((img: MediaImageItem) => ({
+            ...pendingItems.map((img: MediaLibraryItem) => ({
               id: img.path,
               title: img.name,
               imageUrl: img.url,
+              mediaType: img.mediaKind,
             })),
           );
         });
@@ -70,7 +71,7 @@ export function useFolderImagesStream(
     };
 
     const lastLoggedLoadedByRequest = new Map<string, number>();
-    const unsubscribe = window.desktopApi.onFolderImagesProgress((event) => {
+    const unsubscribe = window.desktopApi.onFolderMediaProgress((event) => {
       const activeRequestId = activeFolderRequestIdRef.current;
       if (!activeRequestId || event.requestId !== activeRequestId) return;
 

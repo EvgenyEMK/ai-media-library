@@ -12,7 +12,7 @@ import {
 import { createPortal } from "react-dom";
 import { Swiper, SwiperSlide } from "swiper/react";
 import type { Swiper as SwiperType } from "swiper";
-import { Autoplay, FreeMode, Keyboard, Mousewheel, Thumbs } from "swiper/modules";
+import { FreeMode, Keyboard, Mousewheel, Thumbs } from "swiper/modules";
 import "swiper/css";
 import "swiper/css/thumbs";
 import "./swiper-viewer.css";
@@ -45,6 +45,100 @@ import {
 
 export type { ThumbSize } from "./viewer-styles";
 
+/** Main carousel: only slides within this index distance load real `src` (avoids hundreds of videos/images at once). */
+const MAIN_SLIDE_MEDIA_DISTANCE = 2;
+/** Thumb rail: eager-load video preview for neighbors of the active slide; others use intersection lazy-load. */
+const THUMB_STRIP_VIDEO_PRIORITY_DISTANCE = 6;
+
+const stripVideoPlaceholderStyle: CSSProperties = {
+  width: "100%",
+  height: "100%",
+  objectFit: "cover",
+  background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  color: "#e2e8f0",
+  fontSize: 11,
+};
+
+interface LazyStripVideoThumbProps {
+  src: string;
+  thumbStyle: CSSProperties;
+  highPriority: boolean;
+}
+
+function LazyStripVideoThumb({ src, thumbStyle, highPriority }: LazyStripVideoThumbProps): ReactElement {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [showVideo, setShowVideo] = useState(highPriority);
+
+  useEffect(() => {
+    if (highPriority) {
+      setShowVideo(true);
+    }
+  }, [highPriority]);
+
+  useEffect(() => {
+    if (showVideo) {
+      return;
+    }
+    const el = wrapRef.current;
+    if (!el) {
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setShowVideo(true);
+          observer.disconnect();
+        }
+      },
+      { root: null, rootMargin: "480px 0px 480px 0px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [showVideo]);
+
+  return (
+    <div ref={wrapRef} style={{ position: "relative", width: "100%", height: "100%" }}>
+      {showVideo ? (
+        <video
+          src={src}
+          muted
+          preload="metadata"
+          playsInline
+          style={{ ...thumbStyle, pointerEvents: "none" }}
+          aria-hidden
+        />
+      ) : (
+        <div style={{ ...thumbStyle, ...stripVideoPlaceholderStyle }} aria-hidden>
+          Video
+        </div>
+      )}
+      <div
+        style={{
+          position: "absolute",
+          left: 6,
+          bottom: 6,
+          width: 18,
+          height: 18,
+          borderRadius: 999,
+          background: "rgba(15, 23, 42, 0.82)",
+          border: "1px solid rgba(148, 163, 184, 0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#f8fafc",
+        }}
+      >
+        <svg width="8" height="8" viewBox="0 0 10 10" aria-hidden="true">
+          <path d="M2 1.5L8 5L2 8.5V1.5Z" fill="currentColor" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 interface MediaSwiperViewerProps<TItem extends MediaSwiperViewerItem> {
   isOpen: boolean;
   items: TItem[];
@@ -60,6 +154,12 @@ interface MediaSwiperViewerProps<TItem extends MediaSwiperViewerItem> {
   /** When set with `onInfoPanelOpenChange`, info panel visibility is controlled by the parent. */
   infoPanelOpen?: boolean;
   onInfoPanelOpenChange?: (open: boolean) => void;
+  /** When true, auto-start playback only for the initially opened video slide. */
+  autoPlayInitialVideo?: boolean;
+  /** When true, selecting a video slide (thumb/nav) auto-starts playback. */
+  autoPlayVideoOnSelection?: boolean;
+  /** In slideshow mode, skip videos instead of playing them. */
+  skipVideosInSlideshow?: boolean;
 }
 
 export function MediaSwiperViewer<TItem extends MediaSwiperViewerItem>({
@@ -76,6 +176,9 @@ export function MediaSwiperViewer<TItem extends MediaSwiperViewerItem>({
   renderInfoPanel,
   infoPanelOpen: controlledInfoOpen,
   onInfoPanelOpenChange,
+  autoPlayInitialVideo = false,
+  autoPlayVideoOnSelection = false,
+  skipVideosInSlideshow = false,
 }: MediaSwiperViewerProps<TItem>): ReactElement | null {
   const resolvedThumbSize = useResolvedThumbSize(thumbSize);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -104,9 +207,11 @@ export function MediaSwiperViewer<TItem extends MediaSwiperViewerItem>({
       setInternalShowInfoPanel((previous) => !previous);
     }
   };
-  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
   const [frameSize, setFrameSize] = useState<FrameSize | null>(null);
   const [imageNaturalSizes, setImageNaturalSizes] = useState<Record<string, ImageNaturalSize>>({});
+  const mediaVideoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
+  const initialVideoAutoPlayAttemptedRef = useRef(false);
+  const slideshowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const upsertImageNaturalSize = (itemId: string, width: number, height: number) => {
     if (!width || !height) {
       return;
@@ -136,9 +241,15 @@ export function MediaSwiperViewer<TItem extends MediaSwiperViewerItem>({
   useEffect(() => {
     if (!isOpen) {
       setIsSlideshowPlaying(false);
+      for (const videoElement of Object.values(mediaVideoRefs.current)) {
+        if (videoElement && !videoElement.paused) {
+          videoElement.pause();
+        }
+      }
       if (!isInfoControlled) {
         setInternalShowInfoPanel(false);
       }
+      initialVideoAutoPlayAttemptedRef.current = false;
     }
   }, [isOpen, isInfoControlled]);
 
@@ -156,21 +267,6 @@ export function MediaSwiperViewer<TItem extends MediaSwiperViewerItem>({
     }
     mainSwiper.slideTo(currentIndex);
   }, [currentIndex, mainSwiper]);
-
-  useEffect(() => {
-    if (!mainSwiper || mainSwiper.destroyed || !mainSwiper.autoplay) {
-      return;
-    }
-    if (isSlideshowPlaying) {
-      mainSwiper.autoplay.start();
-    } else {
-      mainSwiper.autoplay.stop();
-    }
-  }, [isSlideshowPlaying, mainSwiper]);
-
-  useEffect(() => {
-    setPortalRoot(document.body);
-  }, []);
 
   useEffect(() => {
     const frameElement = frameRef.current;
@@ -193,14 +289,7 @@ export function MediaSwiperViewer<TItem extends MediaSwiperViewerItem>({
     const observer = new ResizeObserver(updateFrameSize);
     observer.observe(frameElement);
     return () => observer.disconnect();
-  }, [isOpen, resolvedThumbSize, portalRoot]);
-
-  if (!isOpen || resolvedItems.length === 0) {
-    return null;
-  }
-  if (!portalRoot) {
-    return null;
-  }
+  }, [isOpen, resolvedThumbSize]);
 
   const selectedItem = resolvedItems[currentIndex];
   const canGoPrev = resolvedItems.length > 1;
@@ -237,6 +326,27 @@ export function MediaSwiperViewer<TItem extends MediaSwiperViewerItem>({
     });
   };
 
+  const pauseAllVideos = (): void => {
+    for (const videoElement of Object.values(mediaVideoRefs.current)) {
+      if (videoElement && !videoElement.paused) {
+        videoElement.pause();
+      }
+    }
+  };
+
+  const clearSlideshowTimer = (): void => {
+    if (slideshowTimerRef.current) {
+      clearTimeout(slideshowTimerRef.current);
+      slideshowTimerRef.current = null;
+    }
+  };
+
+  const goToNextSlide = (): void => {
+    if (mainSwiper && !mainSwiper.destroyed) {
+      mainSwiper.slideNext();
+    }
+  };
+
   const controlsRegionStyle: CSSProperties = {
     ...styles.controlsRegion,
     width: showingInfo ? "60%" : "100%",
@@ -246,6 +356,82 @@ export function MediaSwiperViewer<TItem extends MediaSwiperViewerItem>({
 
   const hideThumbs = isSlideshowPlaying;
   const { railWidth, slideHeight } = THUMB_DIMENSIONS[resolvedThumbSize];
+
+  // Mark "initial autoplay handled" when opening a non-video or when autoplay is off.
+  // Actual play() for the initial video runs in the slide's onLoadedMetadata — Swiper
+  // mounts slides asynchronously, so the <video> ref is often still null on first effect run.
+  useEffect(() => {
+    if (!isOpen || !autoPlayInitialVideo || initialVideoAutoPlayAttemptedRef.current) {
+      return;
+    }
+    const selected = resolvedItems[currentIndex];
+    if (!selected || selected.mediaType !== "video") {
+      initialVideoAutoPlayAttemptedRef.current = true;
+    }
+  }, [autoPlayInitialVideo, currentIndex, isOpen, resolvedItems]);
+
+  useEffect(() => {
+    if (!isOpen || !autoPlayVideoOnSelection || isSlideshowPlaying) {
+      return;
+    }
+    const selected = resolvedItems[currentIndex];
+    if (!selected || selected.mediaType !== "video") {
+      return;
+    }
+    const videoElement = mediaVideoRefs.current[selected.id];
+    if (!videoElement) {
+      return;
+    }
+    void videoElement.play().catch(() => undefined);
+  }, [autoPlayVideoOnSelection, currentIndex, isOpen, isSlideshowPlaying, resolvedItems]);
+
+  useEffect(() => {
+    clearSlideshowTimer();
+    if (!isOpen || !isSlideshowPlaying || !resolvedItems.length) {
+      return;
+    }
+    const selected = resolvedItems[currentIndex];
+    if (!selected) {
+      return;
+    }
+    if (selected.mediaType !== "video") {
+      slideshowTimerRef.current = setTimeout(goToNextSlide, showPhotoDuration);
+      return () => clearSlideshowTimer();
+    }
+    if (skipVideosInSlideshow) {
+      slideshowTimerRef.current = setTimeout(goToNextSlide, 0);
+      return () => clearSlideshowTimer();
+    }
+    const videoElement = mediaVideoRefs.current[selected.id];
+    if (!videoElement) {
+      return;
+    }
+    const handleEnded = () => {
+      goToNextSlide();
+    };
+    videoElement.addEventListener("ended", handleEnded);
+    void videoElement.play().catch(() => undefined);
+    return () => {
+      videoElement.removeEventListener("ended", handleEnded);
+      clearSlideshowTimer();
+    };
+  }, [
+    currentIndex,
+    isOpen,
+    isSlideshowPlaying,
+    resolvedItems,
+    showPhotoDuration,
+    skipVideosInSlideshow,
+    mainSwiper,
+  ]);
+
+  if (!isOpen || resolvedItems.length === 0) {
+    return null;
+  }
+  const portalRoot = typeof document === "undefined" ? null : document.body;
+  if (!portalRoot) {
+    return null;
+  }
 
   return createPortal(
     <div ref={containerRef} style={styles.overlay} className="media-swiper-theme">
@@ -268,18 +454,36 @@ export function MediaSwiperViewer<TItem extends MediaSwiperViewerItem>({
               watchSlidesProgress={true}
               style={{ height: "100%" }}
             >
-              {resolvedItems.map((item, index) => (
-                <SwiperSlide key={`${item.id}-thumb`} style={{ ...styles.thumbSlide, height: slideHeight }}>
-                  <button
-                    type="button"
-                    style={{ border: "none", padding: 0, background: "transparent", width: "100%", height: "100%" }}
-                    onClick={() => handleThumbClick(index)}
-                    aria-label={`Go to photo ${index + 1}`}
-                  >
-                    <img src={item.thumb} alt={item.title || `Thumbnail ${index + 1}`} style={styles.thumbImage} />
-                  </button>
-                </SwiperSlide>
-              ))}
+              {resolvedItems.map((item, index) => {
+                const stripNeighbor =
+                  Math.abs(index - currentIndex) <= THUMB_STRIP_VIDEO_PRIORITY_DISTANCE;
+                return (
+                  <SwiperSlide key={`${item.id}-thumb`} style={{ ...styles.thumbSlide, height: slideHeight }}>
+                    <button
+                      type="button"
+                      style={{ border: "none", padding: 0, background: "transparent", width: "100%", height: "100%" }}
+                      onClick={() => handleThumbClick(index)}
+                      aria-label={`Go to item ${index + 1}`}
+                    >
+                      {item.mediaType === "video" ? (
+                        <LazyStripVideoThumb
+                          src={item.full}
+                          thumbStyle={styles.thumbImage}
+                          highPriority={stripNeighbor}
+                        />
+                      ) : (
+                        <img
+                          src={item.thumb}
+                          alt={item.title || `Thumbnail ${index + 1}`}
+                          style={styles.thumbImage}
+                          loading={stripNeighbor ? "eager" : "lazy"}
+                          decoding="async"
+                        />
+                      )}
+                    </button>
+                  </SwiperSlide>
+                );
+              })}
             </Swiper>
           </div>
         )}
@@ -346,8 +550,8 @@ export function MediaSwiperViewer<TItem extends MediaSwiperViewerItem>({
                     style={{ ...styles.navButton, ...styles.navLeft }}
                     onClick={() => handleNavigate("prev")}
                     disabled={!canGoPrev}
-                    title="Previous image"
-                    aria-label="Previous image"
+                    title="Previous item"
+                    aria-label="Previous item"
                   >
                     <IconChevronLeft />
                   </button>
@@ -356,8 +560,8 @@ export function MediaSwiperViewer<TItem extends MediaSwiperViewerItem>({
                     style={{ ...styles.navButton, ...styles.navRight }}
                     onClick={() => handleNavigate("next")}
                     disabled={!canGoNext}
-                    title="Next image"
-                    aria-label="Next image"
+                    title="Next item"
+                    aria-label="Next item"
                   >
                     <IconChevronRight />
                   </button>
@@ -367,42 +571,27 @@ export function MediaSwiperViewer<TItem extends MediaSwiperViewerItem>({
           </div>
 
           <Swiper
-            modules={[Keyboard, Thumbs, Autoplay]}
+            modules={[Keyboard, Thumbs]}
             thumbs={{ swiper: thumbsSwiper && !thumbsSwiper.destroyed ? thumbsSwiper : null }}
             slidesPerView={1}
             keyboard={{ enabled: true }}
             observer={true}
             observeParents={true}
             initialSlide={currentIndex}
-            autoplay={
-              isSlideshowPlaying
-                ? {
-                    delay: showPhotoDuration,
-                    disableOnInteraction: false,
-                    pauseOnMouseEnter: true,
-                  }
-                : false
-            }
+            autoplay={false}
             onSwiper={(swiper) => {
               setMainSwiper(swiper);
-              if (swiper.autoplay) {
-                swiper.autoplay.stop();
-              }
             }}
-            onSlideChange={(swiper) => onIndexChange(swiper.activeIndex)}
+            onSlideChange={(swiper) => {
+              pauseAllVideos();
+              onIndexChange(swiper.activeIndex);
+            }}
             style={{ width: "100%", height: "100%", background: themeBg }}
           >
-            {resolvedItems.map((item, index) => (
-              (() => {
-                const effectiveNaturalSize = resolveEffectiveNaturalSize(item, imageNaturalSizes[item.id]);
-                const fitResult = resolveMainImageFit(
-                  autoFitImageToFrame,
-                  frameSize,
-                  resolvedMaxUpscaleFactor,
-                  resolvedCoverAspectMismatchThreshold,
-                  effectiveNaturalSize,
-                );
+            {resolvedItems.map((item, index) => {
+              const loadMainMedia = Math.abs(index - currentIndex) <= MAIN_SLIDE_MEDIA_DISTANCE;
 
+              if (item.mediaType === "video") {
                 return (
                   <SwiperSlide
                     key={`${item.id}-main`}
@@ -410,9 +599,71 @@ export function MediaSwiperViewer<TItem extends MediaSwiperViewerItem>({
                     className="!flex !items-center !justify-center"
                   >
                     <div style={styles.mainImageWrap}>
+                      {loadMainMedia ? (
+                        <video
+                          src={item.full}
+                          controls
+                          preload="metadata"
+                          playsInline
+                          ref={(element) => {
+                            mediaVideoRefs.current[item.id] = element;
+                          }}
+                          onLoadedMetadata={(event) => {
+                            if (!autoPlayInitialVideo || initialVideoAutoPlayAttemptedRef.current) {
+                              return;
+                            }
+                            if (index !== currentIndex) {
+                              return;
+                            }
+                            initialVideoAutoPlayAttemptedRef.current = true;
+                            void event.currentTarget.play().catch(() => undefined);
+                          }}
+                          style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+                          aria-label={item.title || `Video ${index + 1}`}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            maxWidth: "100%",
+                            maxHeight: "100%",
+                            width: "100%",
+                            height: "100%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "#64748b",
+                            fontSize: 14,
+                          }}
+                          aria-hidden
+                        >
+                          Video
+                        </div>
+                      )}
+                    </div>
+                  </SwiperSlide>
+                );
+              }
+
+              const effectiveNaturalSize = resolveEffectiveNaturalSize(item, imageNaturalSizes[item.id]);
+              const fitResult = resolveMainImageFit(
+                autoFitImageToFrame,
+                frameSize,
+                resolvedMaxUpscaleFactor,
+                resolvedCoverAspectMismatchThreshold,
+                effectiveNaturalSize,
+              );
+
+              return (
+                <SwiperSlide
+                  key={`${item.id}-main`}
+                  style={{ width: "100%", height: "100%", background: themeBg }}
+                  className="!flex !items-center !justify-center"
+                >
+                  <div style={styles.mainImageWrap}>
+                    {loadMainMedia ? (
                       <img
                         src={item.full}
-                        alt={item.title || `Photo ${index + 1}`}
+                        alt={item.title || `Image ${index + 1}`}
                         ref={(imageElement) => {
                           if (!imageElement || !imageElement.complete) {
                             return;
@@ -436,11 +687,22 @@ export function MediaSwiperViewer<TItem extends MediaSwiperViewerItem>({
                         data-emk-frame-height={frameSize?.height ?? "na"}
                         style={fitResult.style}
                       />
-                    </div>
-                  </SwiperSlide>
-                );
-              })()
-            ))}
+                    ) : (
+                      <div
+                        style={{
+                          maxWidth: "100%",
+                          maxHeight: "100%",
+                          width: "100%",
+                          height: "100%",
+                          background: themeBg,
+                        }}
+                        aria-hidden
+                      />
+                    )}
+                  </div>
+                </SwiperSlide>
+              );
+            })}
           </Swiper>
 
           {showingInfo ? (
