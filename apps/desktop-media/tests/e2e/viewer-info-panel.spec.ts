@@ -12,7 +12,7 @@ test.describe("Viewer info panel (e2e-photos)", () => {
     await mainWindow.getByRole("button", { name: "Show info" }).click();
 
     const unavailable = mainWindow.getByText("Metadata is not available yet for this file.");
-    await expect(unavailable).not.toBeVisible({ timeout: 25_000 });
+    await expect(unavailable).not.toBeVisible({ timeout: 60_000 });
 
     await mainWindow
       .locator("details")
@@ -36,7 +36,7 @@ test.describe("Viewer info panel (e2e-photos)", () => {
     await mainWindow.getByRole("button", { name: "Show info" }).click();
     await expect(
       mainWindow.getByText("Metadata is not available yet for this file."),
-    ).not.toBeVisible({ timeout: 25_000 });
+    ).not.toBeVisible({ timeout: 60_000 });
 
     await mainWindow.getByRole("button", { name: "Face tags", exact: true }).click();
     await mainWindow.getByRole("button", { name: "Info", exact: true }).click();

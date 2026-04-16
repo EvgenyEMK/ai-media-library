@@ -2,8 +2,8 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  /** Electron cold start + first paint can exceed 30s on Windows CI or dev machines. */
-  timeout: 120_000,
+  /** Electron cold start + first window on GitHub windows-latest often needs >2m under load. */
+  timeout: 180_000,
   expect: { timeout: 20_000 },
   fullyParallel: false,
   retries: 0,

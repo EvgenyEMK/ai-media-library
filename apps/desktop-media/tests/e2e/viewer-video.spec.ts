@@ -204,7 +204,7 @@ test.describe("Viewer mixed media", () => {
 
   test("slideshow started on image eventually plays a video slide", async ({ electronApp, mainWindow }) => {
     test.skip(!hasE2eMixedMediaAssets(), mixedAssetsMissing);
-    test.setTimeout(180_000);
+    test.setTimeout(300_000);
 
     await openE2eMixedMediaLibrary(electronApp, mainWindow);
     await switchToListView(mainWindow);
@@ -219,7 +219,7 @@ test.describe("Viewer mixed media", () => {
     await mainWindow.getByRole("button", { name: "Play slideshow" }).click();
 
     await expect
-      .poll(async () => currentViewerVideoPaused(mainWindow), { timeout: 150_000 })
+      .poll(async () => currentViewerVideoPaused(mainWindow), { timeout: 240_000 })
       .toBe(false);
   });
 });

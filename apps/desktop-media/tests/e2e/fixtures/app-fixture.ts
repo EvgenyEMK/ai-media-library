@@ -59,7 +59,7 @@ export const test = base.extend<AppFixtures & AppOptions>({
   },
 
   mainWindow: async ({ electronApp }, use) => {
-    const window = await electronApp.firstWindow({ timeout: 120_000 });
+    const window = await electronApp.firstWindow({ timeout: 180_000 });
     await window.waitForLoadState("domcontentloaded");
     await use(window);
   },
