@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "notes": "Test expectations for e2e-photos. Update manually when test assets change.",
+  "semanticSearch": {
+    "notes": "Prompt cases for semantic search ranking validation.",
+    "requiredFiles": [
+      "20200910_151932.jpg",
+      "20191013_142053.jpg",
+      "20230810_141737.jpg"
+    ],
+    "promptCases": [
+      {
+        "prompt": "Mountains with cloudy sky",
+        "expectedFilename": "20200910_151932.jpg",
+        "softRanking": false
+      },
+      {
+        "prompt": "Boy with wakeboard in wakepark",
+        "expectedFilename": "20191013_142053.jpg",
+        "softRanking": false
+      },
+      {
+        "prompt": "wakepark",
+        "expectedFilename": "20191013_142053.jpg",
+        "softRanking": true
+      },
+      {
+        "prompt": "Selfie of bald man with woman in glasses",
+        "expectedFilename": "20230810_141737.jpg",
+        "softRanking": false
+      }
+    ]
+  },
+  "unconfirmedFaceSearch": {
+    "notes": "Expectations for the 'include unconfirmed similar faces' toggle in semantic search. The person in face-detect-sample-01.jpg also appears in the unconfirmedImage. Tagging one face in the confirmed image and enabling the unconfirmed toggle should surface the unconfirmed image.",
+    "personLabel": "TestPerson",
+    "confirmedImage": "face-detect-sample-01.jpg",
+    "unconfirmedImage": "20230810_141737.jpg",
+    "searchPrompt": "person photo",
+    "requiredFiles": [
+      "20230810_141737.jpg",
+      "face-detect-sample-01.jpg"
+    ]
+  }
+}

@@ -4,9 +4,11 @@ on:
   pull_request:
     branches:
       - dev
+      - main
   push:
     branches:
       - dev
+      - main
 
 jobs:
   typecheck-and-tests:
@@ -37,3 +39,32 @@ jobs:
 
       - name: Run tests (excluding E2E)
         run: pnpm test
+
+  desktop-e2e-smoke:
+    name: Desktop E2E Smoke (no AI model deps)
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.16.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        run: pnpm --filter @emk/desktop-media exec playwright install chromium
+
+      - name: Run desktop E2E smoke subset
+        run: pnpm --filter @emk/desktop-media test:e2e:ci-smoke

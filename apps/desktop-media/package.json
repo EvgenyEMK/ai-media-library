@@ -22,6 +22,7 @@
     "test:path-llm-ollama-bulk": "pnpm exec tsx scripts/test-path-llm-ollama-bulk.ts",
     "test": "vitest run",
     "test:e2e": "pnpm run rebuild:native && pnpm run build && pnpm exec playwright test --config playwright.config.ts",
+    "test:e2e:ci-smoke": "pnpm run rebuild:native && pnpm run build && pnpm exec playwright test --config playwright.config.ts tests/e2e/app-launch.spec.ts tests/e2e/folder-browsing.spec.ts tests/e2e/geocoder-download.spec.ts tests/e2e/settings.spec.ts tests/e2e/sidebar-navigation.spec.ts tests/e2e/star-rating.spec.ts tests/e2e/viewer-info-panel.spec.ts tests/e2e/viewer-video.spec.ts tests/e2e/viewer.spec.ts",
     "test:e2e:no-build": "pnpm exec playwright test --config playwright.config.ts",
     "dist:win": "pnpm run build && pnpm run rebuild:native && pnpm exec electron-builder --win --x64 --config electron-builder.yml"
   },

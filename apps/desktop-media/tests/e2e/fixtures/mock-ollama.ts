@@ -60,9 +60,9 @@ function e2eAnalysisFieldsForFilename(basename: string): {
     string,
     { image_category: string; number_of_people: number | null; photo_estetic_quality: number }
   > = {
-    "20210701_163111.jpg": { image_category: "invoice_or_receipt", number_of_people: 0, photo_estetic_quality: 6 },
-    "20210730_085853.jpg": { image_category: "invoice_or_receipt", number_of_people: 0, photo_estetic_quality: 6 },
-    "20210702_134329.jpg": { image_category: "document_id_or_passport", number_of_people: 0, photo_estetic_quality: 6 },
+    "mock_invoice_01_gemini.png": { image_category: "invoice_or_receipt", number_of_people: 0, photo_estetic_quality: 6 },
+    "receipt-mock-02-french.jpg": { image_category: "invoice_or_receipt", number_of_people: 0, photo_estetic_quality: 6 },
+    "Dutch_identity_card_front_specimen_issued_9_March_2014.jpg": { image_category: "document_id_or_passport", number_of_people: 0, photo_estetic_quality: 6 },
     /** Sports: low esthetic → AI stars 2 (< 4) for AI Rating ≥ 4 tests. */
     "20191013_142053.jpg": { image_category: "sports", number_of_people: 1, photo_estetic_quality: 4 },
     /** Nature: high esthetic → AI stars 5. */
