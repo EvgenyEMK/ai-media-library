@@ -28,10 +28,6 @@ apps/desktop-media/dist-electron/
 apps/desktop-media/dist-renderer/
 apps/desktop-media/release/
 
-# Local-only E2E photo sets (often real-world images; may contain PII). Never commit.
-apps/desktop-media/test-assets-local/
-**/test-assets-local/
-
 # misc
 .DS_Store
 *.pem
