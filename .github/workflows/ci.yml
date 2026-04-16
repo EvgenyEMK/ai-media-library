@@ -42,7 +42,7 @@ jobs:
 
   desktop-e2e-smoke:
     name: Desktop E2E Smoke (no AI model deps)
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     timeout-minutes: 45
 
     steps:
@@ -63,8 +63,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright system deps
-        run: pnpm --filter @emk/desktop-media exec playwright install --with-deps chromium
+      - name: Install Playwright browser
+        run: pnpm --filter @emk/desktop-media exec playwright install chromium
 
       - name: Run desktop E2E smoke subset
-        run: xvfb-run -a pnpm --filter @emk/desktop-media test:e2e:ci-smoke
+        run: pnpm --filter @emk/desktop-media test:e2e:ci-smoke
