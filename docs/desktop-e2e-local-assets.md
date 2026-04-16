@@ -1,23 +1,28 @@
-# Desktop E2E: local photo assets (not in git)
+# Desktop E2E test assets
 
-Some Playwright tests use **real image files** for semantic search and face workflows. Those files live **only on your machine** under:
+Desktop Playwright tests use fixture assets under:
 
 `apps/desktop-media/test-assets-local/e2e-photos/`
 
-This directory is **gitignored** because it may contain **personal or sensitive content** (IDs, invoices, addresses, etc.). Do **not** commit it.
+Related fixture folders:
+
+- `apps/desktop-media/test-assets-local/e2e-media-mixed/`
+- `apps/desktop-media/test-assets-local/rotation-crop/`
+
+These fixtures are now tracked in the repository so CI can run E2E suites consistently.
 
 ## Optional override
 
-Set `EMK_E2E_PHOTOS_DIR` to an absolute path if your assets live elsewhere.
+Set `EMK_E2E_PHOTOS_DIR` to an absolute path if you want to run tests against a different local asset folder.
 
 ## Replacing fixtures
 
-When you have a **sanitized, non-sensitive** image set that still satisfies each spec’s required filenames, you can:
+When replacing fixtures, keep each test contract in sync:
 
-1. Document the required filenames in the relevant `tests/e2e/*.spec.ts` files (see `REQUIRED_FILES` and similar).
-2. Swap your local folder contents or point `EMK_E2E_PHOTOS_DIR` at a dedicated fixtures repo/path.
-
-Until then, tests that depend on these files will **skip** or **fail** if the folder or files are missing.
+1. Update required filenames in relevant E2E specs (`REQUIRED_FILES`, `REQUIRED_FILTER_FILES`, etc.).
+2. Update filename-based mappings in `tests/e2e/fixtures/mock-ollama.ts` when quick-filter expectations depend on category mapping.
+3. Keep `apps/desktop-media/test-assets-local/e2e-photos/expectations.json` aligned for unconfirmed-face and semantic expectations.
+4. Re-run `pnpm test:e2e` (or CI smoke subset) to confirm no regressions.
 
 ## Troubleshooting (semantic / vision indexing)
 

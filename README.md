@@ -4,48 +4,48 @@
 Desktop application that helps you organize and search your media using AI—without ever sending your data to the cloud.
 Open source and runs entirely on your computer: local data, local AI models, no vendor lock.
 
-While currently desktop-only, it is built with possibility to extend to multi-client and cloud: desktop + mobile apps + web (monorepo with shared packages)
+While currently desktop-only, it is built with the possibility to extend to multi-client and cloud: desktop + mobile apps + web (monorepo with shared packages).
 
 
 ## Key Capabilities
 
 - **Find anything with natural language**
   - Search for "lady in white dress near piano" just like you would on Google Photos, but 100% offline
-  - **Search in any language** - the prompt is automatically translated to English (AI indexing is English only currently)
+- **Search in any language** - the prompt is automatically translated to English (AI indexing is currently English-only)
   - The search is based on visual similarity (VLM - Visual Language Model) and/or on AI image description
 
-- **Face detection and recognition** 
+- **Face detection and recognition**
   - The app automatically detects faces and groups them, making it easy to tag family and friends
   - You can narrow the search scope to tagged people, including automatically detected similar faces as an option
   - You can filter images in a folder, album or in search by person tags or by number of people
   - Pet faces are detected, but I haven't tested the grouping / auto-recognition for pets
   - [roadmap] detection of sex and average age per face for smart filters/albums
 
-- **AI image analysis, categorization, invoice data extraction** 
-  - Assess image quality and photo aestetic rating, identify key issues like blur, rotated, need crop, tiltet horizon, etc.
+- **AI image analysis, categorization, invoice data extraction**
+  - Assess image quality and photo aesthetic rating, identify key issues like blur, rotation needed, crop needed, tilted horizon, etc.
   - Automatically identify categories like ID / passport, invoice / receipt, screenshot, slide / diagram, nature, etc.
-  - Automatically extract data from invoice / receipt images: subject, invoice from, total and VAT ammount, currency, etc.
+  - Automatically extract data from invoice / receipt images: subject, invoice issuer, total and VAT amount, currency, etc.
   - Automated suggestions to rotate image based on AI analysis and detected face features
 
-- **Geo-location context** 
-  - GPS coordinates can be translated to **searchablge / filterable context** (country / region / city )
-  - If no GPS coordinates, AI tries to extact location from the image analysis and/or from file name
+- **Geo-location context**
+  - GPS coordinates can be translated to **searchable / filterable context** (country / region / city)
+  - If there are no GPS coordinates, AI tries to extract location from image analysis and/or the file name
 
 - **Powerful filters** based on the features above: **person tags**, **people counts**, **locations**, ratings, image category.
 
 - **Smart albums** [roadmap]
-  - Dynamic albums based on defined filters, for example, "My frend and I - best photos", "School friends",...
+  - Dynamic albums based on defined filters, for example, "My friend and I - best photos", "School friends", ...
 
-- **Image taken date** 
-  - For images with missing "date taken" metadata, automatic exctraction of the date or period from file name or path
+- **Image taken date**
+  - For images with missing "date taken" metadata, automatic extraction of the date or period from file name or path
   - For example, "1961-01 - old family photo.jpg", or "visiting Paris - 1985 july.jpg" (useful for old photos)
 
 - **Data safety** 
   - The application **does NOT modify any files** in your media library by default
   - It only collects data into a searchable database (file metadata + AI detections and analytics)
   - Even if you lose the database, you can re-build most data by running AI analysis pipelines again (but would need to tag people manually again)
-  - During installation you can select a folder where the database and application settings are stored. The data is preserved if you ununstall or re-install the app. Include the folder in your backup plan.
-  - Optionally you can allow saving data like **star rating** to the file metadata when it is changed by user within the app, so it is visible in Windows explorer for example. While supported, it is disabled by default.
+  - During installation you can select a folder where the database and application settings are stored. The data is preserved if you uninstall or re-install the app. Include the folder in your backup plan.
+  - Optionally you can allow saving data like **star rating** to file metadata when it is changed by the user within the app, so it is visible in Windows Explorer, for example. While supported, it is disabled by default.
 
 ## License
 
@@ -56,41 +56,9 @@ While currently desktop-only, it is built with possibility to extend to multi-cl
 
 ## Limitations & Transparency
 
-- The application is in early **betta**
-  - The author tested it on personal media library (30K images, >100K faces) and does not expect any big changes - it works well
-  - Bug fixes are expected as well as potential minor data model updates (with automatic data migrations in new versions)
-
-- **AI search limitations**
-  - While contextual search exceeded by far my initial low expectations of what local AI models could provide, it is not perfect and you may need to experiment with multiple search prompts. I could find most photoes easily, but I coudn't find some others photos as easy
-  - I recommend combining filters with search, especially filter by person-tag, date, location. This narrows down scope before the search starts.
-  - For example, search results for "woman wearing red hat and white dress in Paris" may include photos where "red" and "white" colors present, but not exactly matching "hat" and "dress".
-
-- **AI image analysis pipelines take hours and days on a big library - start with few folders first**
-  - Before you can take full advantage of the all features you must run multiple data collection and AI analysis pipepines on your media library
-    - File metadata collection (EXIF image size, date taken, title, GPS, ...)
-    - AI search indexing (allows to search images with text prompt)
-    - Face detection -> manually tag several people -> other similar faces will be detected automatically
-    - AI image analysis and optional invoice data extraction (Qwen 3.5)
-  - Running each pipeline on a big media library will take hours and even days - anticipate leaving PC running at night or similar
-  - Initially run the pipelines on just several folders that include images of people you want to tag. This will allow you to test and especially tag detected faces that can be used to regognize other similar faces automatically and search by person tags
-
-- **Images only - no video analysis/search yet**
-  - AI indexing and analysis of video is possible, but not yet implemented
-
-- **No automated version update announcement within the app**
-  - To be implemented soon. Currently you have to check the git repo manually
-
-- **AI models**
-  - The application automatically downloads most AI models after installation (VLM for visual image indexing  and contextual search, face detection and recognition)
-  - However, for heavy LLM AI models like Qwen 3.5 and Qwen 2.5 the application relies on Ollama. You must install ollama and download these AI models yourself. If not done, some features like search prompt translation and AI image analysis / data extraction won't work.
-  - Currently the AI models are "hard coded", i.e. you cannot change them in application settings. The possibility to change an AI model will be added for generic LLMs (Qwen), but will most likely not be added for other AI models (VLM, embeddings, face detection and recognition, etc.) as these models are not easily inter-exchangeable (it would require re-building of all previously built AI analysis data).
-
-- **Favorite images, star rating**
-  - Most default media libraries on mobile phones do not store "favorite" or "star rating" in the image file. 
-  - They store the data only in their propriatary databases. 
-  - The information on **favorite images** is unfortunately not preserved when you copy the image files to your PC
-  - This is not the limitation of this application, but good to know
-  - To store the info about **favorite or starred** images in the file metadata you can install some specialized media library apps on your phone
+- The application is in early **beta**.
+- AI indexing and analysis currently covers only images (not yet videos).
+- Current limitation details and behavior notes are documented in [docs/limitations-and-transparency.md](docs/limitations-and-transparency.md).
 
 ## Platform Support
 
@@ -103,7 +71,7 @@ While currently desktop-only, it is built with possibility to extend to multi-cl
 | **Android / iOS mobile apps** | - | If desktop app gets traction |
 | **Cloud platform for data sharing and backup** | - | Private repo currently |
 
-## Prerequisties - desktop app
+## Prerequisites - desktop app
 
 ### Minimum PC configuration (practical baseline)
 
@@ -121,18 +89,18 @@ Without a capable GPU, the app still works on CPU but indexing/analysis jobs can
 
 ### Ollama installation and required models
 
-Ollama is not required for core app features like contextual VLM-based search using English query, face detection and recognition. 
+Ollama is not required for core app features like contextual VLM-based search using English query, face detection and recognition.
 But the following features depend on LLM models hosted via Ollama:
 - search query translation and parsing for advanced search
 - image/document analysis (e.g. building textual image description used as 2nd search method)
 - invoice data extraction
-- date and location extraction from file name or path. 
+- date and location extraction from file name or path.
 
 Install Ollama and download AI models before running the desktop app:
 
 1. **Install Ollama**
    - Download and install from [ollama.com](https://ollama.com/download).
-   - Start Ollama and keep it running in background.
+   - Start Ollama and keep it running in the background.
 
 2. **Pull required Qwen models**
 ```bash
@@ -220,4 +188,5 @@ Linux and macOS package targets are planned but are not yet configured in this r
 - Desktop E2E (Playwright; builds app first): `pnpm test:e2e`
 - Full test run: `pnpm test:all`
 
-Note: some E2E tests depend on images that are not yet published in the repository due to privacy (e.g. IDs, invoices, ...). They will be published later as I find generic-purpose replacements. See [docs/desktop-e2e-local-assets.md](docs/desktop-e2e-local-assets.md).
+Desktop E2E fixtures are now tracked in-repo under `apps/desktop-media/test-assets-local/`.
+See [docs/desktop-e2e-local-assets.md](docs/desktop-e2e-local-assets.md) for fixture notes and troubleshooting.
