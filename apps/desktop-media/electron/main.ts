@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain } from "electron";
 import { setDatabaseProvider } from "./face-rotation-check";
 import { getDesktopDatabase, initDesktopDatabase } from "./db/client";
+import { clearAllInProgressFlags } from "./db/folder-analysis-status";
 import { probeMultimodalEmbeddingSupport } from "./semantic-embeddings";
 import { createMainWindow } from "./window";
 import {
@@ -104,6 +105,7 @@ function emitFaceModelDownloadProgress(event: FaceModelDownloadProgressEvent): v
 app.whenReady().then(async () => {
   initDesktopDatabase(app.getPath("userData"));
   setDatabaseProvider(() => getDesktopDatabase());
+  clearAllInProgressFlags();
 
   setModelsDirectory(resolveModelsPath(app));
 

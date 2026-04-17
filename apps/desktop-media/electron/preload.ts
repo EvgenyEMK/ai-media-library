@@ -5,6 +5,12 @@ const api: DesktopApi = {
   selectLibraryFolder: () => ipcRenderer.invoke(IPC_CHANNELS.selectLibraryFolder),
   readFolderChildren: (folderPath) =>
     ipcRenderer.invoke(IPC_CHANNELS.readFolderChildren, folderPath),
+  pruneFolderAnalysisForMissingChildren: (parentPath, existingChildren) =>
+    ipcRenderer.invoke(
+      IPC_CHANNELS.pruneFolderAnalysisForMissingChildren,
+      parentPath,
+      existingChildren,
+    ),
   revealItemInFolder: (filePath) =>
     ipcRenderer.invoke(IPC_CHANNELS.revealItemInFolder, filePath),
   listFolderImages: (folderPath) =>

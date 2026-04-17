@@ -75,6 +75,12 @@ export function useFolderTreeHandlers(opts: {
       }
 
       const latestChildren = await window.desktopApi.readFolderChildren(folderPath);
+      void window.desktopApi
+        .pruneFolderAnalysisForMissingChildren(
+          folderPath,
+          latestChildren.map((child) => child.path),
+        )
+        .catch(() => undefined);
       const latestChildPaths = new Set(latestChildren.map((child) => child.path));
 
       store.setState((s) => {

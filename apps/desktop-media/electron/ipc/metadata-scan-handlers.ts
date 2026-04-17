@@ -12,7 +12,10 @@ import {
 import { runPathExtractionForMediaItem } from "../db/media-item-path-extraction";
 import { getObservedFileStateByPaths, observeFiles } from "../db/file-identity";
 import { reconcileFolder, purgeDeletedMediaItems } from "../db/media-item-reconciliation";
-import { DEFAULT_LIBRARY_ID } from "../db/folder-analysis-status";
+import {
+  DEFAULT_LIBRARY_ID,
+  pruneFolderAnalysisStatusesNotInSet,
+} from "../db/folder-analysis-status";
 import { readSettings } from "../storage";
 import { emitMetadataScanProgress } from "./progress-emitters";
 import { runningMetadataScanJobs } from "./state";
@@ -164,6 +167,7 @@ export async function runMetadataScanJob(params: {
   let cancelled = 0;
   let scanningProcessed = 0;
   let filesNeedingAiPipelineFollowUp = 0;
+  const observedFolders = new Set<string>([params.folderPath]);
   const folderTouchMap = new Map<
     string,
     { created: number; updated: number; needsAiFollowUp: number }
@@ -362,6 +366,13 @@ export async function runMetadataScanJob(params: {
           `[metadata-scan][${scanTs()}] reconciliation softDeleted=${totalSoftDeleted} resurrected=${totalResurrected}`,
         );
       }
+    }
+
+    if (!job.cancelled && params.recursive) {
+      for (const folderPath of entriesByFolder.keys()) {
+        observedFolders.add(folderPath);
+      }
+      pruneFolderAnalysisStatusesNotInSet(params.folderPath, observedFolders, DEFAULT_LIBRARY_ID);
     }
   } finally {
     if (job.powerSaveToken) {

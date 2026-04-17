@@ -30,6 +30,7 @@ export type MediaKind = "image" | "video";
 export const IPC_CHANNELS = {
   selectLibraryFolder: "media:select-library-folder",
   readFolderChildren: "media:read-folder-children",
+  pruneFolderAnalysisForMissingChildren: "media:prune-folder-analysis-for-missing-children",
   /** Opens the OS file manager with the given file selected (Electron `shell.showItemInFolder`). */
   revealItemInFolder: "media:reveal-item-in-folder",
   listFolderImages: "media:list-folder-images",
@@ -1191,6 +1192,10 @@ export interface FaceEmbeddingStats {
 export interface DesktopApi {
   selectLibraryFolder: () => Promise<string | null>;
   readFolderChildren: (folderPath: string) => Promise<FolderNode[]>;
+  pruneFolderAnalysisForMissingChildren: (
+    parentPath: string,
+    existingChildren: string[],
+  ) => Promise<{ removed: number }>;
   revealItemInFolder: (filePath: string) => Promise<{ success: boolean; error?: string }>;
   listFolderImages: (folderPath: string) => Promise<MediaImageItem[]>;
   startFolderImagesStream: (folderPath: string) => Promise<{ requestId: string }>;
