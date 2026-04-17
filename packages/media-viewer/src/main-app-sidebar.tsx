@@ -22,6 +22,7 @@ interface MainAppSidebarProps {
   collapseIcon: ReactNode;
   sections: MainAppSidebarSection[];
   bottomSections?: MainAppSidebarSection[];
+  activeSectionId: string | null;
   expandedSectionId: string | null;
   onSectionToggle: (sectionId: string) => void;
 }
@@ -35,11 +36,13 @@ export function MainAppSidebar({
   collapseIcon,
   sections,
   bottomSections = [],
+  activeSectionId,
   expandedSectionId,
   onSectionToggle,
 }: MainAppSidebarProps): ReactElement {
   const collapseTitle = collapsed ? expandLabel : collapseLabel;
   const renderSection = (section: MainAppSidebarSection): ReactElement => {
+    const isActive = section.id === activeSectionId;
     const isExpanded = !collapsed && section.id === expandedSectionId;
     return (
       <div key={section.id} className="space-y-1">
@@ -50,9 +53,9 @@ export function MainAppSidebar({
           aria-label={section.label}
           aria-expanded={isExpanded}
           className={joinClasses(
-            "inline-flex h-9 w-full items-center rounded-md border px-2 text-sm",
+            "inline-flex h-10 w-full items-center rounded-md border px-3 text-base",
             collapsed ? "justify-center" : "justify-start",
-            isExpanded ? "border-primary bg-primary/10 text-foreground" : "border-border",
+            isActive ? "border-primary bg-primary/10 text-foreground" : "border-border",
           )}
         >
           <span className={collapsed ? "" : "mr-2"} aria-hidden="true">

@@ -12,6 +12,7 @@ import type { SidebarSectionId } from "../types/app-types";
 interface DesktopAppSidebarProps {
   store: DesktopStore;
   sidebarCollapsed: boolean;
+  activeSidebarSection: SidebarSectionId;
   expandedSidebarSection: SidebarSectionId | null;
   onSectionToggle: (sectionId: string) => void;
   libraryRoots: DesktopStoreState["libraryRoots"];
@@ -35,6 +36,7 @@ interface DesktopAppSidebarProps {
 export function DesktopAppSidebar({
   store,
   sidebarCollapsed,
+  activeSidebarSection,
   expandedSidebarSection,
   onSectionToggle,
   libraryRoots,
@@ -66,7 +68,7 @@ export function DesktopAppSidebar({
           {
             id: "folders",
             label: UI_TEXT.sectionFolders,
-            icon: <FolderOpen size={16} aria-hidden="true" />,
+            icon: <FolderOpen size={20} aria-hidden="true" />,
             content: (
               <DesktopFoldersSidebarPanel
                 libraryRoots={libraryRoots}
@@ -89,22 +91,23 @@ export function DesktopAppSidebar({
           {
             id: "albums",
             label: UI_TEXT.sectionAlbums,
-            icon: <Images size={16} aria-hidden="true" />,
+            icon: <Images size={20} aria-hidden="true" />,
             content: <DesktopSidebarAlbumsSection collapsed={false} />,
           },
           {
             id: "people",
             label: UI_TEXT.sectionPeople,
-            icon: <Users size={16} aria-hidden="true" />,
+            icon: <Users size={20} aria-hidden="true" />,
           },
         ]}
         bottomSections={[
           {
             id: "settings",
             label: UI_TEXT.sectionSettings,
-            icon: <Settings size={16} aria-hidden="true" />,
+            icon: <Settings size={20} aria-hidden="true" />,
           },
         ]}
+        activeSectionId={activeSidebarSection}
         expandedSectionId={expandedSidebarSection}
         onSectionToggle={onSectionToggle}
       />

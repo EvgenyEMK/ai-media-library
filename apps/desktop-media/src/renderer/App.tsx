@@ -239,6 +239,11 @@ export function App(): ReactElement {
     if (sectionId === "folders" || sectionId === "albums" || sectionId === "people" || sectionId === "settings") {
       setActiveSidebarSection(sectionId);
       if (sidebarCollapsed) {
+        if (sectionId === "folders" || sectionId === "albums") {
+          store.getState().setSidebarCollapsed(false);
+          setExpandedSidebarSection(sectionId);
+          return;
+        }
         setExpandedSidebarSection(null);
         return;
       }
@@ -259,6 +264,7 @@ export function App(): ReactElement {
       <DesktopAppSidebar
         store={store}
         sidebarCollapsed={sidebarCollapsed}
+        activeSidebarSection={activeSidebarSection}
         expandedSidebarSection={expandedSidebarSection}
         onSectionToggle={handleSidebarSectionToggle}
         libraryRoots={libraryRoots}
