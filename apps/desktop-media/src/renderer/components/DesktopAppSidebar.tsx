@@ -22,7 +22,6 @@ interface DesktopAppSidebarProps {
   folderAnalysisByPath: DesktopStoreState["folderAnalysisByPath"];
   folderRollupByPath: DesktopStoreState["folderRollupByPath"];
   foldersWithCatalogChanges: DesktopStoreState["foldersWithCatalogChanges"];
-  descEmbedBackfillRunning: boolean;
   pipeline: DesktopPipelineHandlers;
   folderTree: {
     handleAddLibrary: () => Promise<void>;
@@ -46,7 +45,6 @@ export function DesktopAppSidebar({
   folderAnalysisByPath,
   folderRollupByPath,
   foldersWithCatalogChanges,
-  descEmbedBackfillRunning,
   pipeline,
   folderTree,
 }: DesktopAppSidebarProps): ReactElement {
@@ -93,7 +91,6 @@ export function DesktopAppSidebar({
                 folderAnalysisByPath={folderAnalysisByPath}
                 folderRollupByPath={folderRollupByPath}
                 foldersWithCatalogChanges={foldersWithCatalogChanges}
-                descEmbedBackfillRunning={descEmbedBackfillRunning}
                 pipeline={pipeline}
                 handleAddLibrary={folderTree.handleAddLibrary}
                 handleToggleExpand={folderTree.handleToggleExpand}

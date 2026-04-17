@@ -20,10 +20,6 @@ interface FolderAnalysisMenuSectionProps {
   onCancelFaceDetection: () => void;
   onIndexSemantic: (folderPath: string, recursive: boolean, overrideExisting: boolean) => void;
   onCancelSemanticIndex: () => void;
-  // TEMPORARY: description embedding backfill — remove after migration
-  onIndexDescEmbeddings?: (folderPath: string, recursive: boolean) => void;
-  onCancelDescEmbedBackfill?: () => void;
-  descEmbedBackfillRunning?: boolean;
   onAnalyzeFolderPathMetadata?: (folderPath: string, recursive: boolean) => void;
   onCancelPathAnalysis?: () => void;
 }
@@ -36,10 +32,6 @@ export function FolderAnalysisMenuSection({
   onCancelFaceDetection,
   onIndexSemantic,
   onCancelSemanticIndex,
-  // TEMPORARY: description embedding backfill — remove after migration
-  onIndexDescEmbeddings,
-  onCancelDescEmbedBackfill,
-  descEmbedBackfillRunning = false,
   onAnalyzeFolderPathMetadata,
   onCancelPathAnalysis,
 }: FolderAnalysisMenuSectionProps): ReactElement {
@@ -69,6 +61,65 @@ export function FolderAnalysisMenuSection({
 
   return (
     <>
+      <div className="box-border flex min-h-[34px] w-full items-center justify-between gap-2 py-2 pl-2.5 pr-0 text-left text-sm leading-snug">
+        <button type="button" className={rowLabelBtnClass} onClick={() => setSemanticMenuOpen((v) => !v)}>
+          <ChevronRight
+            size={14}
+            className={cn(
+              "shrink-0 transition-transform duration-150 ease-in-out",
+              semanticMenuOpen && "rotate-90",
+            )}
+            aria-hidden="true"
+          />
+          {UI_TEXT.semanticIndexTitle}
+        </button>
+        <button
+          type="button"
+          className={cn(playBtnClass, "face-detect-play-btn")}
+          disabled={!hasTargetFolder}
+          title={isSemanticIndexing ? UI_TEXT.cancelSemanticIndex : "Start AI search indexing"}
+          onClick={() => {
+            if (isSemanticIndexing) {
+              onCancelSemanticIndex();
+            } else if (targetFolderPath) {
+              onIndexSemantic(targetFolderPath, semanticIncludeSubfolders, semanticOverrideExisting);
+            }
+          }}
+        >
+          {isSemanticIndexing ? (
+            <>
+              <Loader size={14} className="animate-spin" aria-hidden="true" />
+              <Pause size={14} aria-hidden="true" />
+            </>
+          ) : (
+            <Play size={14} aria-hidden="true" />
+          )}
+        </button>
+      </div>
+      {semanticMenuOpen ? (
+        <div className="ml-3 grid gap-1.5 border-l border-border pl-3">
+          <label className={submenuLabelClass}>
+            <span>Include sub-folders</span>
+            <input
+              type="checkbox"
+              className={submenuCheckboxClass}
+              checked={semanticIncludeSubfolders}
+              disabled={isSemanticIndexing}
+              onChange={(e) => setSemanticIncludeSubfolders(e.target.checked)}
+            />
+          </label>
+          <label className={submenuLabelClass}>
+            <span>Override existing</span>
+            <input
+              type="checkbox"
+              className={submenuCheckboxClass}
+              checked={semanticOverrideExisting}
+              disabled={isSemanticIndexing}
+              onChange={(e) => setSemanticOverrideExisting(e.target.checked)}
+            />
+          </label>
+        </div>
+      ) : null}
       <div className="box-border flex min-h-[34px] w-full items-center justify-between gap-2 py-2 pl-2.5 pr-0 text-left text-sm leading-snug">
         <button type="button" className={rowLabelBtnClass} onClick={() => setFaceMenuOpen((v) => !v)}>
           <ChevronRight
@@ -187,65 +238,6 @@ export function FolderAnalysisMenuSection({
           </label>
         </div>
       ) : null}
-      <div className="box-border flex min-h-[34px] w-full items-center justify-between gap-2 py-2 pl-2.5 pr-0 text-left text-sm leading-snug">
-        <button type="button" className={rowLabelBtnClass} onClick={() => setSemanticMenuOpen((v) => !v)}>
-          <ChevronRight
-            size={14}
-            className={cn(
-              "shrink-0 transition-transform duration-150 ease-in-out",
-              semanticMenuOpen && "rotate-90",
-            )}
-            aria-hidden="true"
-          />
-          {UI_TEXT.semanticIndexTitle}
-        </button>
-        <button
-          type="button"
-          className={cn(playBtnClass, "face-detect-play-btn")}
-          disabled={!hasTargetFolder}
-          title={isSemanticIndexing ? UI_TEXT.cancelSemanticIndex : "Start AI search indexing"}
-          onClick={() => {
-            if (isSemanticIndexing) {
-              onCancelSemanticIndex();
-            } else if (targetFolderPath) {
-              onIndexSemantic(targetFolderPath, semanticIncludeSubfolders, semanticOverrideExisting);
-            }
-          }}
-        >
-          {isSemanticIndexing ? (
-            <>
-              <Loader size={14} className="animate-spin" aria-hidden="true" />
-              <Pause size={14} aria-hidden="true" />
-            </>
-          ) : (
-            <Play size={14} aria-hidden="true" />
-          )}
-        </button>
-      </div>
-      {semanticMenuOpen ? (
-        <div className="ml-3 grid gap-1.5 border-l border-border pl-3">
-          <label className={submenuLabelClass}>
-            <span>Include sub-folders</span>
-            <input
-              type="checkbox"
-              className={submenuCheckboxClass}
-              checked={semanticIncludeSubfolders}
-              disabled={isSemanticIndexing}
-              onChange={(e) => setSemanticIncludeSubfolders(e.target.checked)}
-            />
-          </label>
-          <label className={submenuLabelClass}>
-            <span>Override existing</span>
-            <input
-              type="checkbox"
-              className={submenuCheckboxClass}
-              checked={semanticOverrideExisting}
-              disabled={isSemanticIndexing}
-              onChange={(e) => setSemanticOverrideExisting(e.target.checked)}
-            />
-          </label>
-        </div>
-      ) : null}
       {pathExtractionUseLlm && onAnalyzeFolderPathMetadata && onCancelPathAnalysis ? (
         <>
           <div className="box-border flex min-h-[34px] w-full items-center justify-between gap-2 py-2 pl-2.5 pr-0 text-left text-sm leading-snug">
@@ -298,38 +290,6 @@ export function FolderAnalysisMenuSection({
             </div>
           ) : null}
         </>
-      ) : null}
-      {/* TEMPORARY: description embedding backfill — remove after migration */}
-      {onIndexDescEmbeddings ? (
-        <div className="box-border flex min-h-[34px] w-full items-center justify-between gap-2 py-2 pl-2.5 pr-0 text-left text-sm leading-snug">
-          <span className="inline-flex flex-1 items-center gap-2 px-0.5 font-inherit">{UI_TEXT.descEmbedBackfillTitle}</span>
-          <button
-            type="button"
-            className={cn(playBtnClass, "face-detect-play-btn")}
-            disabled={!hasTargetFolder || descEmbedBackfillRunning}
-            title={
-              descEmbedBackfillRunning
-                ? UI_TEXT.cancelDescEmbedBackfill
-                : "Build text embeddings from existing AI descriptions"
-            }
-            onClick={() => {
-              if (descEmbedBackfillRunning) {
-                onCancelDescEmbedBackfill?.();
-              } else if (targetFolderPath) {
-                onIndexDescEmbeddings(targetFolderPath, true);
-              }
-            }}
-          >
-            {descEmbedBackfillRunning ? (
-              <>
-                <Loader size={14} className="animate-spin" aria-hidden="true" />
-                <Pause size={14} aria-hidden="true" />
-              </>
-            ) : (
-              <Play size={14} aria-hidden="true" />
-            )}
-          </button>
-        </div>
       ) : null}
     </>
   );

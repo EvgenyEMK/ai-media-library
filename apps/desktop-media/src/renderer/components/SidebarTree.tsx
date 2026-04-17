@@ -76,10 +76,6 @@ interface SidebarTreeProps {
   onIndexSemantic: (folderPath: string, recursive: boolean, overrideExisting: boolean) => void;
   onCancelSemanticIndex: () => void;
   onOpenFolderAiSummary: (folderPath: string) => void;
-  // TEMPORARY: description embedding backfill — remove after migration
-  onIndexDescEmbeddings?: (folderPath: string, recursive: boolean) => void;
-  onCancelDescEmbedBackfill?: () => void;
-  descEmbedBackfillRunning?: boolean;
   onAnalyzeFolderPathMetadata?: (folderPath: string, recursive: boolean) => void;
   onCancelPathAnalysis?: () => void;
 }
@@ -105,10 +101,6 @@ export function SidebarTree({
   onIndexSemantic,
   onCancelSemanticIndex,
   onOpenFolderAiSummary,
-  // TEMPORARY: description embedding backfill — remove after migration
-  onIndexDescEmbeddings,
-  onCancelDescEmbedBackfill,
-  descEmbedBackfillRunning,
   onAnalyzeFolderPathMetadata,
   onCancelPathAnalysis,
 }: SidebarTreeProps): ReactElement {
@@ -157,9 +149,6 @@ export function SidebarTree({
           onIndexSemantic={onIndexSemantic}
           onCancelSemanticIndex={onCancelSemanticIndex}
           onOpenFolderAiSummary={onOpenFolderAiSummary}
-          onIndexDescEmbeddings={onIndexDescEmbeddings}
-          onCancelDescEmbedBackfill={onCancelDescEmbedBackfill}
-          descEmbedBackfillRunning={descEmbedBackfillRunning}
           onAnalyzeFolderPathMetadata={onAnalyzeFolderPathMetadata}
           onCancelPathAnalysis={onCancelPathAnalysis}
         />
@@ -301,10 +290,6 @@ interface TreeNodeProps {
   onIndexSemantic: (folderPath: string, recursive: boolean, overrideExisting: boolean) => void;
   onCancelSemanticIndex: () => void;
   onOpenFolderAiSummary: (folderPath: string) => void;
-  // TEMPORARY: description embedding backfill — remove after migration
-  onIndexDescEmbeddings?: (folderPath: string, recursive: boolean) => void;
-  onCancelDescEmbedBackfill?: () => void;
-  descEmbedBackfillRunning?: boolean;
   onAnalyzeFolderPathMetadata?: (folderPath: string, recursive: boolean) => void;
   onCancelPathAnalysis?: () => void;
 }
@@ -334,10 +319,6 @@ function TreeNode({
   onIndexSemantic,
   onCancelSemanticIndex,
   onOpenFolderAiSummary,
-  // TEMPORARY: description embedding backfill — remove after migration
-  onIndexDescEmbeddings,
-  onCancelDescEmbedBackfill,
-  descEmbedBackfillRunning,
   onAnalyzeFolderPathMetadata,
   onCancelPathAnalysis,
 }: TreeNodeProps): ReactElement {
@@ -536,20 +517,6 @@ function TreeNode({
                       right: "auto",
                     }}
                   >
-                    {isLibraryRoot ? (
-                      <div className="box-border flex min-h-[34px] w-full items-center px-2.5 py-2 text-left text-sm leading-snug">
-                        <button
-                          type="button"
-                          className="w-full cursor-pointer border-0 bg-transparent p-0 px-0.5 text-left font-inherit leading-snug text-inherit shadow-none"
-                          onClick={() => {
-                            onRemoveLibrary(folderPath);
-                            closeMenu();
-                          }}
-                        >
-                          Remove (does not delete)
-                        </button>
-                      </div>
-                    ) : null}
                     <div className="box-border flex min-h-[34px] w-full items-center justify-between gap-2 py-2 pl-2.5 pr-0 text-left text-sm leading-snug">
                       <button
                         type="button"
@@ -643,18 +610,25 @@ function TreeNode({
                         onCancelSemanticIndex();
                         closeMenu();
                       }}
-                      onIndexDescEmbeddings={onIndexDescEmbeddings ? (path, recursive) => {
-                        onIndexDescEmbeddings(path, recursive);
-                        closeMenu();
-                      } : undefined}
-                      onCancelDescEmbedBackfill={onCancelDescEmbedBackfill ? () => {
-                        onCancelDescEmbedBackfill();
-                        closeMenu();
-                      } : undefined}
-                      descEmbedBackfillRunning={descEmbedBackfillRunning}
                       onAnalyzeFolderPathMetadata={onAnalyzeFolderPathMetadata}
                       onCancelPathAnalysis={onCancelPathAnalysis}
                     />
+                    {isLibraryRoot ? (
+                      <div className="border-t border-border pt-1.5">
+                        <div className="box-border flex min-h-[34px] w-full items-center px-2.5 py-2 text-left text-sm leading-snug">
+                          <button
+                            type="button"
+                            className="w-full cursor-pointer border-0 bg-transparent p-0 px-0.5 text-left font-inherit leading-snug text-inherit shadow-none"
+                            onClick={() => {
+                              onRemoveLibrary(folderPath);
+                              closeMenu();
+                            }}
+                          >
+                            Remove (does not delete)
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>,
                   document.body,
                 )
@@ -692,9 +666,6 @@ function TreeNode({
               onIndexSemantic={onIndexSemantic}
               onCancelSemanticIndex={onCancelSemanticIndex}
               onOpenFolderAiSummary={onOpenFolderAiSummary}
-              onIndexDescEmbeddings={onIndexDescEmbeddings}
-              onCancelDescEmbedBackfill={onCancelDescEmbedBackfill}
-              descEmbedBackfillRunning={descEmbedBackfillRunning}
               onAnalyzeFolderPathMetadata={onAnalyzeFolderPathMetadata}
               onCancelPathAnalysis={onCancelPathAnalysis}
             />

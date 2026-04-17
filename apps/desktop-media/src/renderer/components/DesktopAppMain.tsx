@@ -63,7 +63,6 @@ interface DesktopAppMainProps {
   mainPaneViewMode: MainPaneViewMode;
   setMainPaneViewMode: Dispatch<SetStateAction<MainPaneViewMode>>;
   pipeline: DesktopPipelineHandlers;
-  descEmbedBackfillRunning: boolean;
   metadataScanFollowUp: DesktopStoreState["metadataScanFollowUp"];
   faceModelDownload: DesktopStoreState["faceModelDownload"];
   handleOpenFolderAiSummary: (folderPath: string) => void;
@@ -121,7 +120,6 @@ export function DesktopAppMain({
   mainPaneViewMode,
   setMainPaneViewMode,
   pipeline,
-  descEmbedBackfillRunning,
   metadataScanFollowUp,
   faceModelDownload,
   handleOpenFolderAiSummary,
@@ -208,7 +206,6 @@ export function DesktopAppMain({
             actionsMenuWrapRef={actionsMenuWrapRef}
             setMainPaneViewMode={setMainPaneViewMode}
             pipeline={pipeline}
-            descEmbedBackfillRunning={descEmbedBackfillRunning}
           />
           <DesktopMediaWorkspace
             store={store}

@@ -13,7 +13,6 @@ interface DesktopFoldersSidebarPanelProps {
   folderAnalysisByPath: DesktopStoreState["folderAnalysisByPath"];
   folderRollupByPath: DesktopStoreState["folderRollupByPath"];
   foldersWithCatalogChanges: DesktopStoreState["foldersWithCatalogChanges"];
-  descEmbedBackfillRunning: boolean;
   pipeline: DesktopPipelineHandlers;
   handleAddLibrary: () => Promise<void>;
   handleToggleExpand: (folderPath: string) => Promise<void>;
@@ -30,7 +29,6 @@ export function DesktopFoldersSidebarPanel({
   folderAnalysisByPath,
   folderRollupByPath,
   foldersWithCatalogChanges,
-  descEmbedBackfillRunning,
   pipeline,
   handleAddLibrary,
   handleToggleExpand,
@@ -69,11 +67,6 @@ export function DesktopFoldersSidebarPanel({
         }
         onCancelSemanticIndex={() => void pipeline.handleCancelSemanticIndex()}
         onOpenFolderAiSummary={handleOpenFolderAiSummary}
-        onIndexDescEmbeddings={(folderPath, recursive) =>
-          void pipeline.handleIndexDescEmbeddings(folderPath, recursive)
-        }
-        onCancelDescEmbedBackfill={() => void pipeline.handleCancelDescEmbedBackfill()}
-        descEmbedBackfillRunning={descEmbedBackfillRunning}
         onAnalyzeFolderPathMetadata={(folderPath, recursive) =>
           void pipeline.handleAnalyzeFolderPathMetadata(folderPath, recursive)
         }
