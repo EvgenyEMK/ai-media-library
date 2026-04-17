@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 import { MainAppSidebar } from "@emk/media-viewer";
-import { FolderOpen, Images, PanelLeftClose, PanelLeftOpen, Settings, Users } from "lucide-react";
+import { FolderOpen, Images, PanelLeftClose, PanelLeftOpen, Plus, Settings, Users } from "lucide-react";
 import { DesktopFoldersSidebarPanel } from "./DesktopFoldersSidebarPanel";
 import { DesktopSidebarAlbumsSection } from "./DesktopSidebarAlbumsSection";
 import type { DesktopPipelineHandlers } from "../hooks/use-desktop-pipeline-handlers";
@@ -69,6 +69,21 @@ export function DesktopAppSidebar({
             id: "folders",
             label: UI_TEXT.sectionFolders,
             icon: <FolderOpen size={20} aria-hidden="true" />,
+            headerTrailing: (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void folderTree.handleAddLibrary();
+                }}
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center border-0 bg-transparent px-0 text-foreground shadow-none outline-none hover:bg-primary/15"
+                aria-label={UI_TEXT.addLibrary}
+                title={UI_TEXT.addLibrary}
+              >
+                <Plus size={20} aria-hidden="true" />
+              </button>
+            ),
+            contentClassName: "pr-0",
             content: (
               <DesktopFoldersSidebarPanel
                 libraryRoots={libraryRoots}

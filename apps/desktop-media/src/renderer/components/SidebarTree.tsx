@@ -129,7 +129,7 @@ export function SidebarTree({
   }, []);
 
   return (
-    <div ref={treeRef} className="flex flex-col">
+    <div ref={treeRef} className="flex min-w-full w-max flex-col">
       {roots.map((rootPath) => (
         <TreeNode
           key={rootPath}
@@ -430,7 +430,7 @@ function TreeNode({
   const sidebarRollup = folderRollupByPath[folderPath];
   const iconTitle = sidebarIconTitle(analysisState, sidebarRollup);
   const rowClassName = cn(
-    "group relative flex items-center gap-1.5 rounded-md p-1",
+    "group relative flex w-full items-center gap-0 rounded-md py-1 pl-1 pr-0",
     selectedFolder === folderPath && "bg-[#222a3d]",
     foldersWithCatalogChanges[folderPath] &&
       "shadow-[inset_0_0_0_1px_rgba(245,158,11,0.45)] rounded-md",
@@ -445,52 +445,60 @@ function TreeNode({
     <div>
       <div
         className={rowClassName}
-        style={{ paddingLeft: `${8 + level * 12}px` }}
         onContextMenu={(event) => {
           event.preventDefault();
           event.stopPropagation();
           openMenuAt({ x: event.clientX, y: event.clientY });
         }}
       >
-        {canExpand ? (
+        <div
+          className="flex min-h-0 min-w-0 flex-1 items-center gap-1.5"
+          style={{ paddingLeft: `${level === 0 ? 0 : 8 + level * 12}px` }}
+        >
+          {canExpand ? (
+            <button
+              type="button"
+              className="inline-flex h-7 min-w-7 w-7 items-center justify-center border-0 bg-transparent p-1.5 shadow-none rounded-none"
+              onClick={() => onToggleExpand(folderPath)}
+              aria-label={isExpanded ? "Collapse folder" : "Expand folder"}
+              title={`${isExpanded ? "Collapse folder" : "Expand folder"} - ${iconTitle}`}
+            >
+              <FolderToggleIcon expanded={isExpanded} />
+            </button>
+          ) : (
+            <span className="inline-flex h-7 min-w-7 w-7 shrink-0" aria-hidden="true" />
+          )}
           <button
             type="button"
-            className="inline-flex h-7 min-w-7 w-7 items-center justify-center border-0 bg-transparent p-1.5 shadow-none rounded-none"
-            onClick={() => onToggleExpand(folderPath)}
-            aria-label={isExpanded ? "Collapse folder" : "Expand folder"}
-            title={`${isExpanded ? "Collapse folder" : "Expand folder"} - ${iconTitle}`}
+            className="flex min-w-0 flex-1 items-center justify-start gap-2 border-0 bg-transparent p-0 text-left shadow-none rounded-none"
+            onClick={() => {
+              if (canExpand && !isExpanded) {
+                onToggleExpand(folderPath);
+              }
+              onSelectFolder(folderPath);
+              closeMenu();
+            }}
+            title={label}
           >
-            <FolderToggleIcon expanded={isExpanded} />
+            <span className="inline-flex h-3.5 min-w-3.5 w-3.5 shrink-0 items-center justify-center" title={iconTitle}>
+              <FolderSidebarStatusIcon
+                analysisState={analysisState}
+                sidebarRollup={sidebarRollup}
+                photoPendingTint={photoPendingFolderIconTint}
+              />
+            </span>
+            {!collapsed && <span className="min-w-0 whitespace-nowrap">{label}</span>}
           </button>
-        ) : (
-          <span className="inline-flex h-7 min-w-7 w-7 shrink-0" aria-hidden="true" />
-        )}
-        <button
-          type="button"
-          className="flex flex-1 items-center justify-start gap-2 border-0 bg-transparent p-0 text-left shadow-none rounded-none"
-          onClick={() => {
-            if (canExpand && !isExpanded) {
-              onToggleExpand(folderPath);
-            }
-            onSelectFolder(folderPath);
-            closeMenu();
-          }}
-          title={label}
-        >
-          <span className="inline-flex h-3.5 min-w-3.5 w-3.5 shrink-0 items-center justify-center" title={iconTitle}>
-            <FolderSidebarStatusIcon
-              analysisState={analysisState}
-              sidebarRollup={sidebarRollup}
-              photoPendingTint={photoPendingFolderIconTint}
-            />
-          </span>
-          {!collapsed && <span className="min-w-0 truncate">{label}</span>}
-        </button>
+        </div>
         {!collapsed ? (
           <div
             data-sidebar-tree-menu
             className={cn(
-              "relative ml-auto opacity-0 pointer-events-none transition-opacity duration-[120ms] ease-in-out",
+              "sticky right-0 z-[2] flex shrink-0 items-center pl-1",
+              selectedFolder === folderPath
+                ? "bg-[#222a3d]"
+                : "bg-card shadow-[-6px_0_8px_-2px_rgba(0,0,0,0.35)]",
+              "opacity-0 pointer-events-none transition-opacity duration-[120ms] ease-in-out",
               menuOpen
                 ? "pointer-events-auto opacity-100 transition-none"
                 : "group-hover:pointer-events-auto group-hover:opacity-100",

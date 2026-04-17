@@ -40,14 +40,6 @@ export function DesktopFoldersSidebarPanel({
 }: DesktopFoldersSidebarPanelProps): ReactElement {
   return (
     <div className="space-y-2">
-      <button
-        type="button"
-        onClick={() => void handleAddLibrary()}
-        className="inline-flex h-9 w-full items-center justify-start rounded-md border border-border px-2 text-sm"
-      >
-        <Plus size={16} aria-hidden="true" className="mr-2" />
-        {UI_TEXT.addLibrary}
-      </button>
       <SidebarTree
         roots={libraryRoots}
         selectedFolder={selectedFolder}
@@ -87,6 +79,14 @@ export function DesktopFoldersSidebarPanel({
         }
         onCancelPathAnalysis={() => void pipeline.handleCancelPathAnalysis()}
       />
+      <button
+        type="button"
+        onClick={() => void handleAddLibrary()}
+        className="inline-flex h-9 w-full items-center justify-start rounded-md border border-border px-2 text-sm"
+      >
+        <Plus size={16} aria-hidden="true" className="mr-2" />
+        {UI_TEXT.addLibrary}
+      </button>
     </div>
   );
 }
