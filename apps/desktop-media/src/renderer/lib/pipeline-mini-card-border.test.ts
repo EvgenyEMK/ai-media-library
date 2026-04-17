@@ -52,12 +52,12 @@ describe("photoPipelineMiniCardBorderClass (image analysis mini-card + settings 
     const cov = coverage(pipe("partial", 5, 2), faceDone, semDone);
     expect(photoPipelineMiniCardBorderClass(cov, "red")).toBe("border-destructive");
     expect(photoPipelineMiniCardBorderClass(cov, "amber")).toBe("border-amber-400");
-    expect(photoPipelineMiniCardBorderClass(cov, "green")).toBe("border-[hsl(var(--success))]");
+    expect(photoPipelineMiniCardBorderClass(cov, "green")).toBe("border-[#2a3550]");
   });
 
   it("uses standard photo border when face or semantic not done", () => {
     const cov = coverage(pipe("not_done", 5, 0), pipe("not_done", 5, 0), semDone);
-    expect(photoPipelineMiniCardBorderClass(cov, "green")).toBe("border-destructive");
+    expect(photoPipelineMiniCardBorderClass(cov, "green")).toBe("border-[#2a3550]");
   });
 
   it("uses neutral border when photo pipeline fully done", () => {

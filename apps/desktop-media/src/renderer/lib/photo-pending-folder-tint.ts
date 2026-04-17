@@ -14,7 +14,10 @@ export function photoPendingTintToSquareClass(tint: PhotoPendingFolderIconTint):
   }
 }
 
-/** Mini-card border when image analysis is the only incomplete pipeline (matches sidebar tint). */
+/**
+ * Mini-card border when image analysis is the only incomplete pipeline (matches sidebar red/amber).
+ * `green` means “ignore pending image analysis” — use neutral border, never a success/green outline.
+ */
 export function photoPendingTintToBorderClass(tint: PhotoPendingFolderIconTint): string {
   switch (tint) {
     case "red":
@@ -22,7 +25,7 @@ export function photoPendingTintToBorderClass(tint: PhotoPendingFolderIconTint):
     case "amber":
       return "border-amber-400";
     case "green":
-      return "border-[hsl(var(--success))]";
+      return "border-[#2a3550]";
     default:
       return "border-amber-400";
   }

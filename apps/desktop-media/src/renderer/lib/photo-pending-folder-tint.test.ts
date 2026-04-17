@@ -13,6 +13,6 @@ describe("photoPendingTintToBorderClass (image analysis mini-card when face+sear
   it("maps settings tint to mini-card border classes", () => {
     expect(photoPendingTintToBorderClass("red")).toBe("border-destructive");
     expect(photoPendingTintToBorderClass("amber")).toBe("border-amber-400");
-    expect(photoPendingTintToBorderClass("green")).toBe("border-[hsl(var(--success))]");
+    expect(photoPendingTintToBorderClass("green")).toBe("border-[#2a3550]");
   });
 });

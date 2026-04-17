@@ -23,6 +23,8 @@ export function pipelineMiniCardBorderClass(pipeline: FolderAiCoverageReport["ph
 /**
  * Image analysis mini-card border: uses app setting tint when face + AI search are complete
  * but image analysis is not; otherwise same rules as {@link pipelineMiniCardBorderClass}.
+ * Borders are only red or amber (or neutral); `folderIconWhenPhotoAnalysisPending` = `green` clears
+ * urgency on this card (neutral border) even when other pipelines are still not done.
  */
 export function photoPipelineMiniCardBorderClass(
   coverage: FolderAiCoverageReport,
@@ -37,6 +39,15 @@ export function photoPipelineMiniCardBorderClass(
   if ((pipeline.label === "done" || (pipeline.label === "partial" && noPendingWork)) && total > 0) {
     return "border-[#2a3550]";
   }
+
+  const defaultBorder = pipelineMiniCardBorderClass(pipeline);
+  if (
+    photoPendingTint === "green" &&
+    (defaultBorder === "border-destructive" || defaultBorder === "border-amber-400")
+  ) {
+    return "border-[#2a3550]";
+  }
+
   if (
     coverage.face.label === "done" &&
     coverage.semantic.label === "done" &&
@@ -44,5 +55,5 @@ export function photoPipelineMiniCardBorderClass(
   ) {
     return photoPendingTintToBorderClass(photoPendingTint);
   }
-  return pipelineMiniCardBorderClass(pipeline);
+  return defaultBorder;
 }
