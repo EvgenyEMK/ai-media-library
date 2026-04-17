@@ -93,6 +93,8 @@ export function DesktopMainToolbar({
         <ToolbarIconButton
           title={UI_TEXT.semanticOpen}
           ariaExpanded={semanticPanelOpen}
+          ariaPressed={semanticModeActive}
+          isActive={semanticModeActive}
           onClick={() => store.getState().toggleSemanticPanel()}
         >
           <Search size={16} aria-hidden="true" />

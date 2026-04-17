@@ -129,6 +129,7 @@ export function useFolderTreeHandlers(opts: {
         s.semanticResults = [];
         s.semanticStatus = null;
         s.semanticSearching = false;
+        s.semanticPanelOpen = false;
       });
       try {
         const { requestId } = await window.desktopApi.startFolderMediaStream(folderPath);

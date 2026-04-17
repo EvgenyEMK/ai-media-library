@@ -258,4 +258,113 @@ test.describe("Semantic image search", () => {
     console.log(`[test][UI] Result images visible: ${imageCount}`);
     expect(imageCount).toBeGreaterThan(0);
   });
+
+  test("search icon active state follows results and folder click hides AI search panel", async ({
+    electronApp,
+    mainWindow,
+  }) => {
+    test.skip(
+      !hasRequiredAssets(),
+      `Missing semantic test assets. Expected files in: ${e2ePhotosDir}`,
+    );
+
+    await waitForSemanticSearchAiReady(mainWindow);
+
+    await mockFolderDialog(electronApp, e2ePhotosDir);
+    await mainWindow.getByText("Add library folder").click();
+    await clickSidebarLibraryRoot(mainWindow, e2ePhotosDir);
+    await mainWindow.waitForTimeout(2_000);
+
+    await mainWindow.evaluate(async (folderPath) => {
+      return window.desktopApi.indexFolderSemanticEmbeddings({
+        folderPath,
+        mode: "all",
+        recursive: false,
+      });
+    }, e2ePhotosDir);
+    await waitForSemanticIndexIdle(mainWindow);
+
+    const semanticButton = mainWindow.locator('button[title="Open AI image search"]');
+    await expect(semanticButton).toHaveAttribute("aria-pressed", "false");
+
+    await semanticButton.click();
+    const searchInput = mainWindow.locator('input[placeholder*="Bald man"]');
+    await expect(searchInput).toBeVisible();
+    await searchInput.fill("Mountains with cloudy sky");
+    await searchInput.press("Enter");
+
+    await expect(mainWindow.getByTestId("desktop-search-results-grid")).toBeVisible({ timeout: 60_000 });
+    await expect(semanticButton).toHaveAttribute("aria-pressed", "true");
+
+    await mainWindow.getByRole("button", { name: "Clear results" }).click();
+    await expect(mainWindow.getByTestId("desktop-search-results-grid")).not.toBeVisible();
+    await expect(semanticButton).toHaveAttribute("aria-pressed", "false");
+
+    await expect(searchInput).toBeVisible();
+    await searchInput.fill("Mountains with cloudy sky");
+    await searchInput.press("Enter");
+    await expect(mainWindow.getByTestId("desktop-search-results-grid")).toBeVisible({ timeout: 60_000 });
+
+    // Re-selecting any folder should hide AI search panel and clear search results.
+    await clickSidebarLibraryRoot(mainWindow, e2ePhotosDir);
+
+    await expect(searchInput).not.toBeVisible();
+    await expect(mainWindow.getByTestId("desktop-search-results-grid")).not.toBeVisible();
+    await expect(semanticButton).toHaveAttribute("aria-pressed", "false");
+  });
+
+  test("shows two-line empty message when thresholds hide all search results", async ({
+    electronApp,
+    mainWindow,
+  }) => {
+    test.skip(
+      !hasRequiredAssets(),
+      `Missing semantic test assets. Expected files in: ${e2ePhotosDir}`,
+    );
+
+    await waitForSemanticSearchAiReady(mainWindow);
+
+    await mockFolderDialog(electronApp, e2ePhotosDir);
+    await mainWindow.getByText("Add library folder").click();
+    await clickSidebarLibraryRoot(mainWindow, e2ePhotosDir);
+    await mainWindow.waitForTimeout(2_000);
+
+    await mainWindow.evaluate(async (folderPath) => {
+      return window.desktopApi.indexFolderSemanticEmbeddings({
+        folderPath,
+        mode: "all",
+        recursive: false,
+      });
+    }, e2ePhotosDir);
+    await waitForSemanticIndexIdle(mainWindow);
+
+    const semanticButton = mainWindow.locator('button[title="Open AI image search"]');
+    await semanticButton.click();
+
+    const searchInput = mainWindow.locator('input[placeholder*="Bald man"]');
+    await searchInput.fill("Mountains with cloudy sky");
+    await searchInput.press("Enter");
+    await expect(mainWindow.getByTestId("desktop-search-results-grid")).toBeVisible({ timeout: 60_000 });
+
+    await mainWindow.getByRole("navigation").getByText("Settings", { exact: true }).click();
+    const aiSearchCard = mainWindow.locator("details").filter({
+      has: mainWindow.getByText("AI image search", { exact: true }),
+    });
+    await aiSearchCard.locator("summary").click();
+    const thresholdInputs = aiSearchCard.getByRole("spinbutton");
+    await thresholdInputs.nth(0).fill("1");
+    await thresholdInputs.nth(0).press("Enter");
+    await thresholdInputs.nth(1).fill("1");
+    await thresholdInputs.nth(1).press("Enter");
+
+    await mainWindow.getByRole("navigation").getByText("Folders", { exact: true }).click();
+
+    await expect(mainWindow.getByText("Nothing found", { exact: true })).toBeVisible();
+    await expect(
+      mainWindow.getByText(
+        "All search results are below similarity threasholds defined in Settings → AI image search",
+        { exact: true },
+      ),
+    ).toBeVisible();
+  });
 });

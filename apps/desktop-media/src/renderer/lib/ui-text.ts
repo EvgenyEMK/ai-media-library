@@ -84,8 +84,9 @@ export const UI_TEXT = {
   semanticSearchSignalVlmOnly: "VLM only",
   semanticSearchSignalDescriptionOnly: "Description only",
   semanticClear: "Clear results",
+  semanticSearchNoResultsTitle: "Nothing found",
   semanticSearchNoResultsAboveThreshold:
-    "All search results are below your VLM and AI-description thresholds. Lower those values under Settings → AI image search, or clear results and try again.",
+    "All search results are below similarity threasholds defined in Settings → AI image search",
   semanticIndexFolder: "Index selected folder",
   semanticCancelIndex: "Cancel indexing",
   semanticOpen: "Open AI image search",
