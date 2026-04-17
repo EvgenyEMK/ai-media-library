@@ -56,15 +56,17 @@ export async function refreshFolderAiRollups(store: DesktopStore): Promise<void>
 }
 
 export async function refreshFolderAnalysisStatuses(store: DesktopStore): Promise<void> {
-  try {
-    const statuses = await window.desktopApi.getFolderAnalysisStatuses();
-    store.setState((s) => {
-      s.folderAnalysisByPath = statuses;
-    });
-  } catch {
-    // ignore
-  }
-  await refreshFolderAiRollups(store);
+  await Promise.all([
+    window.desktopApi
+      .getFolderAnalysisStatuses()
+      .then((statuses) => {
+        store.setState((s) => {
+          s.folderAnalysisByPath = statuses;
+        });
+      })
+      .catch(() => undefined),
+    refreshFolderAiRollups(store).catch(() => undefined),
+  ]);
 }
 
 export async function refreshMetadataForItems(

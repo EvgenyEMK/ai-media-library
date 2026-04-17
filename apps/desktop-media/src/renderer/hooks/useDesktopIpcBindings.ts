@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { DEFAULT_PHOTO_ANALYSIS_SETTINGS } from "../../shared/ipc";
 import { useDesktopStoreApi } from "../stores/desktop-store";
 import {
   bindPhotoAnalysisProgress,
@@ -104,7 +105,10 @@ export function useDesktopInitialization(): void {
           s.libraryRoots = settings.libraryRoots;
           s.sidebarCollapsed = settings.sidebarCollapsed;
           s.faceDetectionSettings = settings.faceDetection;
-          s.photoAnalysisSettings = settings.photoAnalysis;
+          s.photoAnalysisSettings = {
+            ...DEFAULT_PHOTO_ANALYSIS_SETTINGS,
+            ...(settings.photoAnalysis ?? {}),
+          };
           // Keep the global AI slice selection in sync with settings (model is now configured in Settings).
           if (settings.photoAnalysis?.model) {
             s.aiSelectedModel = settings.photoAnalysis.model;
@@ -254,6 +258,8 @@ export function useDesktopSettingsPersistence(): void {
             prev.photoAnalysisSettings.useFaceFeaturesForRotation ||
           state.photoAnalysisSettings.extractInvoiceData !==
             prev.photoAnalysisSettings.extractInvoiceData ||
+          state.photoAnalysisSettings.folderIconWhenPhotoAnalysisPending !==
+            prev.photoAnalysisSettings.folderIconWhenPhotoAnalysisPending ||
           state.folderScanningSettings.autoMetadataScanOnSelectMaxFiles !==
             prev.folderScanningSettings.autoMetadataScanOnSelectMaxFiles ||
           state.folderScanningSettings.writeEmbeddedMetadataOnUserEdit !==

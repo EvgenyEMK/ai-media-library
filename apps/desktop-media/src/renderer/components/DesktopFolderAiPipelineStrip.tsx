@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useState, type ReactElement } from "react";
-import { Check, CircleDashed, ImageIcon, RefreshCw, Video } from "lucide-react";
+import { Check, CircleDashed, ImageIcon, Loader2, RefreshCw, Video } from "lucide-react";
 import type { FolderAiCoverageReport } from "../../shared/ipc";
+import {
+  photoPipelineMiniCardBorderClass,
+  pipelineMiniCardBorderClass,
+} from "../lib/pipeline-mini-card-border";
 import { UI_TEXT } from "../lib/ui-text";
+import { useDesktopStore } from "../stores/desktop-store";
 
 function formatPartialPercent(doneCount: number, totalImages: number): string {
   const raw = (doneCount / totalImages) * 100;
@@ -11,6 +16,13 @@ function formatPartialPercent(doneCount: number, totalImages: number): string {
   }
   return `${floored}%`;
 }
+
+const EMPTY_PIPELINE: FolderAiCoverageReport["photo"] = {
+  doneCount: 0,
+  failedCount: 0,
+  totalImages: 0,
+  label: "empty",
+};
 
 function PipelineStatusMini({ pipeline }: { pipeline: FolderAiCoverageReport["photo"] }): ReactElement {
   const total = pipeline.totalImages;
@@ -33,6 +45,16 @@ function PipelineStatusMini({ pipeline }: { pipeline: FolderAiCoverageReport["ph
   return <span className="text-sm tracking-wide text-destructive">—</span>;
 }
 
+function PipelineMiniLoadingSpinner(): ReactElement {
+  return (
+    <Loader2
+      size={16}
+      aria-hidden="true"
+      className="inline-block shrink-0 animate-spin text-gray-400"
+    />
+  );
+}
+
 interface DesktopFolderAiPipelineStripProps {
   folderPath: string | null;
   imagesCount: number;
@@ -49,6 +71,7 @@ export function DesktopFolderAiPipelineStrip({
 }: DesktopFolderAiPipelineStripProps): ReactElement | null {
   const [coverage, setCoverage] = useState<FolderAiCoverageReport | null>(null);
   const [loading, setLoading] = useState(false);
+  const photoPendingTint = useDesktopStore((s) => s.photoAnalysisSettings.folderIconWhenPhotoAnalysisPending);
   const debugPhotoAi =
     typeof process !== "undefined" && process.env?.EMK_DEBUG_PHOTO_AI === "1";
 
@@ -92,49 +115,108 @@ export function DesktopFolderAiPipelineStrip({
     return null;
   }
 
+  const showPipelineCards = imagesCount > 0;
+  const semanticBorder =
+    loading || !coverage
+      ? "border-[#2a3550]"
+      : pipelineMiniCardBorderClass(coverage.semantic);
+  const faceBorder =
+    loading || !coverage ? "border-[#2a3550]" : pipelineMiniCardBorderClass(coverage.face);
+  const photoBorder =
+    loading || !coverage
+      ? "border-[#2a3550]"
+      : photoPipelineMiniCardBorderClass(coverage, photoPendingTint);
+
+  const semanticInner =
+    loading ? (
+      <PipelineMiniLoadingSpinner />
+    ) : coverage ? (
+      <PipelineStatusMini pipeline={coverage.semantic} />
+    ) : (
+      <PipelineStatusMini pipeline={EMPTY_PIPELINE} />
+    );
+  const faceInner =
+    loading ? (
+      <PipelineMiniLoadingSpinner />
+    ) : coverage ? (
+      <PipelineStatusMini pipeline={coverage.face} />
+    ) : (
+      <PipelineStatusMini pipeline={EMPTY_PIPELINE} />
+    );
+  const photoInner =
+    loading ? (
+      <PipelineMiniLoadingSpinner />
+    ) : coverage ? (
+      <PipelineStatusMini pipeline={coverage.photo} />
+    ) : (
+      <PipelineStatusMini pipeline={EMPTY_PIPELINE} />
+    );
+
   return (
-    <div className="text-xs text-[#9fb0d4]" aria-label={UI_TEXT.folderAiPipelineStripLabel}>
-      {loading ? (
-        <span className="opacity-[0.85]">{UI_TEXT.folderAiPipelineStripLoading}</span>
-      ) : coverage ? (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <span className="inline-flex h-12 items-center gap-1.5 rounded-md border border-[#2a3550] bg-[#151d2e] px-2.5 py-1.5 text-xs text-[#e8eefc]">
-            <Video size={28} aria-hidden="true" className="opacity-85" />
-            <span className="text-base font-semibold leading-none">{videosCount}</span>
-          </span>
-          <span className="inline-flex h-12 items-center gap-1.5 rounded-md border border-[#2a3550] bg-[#151d2e] px-2.5 py-1.5 text-xs text-[#e8eefc]">
-            <ImageIcon size={28} aria-hidden="true" className="opacity-85" />
-            <span className="text-base font-semibold leading-none">{imagesCount}</span>
-          </span>
-          {imagesCount > 0 ? (
-            <>
-              <span className="inline-flex h-12 flex-col items-center justify-center gap-0.5 rounded-md border border-[#2a3550] bg-[#151d2e] px-2 py-1 text-center" title={UI_TEXT.folderAiSummaryColumnSemantic}>
-                <span className="text-[10px] uppercase tracking-wide opacity-75">{UI_TEXT.folderAiSummaryColumnSemantic}</span>
-                <span className="text-xs text-[#e8eefc]"><PipelineStatusMini pipeline={coverage.semantic} /></span>
+    <div
+      className="text-xs text-[#9fb0d4]"
+      aria-label={UI_TEXT.folderAiPipelineStripLabel}
+      aria-busy={loading}
+    >
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="inline-flex h-12 items-center gap-1.5 rounded-md border border-[#2a3550] bg-[#151d2e] px-2.5 py-1.5 text-xs text-[#e8eefc]">
+          <Video size={28} aria-hidden="true" className="opacity-85" />
+          <span className="text-base font-semibold leading-none">{videosCount}</span>
+        </span>
+        <span className="inline-flex h-12 items-center gap-1.5 rounded-md border border-[#2a3550] bg-[#151d2e] px-2.5 py-1.5 text-xs text-[#e8eefc]">
+          <ImageIcon size={28} aria-hidden="true" className="opacity-85" />
+          <span className="text-base font-semibold leading-none">{imagesCount}</span>
+        </span>
+        {showPipelineCards ? (
+          <>
+            <span
+              className={`inline-flex h-12 flex-col items-center justify-center gap-0.5 rounded-md border bg-[#151d2e] px-2 py-1 text-center ${semanticBorder}`}
+              title={UI_TEXT.folderAiSummaryColumnSemantic}
+            >
+              <span className="text-[10px] uppercase tracking-wide opacity-75">
+                {UI_TEXT.folderAiSummaryColumnSemantic}
               </span>
-              <span className="inline-flex h-12 flex-col items-center justify-center gap-0.5 rounded-md border border-[#2a3550] bg-[#151d2e] px-2 py-1 text-center" title={UI_TEXT.folderAiSummaryColumnFace}>
-                <span className="text-[10px] uppercase tracking-wide opacity-75">{UI_TEXT.folderAiSummaryColumnFace}</span>
-                <span className="text-xs text-[#e8eefc]"><PipelineStatusMini pipeline={coverage.face} /></span>
+              <span className="flex min-h-[1.25rem] items-center justify-center text-xs text-[#e8eefc]">
+                {semanticInner}
               </span>
-              <span className="inline-flex h-12 flex-col items-center justify-center gap-0.5 rounded-md border border-[#2a3550] bg-[#151d2e] px-2 py-1 text-center" title={UI_TEXT.folderAiSummaryColumnPhoto}>
-                <span className="text-[10px] uppercase tracking-wide opacity-75">{UI_TEXT.folderAiSummaryColumnPhoto}</span>
-                <span className="text-xs text-[#e8eefc]"><PipelineStatusMini pipeline={coverage.photo} /></span>
+            </span>
+            <span
+              className={`inline-flex h-12 flex-col items-center justify-center gap-0.5 rounded-md border bg-[#151d2e] px-2 py-1 text-center ${faceBorder}`}
+              title={UI_TEXT.folderAiSummaryColumnFace}
+            >
+              <span className="text-[10px] uppercase tracking-wide opacity-75">
+                {UI_TEXT.folderAiSummaryColumnFace}
               </span>
-            </>
-          ) : null}
-          <button
-            type="button"
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-input bg-secondary p-0 shadow-none"
-            onClick={() => void load()}
-            title={UI_TEXT.folderAiSummaryRefresh}
-            aria-label={UI_TEXT.folderAiSummaryRefresh}
-          >
-            <RefreshCw size={14} aria-hidden="true" className={loading ? "animate-spin" : undefined} />
-          </button>
-        </div>
-      ) : (
-        <span className="opacity-[0.85]">{UI_TEXT.folderAiPipelineStripUnavailable}</span>
-      )}
+              <span className="flex min-h-[1.25rem] items-center justify-center text-xs text-[#e8eefc]">
+                {faceInner}
+              </span>
+            </span>
+            <span
+              className={`inline-flex h-12 flex-col items-center justify-center gap-0.5 rounded-md border bg-[#151d2e] px-2 py-1 text-center ${photoBorder}`}
+              title={UI_TEXT.folderAiSummaryColumnPhoto}
+            >
+              <span className="text-[10px] uppercase tracking-wide opacity-75">
+                {UI_TEXT.folderAiSummaryColumnPhoto}
+              </span>
+              <span className="flex min-h-[1.25rem] items-center justify-center text-xs text-[#e8eefc]">
+                {photoInner}
+              </span>
+            </span>
+          </>
+        ) : null}
+        <button
+          type="button"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-input bg-secondary p-0 shadow-none"
+          onClick={() => void load()}
+          title={UI_TEXT.folderAiSummaryRefresh}
+          aria-label={UI_TEXT.folderAiSummaryRefresh}
+        >
+          <RefreshCw size={14} aria-hidden="true" className={loading ? "animate-spin" : undefined} />
+        </button>
+      </div>
+      {!loading && !coverage && imagesCount > 0 ? (
+        <span className="mt-1 block text-[11px] text-muted-foreground">{UI_TEXT.folderAiPipelineStripUnavailable}</span>
+      ) : null}
     </div>
   );
 }

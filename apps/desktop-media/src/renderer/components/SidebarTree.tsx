@@ -9,16 +9,19 @@ import {
   type ReactElement,
 } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown, ChevronRight, Loader, Loader2, MoreVertical, Pause, Play, Square } from "lucide-react";
-import type {
-  FolderAiSidebarRollup,
-  FolderAnalysisState,
-  FolderAnalysisStatus,
-  FolderNode,
+import { ChevronDown, ChevronRight, Loader, Loader2, MoreVertical, Pause, Play, Square } from "lucide-react";
+import {
+  DEFAULT_PHOTO_ANALYSIS_SETTINGS,
+  type FolderAiSidebarRollup,
+  type FolderAnalysisState,
+  type FolderAnalysisStatus,
+  type FolderNode,
+  type PhotoPendingFolderIconTint,
 } from "../../shared/ipc";
 import { FolderAnalysisMenuSection } from "./FolderAnalysisMenuSection";
 import { UI_TEXT } from "../lib/ui-text";
 import { cn } from "../lib/cn";
+import { photoPendingTintToSquareClass } from "../lib/photo-pending-folder-tint";
 import { useDesktopStore } from "../stores/desktop-store";
 
 let _openMenuPath: string | null = null;
@@ -184,8 +187,14 @@ function sidebarIconTitle(
   if (analysisState === "in_progress") {
     return "AI job in progress for this folder";
   }
+  if (sidebarRollup === undefined) {
+    return "Loading folder AI status…";
+  }
   if (sidebarRollup === "all_done") {
     return "Subtree: face, photo AI, and search index complete for all images";
+  }
+  if (sidebarRollup === "photo_analysis_waiting") {
+    return "Subtree: face and search index complete; image analysis still pending";
   }
   if (sidebarRollup === "partial") {
     return "Subtree: some images still need one or more AI steps";
@@ -196,20 +205,19 @@ function sidebarIconTitle(
   if (sidebarRollup === "empty") {
     return "No catalogued images in this subtree";
   }
-  if (analysisState === "analyzed") {
-    return "Folder has recorded analysis activity";
-  }
   return "Folder not analyzed";
 }
 
 interface FolderSidebarStatusIconProps {
   analysisState: FolderAnalysisState;
   sidebarRollup: FolderAiSidebarRollup | undefined;
+  photoPendingTint: PhotoPendingFolderIconTint;
 }
 
 function FolderSidebarStatusIcon({
   analysisState,
   sidebarRollup,
+  photoPendingTint,
 }: FolderSidebarStatusIconProps): ReactElement {
   if (analysisState === "in_progress") {
     return (
@@ -222,12 +230,33 @@ function FolderSidebarStatusIcon({
     );
   }
 
-  if (sidebarRollup === "all_done") {
+  if (sidebarRollup === undefined) {
     return (
-      <Check
-        className="block shrink-0 text-[hsl(var(--success))]"
+      <Loader2
+        className="block shrink-0 animate-spin text-gray-400"
         size={14}
         strokeWidth={2.2}
+        aria-hidden="true"
+      />
+    );
+  }
+
+  if (sidebarRollup === "all_done") {
+    return (
+      <Square
+        className="block shrink-0 text-[hsl(var(--success))]"
+        size={14}
+        strokeWidth={2.1}
+        aria-hidden="true"
+      />
+    );
+  }
+  if (sidebarRollup === "photo_analysis_waiting") {
+    return (
+      <Square
+        className={cn("block shrink-0", photoPendingTintToSquareClass(photoPendingTint))}
+        size={14}
+        strokeWidth={2.1}
         aria-hidden="true"
       />
     );
@@ -241,17 +270,6 @@ function FolderSidebarStatusIcon({
   if (sidebarRollup === "empty") {
     return (
       <Square className="block shrink-0 text-gray-500" size={14} strokeWidth={1.6} aria-hidden="true" />
-    );
-  }
-
-  if (analysisState === "analyzed") {
-    return (
-      <Check
-        className="block shrink-0 text-[hsl(var(--success))]"
-        size={14}
-        strokeWidth={2.2}
-        aria-hidden="true"
-      />
     );
   }
 
@@ -323,6 +341,11 @@ function TreeNode({
   onAnalyzeFolderPathMetadata,
   onCancelPathAnalysis,
 }: TreeNodeProps): ReactElement {
+  const photoPendingFolderIconTint = useDesktopStore(
+    (s) =>
+      s.photoAnalysisSettings.folderIconWhenPhotoAnalysisPending ??
+      DEFAULT_PHOTO_ANALYSIS_SETTINGS.folderIconWhenPhotoAnalysisPending,
+  );
   const [scanMenuOpen, setScanMenuOpen] = useState(false);
   const [scanIncludeSubfolders, setScanIncludeSubfolders] = useState(true);
   const menuOpen = useIsMenuOpen(folderPath);
@@ -455,7 +478,11 @@ function TreeNode({
           title={label}
         >
           <span className="inline-flex h-3.5 min-w-3.5 w-3.5 shrink-0 items-center justify-center" title={iconTitle}>
-            <FolderSidebarStatusIcon analysisState={analysisState} sidebarRollup={sidebarRollup} />
+            <FolderSidebarStatusIcon
+              analysisState={analysisState}
+              sidebarRollup={sidebarRollup}
+              photoPendingTint={photoPendingFolderIconTint}
+            />
           </span>
           {!collapsed && <span className="min-w-0 truncate">{label}</span>}
         </button>

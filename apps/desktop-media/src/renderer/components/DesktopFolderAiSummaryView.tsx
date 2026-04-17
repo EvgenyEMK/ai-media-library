@@ -42,10 +42,12 @@ interface DesktopFolderAiSummaryViewProps {
 
 function FailedLine({ failedCount, totalImages }: { failedCount: number; totalImages: number }): ReactElement | null {
   if (failedCount <= 0 || totalImages <= 0) return null;
-  const pct = formatPartialPercent(failedCount, totalImages);
   return (
-    <span className="block text-[11px] leading-snug text-[hsl(var(--warning))]" title={UI_TEXT.folderAiSummaryStatusFailed}>
-      {UI_TEXT.folderAiSummaryStatusFailed}: {pct} ({formatGroupedInt(failedCount)})
+    <span
+      className="block text-[11px] leading-snug text-destructive"
+      title={UI_TEXT.folderAiSummaryStatusFailedCorrupt}
+    >
+      {UI_TEXT.folderAiSummaryStatusFailed}: {formatGroupedInt(failedCount)}
     </span>
   );
 }
@@ -69,11 +71,11 @@ function PipelineStatusCell({ pipeline }: { pipeline: FolderAiPipelineCounts }):
     const percentLabel = formatPartialPercent(pipeline.doneCount, total);
     return (
       <span className="inline-flex flex-col items-start gap-0.5 text-foreground" title={UI_TEXT.folderAiSummaryStatusPartial}>
-        <span className="inline-flex min-h-6 items-center gap-1.5">
+        <span className="inline-flex min-h-6 items-center gap-1.5 text-amber-400">
           <CircleDashed size={16} aria-hidden="true" className="shrink-0 opacity-[0.85]" />
           <span className="inline-flex items-baseline gap-[0.35em] whitespace-nowrap">
             <span className="text-base font-semibold leading-none">{percentLabel}</span>
-            <span className="text-[11px] text-muted-foreground">({formatGroupedInt(pipeline.doneCount)})</span>
+            <span className="text-[11px] opacity-90">({formatGroupedInt(pipeline.doneCount)})</span>
           </span>
         </span>
         {failedLine}

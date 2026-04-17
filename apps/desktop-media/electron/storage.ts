@@ -16,6 +16,7 @@ import {
   type MediaViewerSettings,
   type PathExtractionSettings,
   type PhotoAnalysisSettings,
+  type PhotoPendingFolderIconTint,
 } from "../src/shared/ipc";
 
 const DEFAULT_SETTINGS: Omit<AppSettings, "clientId"> = DEFAULT_APP_SETTINGS;
@@ -221,7 +222,19 @@ function sanitizePhotoAnalysisSettings(candidate: unknown): PhotoAnalysisSetting
       typeof value.extractInvoiceData === "boolean"
         ? value.extractInvoiceData
         : DEFAULT_PHOTO_ANALYSIS_SETTINGS.extractInvoiceData,
+    folderIconWhenPhotoAnalysisPending: sanitizePhotoPendingTint(value.folderIconWhenPhotoAnalysisPending),
   };
+}
+
+const PHOTO_PENDING_TINTS = new Set<PhotoPendingFolderIconTint>(["red", "amber", "green"]);
+
+function sanitizePhotoPendingTint(raw: unknown): PhotoPendingFolderIconTint {
+  if (raw === "gray") {
+    return "green";
+  }
+  return typeof raw === "string" && PHOTO_PENDING_TINTS.has(raw as PhotoPendingFolderIconTint)
+    ? (raw as PhotoPendingFolderIconTint)
+    : DEFAULT_PHOTO_ANALYSIS_SETTINGS.folderIconWhenPhotoAnalysisPending;
 }
 
 function sanitizePathExtractionSettings(candidate: unknown): PathExtractionSettings {
