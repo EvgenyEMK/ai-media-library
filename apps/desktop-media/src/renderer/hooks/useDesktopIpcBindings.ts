@@ -13,6 +13,7 @@ import {
 } from "./ipc-progress-binders";
 import {
   clearPendingRefreshTimers,
+  refreshFolderAiRollups,
   refreshFolderAnalysisStatuses,
 } from "./ipc-binding-helpers";
 
@@ -118,6 +119,9 @@ export function useDesktopInitialization(): void {
           s.mediaViewerSettings = settings.mediaViewer;
           s.pathExtractionSettings = settings.pathExtraction;
         });
+        // Initial refreshFolderAnalysisStatuses runs before libraryRoots are loaded from settings,
+        // so rollup batch was empty and sidebar icons stayed on the loading spinner until interaction.
+        void refreshFolderAiRollups(store);
       })
       .catch(() => undefined);
 
