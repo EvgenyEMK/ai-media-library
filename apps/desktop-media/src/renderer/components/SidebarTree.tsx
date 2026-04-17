@@ -9,16 +9,19 @@ import {
   type ReactElement,
 } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown, ChevronRight, Loader, Loader2, MoreVertical, Pause, Play, Square } from "lucide-react";
-import type {
-  FolderAiSidebarRollup,
-  FolderAnalysisState,
-  FolderAnalysisStatus,
-  FolderNode,
+import { ChevronDown, ChevronRight, Loader, Loader2, MoreVertical, Pause, Play, Square } from "lucide-react";
+import {
+  DEFAULT_PHOTO_ANALYSIS_SETTINGS,
+  type FolderAiSidebarRollup,
+  type FolderAnalysisState,
+  type FolderAnalysisStatus,
+  type FolderNode,
+  type PhotoPendingFolderIconTint,
 } from "../../shared/ipc";
 import { FolderAnalysisMenuSection } from "./FolderAnalysisMenuSection";
 import { UI_TEXT } from "../lib/ui-text";
 import { cn } from "../lib/cn";
+import { photoPendingTintToSquareClass } from "../lib/photo-pending-folder-tint";
 import { useDesktopStore } from "../stores/desktop-store";
 
 let _openMenuPath: string | null = null;
@@ -73,10 +76,6 @@ interface SidebarTreeProps {
   onIndexSemantic: (folderPath: string, recursive: boolean, overrideExisting: boolean) => void;
   onCancelSemanticIndex: () => void;
   onOpenFolderAiSummary: (folderPath: string) => void;
-  // TEMPORARY: description embedding backfill — remove after migration
-  onIndexDescEmbeddings?: (folderPath: string, recursive: boolean) => void;
-  onCancelDescEmbedBackfill?: () => void;
-  descEmbedBackfillRunning?: boolean;
   onAnalyzeFolderPathMetadata?: (folderPath: string, recursive: boolean) => void;
   onCancelPathAnalysis?: () => void;
 }
@@ -102,10 +101,6 @@ export function SidebarTree({
   onIndexSemantic,
   onCancelSemanticIndex,
   onOpenFolderAiSummary,
-  // TEMPORARY: description embedding backfill — remove after migration
-  onIndexDescEmbeddings,
-  onCancelDescEmbedBackfill,
-  descEmbedBackfillRunning,
   onAnalyzeFolderPathMetadata,
   onCancelPathAnalysis,
 }: SidebarTreeProps): ReactElement {
@@ -126,7 +121,7 @@ export function SidebarTree({
   }, []);
 
   return (
-    <div ref={treeRef} className="flex flex-col">
+    <div ref={treeRef} className="flex min-w-full w-max flex-col">
       {roots.map((rootPath) => (
         <TreeNode
           key={rootPath}
@@ -154,9 +149,6 @@ export function SidebarTree({
           onIndexSemantic={onIndexSemantic}
           onCancelSemanticIndex={onCancelSemanticIndex}
           onOpenFolderAiSummary={onOpenFolderAiSummary}
-          onIndexDescEmbeddings={onIndexDescEmbeddings}
-          onCancelDescEmbedBackfill={onCancelDescEmbedBackfill}
-          descEmbedBackfillRunning={descEmbedBackfillRunning}
           onAnalyzeFolderPathMetadata={onAnalyzeFolderPathMetadata}
           onCancelPathAnalysis={onCancelPathAnalysis}
         />
@@ -184,8 +176,14 @@ function sidebarIconTitle(
   if (analysisState === "in_progress") {
     return "AI job in progress for this folder";
   }
+  if (sidebarRollup === undefined) {
+    return "Loading folder AI status…";
+  }
   if (sidebarRollup === "all_done") {
     return "Subtree: face, photo AI, and search index complete for all images";
+  }
+  if (sidebarRollup === "photo_analysis_waiting") {
+    return "Subtree: face and search index complete; image analysis still pending";
   }
   if (sidebarRollup === "partial") {
     return "Subtree: some images still need one or more AI steps";
@@ -196,20 +194,19 @@ function sidebarIconTitle(
   if (sidebarRollup === "empty") {
     return "No catalogued images in this subtree";
   }
-  if (analysisState === "analyzed") {
-    return "Folder has recorded analysis activity";
-  }
   return "Folder not analyzed";
 }
 
 interface FolderSidebarStatusIconProps {
   analysisState: FolderAnalysisState;
   sidebarRollup: FolderAiSidebarRollup | undefined;
+  photoPendingTint: PhotoPendingFolderIconTint;
 }
 
 function FolderSidebarStatusIcon({
   analysisState,
   sidebarRollup,
+  photoPendingTint,
 }: FolderSidebarStatusIconProps): ReactElement {
   if (analysisState === "in_progress") {
     return (
@@ -222,12 +219,33 @@ function FolderSidebarStatusIcon({
     );
   }
 
-  if (sidebarRollup === "all_done") {
+  if (sidebarRollup === undefined) {
     return (
-      <Check
-        className="block shrink-0 text-[hsl(var(--success))]"
+      <Loader2
+        className="block shrink-0 animate-spin text-gray-400"
         size={14}
         strokeWidth={2.2}
+        aria-hidden="true"
+      />
+    );
+  }
+
+  if (sidebarRollup === "all_done") {
+    return (
+      <Square
+        className="block shrink-0 text-[hsl(var(--success))]"
+        size={14}
+        strokeWidth={2.1}
+        aria-hidden="true"
+      />
+    );
+  }
+  if (sidebarRollup === "photo_analysis_waiting") {
+    return (
+      <Square
+        className={cn("block shrink-0", photoPendingTintToSquareClass(photoPendingTint))}
+        size={14}
+        strokeWidth={2.1}
         aria-hidden="true"
       />
     );
@@ -241,17 +259,6 @@ function FolderSidebarStatusIcon({
   if (sidebarRollup === "empty") {
     return (
       <Square className="block shrink-0 text-gray-500" size={14} strokeWidth={1.6} aria-hidden="true" />
-    );
-  }
-
-  if (analysisState === "analyzed") {
-    return (
-      <Check
-        className="block shrink-0 text-[hsl(var(--success))]"
-        size={14}
-        strokeWidth={2.2}
-        aria-hidden="true"
-      />
     );
   }
 
@@ -283,10 +290,6 @@ interface TreeNodeProps {
   onIndexSemantic: (folderPath: string, recursive: boolean, overrideExisting: boolean) => void;
   onCancelSemanticIndex: () => void;
   onOpenFolderAiSummary: (folderPath: string) => void;
-  // TEMPORARY: description embedding backfill — remove after migration
-  onIndexDescEmbeddings?: (folderPath: string, recursive: boolean) => void;
-  onCancelDescEmbedBackfill?: () => void;
-  descEmbedBackfillRunning?: boolean;
   onAnalyzeFolderPathMetadata?: (folderPath: string, recursive: boolean) => void;
   onCancelPathAnalysis?: () => void;
 }
@@ -316,13 +319,14 @@ function TreeNode({
   onIndexSemantic,
   onCancelSemanticIndex,
   onOpenFolderAiSummary,
-  // TEMPORARY: description embedding backfill — remove after migration
-  onIndexDescEmbeddings,
-  onCancelDescEmbedBackfill,
-  descEmbedBackfillRunning,
   onAnalyzeFolderPathMetadata,
   onCancelPathAnalysis,
 }: TreeNodeProps): ReactElement {
+  const photoPendingFolderIconTint = useDesktopStore(
+    (s) =>
+      s.photoAnalysisSettings.folderIconWhenPhotoAnalysisPending ??
+      DEFAULT_PHOTO_ANALYSIS_SETTINGS.folderIconWhenPhotoAnalysisPending,
+  );
   const [scanMenuOpen, setScanMenuOpen] = useState(false);
   const [scanIncludeSubfolders, setScanIncludeSubfolders] = useState(true);
   const menuOpen = useIsMenuOpen(folderPath);
@@ -407,7 +411,7 @@ function TreeNode({
   const sidebarRollup = folderRollupByPath[folderPath];
   const iconTitle = sidebarIconTitle(analysisState, sidebarRollup);
   const rowClassName = cn(
-    "group relative flex items-center gap-1.5 rounded-md p-1",
+    "group relative flex w-full items-center gap-0 rounded-md py-1 pl-1 pr-0",
     selectedFolder === folderPath && "bg-[#222a3d]",
     foldersWithCatalogChanges[folderPath] &&
       "shadow-[inset_0_0_0_1px_rgba(245,158,11,0.45)] rounded-md",
@@ -422,48 +426,60 @@ function TreeNode({
     <div>
       <div
         className={rowClassName}
-        style={{ paddingLeft: `${8 + level * 12}px` }}
         onContextMenu={(event) => {
           event.preventDefault();
           event.stopPropagation();
           openMenuAt({ x: event.clientX, y: event.clientY });
         }}
       >
-        {canExpand ? (
+        <div
+          className="flex min-h-0 min-w-0 flex-1 items-center gap-1.5"
+          style={{ paddingLeft: `${level === 0 ? 0 : 8 + level * 12}px` }}
+        >
+          {canExpand ? (
+            <button
+              type="button"
+              className="inline-flex h-7 min-w-7 w-7 items-center justify-center border-0 bg-transparent p-1.5 shadow-none rounded-none"
+              onClick={() => onToggleExpand(folderPath)}
+              aria-label={isExpanded ? "Collapse folder" : "Expand folder"}
+              title={`${isExpanded ? "Collapse folder" : "Expand folder"} - ${iconTitle}`}
+            >
+              <FolderToggleIcon expanded={isExpanded} />
+            </button>
+          ) : (
+            <span className="inline-flex h-7 min-w-7 w-7 shrink-0" aria-hidden="true" />
+          )}
           <button
             type="button"
-            className="inline-flex h-7 min-w-7 w-7 items-center justify-center border-0 bg-transparent p-1.5 shadow-none rounded-none"
-            onClick={() => onToggleExpand(folderPath)}
-            aria-label={isExpanded ? "Collapse folder" : "Expand folder"}
-            title={`${isExpanded ? "Collapse folder" : "Expand folder"} - ${iconTitle}`}
+            className="flex min-w-0 flex-1 items-center justify-start gap-2 border-0 bg-transparent p-0 text-left shadow-none rounded-none"
+            onClick={() => {
+              if (canExpand && !isExpanded) {
+                onToggleExpand(folderPath);
+              }
+              onSelectFolder(folderPath);
+              closeMenu();
+            }}
+            title={label}
           >
-            <FolderToggleIcon expanded={isExpanded} />
+            <span className="inline-flex h-3.5 min-w-3.5 w-3.5 shrink-0 items-center justify-center" title={iconTitle}>
+              <FolderSidebarStatusIcon
+                analysisState={analysisState}
+                sidebarRollup={sidebarRollup}
+                photoPendingTint={photoPendingFolderIconTint}
+              />
+            </span>
+            {!collapsed && <span className="min-w-0 whitespace-nowrap">{label}</span>}
           </button>
-        ) : (
-          <span className="inline-flex h-7 min-w-7 w-7 shrink-0" aria-hidden="true" />
-        )}
-        <button
-          type="button"
-          className="flex flex-1 items-center justify-start gap-2 border-0 bg-transparent p-0 text-left shadow-none rounded-none"
-          onClick={() => {
-            if (canExpand && !isExpanded) {
-              onToggleExpand(folderPath);
-            }
-            onSelectFolder(folderPath);
-            closeMenu();
-          }}
-          title={label}
-        >
-          <span className="inline-flex h-3.5 min-w-3.5 w-3.5 shrink-0 items-center justify-center" title={iconTitle}>
-            <FolderSidebarStatusIcon analysisState={analysisState} sidebarRollup={sidebarRollup} />
-          </span>
-          {!collapsed && <span className="min-w-0 truncate">{label}</span>}
-        </button>
+        </div>
         {!collapsed ? (
           <div
             data-sidebar-tree-menu
             className={cn(
-              "relative ml-auto opacity-0 pointer-events-none transition-opacity duration-[120ms] ease-in-out",
+              "sticky right-0 z-[2] flex shrink-0 items-center pl-1",
+              selectedFolder === folderPath
+                ? "bg-[#222a3d]"
+                : "bg-card shadow-[-6px_0_8px_-2px_rgba(0,0,0,0.35)]",
+              "opacity-0 pointer-events-none transition-opacity duration-[120ms] ease-in-out",
               menuOpen
                 ? "pointer-events-auto opacity-100 transition-none"
                 : "group-hover:pointer-events-auto group-hover:opacity-100",
@@ -501,20 +517,6 @@ function TreeNode({
                       right: "auto",
                     }}
                   >
-                    {isLibraryRoot ? (
-                      <div className="box-border flex min-h-[34px] w-full items-center px-2.5 py-2 text-left text-sm leading-snug">
-                        <button
-                          type="button"
-                          className="w-full cursor-pointer border-0 bg-transparent p-0 px-0.5 text-left font-inherit leading-snug text-inherit shadow-none"
-                          onClick={() => {
-                            onRemoveLibrary(folderPath);
-                            closeMenu();
-                          }}
-                        >
-                          Remove (does not delete)
-                        </button>
-                      </div>
-                    ) : null}
                     <div className="box-border flex min-h-[34px] w-full items-center justify-between gap-2 py-2 pl-2.5 pr-0 text-left text-sm leading-snug">
                       <button
                         type="button"
@@ -608,18 +610,25 @@ function TreeNode({
                         onCancelSemanticIndex();
                         closeMenu();
                       }}
-                      onIndexDescEmbeddings={onIndexDescEmbeddings ? (path, recursive) => {
-                        onIndexDescEmbeddings(path, recursive);
-                        closeMenu();
-                      } : undefined}
-                      onCancelDescEmbedBackfill={onCancelDescEmbedBackfill ? () => {
-                        onCancelDescEmbedBackfill();
-                        closeMenu();
-                      } : undefined}
-                      descEmbedBackfillRunning={descEmbedBackfillRunning}
                       onAnalyzeFolderPathMetadata={onAnalyzeFolderPathMetadata}
                       onCancelPathAnalysis={onCancelPathAnalysis}
                     />
+                    {isLibraryRoot ? (
+                      <div className="border-t border-border pt-1.5">
+                        <div className="box-border flex min-h-[34px] w-full items-center px-2.5 py-2 text-left text-sm leading-snug">
+                          <button
+                            type="button"
+                            className="w-full cursor-pointer border-0 bg-transparent p-0 px-0.5 text-left font-inherit leading-snug text-inherit shadow-none"
+                            onClick={() => {
+                              onRemoveLibrary(folderPath);
+                              closeMenu();
+                            }}
+                          >
+                            Remove (does not delete)
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>,
                   document.body,
                 )
@@ -657,9 +666,6 @@ function TreeNode({
               onIndexSemantic={onIndexSemantic}
               onCancelSemanticIndex={onCancelSemanticIndex}
               onOpenFolderAiSummary={onOpenFolderAiSummary}
-              onIndexDescEmbeddings={onIndexDescEmbeddings}
-              onCancelDescEmbedBackfill={onCancelDescEmbedBackfill}
-              descEmbedBackfillRunning={descEmbedBackfillRunning}
               onAnalyzeFolderPathMetadata={onAnalyzeFolderPathMetadata}
               onCancelPathAnalysis={onCancelPathAnalysis}
             />

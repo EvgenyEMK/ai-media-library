@@ -8,7 +8,10 @@ import {
 } from "../../src/shared/ipc";
 import { listFolderImages, listFolderMedia, readFolderChildren, streamFolderImages, streamFolderMedia } from "../fs-media";
 import { readSettings, writeSettings } from "../storage";
-import { getFolderAnalysisStatuses } from "../db/folder-analysis-status";
+import {
+  getFolderAnalysisStatuses,
+  pruneFolderAnalysisStatusesForMissingChildren,
+} from "../db/folder-analysis-status";
 import { emitFolderImagesProgress, emitFolderMediaProgress } from "./progress-emitters";
 import { runMetadataScanJob } from "./metadata-scan-handlers";
 import { runningMetadataScanJobs } from "./state";
@@ -39,6 +42,16 @@ export function registerFsHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.readFolderChildren, async (_event, folderPath: string) => {
     return readFolderChildren(folderPath);
   });
+  ipcMain.handle(
+    IPC_CHANNELS.pruneFolderAnalysisForMissingChildren,
+    async (_event, parentPath: string, existingChildren: string[]): Promise<{ removed: number }> => {
+      const removed = pruneFolderAnalysisStatusesForMissingChildren(
+        parentPath,
+        Array.isArray(existingChildren) ? existingChildren : [],
+      );
+      return { removed };
+    },
+  );
 
   ipcMain.handle(IPC_CHANNELS.revealItemInFolder, async (_event, filePath: string) => {
     const trimmed = typeof filePath === "string" ? filePath.trim() : "";

@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 import { MainAppSidebar } from "@emk/media-viewer";
-import { FolderOpen, Images, PanelLeftClose, PanelLeftOpen, Settings, Users } from "lucide-react";
+import { FolderOpen, Images, PanelLeftClose, PanelLeftOpen, Plus, Settings, Users } from "lucide-react";
 import { DesktopFoldersSidebarPanel } from "./DesktopFoldersSidebarPanel";
 import { DesktopSidebarAlbumsSection } from "./DesktopSidebarAlbumsSection";
 import type { DesktopPipelineHandlers } from "../hooks/use-desktop-pipeline-handlers";
@@ -12,6 +12,7 @@ import type { SidebarSectionId } from "../types/app-types";
 interface DesktopAppSidebarProps {
   store: DesktopStore;
   sidebarCollapsed: boolean;
+  activeSidebarSection: SidebarSectionId;
   expandedSidebarSection: SidebarSectionId | null;
   onSectionToggle: (sectionId: string) => void;
   libraryRoots: DesktopStoreState["libraryRoots"];
@@ -21,7 +22,6 @@ interface DesktopAppSidebarProps {
   folderAnalysisByPath: DesktopStoreState["folderAnalysisByPath"];
   folderRollupByPath: DesktopStoreState["folderRollupByPath"];
   foldersWithCatalogChanges: DesktopStoreState["foldersWithCatalogChanges"];
-  descEmbedBackfillRunning: boolean;
   pipeline: DesktopPipelineHandlers;
   folderTree: {
     handleAddLibrary: () => Promise<void>;
@@ -35,6 +35,7 @@ interface DesktopAppSidebarProps {
 export function DesktopAppSidebar({
   store,
   sidebarCollapsed,
+  activeSidebarSection,
   expandedSidebarSection,
   onSectionToggle,
   libraryRoots,
@@ -44,7 +45,6 @@ export function DesktopAppSidebar({
   folderAnalysisByPath,
   folderRollupByPath,
   foldersWithCatalogChanges,
-  descEmbedBackfillRunning,
   pipeline,
   folderTree,
 }: DesktopAppSidebarProps): ReactElement {
@@ -66,7 +66,22 @@ export function DesktopAppSidebar({
           {
             id: "folders",
             label: UI_TEXT.sectionFolders,
-            icon: <FolderOpen size={16} aria-hidden="true" />,
+            icon: <FolderOpen size={20} aria-hidden="true" />,
+            headerTrailing: (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void folderTree.handleAddLibrary();
+                }}
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center border-0 bg-transparent px-0 text-foreground shadow-none outline-none hover:bg-primary/15"
+                aria-label={UI_TEXT.addLibrary}
+                title={UI_TEXT.addLibrary}
+              >
+                <Plus size={20} aria-hidden="true" />
+              </button>
+            ),
+            contentClassName: "pr-0",
             content: (
               <DesktopFoldersSidebarPanel
                 libraryRoots={libraryRoots}
@@ -76,7 +91,6 @@ export function DesktopAppSidebar({
                 folderAnalysisByPath={folderAnalysisByPath}
                 folderRollupByPath={folderRollupByPath}
                 foldersWithCatalogChanges={foldersWithCatalogChanges}
-                descEmbedBackfillRunning={descEmbedBackfillRunning}
                 pipeline={pipeline}
                 handleAddLibrary={folderTree.handleAddLibrary}
                 handleToggleExpand={folderTree.handleToggleExpand}
@@ -89,22 +103,23 @@ export function DesktopAppSidebar({
           {
             id: "albums",
             label: UI_TEXT.sectionAlbums,
-            icon: <Images size={16} aria-hidden="true" />,
+            icon: <Images size={20} aria-hidden="true" />,
             content: <DesktopSidebarAlbumsSection collapsed={false} />,
           },
           {
             id: "people",
             label: UI_TEXT.sectionPeople,
-            icon: <Users size={16} aria-hidden="true" />,
+            icon: <Users size={20} aria-hidden="true" />,
           },
         ]}
         bottomSections={[
           {
             id: "settings",
             label: UI_TEXT.sectionSettings,
-            icon: <Settings size={16} aria-hidden="true" />,
+            icon: <Settings size={20} aria-hidden="true" />,
           },
         ]}
+        activeSectionId={activeSidebarSection}
         expandedSectionId={expandedSidebarSection}
         onSectionToggle={onSectionToggle}
       />

@@ -1,4 +1,5 @@
 import { useMemo, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
+import { refreshFolderAiRollups } from "./ipc-binding-helpers";
 import { isPathWithinParent } from "../lib/is-path-within-parent";
 import type { DesktopStore } from "../stores/desktop-store";
 import type { MainPaneViewMode } from "../types/app-types";
@@ -75,6 +76,12 @@ export function useFolderTreeHandlers(opts: {
       }
 
       const latestChildren = await window.desktopApi.readFolderChildren(folderPath);
+      void window.desktopApi
+        .pruneFolderAnalysisForMissingChildren(
+          folderPath,
+          latestChildren.map((child) => child.path),
+        )
+        .catch(() => undefined);
       const latestChildPaths = new Set(latestChildren.map((child) => child.path));
 
       store.setState((s) => {
@@ -114,6 +121,9 @@ export function useFolderTreeHandlers(opts: {
 
         s.expandedFolders.add(folderPath);
       });
+      // Chevron-only expand does not run folder selection / media stream; still fetch AI rollups
+      // for newly visible child rows (otherwise sidebar icons stay on the loading spinner).
+      void refreshFolderAiRollups(store);
     };
 
     const handleSelectFolder = async (folderPath: string): Promise<void> => {
@@ -129,6 +139,7 @@ export function useFolderTreeHandlers(opts: {
         s.semanticResults = [];
         s.semanticStatus = null;
         s.semanticSearching = false;
+        s.semanticPanelOpen = false;
       });
       try {
         const { requestId } = await window.desktopApi.startFolderMediaStream(folderPath);

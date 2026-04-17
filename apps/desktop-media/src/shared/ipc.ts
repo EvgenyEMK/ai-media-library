@@ -30,6 +30,7 @@ export type MediaKind = "image" | "video";
 export const IPC_CHANNELS = {
   selectLibraryFolder: "media:select-library-folder",
   readFolderChildren: "media:read-folder-children",
+  pruneFolderAnalysisForMissingChildren: "media:prune-folder-analysis-for-missing-children",
   /** Opens the OS file manager with the given file selected (Electron `shell.showItemInFolder`). */
   revealItemInFolder: "media:reveal-item-in-folder",
   listFolderImages: "media:list-folder-images",
@@ -182,6 +183,9 @@ export interface FaceDetectionSettings {
   faceGroupMinSize: number;
 }
 
+/** Sidebar folder icon tint when face + AI search are complete but image analysis is still pending. */
+export type PhotoPendingFolderIconTint = "red" | "amber" | "green";
+
 export interface PhotoAnalysisSettings {
   /** Default vision model to use for folder Image AI analysis runs. */
   model: string;
@@ -189,6 +193,12 @@ export interface PhotoAnalysisSettings {
   enableTwoPassRotationConsistency: boolean;
   useFaceFeaturesForRotation: boolean;
   extractInvoiceData: boolean;
+  /**
+   * When face detection and AI search indexing are complete for a subtree but image analysis is not,
+   * the folder list uses this color instead of the default “not done” (red) or “partial” (amber) styling.
+   * `green` matches the “all pipelines complete” square (success); use when you want a calm, complete look.
+   */
+  folderIconWhenPhotoAnalysisPending: PhotoPendingFolderIconTint;
 }
 
 /** Single-folder image count threshold for automatic metadata scan after folder selection. */
@@ -253,6 +263,7 @@ export const DEFAULT_PHOTO_ANALYSIS_SETTINGS: PhotoAnalysisSettings = {
   enableTwoPassRotationConsistency: true,
   useFaceFeaturesForRotation: true,
   extractInvoiceData: true,
+  folderIconWhenPhotoAnalysisPending: "amber",
 };
 
 export const DEFAULT_FOLDER_SCANNING_SETTINGS: FolderScanningSettings = {
@@ -455,7 +466,13 @@ export interface FolderAnalysisStatus {
 export type FolderAiPipelineLabel = "empty" | "done" | "not_done" | "partial";
 
 /** Subtree rollup for sidebar folder health (from DB aggregates, recursive). */
-export type FolderAiSidebarRollup = "empty" | "all_done" | "partial" | "not_done";
+export type FolderAiSidebarRollup =
+  | "empty"
+  | "all_done"
+  | "partial"
+  | "not_done"
+  /** Face + search index complete; image analysis still pending (icon color from settings). */
+  | "photo_analysis_waiting";
 
 export interface FolderAiPipelineCounts {
   doneCount: number;
@@ -1191,6 +1208,10 @@ export interface FaceEmbeddingStats {
 export interface DesktopApi {
   selectLibraryFolder: () => Promise<string | null>;
   readFolderChildren: (folderPath: string) => Promise<FolderNode[]>;
+  pruneFolderAnalysisForMissingChildren: (
+    parentPath: string,
+    existingChildren: string[],
+  ) => Promise<{ removed: number }>;
   revealItemInFolder: (filePath: string) => Promise<{ success: boolean; error?: string }>;
   listFolderImages: (folderPath: string) => Promise<MediaImageItem[]>;
   startFolderImagesStream: (folderPath: string) => Promise<{ requestId: string }>;

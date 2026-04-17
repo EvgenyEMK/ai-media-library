@@ -14,10 +14,6 @@ interface DesktopActionsMenuProps {
   onIndexSemantic: (folderPath: string, recursive: boolean, overrideExisting: boolean) => void;
   onCancelSemanticIndex: () => void;
   onCloseMenu: () => void;
-  // TEMPORARY: description embedding backfill — remove after migration
-  onIndexDescEmbeddings?: (folderPath: string, recursive: boolean) => void;
-  onCancelDescEmbedBackfill?: () => void;
-  descEmbedBackfillRunning?: boolean;
   onAnalyzeFolderPathMetadata?: (folderPath: string, recursive: boolean) => void;
   onCancelPathAnalysis?: () => void;
 }
@@ -31,10 +27,6 @@ export function DesktopActionsMenu({
   onIndexSemantic,
   onCancelSemanticIndex,
   onCloseMenu,
-  // TEMPORARY: description embedding backfill — remove after migration
-  onIndexDescEmbeddings,
-  onCancelDescEmbedBackfill,
-  descEmbedBackfillRunning,
   onAnalyzeFolderPathMetadata,
   onCancelPathAnalysis,
 }: DesktopActionsMenuProps): ReactElement {
@@ -43,7 +35,7 @@ export function DesktopActionsMenu({
   return (
     <div
       className={cn(
-        "desktop-actions-menu absolute right-0 top-9 z-40 grid min-w-[240px] gap-1.5 rounded-lg border border-border bg-card p-2",
+        "desktop-actions-menu absolute right-0 top-9 z-40 grid min-w-[260px] gap-1.5 rounded-lg border border-border bg-card p-2",
       )}
     >
       <div className="box-border flex min-h-[34px] w-full items-center px-2.5 py-2 text-left text-sm leading-snug">
@@ -67,9 +59,6 @@ export function DesktopActionsMenu({
         onCancelFaceDetection={onCancelFaceDetection}
         onIndexSemantic={onIndexSemantic}
         onCancelSemanticIndex={onCancelSemanticIndex}
-        onIndexDescEmbeddings={onIndexDescEmbeddings}
-        onCancelDescEmbedBackfill={onCancelDescEmbedBackfill}
-        descEmbedBackfillRunning={descEmbedBackfillRunning}
         onAnalyzeFolderPathMetadata={onAnalyzeFolderPathMetadata}
         onCancelPathAnalysis={onCancelPathAnalysis}
       />

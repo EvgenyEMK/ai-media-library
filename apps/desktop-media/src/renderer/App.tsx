@@ -239,6 +239,11 @@ export function App(): ReactElement {
     if (sectionId === "folders" || sectionId === "albums" || sectionId === "people" || sectionId === "settings") {
       setActiveSidebarSection(sectionId);
       if (sidebarCollapsed) {
+        if (sectionId === "folders" || sectionId === "albums") {
+          store.getState().setSidebarCollapsed(false);
+          setExpandedSidebarSection(sectionId);
+          return;
+        }
         setExpandedSidebarSection(null);
         return;
       }
@@ -259,6 +264,7 @@ export function App(): ReactElement {
       <DesktopAppSidebar
         store={store}
         sidebarCollapsed={sidebarCollapsed}
+        activeSidebarSection={activeSidebarSection}
         expandedSidebarSection={expandedSidebarSection}
         onSectionToggle={handleSidebarSectionToggle}
         libraryRoots={libraryRoots}
@@ -268,7 +274,6 @@ export function App(): ReactElement {
         folderAnalysisByPath={folderAnalysisByPath}
         folderRollupByPath={folderRollupByPath}
         foldersWithCatalogChanges={foldersWithCatalogChanges}
-        descEmbedBackfillRunning={descEmbedBackfill.status === "running"}
         pipeline={pipeline}
         folderTree={folderTree}
       />
@@ -308,7 +313,6 @@ export function App(): ReactElement {
         mainPaneViewMode={mainPaneViewMode}
         setMainPaneViewMode={setMainPaneViewMode}
         pipeline={pipeline}
-        descEmbedBackfillRunning={descEmbedBackfill.status === "running"}
         metadataScanFollowUp={metadataScanFollowUp}
         faceModelDownload={faceModelDownload}
         handleOpenFolderAiSummary={folderTree.handleOpenFolderAiSummary}

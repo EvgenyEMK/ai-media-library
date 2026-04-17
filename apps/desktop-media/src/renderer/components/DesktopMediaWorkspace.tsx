@@ -284,7 +284,12 @@ export function DesktopMediaWorkspace({
               </div>
             ) : null}
             {semanticResults.length > 0 && displaySemanticResults.length === 0 && (
-              <div className={MEDIA_PANE_EMPTY_STATE_CLASS}>{UI_TEXT.semanticSearchNoResultsAboveThreshold}</div>
+              <div className={MEDIA_PANE_EMPTY_STATE_CLASS}>
+                <div className="text-lg font-semibold">{UI_TEXT.semanticSearchNoResultsTitle}</div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  {UI_TEXT.semanticSearchNoResultsAboveThreshold}
+                </div>
+              </div>
             )}
             {semanticResults.length > 0 &&
               displaySemanticResults.length > 0 &&

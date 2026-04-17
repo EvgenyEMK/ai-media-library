@@ -31,12 +31,30 @@ describe("folderCoverageToSidebarRollup", () => {
     expect(folderCoverageToSidebarRollup(report({ totalImages: 5 }))).toBe("all_done");
   });
 
-  it("returns partial when any pipeline is partial", () => {
+  it("returns partial when any pipeline is partial (except photo-only pending)", () => {
     const r = report({
       totalImages: 4,
-      photo: { doneCount: 2, failedCount: 0, totalImages: 4, label: "partial" },
+      face: { doneCount: 2, failedCount: 0, totalImages: 4, label: "partial" },
     });
     expect(folderCoverageToSidebarRollup(r)).toBe("partial");
+  });
+
+  it("returns photo_analysis_waiting when face and search are done but image analysis is not", () => {
+    const r = report({
+      totalImages: 4,
+      photo: { doneCount: 1, failedCount: 0, totalImages: 4, label: "partial" },
+    });
+    expect(folderCoverageToSidebarRollup(r)).toBe("photo_analysis_waiting");
+  });
+
+  it("returns photo_analysis_waiting when image analysis not started but face and search complete", () => {
+    const r = report({
+      totalImages: 3,
+      photo: { doneCount: 0, failedCount: 0, totalImages: 3, label: "not_done" },
+      face: { doneCount: 3, failedCount: 0, totalImages: 3, label: "done" },
+      semantic: { doneCount: 3, failedCount: 0, totalImages: 3, label: "done" },
+    });
+    expect(folderCoverageToSidebarRollup(r)).toBe("photo_analysis_waiting");
   });
 
   it("returns not_done when a pipeline has zero done but total > 0", () => {

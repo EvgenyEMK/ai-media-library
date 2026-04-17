@@ -36,7 +36,6 @@ interface DesktopMainToolbarProps {
   actionsMenuWrapRef: RefObject<HTMLDivElement | null>;
   setMainPaneViewMode: Dispatch<SetStateAction<MainPaneViewMode>>;
   pipeline: DesktopPipelineHandlers;
-  descEmbedBackfillRunning: boolean;
 }
 
 export function DesktopMainToolbar({
@@ -64,7 +63,6 @@ export function DesktopMainToolbar({
   actionsMenuWrapRef,
   setMainPaneViewMode,
   pipeline,
-  descEmbedBackfillRunning,
 }: DesktopMainToolbarProps): ReactElement {
   return (
     <header className="panel-header flex items-start justify-between gap-3 border-b border-border px-4 py-3">
@@ -93,6 +91,8 @@ export function DesktopMainToolbar({
         <ToolbarIconButton
           title={UI_TEXT.semanticOpen}
           ariaExpanded={semanticPanelOpen}
+          ariaPressed={semanticModeActive}
+          isActive={semanticModeActive}
           onClick={() => store.getState().toggleSemanticPanel()}
         >
           <Search size={16} aria-hidden="true" />
@@ -164,11 +164,6 @@ export function DesktopMainToolbar({
               }
               onCancelSemanticIndex={() => void pipeline.handleCancelSemanticIndex()}
               onCloseMenu={() => setActionsMenuOpen(false)}
-              onIndexDescEmbeddings={(folderPath, recursive) =>
-                void pipeline.handleIndexDescEmbeddings(folderPath, recursive)
-              }
-              onCancelDescEmbedBackfill={() => void pipeline.handleCancelDescEmbedBackfill()}
-              descEmbedBackfillRunning={descEmbedBackfillRunning}
               onAnalyzeFolderPathMetadata={(folderPath, recursive) =>
                 void pipeline.handleAnalyzeFolderPathMetadata(folderPath, recursive)
               }

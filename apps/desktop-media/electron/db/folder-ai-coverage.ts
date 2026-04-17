@@ -66,38 +66,23 @@ export function getFolderAiCoverage(params: {
     ? ""
     : `AND instr(substr(mi.source_path, length(?) + 1), ?) = 0`;
 
+  // One LEFT JOIN on media_embeddings (unique per item+model+type) instead of two correlated EXISTS
+  // subqueries — avoids repeated index lookups per row and matches the query planner’s hash/loop join.
   const sql = `
     SELECT
       COUNT(*) AS total,
       SUM(CASE WHEN mi.photo_analysis_processed_at IS NOT NULL THEN 1 ELSE 0 END) AS photo_done,
       SUM(CASE WHEN mi.face_detection_processed_at IS NOT NULL THEN 1 ELSE 0 END) AS face_done,
-      SUM(
-        CASE
-          WHEN EXISTS (
-            SELECT 1 FROM media_embeddings me
-            WHERE me.media_item_id = mi.id
-              AND me.library_id = mi.library_id
-              AND me.embedding_type = 'image'
-              AND me.model_version = ?
-              AND me.embedding_status = 'ready'
-          )
-          THEN 1 ELSE 0 END
-      ) AS semantic_done,
+      SUM(CASE WHEN me_img.embedding_status = 'ready' THEN 1 ELSE 0 END) AS semantic_done,
       SUM(CASE WHEN mi.photo_analysis_failed_at IS NOT NULL AND mi.photo_analysis_processed_at IS NULL THEN 1 ELSE 0 END) AS photo_failed,
       SUM(CASE WHEN mi.face_detection_failed_at IS NOT NULL AND mi.face_detection_processed_at IS NULL THEN 1 ELSE 0 END) AS face_failed,
-      SUM(
-        CASE
-          WHEN EXISTS (
-            SELECT 1 FROM media_embeddings me
-            WHERE me.media_item_id = mi.id
-              AND me.library_id = mi.library_id
-              AND me.embedding_type = 'image'
-              AND me.model_version = ?
-              AND me.embedding_status = 'failed'
-          )
-          THEN 1 ELSE 0 END
-      ) AS semantic_failed
+      SUM(CASE WHEN me_img.embedding_status = 'failed' THEN 1 ELSE 0 END) AS semantic_failed
     FROM media_items mi
+    LEFT JOIN media_embeddings me_img
+      ON me_img.media_item_id = mi.id
+      AND me_img.library_id = mi.library_id
+      AND me_img.embedding_type = 'image'
+      AND me_img.model_version = ?
     WHERE mi.library_id = ?
       AND mi.deleted_at IS NULL
       AND ${imagePred}
@@ -107,7 +92,7 @@ export function getFolderAiCoverage(params: {
 
   const db = getDesktopDatabase();
   const stmt = db.prepare(sql);
-  const bindRecursive: unknown[] = [modelVersion, modelVersion, libraryId, likePattern];
+  const bindRecursive: unknown[] = [modelVersion, libraryId, likePattern];
   if (!params.recursive) {
     bindRecursive.push(folderPrefix, sep);
   }
@@ -154,6 +139,13 @@ function emptyReport(folderPath: string, recursive: boolean): FolderAiCoverageRe
 export function folderCoverageToSidebarRollup(coverage: FolderAiCoverageReport): FolderAiSidebarRollup {
   if (coverage.totalImages === 0) return "empty";
   const { photo, face, semantic } = coverage;
+  if (
+    face.label === "done" &&
+    semantic.label === "done" &&
+    photo.label !== "done"
+  ) {
+    return "photo_analysis_waiting";
+  }
   if (photo.label === "done" && face.label === "done" && semantic.label === "done") {
     return "all_done";
   }
@@ -166,6 +158,10 @@ export function folderCoverageToSidebarRollup(coverage: FolderAiCoverageReport):
   return "all_done";
 }
 
+/**
+ * Sidebar folder icons: **subtree rollup** (all catalogued images under each path), one batched query.
+ * Toolbar mini-cards remain direct-only via {@link getFolderAiCoverage} — scopes differ by design.
+ */
 export function getFolderAiRollupsForPaths(
   folderPaths: string[],
   libraryId?: string,
@@ -183,17 +179,10 @@ export function getFolderAiRollupsForPaths(
 
   const db = getDesktopDatabase();
 
-  const prefixes = trimmedPaths.map((p) =>
-    p.endsWith(sep) ? p : `${p}${sep}`,
-  );
+  const prefixes = trimmedPaths.map((p) => (p.endsWith(sep) ? p : `${p}${sep}`));
 
-  // Build a VALUES table of (folder_idx, like_pattern) for a single batched query.
-  // Each media_item is joined to every folder prefix it matches, so nested folders
-  // (recursive rollups) count correctly.
-  // Use AS fp only: SQLite does not support AS fp(col1, col2) on VALUES; columns are column1, column2.
   const valuesRows = prefixes.map(
-    (prefix, i) =>
-      `(${i}, '${escapeLikePattern(prefix).replace(/'/g, "''")}%')`,
+    (prefix, i) => `(${i}, '${escapeLikePattern(prefix).replace(/'/g, "''")}%')`,
   );
 
   const sql = `
@@ -202,21 +191,15 @@ export function getFolderAiRollupsForPaths(
       COUNT(*) AS total,
       SUM(CASE WHEN mi.photo_analysis_processed_at IS NOT NULL THEN 1 ELSE 0 END) AS photo_done,
       SUM(CASE WHEN mi.face_detection_processed_at IS NOT NULL THEN 1 ELSE 0 END) AS face_done,
-      SUM(
-        CASE
-          WHEN EXISTS (
-            SELECT 1 FROM media_embeddings me
-            WHERE me.media_item_id = mi.id
-              AND me.library_id = mi.library_id
-              AND me.embedding_type = 'image'
-              AND me.model_version = ?
-              AND me.embedding_status = 'ready'
-          )
-          THEN 1 ELSE 0 END
-      ) AS semantic_done
+      SUM(CASE WHEN me_img.embedding_status = 'ready' THEN 1 ELSE 0 END) AS semantic_done
     FROM (VALUES ${valuesRows.join(", ")}) AS fp
     JOIN media_items mi
       ON mi.source_path LIKE fp.column2 ESCAPE '~'
+    LEFT JOIN media_embeddings me_img
+      ON me_img.media_item_id = mi.id
+      AND me_img.library_id = mi.library_id
+      AND me_img.embedding_type = 'image'
+      AND me_img.model_version = ?
     WHERE mi.library_id = ?
       AND mi.deleted_at IS NULL
       AND ${imagePred}

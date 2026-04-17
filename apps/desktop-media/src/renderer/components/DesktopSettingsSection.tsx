@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactElement } from "react";
+import { Square } from "lucide-react";
 import { SettingsCheckboxField, SettingsNumberField, SettingsSectionCard } from "@emk/media-viewer";
 import {
   DEFAULT_AI_IMAGE_SEARCH_SETTINGS,
@@ -13,7 +14,10 @@ import {
   type MediaViewerSettings,
   type PathExtractionSettings,
   type PhotoAnalysisSettings,
+  type PhotoPendingFolderIconTint,
 } from "../../shared/ipc";
+import { cn } from "../lib/cn";
+import { photoPendingTintToSquareClass } from "../lib/photo-pending-folder-tint";
 import {
   INVOICE_DATA_EXTRACTION_PROMPT,
   INVOICE_DATA_EXTRACTION_PROMPT_VERSION,
@@ -96,6 +100,11 @@ How: When enabled, the folder context menu offers “Extract path metadata (LLM)
   photoAnalysisPromptTitle: "Prompt used",
   invoicePromptTitle: "Invoice extraction prompt",
   photoAnalysisModelTitle: "AI model",
+  folderIconWhenPhotoPendingTitle: "Image analysis pending — folder icon",
+  folderIconWhenPhotoPendingDescription: `Image analysis on a large library can take a long time. When face detection and AI search indexing are already complete for a folder but image analysis is not, choose how the folder icon is tinted so the sidebar does not show every folder as urgent red.`,
+  folderIconWhenPhotoPendingRed: "Red (urgent)",
+  folderIconWhenPhotoPendingAmber: "Amber (moderate)",
+  folderIconWhenPhotoPendingGreen: "Green (same as fully complete)",
   photoAnalysisModelDescription: `Why: Different models balance speed, quality, and what your machine can run comfortably.
 
 How: This is the vision model used when you start Image AI analysis from the folder menus.`,
@@ -624,6 +633,57 @@ How: After you click “Find groups” under People → Untagged faces, any draf
       <SettingsSectionCard title={UI_TEXT.photoAnalysis}>
         <div className="space-y-3">
           <div className="rounded-md border border-border/70 bg-background/40 p-3">
+            <h4 className="m-0 text-base font-medium text-foreground">{UI_TEXT.folderIconWhenPhotoPendingTitle}</h4>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              {UI_TEXT.folderIconWhenPhotoPendingDescription}
+            </p>
+            <div
+              className="mt-3 flex flex-wrap gap-2"
+              role="radiogroup"
+              aria-label={UI_TEXT.folderIconWhenPhotoPendingTitle}
+            >
+              {(
+                [
+                  ["red", UI_TEXT.folderIconWhenPhotoPendingRed],
+                  ["amber", UI_TEXT.folderIconWhenPhotoPendingAmber],
+                  ["green", UI_TEXT.folderIconWhenPhotoPendingGreen],
+                ] as const
+              ).map(([tint, label]) => (
+                <button
+                  key={tint}
+                  type="button"
+                  role="radio"
+                  aria-checked={
+                    (photoAnalysisSettings.folderIconWhenPhotoAnalysisPending ??
+                      DEFAULT_PHOTO_ANALYSIS_SETTINGS.folderIconWhenPhotoAnalysisPending) === tint
+                  }
+                  aria-label={label}
+                  title={label}
+                  className={cn(
+                    "inline-flex h-11 w-11 items-center justify-center rounded-md border-2 bg-background p-0 shadow-none transition-colors",
+                    (photoAnalysisSettings.folderIconWhenPhotoAnalysisPending ??
+                      DEFAULT_PHOTO_ANALYSIS_SETTINGS.folderIconWhenPhotoAnalysisPending) === tint
+                      ? "border-primary"
+                      : "border-border hover:border-muted-foreground/40",
+                  )}
+                  onClick={() =>
+                    onPhotoAnalysisSettingChange(
+                      "folderIconWhenPhotoAnalysisPending",
+                      tint as PhotoPendingFolderIconTint,
+                    )
+                  }
+                >
+                  <Square
+                    className={photoPendingTintToSquareClass(tint)}
+                    size={22}
+                    strokeWidth={2.1}
+                    aria-hidden="true"
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-md border border-border/70 bg-background/40 p-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <h4 className="m-0 text-base font-medium text-foreground">
@@ -706,7 +766,9 @@ How: If analysis of a single image exceeds this many seconds, it is marked faile
                 photoAnalysisSettings.useFaceFeaturesForRotation ===
                   DEFAULT_PHOTO_ANALYSIS_SETTINGS.useFaceFeaturesForRotation &&
                 photoAnalysisSettings.extractInvoiceData ===
-                  DEFAULT_PHOTO_ANALYSIS_SETTINGS.extractInvoiceData
+                  DEFAULT_PHOTO_ANALYSIS_SETTINGS.extractInvoiceData &&
+                photoAnalysisSettings.folderIconWhenPhotoAnalysisPending ===
+                  DEFAULT_PHOTO_ANALYSIS_SETTINGS.folderIconWhenPhotoAnalysisPending
               }
             >
               {UI_TEXT.resetToDefaults}
