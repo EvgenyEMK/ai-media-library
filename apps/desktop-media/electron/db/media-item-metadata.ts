@@ -30,6 +30,9 @@ export type { DesktopMediaItemMetadata } from "../../src/shared/ipc";
 
 const METADATA_VERSION = "desktop-photo-metadata-v2";
 
+/** SQLite default SQLITE_MAX_VARIABLE_NUMBER is often 999; keep IN lists under that (incl. library_id). */
+const METADATA_BY_PATHS_QUERY_CHUNK = 900;
+
 interface ExtractedPhotoMetadata {
   width: number | null;
   height: number | null;
@@ -344,6 +347,43 @@ export async function upsertMediaItemFromFilePath(params: {
   }
 }
 
+type MediaItemMetadataRow = {
+  id: string;
+  source_path: string;
+  filename: string;
+  mime_type: string | null;
+  width: number | null;
+  height: number | null;
+  byte_size: number | null;
+  file_mtime_ms: number | null;
+  orientation: number | null;
+  file_created_at: string | null;
+  photo_taken_at: string | null;
+  photo_taken_precision: string | null;
+  event_date_start: string | null;
+  event_date_end: string | null;
+  star_rating: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  media_kind: string | null;
+  video_duration_sec: number | null;
+  country: string | null;
+  city: string | null;
+  location_area: string | null;
+  location_place: string | null;
+  location_name: string | null;
+  display_title: string | null;
+  checksum_sha256: string | null;
+  content_hash: string | null;
+  duplicate_group_id: string | null;
+  metadata_extracted_at: string | null;
+  metadata_version: string | null;
+  metadata_error: string | null;
+  ai_metadata: string | null;
+  updated_at: string;
+  source_count: number;
+};
+
 export function getMediaItemMetadataByPaths(
   paths: string[],
   libraryId = DEFAULT_LIBRARY_ID,
@@ -353,114 +393,88 @@ export function getMediaItemMetadataByPaths(
   }
 
   const db = getDesktopDatabase();
-  const placeholders = paths.map(() => "?").join(", ");
-  const rows = db
-    .prepare(
-      `SELECT
-         mi.id,
-         mi.source_path,
-         mi.filename,
-         mi.mime_type,
-         mi.width,
-         mi.height,
-         mi.byte_size,
-         mi.file_mtime_ms,
-         mi.orientation,
-         mi.file_created_at,
-         mi.photo_taken_at,
-         mi.photo_taken_precision,
-         mi.event_date_start,
-         mi.event_date_end,
-         mi.star_rating,
-         mi.latitude,
-         mi.longitude,
-         mi.media_kind,
-         mi.video_duration_sec,
-         mi.country,
-         mi.city,
-         mi.location_area,
-         mi.location_place,
-         mi.location_name,
-         mi.display_title,
-         mi.checksum_sha256,
-         mi.content_hash,
-         mi.duplicate_group_id,
-         mi.metadata_extracted_at,
-         mi.metadata_version,
-         mi.metadata_error,
-         mi.ai_metadata,
-         mi.updated_at,
-         COALESCE(sc.active_count, 0) AS source_count
-       FROM media_items mi
-       LEFT JOIN (
-         SELECT media_item_id, COUNT(*) AS active_count
-         FROM media_item_sources
-         WHERE status = 'active'
-         GROUP BY media_item_id
-       ) sc ON sc.media_item_id = mi.id
-       WHERE mi.library_id = ?
-         AND mi.deleted_at IS NULL
-         AND mi.source_path IN (${placeholders})`,
-    )
-    .all(libraryId, ...paths) as Array<{
-    id: string;
-    source_path: string;
-    filename: string;
-    mime_type: string | null;
-    width: number | null;
-    height: number | null;
-    byte_size: number | null;
-    file_mtime_ms: number | null;
-    orientation: number | null;
-    file_created_at: string | null;
-    photo_taken_at: string | null;
-    photo_taken_precision: string | null;
-    event_date_start: string | null;
-    event_date_end: string | null;
-    star_rating: number | null;
-    latitude: number | null;
-    longitude: number | null;
-    media_kind: string | null;
-    video_duration_sec: number | null;
-    country: string | null;
-    city: string | null;
-    location_area: string | null;
-    location_place: string | null;
-    location_name: string | null;
-    display_title: string | null;
-    checksum_sha256: string | null;
-    content_hash: string | null;
-    duplicate_group_id: string | null;
-    metadata_extracted_at: string | null;
-    metadata_version: string | null;
-    metadata_error: string | null;
-    ai_metadata: string | null;
-    updated_at: string;
-    source_count: number;
-  }>;
+  const rows: MediaItemMetadataRow[] = [];
+  for (let i = 0; i < paths.length; i += METADATA_BY_PATHS_QUERY_CHUNK) {
+    const chunk = paths.slice(i, i + METADATA_BY_PATHS_QUERY_CHUNK);
+    const placeholders = chunk.map(() => "?").join(", ");
+    const chunkRows = db
+      .prepare(
+        `SELECT
+           mi.id,
+           mi.source_path,
+           mi.filename,
+           mi.mime_type,
+           mi.width,
+           mi.height,
+           mi.byte_size,
+           mi.file_mtime_ms,
+           mi.orientation,
+           mi.file_created_at,
+           mi.photo_taken_at,
+           mi.photo_taken_precision,
+           mi.event_date_start,
+           mi.event_date_end,
+           mi.star_rating,
+           mi.latitude,
+           mi.longitude,
+           mi.media_kind,
+           mi.video_duration_sec,
+           mi.country,
+           mi.city,
+           mi.location_area,
+           mi.location_place,
+           mi.location_name,
+           mi.display_title,
+           mi.checksum_sha256,
+           mi.content_hash,
+           mi.duplicate_group_id,
+           mi.metadata_extracted_at,
+           mi.metadata_version,
+           mi.metadata_error,
+           mi.ai_metadata,
+           mi.updated_at,
+           COALESCE(sc.active_count, 0) AS source_count
+         FROM media_items mi
+         LEFT JOIN (
+           SELECT media_item_id, COUNT(*) AS active_count
+           FROM media_item_sources
+           WHERE status = 'active'
+           GROUP BY media_item_id
+         ) sc ON sc.media_item_id = mi.id
+         WHERE mi.library_id = ?
+           AND mi.deleted_at IS NULL
+           AND mi.source_path IN (${placeholders})`,
+      )
+      .all(libraryId, ...chunk) as MediaItemMetadataRow[];
+    rows.push(...chunkRows);
+  }
+
   const rowIds = rows.map((row) => row.id);
   const faceConfidenceByMediaId = new Map<string, Array<number | null>>();
   if (rowIds.length > 0) {
-    const idPlaceholders = rowIds.map(() => "?").join(", ");
-    const confidenceRows = db
-      .prepare(
-        `SELECT
-           media_item_id,
-           confidence
-         FROM media_face_instances
-         WHERE library_id = ?
-           AND source = 'auto'
-           AND media_item_id IN (${idPlaceholders})
-         ORDER BY media_item_id, rowid ASC`,
-      )
-      .all(libraryId, ...rowIds) as Array<{
-      media_item_id: string;
-      confidence: number | null;
-    }>;
-    for (const confidenceRow of confidenceRows) {
-      const current = faceConfidenceByMediaId.get(confidenceRow.media_item_id) ?? [];
-      current.push(confidenceRow.confidence);
-      faceConfidenceByMediaId.set(confidenceRow.media_item_id, current);
+    for (let i = 0; i < rowIds.length; i += METADATA_BY_PATHS_QUERY_CHUNK) {
+      const chunk = rowIds.slice(i, i + METADATA_BY_PATHS_QUERY_CHUNK);
+      const idPlaceholders = chunk.map(() => "?").join(", ");
+      const confidenceRows = db
+        .prepare(
+          `SELECT
+             media_item_id,
+             confidence
+           FROM media_face_instances
+           WHERE library_id = ?
+             AND source = 'auto'
+             AND media_item_id IN (${idPlaceholders})
+           ORDER BY media_item_id, rowid ASC`,
+        )
+        .all(libraryId, ...chunk) as Array<{
+        media_item_id: string;
+        confidence: number | null;
+      }>;
+      for (const confidenceRow of confidenceRows) {
+        const current = faceConfidenceByMediaId.get(confidenceRow.media_item_id) ?? [];
+        current.push(confidenceRow.confidence);
+        faceConfidenceByMediaId.set(confidenceRow.media_item_id, current);
+      }
     }
   }
 
