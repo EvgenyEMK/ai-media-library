@@ -21,7 +21,7 @@ vi.mock("./keyword-search", () => ({
 function canOpenSqlite(): boolean {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require("better-sqlite3") as typeof import("better-sqlite3").default;
+    const Database = require("better-sqlite3") as new (path: string) => { close: () => void };
     const d = new Database(":memory:");
     d.close();
     return true;

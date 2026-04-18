@@ -326,6 +326,11 @@ export interface MetadataProgressState {
   metadataProcessed: number;
   metadataTotal: number;
   metadataDisplayProgressPercent: number;
+  /**
+   * True while the scan job is still running but per-file progress has reached 100%
+   * (geocoding, folder reconciliation, DB pruning, etc. still run before `job-completed`).
+   */
+  metadataScanFinalizing: boolean;
   metadataProgressLabel: string | null;
   metadataFolderName: string | null;
   metadataCardTitle: string;
@@ -419,10 +424,17 @@ export function useMetadataProgress(): MetadataProgressState {
         ? UI_TEXT.metadataScanScanningCardTitle
         : UI_TEXT.metadataScanCardTitle;
 
+  const metadataScanFinalizing =
+    isMetadataScanning &&
+    metadataPhase === "scanning" &&
+    metadataPhaseTotal > 0 &&
+    metadataPhaseProcessed >= metadataPhaseTotal;
+
   return {
     metadataProcessed,
     metadataTotal,
     metadataDisplayProgressPercent,
+    metadataScanFinalizing,
     metadataProgressLabel,
     metadataFolderName,
     metadataCardTitle,
