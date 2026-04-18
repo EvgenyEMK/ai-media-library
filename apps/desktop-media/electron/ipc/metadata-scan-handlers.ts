@@ -4,7 +4,6 @@ import {
   IPC_CHANNELS,
   type MetadataScanItemState,
 } from "../../src/shared/ipc";
-import { listFolderImages } from "../fs-media";
 import {
   getMediaItemMetadataByPaths,
   upsertMediaItemFromFilePath,
@@ -20,7 +19,7 @@ import { readSettings } from "../storage";
 import { emitMetadataScanProgress } from "./progress-emitters";
 import { runningMetadataScanJobs } from "./state";
 import type { RunningMetadataScanJob } from "./types";
-import { collectFoldersRecursively, collectImageEntriesForFolders } from "./folder-utils";
+import { collectFoldersRecursively, collectLibraryFileEntriesForFolders } from "./folder-utils";
 import { acquirePowerSave, releasePowerSave } from "./power-save-manager";
 import { isGeocoderReady, initGeocoder, reverseGeocodeBatch } from "../geocoder/reverse-geocoder";
 import { getMediaItemsNeedingGpsGeocoding, updateMediaItemLocationFromGps } from "../db/media-item-geocoding";
@@ -72,25 +71,25 @@ export function registerMetadataScanHandlers(): void {
 export async function runMetadataScanJob(params: {
   folderPath: string;
   recursive: boolean;
-  knownImageEntries?: Array<{ folderPath: string; path: string; name: string }>;
+  knownCatalogEntries?: Array<{ folderPath: string; path: string; name: string }>;
 }): Promise<{ jobId: string; total: number }> {
   const jobId = randomUUID();
   const job: RunningMetadataScanJob = { cancelled: false };
   job.powerSaveToken = acquirePowerSave(`metadata-scan:${params.folderPath}`);
   runningMetadataScanJobs.set(jobId, job);
 
-  let imageEntries: Array<{ folderPath: string; path: string; name: string }>;
+  let scanEntries: Array<{ folderPath: string; path: string; name: string }>;
 
-  if (params.knownImageEntries) {
-    imageEntries = params.knownImageEntries;
+  if (params.knownCatalogEntries) {
+    scanEntries = params.knownCatalogEntries;
   } else {
     const folders = params.recursive
       ? await collectFoldersRecursively(params.folderPath)
       : [params.folderPath];
-    imageEntries = await collectImageEntriesForFolders(folders);
+    scanEntries = await collectLibraryFileEntriesForFolders(folders);
   }
 
-  const items: MetadataScanItemState[] = imageEntries.map((entry) => ({
+  const items: MetadataScanItemState[] = scanEntries.map((entry) => ({
     path: entry.path,
     name: entry.name,
     status: "pending",
@@ -107,20 +106,20 @@ export async function runMetadataScanJob(params: {
 
   const scanT0 = Date.now();
   const scanTs = () => `${new Date().toISOString()} +${Date.now() - scanT0}ms`;
-  console.log(`[metadata-scan][${scanTs()}] job-started jobId=${jobId} total=${imageEntries.length}`);
+  console.log(`[metadata-scan][${scanTs()}] job-started jobId=${jobId} total=${scanEntries.length}`);
 
   emitMetadataScanProgress({
     type: "phase-updated",
     jobId,
     phase: "preparing",
     processed: 0,
-    total: imageEntries.length,
+    total: scanEntries.length,
   });
 
   const PHASE_THROTTLE = 10;
   const YIELD_INTERVAL = 5;
   const entriesByFolder = new Map<string, string[]>();
-  for (const entry of imageEntries) {
+  for (const entry of scanEntries) {
     const current = entriesByFolder.get(entry.folderPath);
     if (current) {
       current.push(entry.path);
@@ -131,7 +130,7 @@ export async function runMetadataScanJob(params: {
 
   let preparingProcessed = 0;
   let lastEmittedPreparing = 0;
-  const preparingTotal = imageEntries.length;
+  const preparingTotal = scanEntries.length;
   for (const [folderPath, paths] of entriesByFolder.entries()) {
     if (job.cancelled) break;
     await observeFiles(
@@ -185,20 +184,20 @@ export async function runMetadataScanJob(params: {
 
   try {
     if (!job.cancelled) {
-      console.log(`[metadata-scan][${scanTs()}] scanning phase START total=${imageEntries.length}`);
+      console.log(`[metadata-scan][${scanTs()}] scanning phase START total=${scanEntries.length}`);
       emitMetadataScanProgress({
         type: "phase-updated",
         jobId,
         phase: "scanning",
         processed: 0,
-        total: imageEntries.length,
+        total: scanEntries.length,
       });
 
-      const observedByPath = getObservedFileStateByPaths(imageEntries.map((entry) => entry.path));
+      const observedByPath = getObservedFileStateByPaths(scanEntries.map((entry) => entry.path));
 
-      for (const entry of imageEntries) {
+      for (const entry of scanEntries) {
         if (job.cancelled) {
-          cancelled += imageEntries.length - scanningProcessed;
+          cancelled += scanEntries.length - scanningProcessed;
           break;
         }
 
@@ -275,24 +274,24 @@ export async function runMetadataScanJob(params: {
           });
         }
 
-        if (scanningProcessed % PHASE_THROTTLE === 0 || scanningProcessed === imageEntries.length) {
+        if (scanningProcessed % PHASE_THROTTLE === 0 || scanningProcessed === scanEntries.length) {
           emitMetadataScanProgress({
             type: "phase-updated",
             jobId,
             phase: "scanning",
             processed: scanningProcessed,
-            total: imageEntries.length,
+            total: scanEntries.length,
           });
         }
       }
     } else {
-      cancelled = imageEntries.length;
-      console.log(`[metadata-scan][${scanTs()}] scanning phase SKIPPED (cancelled) jobId=${jobId} total=${imageEntries.length}`);
+      cancelled = scanEntries.length;
+      console.log(`[metadata-scan][${scanTs()}] scanning phase SKIPPED (cancelled) jobId=${jobId} total=${scanEntries.length}`);
     }
     // --- GPS reverse geocoding phase ---
     // Include every cataloged item in the scanned paths, not only created/updated rows,
     // so turning on "detect location from GPS" after an earlier scan still backfills country/city.
-    if (!job.cancelled && gpsGeocodingEnabled && imageEntries.length > 0) {
+    if (!job.cancelled && gpsGeocodingEnabled && scanEntries.length > 0) {
       try {
         if (!isGeocoderReady()) {
           console.log(`[metadata-scan][${scanTs()}] geocoder not ready, initializing…`);
@@ -300,7 +299,7 @@ export async function runMetadataScanJob(params: {
         }
         if (isGeocoderReady()) {
           const GPS_BATCH_SIZE = 500;
-          const scannedPaths = imageEntries.map((e) => e.path);
+          const scannedPaths = scanEntries.map((e) => e.path);
           const metaByPath = getMediaItemMetadataByPaths(scannedPaths);
           const scannedMediaItemIds = Object.values(metaByPath).map((m) => m.id);
           const itemsToGeocode = getMediaItemsNeedingGpsGeocoding(scannedMediaItemIds);
@@ -311,7 +310,7 @@ export async function runMetadataScanJob(params: {
               jobId,
               phase: "scanning",
               processed: scanningProcessed,
-              total: imageEntries.length,
+              total: scanEntries.length,
             });
 
             for (let i = 0; i < itemsToGeocode.length; i += GPS_BATCH_SIZE) {
@@ -346,7 +345,7 @@ export async function runMetadataScanJob(params: {
 
     if (!job.cancelled) {
       const observedByFolder = new Map<string, Set<string>>();
-      for (const entry of imageEntries) {
+      for (const entry of scanEntries) {
         const current = observedByFolder.get(entry.folderPath);
         if (current) {
           current.add(entry.path);
@@ -396,7 +395,7 @@ export async function runMetadataScanJob(params: {
       jobId,
       folderPath: params.folderPath,
       recursive: params.recursive,
-      total: imageEntries.length,
+      total: scanEntries.length,
       created,
       updated,
       unchanged,
@@ -408,5 +407,5 @@ export async function runMetadataScanJob(params: {
     runningMetadataScanJobs.delete(jobId);
   }
 
-  return { jobId, total: imageEntries.length };
+  return { jobId, total: scanEntries.length };
 }

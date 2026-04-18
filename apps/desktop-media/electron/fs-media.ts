@@ -49,6 +49,24 @@ export async function listFolderImages(
   return images.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+export async function listFolderVideos(folderPath: string): Promise<MediaImageItem[]> {
+  const entries = await fs.readdir(folderPath, { withFileTypes: true });
+
+  const videos = entries
+    .filter((entry) => entry.isFile())
+    .filter((entry) => VIDEO_EXTENSIONS.has(path.extname(entry.name).toLowerCase()))
+    .map((entry) => {
+      const absolutePath = path.join(folderPath, entry.name);
+      return {
+        path: absolutePath,
+        name: entry.name,
+        url: pathToFileURL(absolutePath).toString(),
+      };
+    });
+
+  return videos.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export async function listFolderMedia(
   folderPath: string,
 ): Promise<MediaLibraryItem[]> {

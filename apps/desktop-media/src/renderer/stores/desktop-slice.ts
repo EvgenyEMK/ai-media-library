@@ -33,8 +33,6 @@ export interface DesktopSlice {
     filesNeedingAiPipelineFollowUp: number;
     foldersNeedingAiFollowUpCount: number;
   };
-  /** Folder paths where catalog rows were created/updated (sidebar highlight). */
-  foldersWithCatalogChanges: Record<string, boolean>;
 
   isFolderLoading: boolean;
   faceDetectionSettings: FaceDetectionSettings;
@@ -92,10 +90,6 @@ export interface DesktopSlice {
     foldersNeedingAiFollowUpCount: number;
   }) => void;
   clearMetadataScanFollowUp: () => void;
-  mergeFoldersWithCatalogChanges: (
-    folders: Array<{ folderPath: string; created?: number; updated?: number }>,
-  ) => void;
-  clearFoldersWithCatalogChanges: () => void;
   setFolderLoading: (loading: boolean) => void;
   setFaceDetectionSettings: (settings: FaceDetectionSettings) => void;
   updateFaceDetectionSetting: <K extends keyof FaceDetectionSettings>(
@@ -151,7 +145,6 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   folderAnalysisByPath: {},
   folderRollupByPath: {},
   metadataScanFollowUp: null,
-  foldersWithCatalogChanges: {},
   isFolderLoading: false,
   faceDetectionSettings: { ...DEFAULT_FACE_DETECTION_SETTINGS },
   photoAnalysisSettings: { ...DEFAULT_PHOTO_ANALYSIS_SETTINGS },
@@ -250,21 +243,6 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   clearMetadataScanFollowUp: () =>
     set((state) => {
       state.metadataScanFollowUp = null;
-      state.foldersWithCatalogChanges = {};
-    }),
-
-  mergeFoldersWithCatalogChanges: (folders) =>
-    set((state) => {
-      for (const f of folders) {
-        if (f.folderPath) {
-          state.foldersWithCatalogChanges[f.folderPath] = true;
-        }
-      }
-    }),
-
-  clearFoldersWithCatalogChanges: () =>
-    set((state) => {
-      state.foldersWithCatalogChanges = {};
     }),
 
   setFolderLoading: (loading) =>

@@ -339,13 +339,6 @@ export function bindMetadataScanProgress(store: DesktopStore): () => void {
           failed: event.failed,
           cancelled: event.cancelled,
         };
-        if (event.foldersTouched.length > 0) {
-          for (const ft of event.foldersTouched) {
-            if (ft.created > 0 || ft.updated > 0) {
-              s.foldersWithCatalogChanges[ft.folderPath] = true;
-            }
-          }
-        }
         if (event.filesNeedingAiPipelineFollowUp > 0) {
           s.metadataScanFollowUp = {
             scanRootFolderPath: event.folderPath,

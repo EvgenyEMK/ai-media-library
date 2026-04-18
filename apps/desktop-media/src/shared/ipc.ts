@@ -27,6 +27,27 @@ export const VIDEO_EXTENSIONS = new Set([
 
 export type MediaKind = "image" | "video";
 
+/** Classify catalog row kind from MIME (if known) and file path extension. Defaults to image. */
+export function inferCatalogMediaKind(sourcePath: string, mimeType: string | null | undefined): MediaKind {
+  const m = (mimeType ?? "").trim().toLowerCase();
+  if (m.startsWith("video/")) {
+    return "video";
+  }
+  if (m.startsWith("image/")) {
+    return "image";
+  }
+  const lower = sourcePath.toLowerCase();
+  const dot = lower.lastIndexOf(".");
+  const ext = dot >= 0 ? lower.slice(dot) : "";
+  if (VIDEO_EXTENSIONS.has(ext)) {
+    return "video";
+  }
+  if (IMAGE_EXTENSIONS.has(ext)) {
+    return "image";
+  }
+  return "image";
+}
+
 export const IPC_CHANNELS = {
   selectLibraryFolder: "media:select-library-folder",
   readFolderChildren: "media:read-folder-children",
@@ -395,6 +416,10 @@ export interface DesktopMediaItemMetadata {
   sourcePath: string;
   filename: string;
   mimeType: string | null;
+  /** Catalog kind; falls back to inference from path/MIME when the column is unset. */
+  mediaKind: MediaKind;
+  /** Container duration in seconds when known (video). */
+  videoDurationSec: number | null;
   width: number | null;
   height: number | null;
   byteSize: number | null;

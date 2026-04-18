@@ -1,6 +1,6 @@
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { listFolderImages, readFolderChildren } from "../fs-media";
+import { listFolderImages, listFolderVideos, readFolderChildren } from "../fs-media";
 import { getDesktopDatabase } from "../db/client";
 import { DEFAULT_LIBRARY_ID } from "../db/folder-analysis-status";
 import { upsertMediaItemFromFilePath } from "../db/media-item-metadata";
@@ -45,6 +45,38 @@ export async function collectImageEntriesForFolders(
           folderPath,
           path: image.path,
           name: image.name,
+        })),
+      );
+    } catch {
+      // Continue with other folders when one folder cannot be read.
+    }
+  }
+
+  return allEntries;
+}
+
+/** Images and videos for metadata scan / reconciliation (sorted per folder: images then videos by name). */
+export async function collectLibraryFileEntriesForFolders(
+  folderPaths: string[],
+): Promise<Array<{ folderPath: string; path: string; name: string }>> {
+  const allEntries: Array<{ folderPath: string; path: string; name: string }> = [];
+
+  for (const folderPath of folderPaths) {
+    try {
+      const [images, videos] = await Promise.all([
+        listFolderImages(folderPath),
+        listFolderVideos(folderPath),
+      ]);
+      allEntries.push(
+        ...images.map((image) => ({
+          folderPath,
+          path: image.path,
+          name: image.name,
+        })),
+        ...videos.map((video) => ({
+          folderPath,
+          path: video.path,
+          name: video.name,
         })),
       );
     } catch {

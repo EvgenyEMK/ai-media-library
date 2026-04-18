@@ -272,7 +272,7 @@ export function DesktopMediaWorkspace({
                       starRating: typeof meta?.starRating === "number" ? meta.starRating : null,
                       onStarRatingChange: onStarRatingChangeForPath(image.id),
                       starRatingShowRejected: STAR_RATING_SHOW_REJECTED_UI,
-                      mediaType: "image",
+                      mediaType: meta?.mediaKind === "video" ? "video" : "image",
                     };
                   })}
                   onItemClick={(index) => store.getState().openViewer(index, "search")}
@@ -317,21 +317,28 @@ export function DesktopMediaWorkspace({
             ) : null}
             {semanticModeActive && viewMode === "list" && filteredSemanticListItems.length > 0 ? (
               <div className="grid grid-cols-1 gap-2 overflow-visible p-4 lg:grid-cols-2 lg:gap-3">
-                {filteredSemanticListItems.map((image, index) => (
-                  <DesktopMediaItemListRow
-                    key={image.id}
-                    title={image.title}
-                    onRowClick={() => store.getState().openViewer(index, "search")}
-                    metadataLine={image.photoTakenDisplay}
-                    folderLine={image.subtitle}
-                    filePath={image.id}
-                    mediaType="image"
-                    starRating={image.starRating}
-                    onStarRatingChange={onStarRatingChangeForPath(image.id)}
-                    starRatingShowRejected={STAR_RATING_SHOW_REJECTED_UI}
-                    thumbnail={renderListThumbnail(image.imageUrl, image.title, "image")}
-                  />
-                ))}
+                {filteredSemanticListItems.map((image, index) => {
+                  const meta = lookupMediaMetadataByItemId<DesktopMediaItemMetadata>(
+                    image.id,
+                    mediaMetadataByItemId,
+                  );
+                  const rowMediaType = meta?.mediaKind === "video" ? "video" : "image";
+                  return (
+                    <DesktopMediaItemListRow
+                      key={image.id}
+                      title={image.title}
+                      onRowClick={() => store.getState().openViewer(index, "search")}
+                      metadataLine={image.photoTakenDisplay}
+                      folderLine={image.subtitle}
+                      filePath={image.id}
+                      mediaType={rowMediaType}
+                      starRating={image.starRating}
+                      onStarRatingChange={onStarRatingChangeForPath(image.id)}
+                      starRatingShowRejected={STAR_RATING_SHOW_REJECTED_UI}
+                      thumbnail={renderListThumbnail(image.imageUrl, image.title, rowMediaType)}
+                    />
+                  );
+                })}
               </div>
             ) : null}
           </>

@@ -12,7 +12,6 @@ interface DesktopFoldersSidebarPanelProps {
   childrenByPath: DesktopStoreState["childrenByPath"];
   folderAnalysisByPath: DesktopStoreState["folderAnalysisByPath"];
   folderRollupByPath: DesktopStoreState["folderRollupByPath"];
-  foldersWithCatalogChanges: DesktopStoreState["foldersWithCatalogChanges"];
   pipeline: DesktopPipelineHandlers;
   handleAddLibrary: () => Promise<void>;
   handleToggleExpand: (folderPath: string) => Promise<void>;
@@ -28,7 +27,6 @@ export function DesktopFoldersSidebarPanel({
   childrenByPath,
   folderAnalysisByPath,
   folderRollupByPath,
-  foldersWithCatalogChanges,
   pipeline,
   handleAddLibrary,
   handleToggleExpand,
@@ -45,7 +43,6 @@ export function DesktopFoldersSidebarPanel({
         childrenByPath={childrenByPath}
         folderAnalysisByPath={folderAnalysisByPath}
         folderRollupByPath={folderRollupByPath}
-        foldersWithCatalogChanges={foldersWithCatalogChanges}
         collapsed={false}
         onToggleExpand={handleToggleExpand}
         onSelectFolder={handleSelectFolder}

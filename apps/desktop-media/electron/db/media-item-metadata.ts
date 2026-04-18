@@ -17,10 +17,14 @@ import { invalidateMediaItemAiAfterMetadataRefresh } from "./media-ai-invalidati
 import type { ObservedFileState } from "./file-identity";
 import { upsertSource } from "./media-item-sources";
 import { syncFtsForMediaItem } from "./keyword-search";
-import type {
-  DesktopMediaItemMetadata,
-  DesktopPhotoTakenPrecision,
+import {
+  inferCatalogMediaKind,
+  type DesktopMediaItemMetadata,
+  type DesktopPhotoTakenPrecision,
+  type MediaKind,
+  VIDEO_EXTENSIONS,
 } from "../../src/shared/ipc";
+import { extractVideoMetadataWithExifTool } from "../lib/extract-video-metadata-exiftool";
 
 export type { DesktopMediaItemMetadata } from "../../src/shared/ipc";
 
@@ -49,6 +53,7 @@ interface ExtractedPhotoMetadata {
   embeddedDescription: string | null;
   embeddedLocation: string | null;
   starRating: number | null;
+  videoDurationSec: number | null;
 }
 
 export interface UpsertMediaItemResult {
@@ -159,7 +164,7 @@ export async function upsertMediaItemFromFilePath(params: {
   }
 
   const now = new Date().toISOString();
-  const extracted = await extractPhotoMetadata(filePath, observedState);
+  const extracted = await extractCatalogFileMetadata(filePath, observedState);
   const metadata =
     typeof params.overrideStarRating === "number" &&
     Number.isInteger(params.overrideStarRating) &&
@@ -167,9 +172,16 @@ export async function upsertMediaItemFromFilePath(params: {
     params.overrideStarRating <= 5
       ? { ...extracted, starRating: params.overrideStarRating }
       : extracted;
+  const catalogMediaKind: MediaKind = inferCatalogMediaKind(filePath, metadata.mimeType);
+  const isImageKind = catalogMediaKind === "image";
   const baseName = path.basename(filePath);
   const itemId = existing?.id ?? randomUUID();
-  const nextAiMetadata = buildDesktopAiMetadata(existing?.ai_metadata ?? null, metadata, now);
+  const nextAiMetadata = buildDesktopAiMetadata(
+    existing?.ai_metadata ?? null,
+    metadata,
+    now,
+    filePath,
+  );
 
   try {
     const contentHash = observedState?.strongHash ?? null;
@@ -194,6 +206,8 @@ export async function upsertMediaItemFromFilePath(params: {
         star_rating,
         latitude,
         longitude,
+        media_kind,
+        video_duration_sec,
         metadata_extracted_at,
         metadata_version,
         metadata_error,
@@ -201,7 +215,7 @@ export async function upsertMediaItemFromFilePath(params: {
         ai_metadata,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(library_id, source_path) DO UPDATE SET
         filename = excluded.filename,
         mime_type = excluded.mime_type,
@@ -218,6 +232,8 @@ export async function upsertMediaItemFromFilePath(params: {
         star_rating = excluded.star_rating,
         latitude = excluded.latitude,
         longitude = excluded.longitude,
+        media_kind = excluded.media_kind,
+        video_duration_sec = excluded.video_duration_sec,
         metadata_extracted_at = excluded.metadata_extracted_at,
         metadata_version = excluded.metadata_version,
         metadata_error = excluded.metadata_error,
@@ -244,6 +260,8 @@ export async function upsertMediaItemFromFilePath(params: {
       metadata.starRating,
       metadata.latitude,
       metadata.longitude,
+      catalogMediaKind,
+      metadata.videoDurationSec,
       now,
       METADATA_VERSION,
       metadata.metadataError,
@@ -267,7 +285,7 @@ export async function upsertMediaItemFromFilePath(params: {
     }
 
     let didInvalidateAi = false;
-    if (existingByPath) {
+    if (existingByPath && isImageKind) {
       const nextCatalog = {
         content_hash: contentHash,
         width: metadata.width,
@@ -295,7 +313,7 @@ export async function upsertMediaItemFromFilePath(params: {
       }
     }
 
-    const needsAiPipelineFollowUp = !existing || didInvalidateAi;
+    const needsAiPipelineFollowUp = isImageKind && (!existing || didInvalidateAi);
 
     return {
       path: filePath,
@@ -349,6 +367,8 @@ export function getMediaItemMetadataByPaths(
          mi.star_rating,
          mi.latitude,
          mi.longitude,
+         mi.media_kind,
+         mi.video_duration_sec,
          mi.country,
          mi.city,
          mi.location_area,
@@ -393,6 +413,8 @@ export function getMediaItemMetadataByPaths(
     star_rating: number | null;
     latitude: number | null;
     longitude: number | null;
+    media_kind: string | null;
+    video_duration_sec: number | null;
     country: string | null;
     city: string | null;
     location_area: string | null;
@@ -439,11 +461,21 @@ export function getMediaItemMetadataByPaths(
     const parsedAi = parseJson(row.ai_metadata);
     const capture = extractTechnicalCaptureFromUnknown(parsedAi);
     const embedded = readEmbeddedStrings(parsedAi);
+    const mediaKind: MediaKind =
+      row.media_kind === "video" || row.media_kind === "image"
+        ? row.media_kind
+        : inferCatalogMediaKind(row.source_path, row.mime_type);
+    const videoDurationSec =
+      typeof row.video_duration_sec === "number" && Number.isFinite(row.video_duration_sec)
+        ? row.video_duration_sec
+        : null;
     acc[row.source_path] = {
       id: row.id,
       sourcePath: row.source_path,
       filename: row.filename,
       mimeType: row.mime_type,
+      mediaKind,
+      videoDurationSec,
       width: row.width,
       height: row.height,
       byteSize: row.byte_size,
@@ -486,6 +518,46 @@ export function getMediaItemMetadataByPaths(
     };
     return acc;
   }, {});
+}
+
+async function extractCatalogFileMetadata(
+  filePath: string,
+  observedState?: ObservedFileState,
+): Promise<ExtractedPhotoMetadata> {
+  const ext = path.extname(filePath).toLowerCase();
+  if (VIDEO_EXTENSIONS.has(ext)) {
+    const v = await extractVideoMetadataWithExifTool(
+      filePath,
+      toIsoDate(observedState?.mtimeMs ?? null),
+    );
+    return {
+      width: v.width,
+      height: v.height,
+      orientation: v.orientation,
+      photoTakenAt: v.photoTakenAt,
+      photoTakenPrecision: v.photoTakenPrecision,
+      fileCreatedAt: v.fileCreatedAt,
+      latitude: v.latitude,
+      longitude: v.longitude,
+      mimeType: v.mimeType,
+      metadataError: v.metadataError,
+      cameraMake: v.cameraMake,
+      cameraModel: v.cameraModel,
+      lensModel: v.lensModel,
+      focalLengthMm: v.focalLengthMm,
+      fNumber: v.fNumber,
+      exposureTime: v.exposureTime,
+      iso: v.iso,
+      metadataModifiedAt: v.metadataModifiedAt,
+      embeddedTitle: v.embeddedTitle,
+      embeddedDescription: v.embeddedDescription,
+      embeddedLocation: v.embeddedLocation,
+      starRating: v.starRating,
+      videoDurationSec: v.videoDurationSec,
+    };
+  }
+  const photo = await extractPhotoMetadata(filePath, observedState);
+  return { ...photo, videoDurationSec: null };
 }
 
 async function getObservedStateFromFs(filePath: string): Promise<ObservedFileState | undefined> {
@@ -545,6 +617,7 @@ async function extractPhotoMetadata(
       embeddedDescription: exif.embeddedDescription,
       embeddedLocation: exif.embeddedLocation,
       starRating: exif.starRating,
+      videoDurationSec: null,
     };
   } catch (error) {
     return {
@@ -570,6 +643,7 @@ async function extractPhotoMetadata(
       embeddedDescription: null,
       embeddedLocation: null,
       starRating: null,
+      videoDurationSec: null,
     };
   }
 }
@@ -585,12 +659,15 @@ function buildDesktopAiMetadata(
   existingAiMetadata: string | null | undefined,
   extracted: ExtractedPhotoMetadata,
   extractedAt: string,
+  filePath: string,
 ): string {
   const current = parseJson(existingAiMetadata);
   const hasEmbeddedText =
     !!extracted.embeddedTitle || !!extracted.embeddedDescription || !!extracted.embeddedLocation;
   const hasStar = typeof extracted.starRating === "number";
   const embeddedSource = hasEmbeddedText ? "mixed" : hasStar ? "file" : null;
+  const isVideo = VIDEO_EXTENSIONS.has(path.extname(filePath).toLowerCase());
+  const technicalSource = isVideo ? "desktop-exiftool-video" : "desktop-exifreader-xmp";
   const next = mergeMetadataV2(current, {
     schema_version: "2.0",
     technical: {
@@ -606,6 +683,13 @@ function buildDesktopAiMetadata(
         exposure_time: extracted.exposureTime,
         iso: extracted.iso,
       },
+      ...(isVideo
+        ? {
+            video: {
+              duration_sec: extracted.videoDurationSec,
+            },
+          }
+        : {}),
     },
     embedded: {
       source: embeddedSource,
@@ -618,7 +702,7 @@ function buildDesktopAiMetadata(
       metadata_version: METADATA_VERSION,
       metadata_extracted_at: extractedAt,
       sources: {
-        technical: "desktop-exifreader-xmp",
+        technical: technicalSource,
       },
     },
   });

@@ -47,7 +47,6 @@ export function App(): ReactElement {
   const childrenByPath = useDesktopStore((s) => s.childrenByPath);
   const folderAnalysisByPath = useDesktopStore((s) => s.folderAnalysisByPath);
   const folderRollupByPath = useDesktopStore((s) => s.folderRollupByPath);
-  const foldersWithCatalogChanges = useDesktopStore((s) => s.foldersWithCatalogChanges);
   const metadataScanFollowUp = useDesktopStore((s) => s.metadataScanFollowUp);
   const isFolderLoading = useDesktopStore((s) => s.isFolderLoading);
   const mediaItems = useDesktopStore((s) => s.mediaItems);
@@ -273,7 +272,6 @@ export function App(): ReactElement {
         childrenByPath={childrenByPath}
         folderAnalysisByPath={folderAnalysisByPath}
         folderRollupByPath={folderRollupByPath}
-        foldersWithCatalogChanges={foldersWithCatalogChanges}
         pipeline={pipeline}
         folderTree={folderTree}
       />

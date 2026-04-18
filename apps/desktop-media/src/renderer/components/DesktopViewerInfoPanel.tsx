@@ -114,6 +114,7 @@ function buildInfoSections(metadata: DesktopMediaItemMetadata): {
   const fileDataFields: DesktopInfoField[] = [
     { label: "Filename", value: metadata.filename },
     { label: "Path", value: metadata.sourcePath, display: "stacked" },
+    { label: "Media kind", value: metadata.mediaKind },
     { label: "MIME", value: metadata.mimeType },
     {
       label: "Dimensions",
@@ -238,10 +239,16 @@ function buildInfoSections(metadata: DesktopMediaItemMetadata): {
     { label: "VAT amount", value: documentData?.vat_amount ?? null },
   ];
 
-  const videoDurationSecondsRaw = extras.video_duration_seconds ?? extras.duration_seconds;
-  const videoDurationSeconds = typeof videoDurationSecondsRaw === "number"
-    ? videoDurationSecondsRaw
-    : null;
+  const catalogVideoDuration =
+    typeof metadata.videoDurationSec === "number" && Number.isFinite(metadata.videoDurationSec)
+      ? metadata.videoDurationSec
+      : null;
+  const videoDurationSecondsRaw =
+    catalogVideoDuration ?? extras.video_duration_seconds ?? extras.duration_seconds;
+  const videoDurationSeconds =
+    typeof videoDurationSecondsRaw === "number" && Number.isFinite(videoDurationSecondsRaw)
+      ? videoDurationSecondsRaw
+      : null;
   const videoDataFields: DesktopInfoField[] = [
     {
       label: "Duration",

@@ -540,6 +540,17 @@ const MIGRATIONS: Array<{ id: string; sql: string }> = [
       ALTER TABLE media_items_fts_new RENAME TO media_items_fts
     `,
   },
+  {
+    id: "019_media_items_media_kind_video_duration",
+    sql: `
+      ALTER TABLE media_items ADD COLUMN media_kind TEXT NOT NULL DEFAULT 'image';
+      ALTER TABLE media_items ADD COLUMN video_duration_sec REAL;
+      UPDATE media_items SET media_kind = 'video' WHERE lower(COALESCE(mime_type, '')) LIKE 'video/%';
+      UPDATE media_items SET media_kind = 'image' WHERE lower(COALESCE(mime_type, '')) LIKE 'image/%';
+      UPDATE media_items SET media_kind = 'video' WHERE lower(filename) LIKE '%.mp4' OR lower(filename) LIKE '%.mov' OR lower(filename) LIKE '%.m4v' OR lower(filename) LIKE '%.webm' OR lower(filename) LIKE '%.mkv' OR lower(filename) LIKE '%.avi';
+      UPDATE media_items SET media_kind = 'image' WHERE lower(filename) LIKE '%.jpg' OR lower(filename) LIKE '%.jpeg' OR lower(filename) LIKE '%.png' OR lower(filename) LIKE '%.gif' OR lower(filename) LIKE '%.bmp' OR lower(filename) LIKE '%.webp' OR lower(filename) LIKE '%.tif' OR lower(filename) LIKE '%.tiff'
+    `,
+  },
 ];
 
 let db: SQLiteDatabase | null = null;
@@ -780,6 +791,12 @@ function reconcileCriticalSchema(database: SQLiteDatabase): void {
   }
   if (!mediaItemsColumns.has("photo_analysis_error")) {
     database.exec("ALTER TABLE media_items ADD COLUMN photo_analysis_error TEXT");
+  }
+  if (!mediaItemsColumns.has("media_kind")) {
+    database.exec("ALTER TABLE media_items ADD COLUMN media_kind TEXT NOT NULL DEFAULT 'image'");
+  }
+  if (!mediaItemsColumns.has("video_duration_sec")) {
+    database.exec("ALTER TABLE media_items ADD COLUMN video_duration_sec REAL");
   }
 }
 
