@@ -63,7 +63,6 @@ interface DesktopAppMainProps {
   mainPaneViewMode: MainPaneViewMode;
   setMainPaneViewMode: Dispatch<SetStateAction<MainPaneViewMode>>;
   pipeline: DesktopPipelineHandlers;
-  metadataScanFollowUp: DesktopStoreState["metadataScanFollowUp"];
   faceModelDownload: DesktopStoreState["faceModelDownload"];
   handleOpenFolderAiSummary: (folderPath: string) => void;
   imageEditSuggestionItems: ImageEditSuggestionsItem[];
@@ -120,7 +119,6 @@ export function DesktopAppMain({
   mainPaneViewMode,
   setMainPaneViewMode,
   pipeline,
-  metadataScanFollowUp,
   faceModelDownload,
   handleOpenFolderAiSummary,
   imageEditSuggestionItems,
@@ -180,7 +178,7 @@ export function DesktopAppMain({
           />
         </div>
       ) : (
-        <>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <DesktopMainToolbar
             store={store}
             selectedFolderLabel={selectedFolderLabel}
@@ -213,7 +211,6 @@ export function DesktopAppMain({
             setMainPaneViewMode={setMainPaneViewMode}
             selectedFolder={selectedFolder}
             semanticPanelOpen={semanticPanelOpen}
-            metadataScanFollowUp={metadataScanFollowUp}
             faceModelDownload={faceModelDownload}
             pipeline={pipeline}
             handleOpenFolderAiSummary={handleOpenFolderAiSummary}
@@ -231,7 +228,7 @@ export function DesktopAppMain({
             quickFiltersActiveCount={quickFiltersActiveCount}
             openFolderViewerById={openFolderViewerById}
           />
-        </>
+        </div>
       )}
 
       <DesktopProgressDock

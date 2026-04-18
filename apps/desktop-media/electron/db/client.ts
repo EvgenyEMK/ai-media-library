@@ -678,6 +678,19 @@ export function getDesktopDatabase(): SQLiteDatabase {
   return db;
 }
 
+/** Close the singleton DB (Vitest / isolated integration tests only). */
+export function __closeDesktopDatabaseForTesting(): void {
+  if (!db) {
+    return;
+  }
+  try {
+    db.close();
+  } catch {
+    // ignore
+  }
+  db = null;
+}
+
 export function getVectorBackendStatus(): {
   requestedMode: VectorBackendMode;
   activeMode: VectorBackendMode;

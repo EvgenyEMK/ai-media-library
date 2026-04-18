@@ -137,6 +137,7 @@ export const IPC_CHANNELS = {
   getFaceToPersonCentroidSimilarities: "media:get-face-to-person-centroid-similarities",
   refreshPersonSuggestions: "media:refresh-person-suggestions",
   purgeDeletedMediaItems: "media:purge-deleted-media-items",
+  purgeSoftDeletedMediaItemsByIds: "media:purge-soft-deleted-media-items-by-ids",
   getFolderAiSummaryReport: "media:get-folder-ai-summary-report",
   getFolderAiCoverage: "media:get-folder-ai-coverage",
   getFolderAiRollupsBatch: "media:get-folder-ai-rollups-batch",
@@ -804,12 +805,47 @@ export interface ScanFolderMetadataResult {
 
 export type MetadataScanPhase = "preparing" | "scanning";
 
+export type MetadataScanTriggerSource = "manual" | "auto";
+
+export interface MetadataScanPathMove {
+  previousPath: string;
+  newPath: string;
+}
+
+export interface MetadataScanFilePathRef {
+  path: string;
+  name: string;
+}
+
+export interface MetadataScanFailedFileRef extends MetadataScanFilePathRef {
+  error?: string;
+}
+
+export interface MetadataScanDeletedFileRef {
+  id: string;
+  sourcePath: string;
+}
+
+/** Snapshot shown in the manual scan result overlay (renderer). */
+export interface MetadataManualScanResultPayload {
+  jobId: string;
+  folderPath: string;
+  recursive: boolean;
+  scanCancelled: boolean;
+  filesCreated: MetadataScanFilePathRef[];
+  filesUpdated: MetadataScanFilePathRef[];
+  filesFailed: MetadataScanFailedFileRef[];
+  pathMoves: MetadataScanPathMove[];
+  filesDeleted: MetadataScanDeletedFileRef[];
+}
+
 export type MetadataScanProgressEvent =
   | {
       type: "job-started";
       jobId: string;
       folderPath: string;
       recursive: boolean;
+      triggerSource: MetadataScanTriggerSource;
       total: number;
       items: MetadataScanItemState[];
     }
@@ -831,12 +867,20 @@ export type MetadataScanProgressEvent =
       jobId: string;
       folderPath: string;
       recursive: boolean;
+      triggerSource: MetadataScanTriggerSource;
       total: number;
       created: number;
       updated: number;
       unchanged: number;
       failed: number;
       cancelled: number;
+      /** True when the user cancelled after some work; reconciliation may still have run if prepare finished. */
+      scanCancelled: boolean;
+      filesCreated: MetadataScanFilePathRef[];
+      filesUpdated: MetadataScanFilePathRef[];
+      filesFailed: MetadataScanFailedFileRef[];
+      pathMoves: MetadataScanPathMove[];
+      filesDeleted: MetadataScanDeletedFileRef[];
       /**
        * Files where AI should run or re-run: new catalog rows plus updates that
        * invalidated AI (not metadata-only catalog sync).
@@ -1468,6 +1512,15 @@ export interface DesktopApi {
     totalEmbeddingsNeeded: number;
   }>;
   purgeDeletedMediaItems: () => Promise<{
+    purgedMediaItems: number;
+    purgedFaceInstances: number;
+    purgedEmbeddings: number;
+    purgedAlbumItems: number;
+    purgedItemTags: number;
+    purgedFsObjects: number;
+    purgedSources: number;
+  }>;
+  purgeSoftDeletedMediaItemsByIds: (mediaItemIds: string[]) => Promise<{
     purgedMediaItems: number;
     purgedFaceInstances: number;
     purgedEmbeddings: number;

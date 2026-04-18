@@ -175,7 +175,13 @@ export async function upsertMediaItemFromFilePath(params: {
   const catalogMediaKind: MediaKind = inferCatalogMediaKind(filePath, metadata.mimeType);
   const isImageKind = catalogMediaKind === "image";
   const baseName = path.basename(filePath);
-  const itemId = existing?.id ?? randomUUID();
+  /**
+   * Duplicate-by-content (`isDuplicateLink`) must use a new primary key: reusing the existing row's
+   * `id` while inserting a different `source_path` violates `media_items.id` uniqueness (the upsert
+   * only conflicts on `(library_id, source_path)`). Each path gets its own `media_items` row; we
+   * still merge AI metadata from the hash-matched row when present.
+   */
+  const itemId = existingByPath?.id ?? randomUUID();
   const nextAiMetadata = buildDesktopAiMetadata(
     existing?.ai_metadata ?? null,
     metadata,
@@ -274,7 +280,7 @@ export async function upsertMediaItemFromFilePath(params: {
     upsertSource({
       mediaItemId: itemId,
       sourcePath: filePath,
-      isPrimary: !isDuplicateLink,
+      isPrimary: true,
       libraryId,
     });
 
@@ -313,12 +319,13 @@ export async function upsertMediaItemFromFilePath(params: {
       }
     }
 
-    const needsAiPipelineFollowUp = isImageKind && (!existing || didInvalidateAi);
+    const needsAiPipelineFollowUp =
+      isImageKind && (!existingByPath || didInvalidateAi) && !isDuplicateLink;
 
     return {
       path: filePath,
       name: baseName,
-      status: existing ? "updated" : "created",
+      status: existingByPath ? "updated" : "created",
       mediaItemId: itemId,
       needsAiPipelineFollowUp,
       photoTakenAt: metadata.photoTakenAt,

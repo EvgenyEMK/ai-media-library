@@ -1,18 +1,18 @@
 {
   "version": 1,
-  "notes": "Update expected values manually. quarter_turn_cw: 0, 90, 180, 270. Use 0 when no quarter-turn rotate should be suggested.",
+  "notes": "Filenames are anonymized (media01…). Update expected values manually. quarter_turn_cw: 0, 90, 180, 270. Use 0 when no quarter-turn rotate should be suggested.",
   "cases": [
     {
-      "file": "1977-06 EMK купаюсь с мамой (2года 4мес)  scan0046.jpg",
+      "file": "media01.jpg",
       "expected": {
         "quarter_turn_cw": 270,
         "straighten_only": false,
         "crop_required": true
       },
-      "notes": "Rotation is important. Crop is good to have (remove blank space on two sides)"
+      "notes": "Rotation is important. Crop useful to remove blank margins on two sides."
     },
     {
-      "file": "1976-77 На карусели. Петродворец предположительно scan0015.jpg",
+      "file": "media02.jpg",
       "expected": {
         "quarter_turn_cw": 90,
         "straighten_only": false,
@@ -21,7 +21,7 @@
       "notes": ""
     },
     {
-      "file": "1976-77 EMK надо наступить на камушек, который включает фонтанчик. Петродворец.jpg",
+      "file": "media03.jpg",
       "expected": {
         "quarter_turn_cw": 270,
         "straighten_only": false,
@@ -30,40 +30,40 @@
       "notes": ""
     },
     {
-      "file": "mama0003.jpg",
+      "file": "media04.jpg",
       "expected": {
         "quarter_turn_cw": 0,
         "straighten_only": false,
         "crop_required": false
       },
-      "notes": "Must not rotate (only small vertical tilt is present). Crop of blank space on all sides is good to have"
+      "notes": "Must not rotate (only small vertical tilt). Optional crop of blank margins on all sides."
     },
     {
-      "file": "scan0014.jpg",
+      "file": "media05.jpg",
       "expected": {
         "quarter_turn_cw": 90,
         "straighten_only": false,
         "crop_required": true
       },
-      "notes": "Face is not detected on original image, but is detected on rotated image (one person) so it can be used to determine the rotation. Crop is good to have (remove blank space on two sides)"
+      "notes": "Face not detected on original; detected on rotated preview — rotation cue. Crop useful for side margins."
     },
     {
-      "file": "1994-02 EMK и папа.jpg",
+      "file": "media06.jpg",
       "expected": {
         "quarter_turn_cw": 270,
         "straighten_only": false,
         "crop_required": true
       },
-      "notes": "Two people on the photo and at least one face is detected on the original wrongly rotated image. Crop is good to have (remove blank space on two sides)"
+      "notes": "Two people; face(s) detectable on wrongly oriented original. Crop useful for side margins."
     },
     {
-      "file": "1976-12 EMK 1 год и 10мес (2).jpg",
+      "file": "media07.jpg",
       "expected": {
         "quarter_turn_cw": 270,
         "straighten_only": false,
         "crop_required": false
       },
-      "notes": "Rotation is important. Crop is good to have (remove blank space on two sides)"
+      "notes": "Rotation important. Optional crop for side margins."
     }
   ]
 }

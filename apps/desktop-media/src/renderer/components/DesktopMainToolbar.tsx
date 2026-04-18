@@ -65,7 +65,7 @@ export function DesktopMainToolbar({
   pipeline,
 }: DesktopMainToolbarProps): ReactElement {
   return (
-    <header className="panel-header flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+    <header className="panel-header flex shrink-0 items-start justify-between gap-3 border-b border-border px-4 py-3">
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2.5 overflow-hidden text-[13px] text-muted-foreground">
           <span className="min-w-0 truncate">{selectedFolderLabel}</span>

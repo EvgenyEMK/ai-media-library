@@ -16,6 +16,7 @@ import {
   type GeocoderInitStatus,
   type PathExtractionSettings,
   type PhotoAnalysisSettings,
+  type MetadataManualScanResultPayload,
 } from "../../shared/ipc";
 
 export interface DesktopSlice {
@@ -33,6 +34,9 @@ export interface DesktopSlice {
     filesNeedingAiPipelineFollowUp: number;
     foldersNeedingAiFollowUpCount: number;
   };
+
+  /** Manual “Scan for file changes” only: detailed per-group file lists after the job. */
+  metadataManualScanResult: MetadataManualScanResultPayload | null;
 
   isFolderLoading: boolean;
   faceDetectionSettings: FaceDetectionSettings;
@@ -90,6 +94,7 @@ export interface DesktopSlice {
     foldersNeedingAiFollowUpCount: number;
   }) => void;
   clearMetadataScanFollowUp: () => void;
+  setMetadataManualScanResult: (payload: MetadataManualScanResultPayload | null) => void;
   setFolderLoading: (loading: boolean) => void;
   setFaceDetectionSettings: (settings: FaceDetectionSettings) => void;
   updateFaceDetectionSetting: <K extends keyof FaceDetectionSettings>(
@@ -145,6 +150,7 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   folderAnalysisByPath: {},
   folderRollupByPath: {},
   metadataScanFollowUp: null,
+  metadataManualScanResult: null,
   isFolderLoading: false,
   faceDetectionSettings: { ...DEFAULT_FACE_DETECTION_SETTINGS },
   photoAnalysisSettings: { ...DEFAULT_PHOTO_ANALYSIS_SETTINGS },
@@ -243,6 +249,11 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   clearMetadataScanFollowUp: () =>
     set((state) => {
       state.metadataScanFollowUp = null;
+    }),
+
+  setMetadataManualScanResult: (payload) =>
+    set((state) => {
+      state.metadataManualScanResult = payload;
     }),
 
   setFolderLoading: (loading) =>
