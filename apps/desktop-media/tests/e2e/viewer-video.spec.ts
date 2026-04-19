@@ -13,10 +13,13 @@ const mixedAssetsMissing = `Missing mixed media fixtures under ${E2E_MEDIA_MIXED
 const autoPlayVideoOnSelectionLabel = "Automatically start playback on video selection";
 
 async function openViewerFromListRow(mainWindow: import("@playwright/test").Page, title: string): Promise<void> {
-  const rowTitle = mainWindow.locator("article h3").filter({ hasText: title }).first();
-  await expect(rowTitle).toBeVisible({ timeout: 15_000 });
-  await rowTitle.locator("xpath=ancestor::article[1]").click();
-  await expect(mainWindow.locator(".media-swiper-theme")).toBeVisible({ timeout: 25_000 });
+  // Prefer role + exact name over `hasText` (substring) matching; click the title so the event
+  // bubbles to the row `article` reliably on Windows CI (see dev push CI for viewer-video).
+  const titleHeading = mainWindow.getByRole("heading", { level: 3, name: title, exact: true }).first();
+  await expect(titleHeading).toBeVisible({ timeout: 15_000 });
+  await titleHeading.scrollIntoViewIfNeeded();
+  await titleHeading.click();
+  await expect(mainWindow.locator(".media-swiper-theme")).toBeVisible({ timeout: 30_000 });
 }
 
 async function openViewerFromGridByTitle(mainWindow: import("@playwright/test").Page, title: string): Promise<void> {
