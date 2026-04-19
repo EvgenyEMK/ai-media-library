@@ -256,6 +256,10 @@ export function useDesktopSettingsPersistence(): void {
             prev.photoAnalysisSettings.analysisTimeoutPerImageSec ||
           state.photoAnalysisSettings.model !==
             prev.photoAnalysisSettings.model ||
+          state.photoAnalysisSettings.downscaleBeforeLlm !==
+            prev.photoAnalysisSettings.downscaleBeforeLlm ||
+          state.photoAnalysisSettings.downscaleLongestSidePx !==
+            prev.photoAnalysisSettings.downscaleLongestSidePx ||
           state.photoAnalysisSettings.enableTwoPassRotationConsistency !==
             prev.photoAnalysisSettings.enableTwoPassRotationConsistency ||
           state.photoAnalysisSettings.useFaceFeaturesForRotation !==
@@ -264,6 +268,8 @@ export function useDesktopSettingsPersistence(): void {
             prev.photoAnalysisSettings.extractInvoiceData ||
           state.photoAnalysisSettings.folderIconWhenPhotoAnalysisPending !==
             prev.photoAnalysisSettings.folderIconWhenPhotoAnalysisPending ||
+          state.folderScanningSettings.showFolderAiSummaryWhenSelectingEmptyFolder !==
+            prev.folderScanningSettings.showFolderAiSummaryWhenSelectingEmptyFolder ||
           state.folderScanningSettings.autoMetadataScanOnSelectMaxFiles !==
             prev.folderScanningSettings.autoMetadataScanOnSelectMaxFiles ||
           state.folderScanningSettings.writeEmbeddedMetadataOnUserEdit !==
@@ -288,12 +294,12 @@ export function useDesktopSettingsPersistence(): void {
             prev.mediaViewerSettings.skipVideosInSlideshow ||
           state.pathExtractionSettings.extractDates !==
             prev.pathExtractionSettings.extractDates ||
-          state.pathExtractionSettings.extractLocation !==
-            prev.pathExtractionSettings.extractLocation ||
           state.pathExtractionSettings.useLlm !==
             prev.pathExtractionSettings.useLlm ||
-          state.pathExtractionSettings.llmModel !==
-            prev.pathExtractionSettings.llmModel
+          state.pathExtractionSettings.llmModelPrimary !==
+            prev.pathExtractionSettings.llmModelPrimary ||
+          state.pathExtractionSettings.llmModelFallback !==
+            prev.pathExtractionSettings.llmModelFallback
         ) {
           void window.desktopApi.saveSettings({
             clientId: state.clientId,

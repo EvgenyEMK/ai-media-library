@@ -139,6 +139,7 @@ export const IPC_CHANNELS = {
   purgeDeletedMediaItems: "media:purge-deleted-media-items",
   purgeSoftDeletedMediaItemsByIds: "media:purge-soft-deleted-media-items-by-ids",
   getFolderAiSummaryReport: "media:get-folder-ai-summary-report",
+  getFolderAiFailedFiles: "media:get-folder-ai-failed-files",
   getFolderAiCoverage: "media:get-folder-ai-coverage",
   getFolderAiRollupsBatch: "media:get-folder-ai-rollups-batch",
   faceModelDownloadProgress: "media:face-model-download-progress",
@@ -180,9 +181,11 @@ export interface DatabaseLocationInfo {
 
 export interface PathExtractionSettings {
   extractDates: boolean;
-  extractLocation: boolean;
   useLlm: boolean;
-  llmModel: string;
+  /** First Ollama text model id to try for path-metadata LLM (must match `ollama list` names). */
+  llmModelPrimary: string;
+  /** Second choice if the primary id is not installed locally. */
+  llmModelFallback: string;
 }
 
 export interface FaceDetectionSettings {
@@ -212,6 +215,13 @@ export interface PhotoAnalysisSettings {
   /** Default vision model to use for folder Image AI analysis runs. */
   model: string;
   analysisTimeoutPerImageSec: number;
+  /**
+   * When true, shrink images so the longest edge is at most `downscaleLongestSidePx` before base64-encoding for Ollama.
+   * Reduces memory use and failures on very large files.
+   */
+  downscaleBeforeLlm: boolean;
+  /** Longest edge in pixels when `downscaleBeforeLlm` is true (typical range 512–2048). */
+  downscaleLongestSidePx: number;
   enableTwoPassRotationConsistency: boolean;
   useFaceFeaturesForRotation: boolean;
   extractInvoiceData: boolean;
@@ -225,11 +235,16 @@ export interface PhotoAnalysisSettings {
 
 /** Single-folder image count threshold for automatic metadata scan after folder selection. */
 export interface FolderScanningSettings {
+  /**
+   * When true, selecting a folder with no direct media files but with sub-folders opens the Folder AI analysis summary
+   * (same as the folder right-click action). Ignored when the folder has no sub-folders.
+   */
+  showFolderAiSummaryWhenSelectingEmptyFolder: boolean;
   /** Run automatic scan only when image count in the selected folder (non-recursive) is strictly less than this. */
   autoMetadataScanOnSelectMaxFiles: number;
   /**
    * When true, propagate rating (and future title/description) edits into embedded file metadata via ExifTool.
-   * Default off so the catalog can diverge from files until the user opts in.
+   * Default off so the database can diverge from files until the user opts in.
    */
   writeEmbeddedMetadataOnUserEdit: boolean;
   /**
@@ -282,6 +297,8 @@ export const DEFAULT_FACE_DETECTION_SETTINGS: FaceDetectionSettings = {
 export const DEFAULT_PHOTO_ANALYSIS_SETTINGS: PhotoAnalysisSettings = {
   model: "qwen3.5:9b",
   analysisTimeoutPerImageSec: 120,
+  downscaleBeforeLlm: true,
+  downscaleLongestSidePx: 1024,
   enableTwoPassRotationConsistency: true,
   useFaceFeaturesForRotation: true,
   extractInvoiceData: true,
@@ -289,6 +306,7 @@ export const DEFAULT_PHOTO_ANALYSIS_SETTINGS: PhotoAnalysisSettings = {
 };
 
 export const DEFAULT_FOLDER_SCANNING_SETTINGS: FolderScanningSettings = {
+  showFolderAiSummaryWhenSelectingEmptyFolder: true,
   autoMetadataScanOnSelectMaxFiles: 100,
   writeEmbeddedMetadataOnUserEdit: false,
   detectLocationFromGps: false,
@@ -305,10 +323,9 @@ export const DEFAULT_AI_IMAGE_SEARCH_SETTINGS: AiImageSearchSettings = {
 
 export const DEFAULT_PATH_EXTRACTION_SETTINGS: PathExtractionSettings = {
   extractDates: true,
-  extractLocation: true,
   useLlm: false,
-  /** Empty: main process picks first installed Qwen via /api/tags (same as AI search query understanding). */
-  llmModel: "",
+  llmModelPrimary: "qwen2.5vl:3b",
+  llmModelFallback: "qwen3.5:9b",
 };
 
 export const DEFAULT_MEDIA_VIEWER_SETTINGS: MediaViewerSettings = {
@@ -526,6 +543,16 @@ export interface FolderAiSummaryReport {
   }>;
 }
 
+export type FolderAiPipelineKind = "photo" | "face" | "semantic";
+
+export interface FolderAiFailedFileItem {
+  path: string;
+  name: string;
+  mediaKind: MediaKind;
+  failedAt: string | null;
+  error: string | null;
+}
+
 export interface PhotoAnalysisModelInfo {
   model: string;
   promptVersion: string;
@@ -650,10 +677,16 @@ export interface AnalyzeFolderPhotosRequest {
   model?: string;
   think?: boolean;
   timeoutMsPerImage?: number;
+  /** When set, overrides saved settings for this run. */
+  downscaleBeforeLlm?: boolean;
+  /** When set, overrides saved settings for this run (longest edge, pixels). */
+  downscaleLongestSidePx?: number;
   enableTwoPassRotationConsistency?: boolean;
   useFaceFeaturesForRotation?: boolean;
   extractInvoiceData?: boolean;
   mode?: "missing" | "all";
+  /** Internal option: when true, exclude files that previously failed this pipeline. */
+  skipPreviouslyFailed?: boolean;
   recursive?: boolean;
   concurrency?: number;
 }
@@ -743,6 +776,8 @@ export interface FaceDetectionItemState {
 export interface DetectFolderFacesRequest {
   folderPath: string;
   mode?: "missing" | "all";
+  /** Internal option: when true, exclude files that previously failed this pipeline. */
+  skipPreviouslyFailed?: boolean;
   recursive?: boolean;
   concurrency?: number;
   faceDetectionSettings?: FaceDetectionSettings;
@@ -1088,6 +1123,8 @@ export interface SemanticIndexItemState {
 export interface IndexFolderSemanticRequest {
   folderPath: string;
   mode?: "missing" | "all";
+  /** Internal option: when true, exclude files that previously failed this pipeline. */
+  skipPreviouslyFailed?: boolean;
   recursive?: boolean;
 }
 
@@ -1293,6 +1330,11 @@ export interface DesktopApi {
   saveSettings: (settings: AppSettings) => Promise<void>;
   getFolderAnalysisStatuses: () => Promise<Record<string, FolderAnalysisStatus>>;
   getFolderAiSummaryReport: (folderPath: string) => Promise<FolderAiSummaryReport>;
+  getFolderAiFailedFiles: (
+    folderPath: string,
+    pipeline: FolderAiPipelineKind,
+    recursive: boolean,
+  ) => Promise<FolderAiFailedFileItem[]>;
   getFolderAiCoverage: (folderPath: string, recursive: boolean) => Promise<FolderAiCoverageReport>;
   getFolderAiRollupsBatch: (folderPaths: string[]) => Promise<Record<string, FolderAiSidebarRollup>>;
   analyzeFolderPhotos: (

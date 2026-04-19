@@ -216,7 +216,7 @@ export async function runMetadataScanJob(params: {
   let gpsGeocodingEnabled = false;
   try {
     const appSettings = await readSettings(app.getPath("userData"));
-    pathExtractionEnabled = appSettings.pathExtraction.extractDates || appSettings.pathExtraction.extractLocation;
+    pathExtractionEnabled = appSettings.pathExtraction.extractDates;
     gpsGeocodingEnabled = appSettings.folderScanning.detectLocationFromGps;
   } catch {
     // Settings read failure — keep path extraction enabled as default

@@ -189,7 +189,7 @@ function sidebarIconTitle(
     return "Subtree: AI pipelines not complete";
   }
   if (sidebarRollup === "empty") {
-    return "No catalogued images in this subtree";
+    return "No indexed images in this subtree";
   }
   return "Folder not analyzed";
 }

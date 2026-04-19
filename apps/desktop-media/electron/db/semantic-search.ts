@@ -120,6 +120,39 @@ export function getIndexedImageMediaIdsByPaths(
   return result;
 }
 
+export function getFailedImageEmbeddingPaths(
+  paths: string[],
+  libraryId = DEFAULT_LIBRARY_ID,
+  modelVersion = MULTIMODAL_EMBED_MODEL,
+): Set<string> {
+  if (paths.length === 0) {
+    return new Set<string>();
+  }
+  const db = getDesktopDatabase();
+  const sqlPrefix = `SELECT mi.source_path
+     FROM media_embeddings me
+     INNER JOIN media_items mi ON mi.id = me.media_item_id
+     WHERE me.library_id = ?
+       AND mi.deleted_at IS NULL
+       AND me.embedding_type = 'image'
+       AND me.model_version = ?
+       AND me.embedding_status = 'failed'
+       AND mi.source_path IN (`;
+  const sqlSuffix = `)`;
+  const result = new Set<string>();
+  for (let i = 0; i < paths.length; i += INDEXED_PATHS_QUERY_CHUNK) {
+    const chunk = paths.slice(i, i + INDEXED_PATHS_QUERY_CHUNK);
+    const placeholders = chunk.map(() => "?").join(", ");
+    const rows = db
+      .prepare(sqlPrefix + placeholders + sqlSuffix)
+      .all(libraryId, modelVersion, ...chunk) as Array<{ source_path: string }>;
+    for (const row of rows) {
+      result.add(row.source_path);
+    }
+  }
+  return result;
+}
+
 const vectorCache = new Map<string, Float32Array>();
 
 export function clearVectorCache(): void {

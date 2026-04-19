@@ -232,8 +232,11 @@ async function run(): Promise<void> {
           think,
           timeoutMs,
           signal: controller.signal,
+          downscaleBeforeLlm: true,
+          downscaleLongestSidePx: 1024,
           enableTwoPassRotationConsistency: true,
           useFaceFeaturesForRotation: true,
+          extractInvoiceData: false,
         });
         caseError = null;
         break;

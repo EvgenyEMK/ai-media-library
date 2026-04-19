@@ -1,5 +1,6 @@
 import { useEffect, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import type { MediaLibraryItem } from "../../shared/ipc";
+import type { MainPaneViewMode } from "../types/app-types";
 import type { DesktopStore } from "../stores/desktop-store";
 
 const DEBUG_PHOTO_AI =
@@ -14,6 +15,7 @@ export function useFolderImagesStream(
   mergeMetadataForPaths: (paths: string[], requestId: string) => Promise<void>,
   activeFolderRequestIdRef: MutableRefObject<string | null>,
   lastCompletedFolderRequestIdRef: MutableRefObject<string | null>,
+  setMainPaneViewMode: Dispatch<SetStateAction<MainPaneViewMode>>,
 ): {
   folderLoadProgress: { loaded: number; total: number | null };
   setFolderLoadProgress: Dispatch<SetStateAction<{ loaded: number; total: number | null }>>;
@@ -124,6 +126,12 @@ export function useFolderImagesStream(
             children = await window.desktopApi.readFolderChildren(event.folderPath);
             store.getState().setChildrenByPath(event.folderPath, children);
           }
+          if (
+            store.getState().folderScanningSettings.showFolderAiSummaryWhenSelectingEmptyFolder &&
+            children.length > 0
+          ) {
+            setMainPaneViewMode("folderAiSummary");
+          }
           if (children.length > 0 && !store.getState().expandedFolders.has(event.folderPath)) {
             store.getState().toggleFolderExpand(event.folderPath);
           }
@@ -150,7 +158,7 @@ export function useFolderImagesStream(
       }
       flushTimersByRequest.clear();
     };
-  }, [mergeMetadataForPaths, store, lastCompletedFolderRequestIdRef]);
+  }, [mergeMetadataForPaths, store, lastCompletedFolderRequestIdRef, setMainPaneViewMode]);
 
   return {
     folderLoadProgress,

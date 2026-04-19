@@ -19,12 +19,10 @@ export function usePathAnalysisHandlers(opts: {
         if (!trimmed) return;
 
         setProgressPanelCollapsed(false);
-        const { llmModel } = store.getState().pathExtractionSettings;
         try {
           await window.desktopApi.analyzeFolderPathMetadata({
             folderPath: trimmed,
             recursive,
-            model: llmModel.trim() || undefined,
           });
         } catch (error) {
           const message = error instanceof Error ? error.message : "Path analysis failed to start";

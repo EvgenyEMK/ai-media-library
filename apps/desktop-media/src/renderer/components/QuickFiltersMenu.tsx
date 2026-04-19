@@ -29,7 +29,7 @@ const FILTER_TEXT = {
   aiRating: "AI Rating",
   categories: "Categories",
   documents: "Documents",
-  eventYears: "Event years (catalog)",
+  eventYears: "Event years (database)",
   locationContains: "Location contains",
   locationPlaceholder: "e.g. Paris",
   yearFrom: "From year",

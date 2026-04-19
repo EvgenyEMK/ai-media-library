@@ -188,6 +188,15 @@ export function DesktopMediaWorkspace({
           <DesktopFolderAiSummaryView
             folderPath={selectedFolder}
             onBackToPhotos={() => setMainPaneViewMode("media")}
+            onRunSemanticPipeline={(folderPath, recursive, overrideExisting) =>
+              pipeline.handleIndexSemantic(folderPath, recursive, overrideExisting)
+            }
+            onRunFacePipeline={(folderPath, recursive, overrideExisting) =>
+              pipeline.handleDetectFaces(folderPath, recursive, overrideExisting)
+            }
+            onRunPhotoPipeline={(folderPath, recursive, overrideExisting) =>
+              pipeline.handleAnalyzePhotos(folderPath, recursive, overrideExisting)
+            }
             onOpenFolderSummary={handleOpenFolderAiSummary}
           />
         ) : (
