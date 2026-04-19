@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fuseWithRRF, toRankedList, type RankedItem } from "./search-fusion";
+import { fuseMaxCosineSimilarity, fuseWithRRF, toRankedList, type RankedItem } from "./search-fusion";
 
 describe("fuseWithRRF", () => {
   it("returns empty array when given no lists", () => {
@@ -139,5 +139,34 @@ describe("toRankedList", () => {
 
   it("returns empty array for empty input", () => {
     expect(toRankedList([])).toEqual([]);
+  });
+});
+
+describe("fuseMaxCosineSimilarity", () => {
+  it("takes max of VLM and description when both exist", () => {
+    const vectorRows = [
+      { mediaItemId: "a", score: 0.5 },
+      { mediaItemId: "b", score: 0.91 },
+    ];
+    const descriptionRows = [
+      { mediaItemId: "a", score: 0.82 },
+      { mediaItemId: "c", score: 0.3 },
+    ];
+    const r = fuseMaxCosineSimilarity(vectorRows, descriptionRows, 10);
+    expect(r[0]).toEqual({ mediaItemId: "b", fusedScore: 0.91 });
+    expect(r.find((x) => x.mediaItemId === "a")).toEqual({ mediaItemId: "a", fusedScore: 0.82 });
+  });
+
+  it("keeps strong VLM-only rows without a description score", () => {
+    const r = fuseMaxCosineSimilarity([{ mediaItemId: "x", score: 0.77 }], [], 5);
+    expect(r).toEqual([{ mediaItemId: "x", fusedScore: 0.77 }]);
+  });
+
+  it("respects limit", () => {
+    const v = [
+      { mediaItemId: "a", score: 0.9 },
+      { mediaItemId: "b", score: 0.8 },
+    ];
+    expect(fuseMaxCosineSimilarity(v, [], 1)).toHaveLength(1);
   });
 });

@@ -472,7 +472,7 @@ How: Used only when **Keyword match reranking** is on. Minimum cosine between ea
             title="Show matching method selector in search filters"
             description={`Why: The AI search uses a mix of visual similarity (VLM) and similarity to image description. This allows to control which of the two methods are used to compare results.
 
-How: When enabled, the AI image search panel shows a "Matching method" control next to Advanced search (hybrid vs VLM only vs description only). When off, search always uses the default combined ranking and visibility rules.`}
+How: When enabled, the AI image search panel shows a "Matching method" control next to Advanced search (VLM + description via RRF or max similarity, VLM only, or description only). When off, search always uses the default combined ranking and visibility rules.`}
             checked={aiImageSearchSettings.showMatchingMethodSelector}
             checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
             onChange={(next) => onAiImageSearchSettingChange("showMatchingMethodSelector", next)}

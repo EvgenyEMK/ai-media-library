@@ -236,6 +236,7 @@ export function SemanticSearchPanel({
                   }
                 >
                   <option value="hybrid">{UI_TEXT.semanticSearchSignalHybrid}</option>
+                  <option value="hybrid-max">{UI_TEXT.semanticSearchSignalHybridMax}</option>
                   <option value="vlm-only">{UI_TEXT.semanticSearchSignalVlmOnly}</option>
                   <option value="description-only">{UI_TEXT.semanticSearchSignalDescriptionOnly}</option>
                 </select>

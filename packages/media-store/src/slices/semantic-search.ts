@@ -4,7 +4,12 @@ import type { SemanticSearchFilters, SemanticSearchResult, SemanticIndexItem, Pr
 export type SemanticSearchScope = "global" | "selected" | "recursive";
 
 /** How VLM (image) vs AI-description embeddings combine in AI image search (desktop). */
-export type SemanticSearchSignalMode = "hybrid" | "vlm-only" | "description-only";
+export type SemanticSearchSignalMode =
+  | "hybrid"
+  /** Max cosine(VLM, description) — favors “best single signal” vs RRF’s dual-list boost. */
+  | "hybrid-max"
+  | "vlm-only"
+  | "description-only";
 
 export type SemanticIndexPhase = "initializing-model" | "indexing" | null;
 

@@ -63,3 +63,53 @@ export function toRankedList(
     rank: index + 1,
   }));
 }
+
+export interface MaxCosineFusedResult {
+  mediaItemId: string;
+  /** `max(vlmCosine, descCosine)` when both exist; otherwise the available cosine. */
+  fusedScore: number;
+}
+
+/**
+ * Merges VLM and description vector hits by **raw cosine** using the best of both:
+ * each item gets `max(vlmScore, descScore)` when both exist, otherwise the single score.
+ * Unlike RRF, this does not boost items that rank on both lists—useful when many items
+ * lack a description embedding.
+ */
+export function fuseMaxCosineSimilarity(
+  vectorRows: Array<{ mediaItemId: string; score: number }>,
+  descriptionRows: Array<{ mediaItemId: string; score: number }>,
+  limit: number,
+): MaxCosineFusedResult[] {
+  const byId = new Map<string, { vlm?: number; desc?: number }>();
+  for (const r of vectorRows) {
+    byId.set(r.mediaItemId, { vlm: r.score });
+  }
+  for (const r of descriptionRows) {
+    const prev = byId.get(r.mediaItemId);
+    if (prev) {
+      byId.set(r.mediaItemId, { ...prev, desc: r.score });
+    } else {
+      byId.set(r.mediaItemId, { desc: r.score });
+    }
+  }
+
+  const fused: MaxCosineFusedResult[] = [];
+  for (const [mediaItemId, s] of byId) {
+    const { vlm, desc } = s;
+    let fusedScore: number;
+    if (vlm !== undefined && desc !== undefined) {
+      fusedScore = Math.max(vlm, desc);
+    } else if (vlm !== undefined) {
+      fusedScore = vlm;
+    } else if (desc !== undefined) {
+      fusedScore = desc;
+    } else {
+      continue;
+    }
+    fused.push({ mediaItemId, fusedScore });
+  }
+
+  fused.sort((a, b) => b.fusedScore - a.fusedScore);
+  return fused.slice(0, Math.max(0, limit));
+}

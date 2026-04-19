@@ -19,5 +19,7 @@ describe("SemanticSearchSlice signal mode", () => {
     expect(store.getState().semanticSearchSignalMode).toBe("vlm-only");
     store.getState().setSemanticSearchSignalMode("description-only");
     expect(store.getState().semanticSearchSignalMode).toBe("description-only");
+    store.getState().setSemanticSearchSignalMode("hybrid-max");
+    expect(store.getState().semanticSearchSignalMode).toBe("hybrid-max");
   });
 });

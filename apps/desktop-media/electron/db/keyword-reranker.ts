@@ -22,7 +22,7 @@ export interface KeywordReRankOptions {
    */
   descriptionThreshold?: number;
   /** Which signals count toward keyword hits (default hybrid = either modality). */
-  hitSignalMode?: "hybrid" | "vlm-only" | "description-only";
+  hitSignalMode?: "hybrid" | "hybrid-max" | "vlm-only" | "description-only";
 }
 
 export interface ReRankedRow extends SemanticSearchRow {
@@ -102,7 +102,7 @@ export async function reRankByKeywordCoverage(
         descSim !== undefined &&
         descSim >= descriptionThreshold;
       const keywordHit =
-        hitSignalMode === "hybrid"
+        hitSignalMode === "hybrid" || hitSignalMode === "hybrid-max"
           ? vlmHit || descHit
           : hitSignalMode === "vlm-only"
             ? vlmHit

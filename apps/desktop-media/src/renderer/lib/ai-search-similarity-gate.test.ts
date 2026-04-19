@@ -11,6 +11,17 @@ describe("passesAiImageSearchSimilarityGate", () => {
     );
   });
 
+  it("hybrid-max uses same OR gate as hybrid", () => {
+    expect(
+      passesAiImageSearchSimilarityGate(
+        { vlmSimilarity: 0.04, descriptionSimilarity: 0 },
+        tV,
+        tD,
+        "hybrid-max",
+      ),
+    ).toBe(true);
+  });
+
   it("passes when description is at threshold", () => {
     expect(
       passesAiImageSearchSimilarityGate({ vlmSimilarity: 0.01, descriptionSimilarity: 0.6 }, tV, tD),

@@ -38,7 +38,7 @@ import {
   type SemanticSearchRow,
 } from "../db/semantic-search";
 import { searchByKeyword, type KeywordSearchFilters } from "../db/keyword-search";
-import { fuseWithRRF, toRankedList } from "../db/search-fusion";
+import { fuseMaxCosineSimilarity, fuseWithRRF, toRankedList } from "../db/search-fusion";
 import { analyzeSearchQuery, type QueryAnalysis } from "../query-understanding";
 import { reRankByKeywordCoverage, type ReRankedRow } from "../db/keyword-reranker";
 import { getVectorBackendStatus, getDesktopDatabase } from "../db/client";
@@ -376,20 +376,29 @@ export function registerSemanticSearchHandlers(): void {
         }
       }
 
-      // RRF: one or both of vision (VLM) + AI description ranks (keyword run kept for summary / diagnostics).
-      const rankedLists =
-        signalMode === "hybrid"
-          ? [toRankedList(vectorRows), toRankedList(descriptionRows)]
-          : signalMode === "vlm-only"
-            ? [toRankedList(vectorRows)]
-            : [toRankedList(descriptionRows)];
-      const fused = fuseWithRRF(rankedLists, 60, effectiveLimit);
-
+      // Hybrid: RRF over rank lists, or max cosine ("best of both") when description coverage is uneven.
       let rows: SemanticSearchRow[] = [];
-      for (const f of fused) {
-        const meta = metadataMap.get(f.mediaItemId);
-        if (meta) {
-          rows.push({ ...meta, score: f.rrfScore });
+      if (signalMode === "hybrid-max") {
+        const fusedMax = fuseMaxCosineSimilarity(vectorRows, descriptionRows, effectiveLimit);
+        for (const f of fusedMax) {
+          const meta = metadataMap.get(f.mediaItemId);
+          if (meta) {
+            rows.push({ ...meta, score: f.fusedScore });
+          }
+        }
+      } else {
+        const rankedLists =
+          signalMode === "hybrid"
+            ? [toRankedList(vectorRows), toRankedList(descriptionRows)]
+            : signalMode === "vlm-only"
+              ? [toRankedList(vectorRows)]
+              : [toRankedList(descriptionRows)];
+        const fused = fuseWithRRF(rankedLists, 60, effectiveLimit);
+        for (const f of fused) {
+          const meta = metadataMap.get(f.mediaItemId);
+          if (meta) {
+            rows.push({ ...meta, score: f.rrfScore });
+          }
         }
       }
 
@@ -471,14 +480,16 @@ export function registerSemanticSearchHandlers(): void {
         rows = reRanked;
       }
 
-      const rrfLabel =
+      const fusionLabel =
         signalMode === "hybrid"
-          ? "VLM + description"
-          : signalMode === "vlm-only"
-            ? "VLM only"
-            : "description only";
+          ? "VLM + description (RRF)"
+          : signalMode === "hybrid-max"
+            ? "VLM + description (max cosine)"
+            : signalMode === "vlm-only"
+              ? "VLM only"
+              : "description only";
       logVerbose(
-        `[semantic-search][main][+${Date.now() - searchT0}ms] returning ${rows.length} results (RRF: ${rrfLabel}${
+        `[semantic-search][main][+${Date.now() - searchT0}ms] returning ${rows.length} results (${fusionLabel}${
           canKeywordRerank ? " + keyword rerank" : ""
         })`,
       );

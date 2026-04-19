@@ -3,7 +3,7 @@ import type { SemanticSearchSignalMode } from "@emk/media-store";
 /**
  * Display filter for AI image search.
  *
- * - **hybrid** (default): hide only when both VLM and description are strictly below their floors.
+ * - **hybrid** / **hybrid-max** (default): hide only when both VLM and description are strictly below their floors.
  * - **vlm-only** / **description-only**: use that signal alone (for comparison tests).
  */
 export function passesAiImageSearchSimilarityGate(
@@ -17,7 +17,7 @@ export function passesAiImageSearchSimilarityGate(
   const vlmOk = typeof vlm === "number" && Number.isFinite(vlm) && vlm >= vlmThreshold;
   const descOk =
     typeof desc === "number" && Number.isFinite(desc) && desc >= descriptionThreshold;
-  if (mode === "hybrid") {
+  if (mode === "hybrid" || mode === "hybrid-max") {
     return vlmOk || descOk;
   }
   if (mode === "vlm-only") {
