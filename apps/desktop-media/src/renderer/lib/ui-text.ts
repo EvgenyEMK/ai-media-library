@@ -66,6 +66,11 @@ export const UI_TEXT = {
   folderAiSummaryStatusFailed: "Failed",
   /** Native tooltip on failed-count lines in Folder AI analysis summary. */
   folderAiSummaryStatusFailedCorrupt: "Failed: typically corrupt file",
+  folderAiSummaryFailedListOpen: "Open failed files list",
+  folderAiSummaryFailedListTitle: "Folder AI failed files",
+  folderAiSummaryFailedListBack: "Back to summary",
+  folderAiSummaryFailedListEmpty: "No failed files found for this selection.",
+  folderAiSummaryFailedListError: "Could not load failed files list.",
   folderAiPipelineStripLabel: "AI pipeline status for this folder (direct images only)",
   folderAiPipelineStripImagesOnlyHint: "AI status (images only)",
   folderAiPipelineStripUnavailable: "AI status unavailable",

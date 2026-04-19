@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from "react";
+import { useEffect, useId, useState, type ReactElement } from "react";
 import { Square } from "lucide-react";
 import { SettingsCheckboxField, SettingsNumberField, SettingsSectionCard } from "@emk/media-viewer";
 import {
@@ -101,9 +101,9 @@ const UI_TEXT = {
   folderIconWhenPhotoPendingGreen: "Green (same as fully complete)",
   photoAnalysisModelDescription: `Choose the vision model Ollama uses when you run Image AI analysis from folder menus. Larger models are often more accurate; smaller ones are faster and use less VRAM.`,
   photoAnalysisDownscaleTitle: "Downscale image dimensions before passing to LLM",
-  photoAnalysisDownscaleDescription: `Very large photos can overwhelm the local AI service (Ollama) that analyzes images, or cause slow runs, failures, or connection errors. When this option is on, the app shrinks each photo so its longest side is at most the size below before sending it to the model. That usually makes analysis more reliable and faster, with a small trade-off in fine detail. Turn it off only when you truly need full resolution for a special case.`,
-  photoAnalysisDownscaleLongestTitle: "Maximum length of the longest side (pixels)",
-  photoAnalysisDownscaleLongestDescription: `Applies only when downscaling is enabled. Lower values use less memory and are often faster; higher values preserve more detail in the image.`,
+  /** Checkbox + longest-side input (single section). */
+  photoAnalysisDownscaleCombinedDescription: `Very large photos can overwhelm the local AI service (Ollama) that analyzes images, or cause slow runs, failures, or connection errors. When this option is on, the app shrinks each photo so its longest side is at most the value you set below before sending it to the model. Lower values use less memory and are often faster; higher values keep more detail. That usually makes analysis more reliable and faster, with a small trade-off in fine detail. Turn the option off only when you truly need full resolution for a special case.`,
+  photoAnalysisDownscaleLongestSideLabel: "Maximum length of the longest side (pixels)",
   twoPassRotationTitle: "Two-pass analysis for rotated images",
   twoPassRotationDescription: `Why: One pass on the original image can miss or misread metadata when the photo still needs rotation.
 
@@ -160,6 +160,16 @@ export function DesktopSettingsSection({
 }: DesktopSettingsSectionProps): ReactElement {
   const [showGpsConfirm, setShowGpsConfirm] = useState(false);
   const [showAiModelHelp, setShowAiModelHelp] = useState(false);
+  const [showPhotoDownscaleDescription, setShowPhotoDownscaleDescription] = useState(false);
+  const [downscaleLongestSideDraft, setDownscaleLongestSideDraft] = useState(() =>
+    String(photoAnalysisSettings.downscaleLongestSidePx),
+  );
+  const photoDownscaleCheckboxId = useId();
+  const photoDownscaleLongestSideId = useId();
+
+  useEffect(() => {
+    setDownscaleLongestSideDraft(String(photoAnalysisSettings.downscaleLongestSidePx));
+  }, [photoAnalysisSettings.downscaleLongestSidePx]);
   const [databaseLocation, setDatabaseLocation] = useState<{
     appDataPath: string;
     userDataPath: string;
@@ -720,24 +730,80 @@ How: If analysis of a single image exceeds this many seconds, it is marked faile
               )
             }
           />
-          <SettingsCheckboxField
-            title={UI_TEXT.photoAnalysisDownscaleTitle}
-            description={UI_TEXT.photoAnalysisDownscaleDescription}
-            checked={photoAnalysisSettings.downscaleBeforeLlm}
-            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
-            onChange={(next) => onPhotoAnalysisSettingChange("downscaleBeforeLlm", next)}
-          />
-          <SettingsNumberField
-            title={UI_TEXT.photoAnalysisDownscaleLongestTitle}
-            description={UI_TEXT.photoAnalysisDownscaleLongestDescription}
-            value={photoAnalysisSettings.downscaleLongestSidePx}
-            min={256}
-            max={8192}
-            step={1}
-            onChange={(nextValue) =>
-              onPhotoAnalysisSettingChange("downscaleLongestSidePx", Math.round(nextValue))
-            }
-          />
+          <div className="rounded-md border border-border/70 bg-background/40 p-3">
+            <div className="flex items-start gap-3">
+              <input
+                id={photoDownscaleCheckboxId}
+                type="checkbox"
+                className={SETTINGS_OPTION_CHECKBOX_CLASS}
+                checked={photoAnalysisSettings.downscaleBeforeLlm}
+                onChange={(event) =>
+                  onPhotoAnalysisSettingChange("downscaleBeforeLlm", event.target.checked)
+                }
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <label
+                    htmlFor={photoDownscaleCheckboxId}
+                    className="m-0 cursor-pointer text-base font-medium text-foreground"
+                  >
+                    {UI_TEXT.photoAnalysisDownscaleTitle}
+                  </label>
+                  <button
+                    type="button"
+                    aria-label={`Toggle description for ${UI_TEXT.photoAnalysisDownscaleTitle}`}
+                    className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border text-sm text-muted-foreground"
+                    onClick={() => setShowPhotoDownscaleDescription((current) => !current)}
+                  >
+                    ?
+                  </button>
+                </div>
+                {showPhotoDownscaleDescription ? (
+                  <div className="mt-1 whitespace-pre-line text-sm leading-6 text-muted-foreground">
+                    {UI_TEXT.photoAnalysisDownscaleCombinedDescription.trim()}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+            {photoAnalysisSettings.downscaleBeforeLlm ? (
+              <div className="mt-3 flex flex-col gap-2 border-t border-border/60 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                <label
+                  htmlFor={photoDownscaleLongestSideId}
+                  className="m-0 shrink-0 text-sm font-medium text-foreground"
+                >
+                  {UI_TEXT.photoAnalysisDownscaleLongestSideLabel}
+                </label>
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                  <input
+                    id={photoDownscaleLongestSideId}
+                    type="number"
+                    min={256}
+                    max={8192}
+                    step={1}
+                    className="h-9 w-32 rounded-md border border-border bg-background px-2 text-base text-foreground"
+                    value={downscaleLongestSideDraft}
+                    onChange={(event) => setDownscaleLongestSideDraft(event.target.value)}
+                    onBlur={() => {
+                      const parsed = Number(downscaleLongestSideDraft);
+                      if (!Number.isFinite(parsed)) {
+                        setDownscaleLongestSideDraft(String(photoAnalysisSettings.downscaleLongestSidePx));
+                        return;
+                      }
+                      const clamped = Math.min(8192, Math.max(256, Math.round(parsed)));
+                      onPhotoAnalysisSettingChange("downscaleLongestSidePx", clamped);
+                      setDownscaleLongestSideDraft(String(clamped));
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        (event.target as HTMLInputElement).blur();
+                      }
+                    }}
+                  />
+                  <span className="text-xs text-muted-foreground">Allowed range: 256 – 8192</span>
+                </div>
+              </div>
+            ) : null}
+          </div>
           <SettingsCheckboxField
             title={UI_TEXT.twoPassRotationTitle}
             description={UI_TEXT.twoPassRotationDescription}

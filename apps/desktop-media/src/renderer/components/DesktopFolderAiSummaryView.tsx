@@ -2,15 +2,30 @@ import { useCallback, useEffect, useState, type ReactElement } from "react";
 import { Check, CircleDashed, Loader2, Play, RefreshCw, X } from "lucide-react";
 import type {
   ActiveJobStatuses,
+  FolderAiFailedFileItem,
+  FolderAiPipelineKind,
   FolderAiCoverageReport,
   FolderAiPipelineCounts,
   FolderAiSummaryReport,
+  DesktopMediaItemMetadata,
 } from "../../shared/ipc";
 import { cn } from "../lib/cn";
 import { UI_TEXT } from "../lib/ui-text";
 import { useDesktopStoreApi } from "../stores/desktop-store";
+import { toFileUrl } from "./face-cluster-utils";
 
 type SummaryPipelineKind = "semantic" | "face" | "photo";
+interface FailedListContext {
+  folderPath: string;
+  pipeline: FolderAiPipelineKind;
+  recursive: boolean;
+  folderLabel: string;
+}
+
+function formatResolution(meta: DesktopMediaItemMetadata | undefined): string | null {
+  if (!meta || !meta.width || !meta.height) return null;
+  return `Resolution: ${meta.width} x ${meta.height}`;
+}
 
 /** Last path segment for display (Windows or POSIX). */
 function folderDisplayNameFromPath(folderPath: string): string {
@@ -47,8 +62,29 @@ interface DesktopFolderAiSummaryViewProps {
   onOpenFolderSummary?: (folderPath: string) => void;
 }
 
-function FailedLine({ failedCount, totalImages }: { failedCount: number; totalImages: number }): ReactElement | null {
+function FailedLine({
+  failedCount,
+  totalImages,
+  onOpenFailedList,
+}: {
+  failedCount: number;
+  totalImages: number;
+  onOpenFailedList?: () => void;
+}): ReactElement | null {
   if (failedCount <= 0 || totalImages <= 0) return null;
+  if (onOpenFailedList) {
+    return (
+      <button
+        type="button"
+        className="m-0 block cursor-pointer border-0 bg-transparent p-0 text-[11px] leading-snug text-destructive shadow-none"
+        title={UI_TEXT.folderAiSummaryFailedListOpen}
+        aria-label={`${UI_TEXT.folderAiSummaryFailedListOpen}: ${formatGroupedInt(failedCount)}`}
+        onClick={onOpenFailedList}
+      >
+        {UI_TEXT.folderAiSummaryStatusFailed}: {formatGroupedInt(failedCount)}
+      </button>
+    );
+  }
   return (
     <span
       className="block text-[11px] leading-snug text-destructive"
@@ -64,6 +100,7 @@ interface PipelineStatusCellProps {
   actionPipeline?: SummaryPipelineKind;
   onRunPipeline?: (pipeline: SummaryPipelineKind) => void;
   actionPending?: boolean;
+  onOpenFailedList?: () => void;
 }
 
 function PipelineStatusCell({
@@ -71,8 +108,15 @@ function PipelineStatusCell({
   actionPipeline,
   onRunPipeline,
   actionPending = false,
+  onOpenFailedList,
 }: PipelineStatusCellProps): ReactElement {
-  const failedLine = <FailedLine failedCount={pipeline.failedCount} totalImages={pipeline.totalImages} />;
+  const failedLine = (
+    <FailedLine
+      failedCount={pipeline.failedCount}
+      totalImages={pipeline.totalImages}
+      onOpenFailedList={onOpenFailedList}
+    />
+  );
   const total = pipeline.totalImages;
   const noPendingWork =
     total > 0 && pipeline.doneCount + pipeline.failedCount === total;
@@ -154,6 +198,12 @@ interface SummaryRowProps {
   /** When set with `onSubfolderClick`, the folder name is a control that opens that folder's summary. */
   subfolderPath?: string;
   onSubfolderClick?: (folderPath: string) => void;
+  onOpenFailedList?: (
+    folderPath: string,
+    pipeline: FolderAiPipelineKind,
+    recursive: boolean,
+    folderLabel: string,
+  ) => void;
 }
 
 function SummaryRow({
@@ -166,6 +216,7 @@ function SummaryRow({
   actionPendingPipeline,
   subfolderPath,
   onSubfolderClick,
+  onOpenFailedList,
 }: SummaryRowProps): ReactElement {
   const folderCell =
     subfolderPath && onSubfolderClick ? (
@@ -202,6 +253,17 @@ function SummaryRow({
           actionPipeline={showPipelineActions ? "semantic" : undefined}
           onRunPipeline={onRunPipeline}
           actionPending={actionPendingPipeline === "semantic"}
+          onOpenFailedList={
+            coverage.semantic.failedCount > 0 && onOpenFailedList
+              ? () =>
+                  onOpenFailedList(
+                    coverage.folderPath,
+                    "semantic",
+                    coverage.recursive,
+                    label,
+                  )
+              : undefined
+          }
         />
       </td>
       <td className={cn("border-b border-border px-3 py-2.5 text-left align-top", noBottomBorder && "border-b-0")}>
@@ -210,6 +272,17 @@ function SummaryRow({
           actionPipeline={showPipelineActions ? "face" : undefined}
           onRunPipeline={onRunPipeline}
           actionPending={actionPendingPipeline === "face"}
+          onOpenFailedList={
+            coverage.face.failedCount > 0 && onOpenFailedList
+              ? () =>
+                  onOpenFailedList(
+                    coverage.folderPath,
+                    "face",
+                    coverage.recursive,
+                    label,
+                  )
+              : undefined
+          }
         />
       </td>
       <td className={cn("border-b border-border px-3 py-2.5 text-left align-top", noBottomBorder && "border-b-0")}>
@@ -218,6 +291,17 @@ function SummaryRow({
           actionPipeline={showPipelineActions ? "photo" : undefined}
           onRunPipeline={onRunPipeline}
           actionPending={actionPendingPipeline === "photo"}
+          onOpenFailedList={
+            coverage.photo.failedCount > 0 && onOpenFailedList
+              ? () =>
+                  onOpenFailedList(
+                    coverage.folderPath,
+                    "photo",
+                    coverage.recursive,
+                    label,
+                  )
+              : undefined
+          }
         />
       </td>
     </tr>
@@ -240,6 +324,11 @@ export function DesktopFolderAiSummaryView({
   const [selectedWithSubfolders, setSelectedWithSubfolders] = useState<FolderAiCoverageReport | null>(null);
   const [selectedDirectOnly, setSelectedDirectOnly] = useState<FolderAiCoverageReport | null>(null);
   const [subfolders, setSubfolders] = useState<FolderAiSummaryReport["subfolders"]>([]);
+  const [failedListContext, setFailedListContext] = useState<FailedListContext | null>(null);
+  const [failedListLoading, setFailedListLoading] = useState(false);
+  const [failedListError, setFailedListError] = useState<string | null>(null);
+  const [failedListItems, setFailedListItems] = useState<FolderAiFailedFileItem[]>([]);
+  const [failedListMetaByPath, setFailedListMetaByPath] = useState<Record<string, DesktopMediaItemMetadata>>({});
 
   const load = useCallback(async () => {
     if (!folderPath) return;
@@ -263,6 +352,66 @@ export function DesktopFolderAiSummaryView({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (failedListItems.length === 0) {
+      setFailedListMetaByPath({});
+      return;
+    }
+    let cancelled = false;
+    const loadMeta = async (): Promise<void> => {
+      try {
+        const paths = failedListItems.map((item) => item.path);
+        const byPath = await window.desktopApi.getMediaItemsByPaths(paths);
+        if (!cancelled) {
+          setFailedListMetaByPath(byPath);
+        }
+      } catch {
+        if (!cancelled) {
+          setFailedListMetaByPath({});
+        }
+      }
+    };
+    void loadMeta();
+    return () => {
+      cancelled = true;
+    };
+  }, [failedListItems]);
+
+  const loadFailedList = useCallback(
+    async (context: FailedListContext): Promise<void> => {
+      setFailedListLoading(true);
+      setFailedListError(null);
+      try {
+        const items = await window.desktopApi.getFolderAiFailedFiles(
+          context.folderPath,
+          context.pipeline,
+          context.recursive,
+        );
+        setFailedListItems(items);
+      } catch {
+        setFailedListItems([]);
+        setFailedListError(UI_TEXT.folderAiSummaryFailedListError);
+      } finally {
+        setFailedListLoading(false);
+      }
+    },
+    [],
+  );
+
+  const openFailedList = useCallback(
+    (targetFolderPath: string, pipeline: FolderAiPipelineKind, recursive: boolean, folderLabel: string): void => {
+      const context: FailedListContext = {
+        folderPath: targetFolderPath,
+        pipeline,
+        recursive,
+        folderLabel,
+      };
+      setFailedListContext(context);
+      void loadFailedList(context);
+    },
+    [loadFailedList],
+  );
 
   const hasAnyActiveAiPipeline = (active: ActiveJobStatuses): boolean =>
     Boolean(active.photoAnalysis || active.faceDetection || active.semanticIndex);
@@ -416,17 +565,32 @@ export function DesktopFolderAiSummaryView({
 
   const iconBtnClass =
     "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-input bg-secondary p-0 shadow-none";
+  const failedListPipelineLabel =
+    failedListContext?.pipeline === "photo"
+      ? UI_TEXT.folderAiSummaryColumnPhoto
+      : failedListContext?.pipeline === "face"
+        ? UI_TEXT.folderAiSummaryColumnFace
+        : UI_TEXT.folderAiSummaryColumnSemantic;
+  const isFailedListView = failedListContext !== null;
 
   return (
     <div className="relative flex max-w-[960px] flex-col gap-3 px-5 py-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="m-0 min-w-0 flex-1 text-lg">{UI_TEXT.folderAiSummaryTitle}</h2>
+        <h2 className="m-0 min-w-0 flex-1 text-lg">
+          {isFailedListView ? UI_TEXT.folderAiSummaryFailedListTitle : UI_TEXT.folderAiSummaryTitle}
+        </h2>
         <div className="inline-flex shrink-0 items-center gap-2">
           {!loading ? (
             <button
               type="button"
               className={iconBtnClass}
-              onClick={() => void load()}
+              onClick={() => {
+                if (failedListContext) {
+                  void loadFailedList(failedListContext);
+                } else {
+                  void load();
+                }
+              }}
               aria-label={UI_TEXT.folderAiSummaryRefresh}
               title={UI_TEXT.folderAiSummaryRefresh}
             >
@@ -444,7 +608,22 @@ export function DesktopFolderAiSummaryView({
           </button>
         </div>
       </div>
-      <p className="m-0 text-sm text-muted-foreground">{UI_TEXT.folderAiSummaryNote}</p>
+      {isFailedListView ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <button
+            type="button"
+            className="m-0 inline-flex h-8 items-center justify-center rounded-md border border-input bg-secondary px-3 text-sm shadow-none"
+            onClick={() => setFailedListContext(null)}
+          >
+            {UI_TEXT.folderAiSummaryFailedListBack}
+          </button>
+          <p className="m-0 text-sm text-muted-foreground">
+            {`${failedListPipelineLabel} - ${failedListContext.folderLabel}`}
+          </p>
+        </div>
+      ) : (
+        <p className="m-0 text-sm text-muted-foreground">{UI_TEXT.folderAiSummaryNote}</p>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-8" aria-label={UI_TEXT.folderAiSummaryLoading}>
@@ -453,7 +632,7 @@ export function DesktopFolderAiSummaryView({
       ) : null}
       {error ? <p className="m-0 text-red-400">{error}</p> : null}
 
-      {!loading && !error && selectedWithSubfolders && selectedDirectOnly ? (
+      {!loading && !error && selectedWithSubfolders && selectedDirectOnly && !isFailedListView ? (
         <div className="overflow-hidden rounded-[10px] border border-border bg-card">
           <table className="w-full border-collapse text-[13px]">
             <thead>
@@ -485,6 +664,7 @@ export function DesktopFolderAiSummaryView({
                     showPipelineActions
                     onRunPipeline={(pipeline) => void runPipelineForFolderWithSubfolders(pipeline)}
                     actionPendingPipeline={actionPendingPipeline}
+                    onOpenFailedList={openFailedList}
                   />
                   <SummaryRow
                     label={UI_TEXT.folderAiSummaryThisFolderDirectOnly}
@@ -492,6 +672,7 @@ export function DesktopFolderAiSummaryView({
                     showPipelineActions
                     onRunPipeline={(pipeline) => void runPipelineForFolderWithSubfolders(pipeline)}
                     actionPendingPipeline={actionPendingPipeline}
+                    onOpenFailedList={openFailedList}
                   />
                   <tr>
                     <td className="h-6 border-0 border-x-0 border-y-0 bg-transparent p-0" colSpan={5} aria-hidden="true" />
@@ -512,6 +693,7 @@ export function DesktopFolderAiSummaryView({
                       noBottomBorder={row.folderPath === subfolders[subfolders.length - 1]?.folderPath}
                       subfolderPath={row.folderPath}
                       onSubfolderClick={onOpenFolderSummary}
+                      onOpenFailedList={openFailedList}
                     />
                   ))}
                 </>
@@ -521,10 +703,54 @@ export function DesktopFolderAiSummaryView({
                   coverage={selectedDirectOnly}
                   highlighted
                   noBottomBorder
+                  onOpenFailedList={openFailedList}
                 />
               )}
             </tbody>
           </table>
+        </div>
+      ) : null}
+
+      {isFailedListView ? (
+        <div className="overflow-hidden rounded-[10px] border border-border bg-card">
+          {failedListLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 size={24} className="animate-spin text-muted-foreground" aria-hidden="true" />
+            </div>
+          ) : failedListError ? (
+            <p className="m-0 px-4 py-4 text-sm text-destructive">{failedListError}</p>
+          ) : failedListItems.length === 0 ? (
+            <p className="m-0 px-4 py-4 text-sm text-muted-foreground">{UI_TEXT.folderAiSummaryFailedListEmpty}</p>
+          ) : (
+            <div className="max-h-[65vh] overflow-auto">
+              {failedListItems.map((item) => (
+                <div key={`${item.path}-${item.failedAt ?? ""}`} className="border-b border-border px-4 py-2.5 last:border-b-0">
+                  <div className="flex items-start gap-3">
+                    <img
+                      src={toFileUrl(item.path)}
+                      alt={item.name}
+                      className="h-32 w-32 shrink-0 rounded object-cover"
+                      loading="lazy"
+                      decoding="async"
+                      onError={(event) => {
+                        event.currentTarget.style.display = "none";
+                      }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="m-0 break-all pb-1 text-sm text-foreground">{item.name}</p>
+                      <p className="m-0 break-all pb-1 text-xs text-muted-foreground">{item.path}</p>
+                      <p className="m-0 break-all pb-1 text-xs text-muted-foreground">
+                        {formatResolution(failedListMetaByPath[item.path]) ?? "Resolution: -"}
+                      </p>
+                      {item.error ? (
+                        <p className="m-0 break-all text-xs text-destructive">{item.error}</p>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ) : null}
 
