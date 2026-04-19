@@ -41,5 +41,9 @@
       "20230810_141737.jpg",
       "face-detect-sample-01.jpg"
     ]
+  },
+  "rotationBwSamples": {
+    "notes": "Paired B&W JPEGs in this folder (rotated-bw-01 from legacy dated filename; rotated-bw-02 renamed from scan0014.jpg). Not asserted by Playwright today; keep names stable for local rotation or path-metadata checks.",
+    "files": ["rotated-bw-01.jpg", "rotated-bw-02.jpg"]
   }
 }

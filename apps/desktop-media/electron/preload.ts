@@ -285,6 +285,8 @@ const api: DesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.reprocessFaceCropsAndEmbeddings),
   purgeDeletedMediaItems: () =>
     ipcRenderer.invoke(IPC_CHANNELS.purgeDeletedMediaItems),
+  purgeSoftDeletedMediaItemsByIds: (mediaItemIds: string[]) =>
+    ipcRenderer.invoke(IPC_CHANNELS.purgeSoftDeletedMediaItemsByIds, mediaItemIds),
   getActiveJobStatuses: () => ipcRenderer.invoke(IPC_CHANNELS.getActiveJobStatuses),
   analyzeFolderPathMetadata: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.analyzeFolderPathMetadata, request),

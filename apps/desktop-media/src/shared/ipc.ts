@@ -27,6 +27,27 @@ export const VIDEO_EXTENSIONS = new Set([
 
 export type MediaKind = "image" | "video";
 
+/** Classify catalog row kind from MIME (if known) and file path extension. Defaults to image. */
+export function inferCatalogMediaKind(sourcePath: string, mimeType: string | null | undefined): MediaKind {
+  const m = (mimeType ?? "").trim().toLowerCase();
+  if (m.startsWith("video/")) {
+    return "video";
+  }
+  if (m.startsWith("image/")) {
+    return "image";
+  }
+  const lower = sourcePath.toLowerCase();
+  const dot = lower.lastIndexOf(".");
+  const ext = dot >= 0 ? lower.slice(dot) : "";
+  if (VIDEO_EXTENSIONS.has(ext)) {
+    return "video";
+  }
+  if (IMAGE_EXTENSIONS.has(ext)) {
+    return "image";
+  }
+  return "image";
+}
+
 export const IPC_CHANNELS = {
   selectLibraryFolder: "media:select-library-folder",
   readFolderChildren: "media:read-folder-children",
@@ -116,6 +137,7 @@ export const IPC_CHANNELS = {
   getFaceToPersonCentroidSimilarities: "media:get-face-to-person-centroid-similarities",
   refreshPersonSuggestions: "media:refresh-person-suggestions",
   purgeDeletedMediaItems: "media:purge-deleted-media-items",
+  purgeSoftDeletedMediaItemsByIds: "media:purge-soft-deleted-media-items-by-ids",
   getFolderAiSummaryReport: "media:get-folder-ai-summary-report",
   getFolderAiCoverage: "media:get-folder-ai-coverage",
   getFolderAiRollupsBatch: "media:get-folder-ai-rollups-batch",
@@ -395,6 +417,10 @@ export interface DesktopMediaItemMetadata {
   sourcePath: string;
   filename: string;
   mimeType: string | null;
+  /** Catalog kind; falls back to inference from path/MIME when the column is unset. */
+  mediaKind: MediaKind;
+  /** Container duration in seconds when known (video). */
+  videoDurationSec: number | null;
   width: number | null;
   height: number | null;
   byteSize: number | null;
@@ -779,12 +805,47 @@ export interface ScanFolderMetadataResult {
 
 export type MetadataScanPhase = "preparing" | "scanning";
 
+export type MetadataScanTriggerSource = "manual" | "auto";
+
+export interface MetadataScanPathMove {
+  previousPath: string;
+  newPath: string;
+}
+
+export interface MetadataScanFilePathRef {
+  path: string;
+  name: string;
+}
+
+export interface MetadataScanFailedFileRef extends MetadataScanFilePathRef {
+  error?: string;
+}
+
+export interface MetadataScanDeletedFileRef {
+  id: string;
+  sourcePath: string;
+}
+
+/** Snapshot shown in the manual scan result overlay (renderer). */
+export interface MetadataManualScanResultPayload {
+  jobId: string;
+  folderPath: string;
+  recursive: boolean;
+  scanCancelled: boolean;
+  filesCreated: MetadataScanFilePathRef[];
+  filesUpdated: MetadataScanFilePathRef[];
+  filesFailed: MetadataScanFailedFileRef[];
+  pathMoves: MetadataScanPathMove[];
+  filesDeleted: MetadataScanDeletedFileRef[];
+}
+
 export type MetadataScanProgressEvent =
   | {
       type: "job-started";
       jobId: string;
       folderPath: string;
       recursive: boolean;
+      triggerSource: MetadataScanTriggerSource;
       total: number;
       items: MetadataScanItemState[];
     }
@@ -806,12 +867,20 @@ export type MetadataScanProgressEvent =
       jobId: string;
       folderPath: string;
       recursive: boolean;
+      triggerSource: MetadataScanTriggerSource;
       total: number;
       created: number;
       updated: number;
       unchanged: number;
       failed: number;
       cancelled: number;
+      /** True when the user cancelled after some work; reconciliation may still have run if prepare finished. */
+      scanCancelled: boolean;
+      filesCreated: MetadataScanFilePathRef[];
+      filesUpdated: MetadataScanFilePathRef[];
+      filesFailed: MetadataScanFailedFileRef[];
+      pathMoves: MetadataScanPathMove[];
+      filesDeleted: MetadataScanDeletedFileRef[];
       /**
        * Files where AI should run or re-run: new catalog rows plus updates that
        * invalidated AI (not metadata-only catalog sync).
@@ -1443,6 +1512,15 @@ export interface DesktopApi {
     totalEmbeddingsNeeded: number;
   }>;
   purgeDeletedMediaItems: () => Promise<{
+    purgedMediaItems: number;
+    purgedFaceInstances: number;
+    purgedEmbeddings: number;
+    purgedAlbumItems: number;
+    purgedItemTags: number;
+    purgedFsObjects: number;
+    purgedSources: number;
+  }>;
+  purgeSoftDeletedMediaItemsByIds: (mediaItemIds: string[]) => Promise<{
     purgedMediaItems: number;
     purgedFaceInstances: number;
     purgedEmbeddings: number;

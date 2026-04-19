@@ -47,8 +47,6 @@ export function App(): ReactElement {
   const childrenByPath = useDesktopStore((s) => s.childrenByPath);
   const folderAnalysisByPath = useDesktopStore((s) => s.folderAnalysisByPath);
   const folderRollupByPath = useDesktopStore((s) => s.folderRollupByPath);
-  const foldersWithCatalogChanges = useDesktopStore((s) => s.foldersWithCatalogChanges);
-  const metadataScanFollowUp = useDesktopStore((s) => s.metadataScanFollowUp);
   const isFolderLoading = useDesktopStore((s) => s.isFolderLoading);
   const mediaItems = useDesktopStore((s) => s.mediaItems);
   const mediaMetadataByItemId = useDesktopStore((s) => s.mediaMetadataByItemId);
@@ -273,7 +271,6 @@ export function App(): ReactElement {
         childrenByPath={childrenByPath}
         folderAnalysisByPath={folderAnalysisByPath}
         folderRollupByPath={folderRollupByPath}
-        foldersWithCatalogChanges={foldersWithCatalogChanges}
         pipeline={pipeline}
         folderTree={folderTree}
       />
@@ -313,7 +310,6 @@ export function App(): ReactElement {
         mainPaneViewMode={mainPaneViewMode}
         setMainPaneViewMode={setMainPaneViewMode}
         pipeline={pipeline}
-        metadataScanFollowUp={metadataScanFollowUp}
         faceModelDownload={faceModelDownload}
         handleOpenFolderAiSummary={folderTree.handleOpenFolderAiSummary}
         imageEditSuggestionItems={imageEditSuggestionItems}

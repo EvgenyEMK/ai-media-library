@@ -7,6 +7,8 @@ import { appendSyncOperation } from "./sync-log";
 export interface ReconcileFolderResult {
   softDeleted: number;
   resurrected: number;
+  /** Rows soft-deleted in this reconciliation pass (`deleted_at` just set). */
+  softDeletedItems: Array<{ id: string; sourcePath: string }>;
 }
 
 /**
@@ -39,7 +41,7 @@ export function reconcileFolder(
   }>;
 
   if (candidates.length === 0) {
-    return { softDeleted: 0, resurrected: 0 };
+    return { softDeleted: 0, resurrected: 0, softDeletedItems: [] };
   }
 
   const directChildren = candidates.filter(
@@ -56,12 +58,14 @@ export function reconcileFolder(
 
   let softDeleted = 0;
   let resurrected = 0;
+  const softDeletedItems: Array<{ id: string; sourcePath: string }> = [];
 
   const tx = db.transaction(() => {
     for (const row of directChildren) {
       const onDisk = observedPaths.has(row.source_path);
       if (!onDisk && row.deleted_at === null) {
         markDeleted.run(now, now, row.id);
+        softDeletedItems.push({ id: row.id, sourcePath: row.source_path });
         const sourceResult = markSourceDeleted({ sourcePath: row.source_path, libraryId });
         if (sourceResult && !sourceResult.hasOtherActiveSources) {
           appendSyncOperation({
@@ -80,7 +84,7 @@ export function reconcileFolder(
   });
 
   tx();
-  return { softDeleted, resurrected };
+  return { softDeleted, resurrected, softDeletedItems };
 }
 
 const PURGE_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
@@ -95,39 +99,26 @@ export interface PurgeResult {
   purgedSources: number;
 }
 
-/**
- * Hard-delete media_items that have been soft-deleted for longer than the
- * grace period, along with all their child rows in dependent tables.
- */
-export function purgeDeletedMediaItems(
-  libraryId = DEFAULT_LIBRARY_ID,
-  gracePeriodMs = PURGE_GRACE_PERIOD_MS,
+const EMPTY_PURGE: PurgeResult = {
+  purgedMediaItems: 0,
+  purgedFaceInstances: 0,
+  purgedEmbeddings: 0,
+  purgedAlbumItems: 0,
+  purgedItemTags: 0,
+  purgedFsObjects: 0,
+  purgedSources: 0,
+};
+
+function runHardPurgeForMediaRows(
+  libraryId: string,
+  rows: Array<{ id: string; source_path: string }>,
 ): PurgeResult {
-  const db = getDesktopDatabase();
-  const cutoff = new Date(Date.now() - gracePeriodMs).toISOString();
-
-  const expired = db
-    .prepare(
-      `SELECT id, source_path
-       FROM media_items
-       WHERE library_id = ? AND deleted_at IS NOT NULL AND deleted_at < ?`,
-    )
-    .all(libraryId, cutoff) as Array<{ id: string; source_path: string }>;
-
-  if (expired.length === 0) {
-    return {
-      purgedMediaItems: 0,
-      purgedFaceInstances: 0,
-      purgedEmbeddings: 0,
-      purgedAlbumItems: 0,
-      purgedItemTags: 0,
-      purgedFsObjects: 0,
-      purgedSources: 0,
-    };
+  if (rows.length === 0) {
+    return { ...EMPTY_PURGE };
   }
 
-  const ids = expired.map((row) => row.id);
-  const sourcePaths = expired.map((row) => row.source_path);
+  const ids = rows.map((row) => row.id);
+  const sourcePaths = rows.map((row) => row.source_path);
 
   const result: PurgeResult = {
     purgedMediaItems: 0,
@@ -140,6 +131,7 @@ export function purgeDeletedMediaItems(
   };
 
   const BATCH_SIZE = 400;
+  const db = getDesktopDatabase();
 
   const tx = db.transaction(() => {
     for (let offset = 0; offset < ids.length; offset += BATCH_SIZE) {
@@ -201,4 +193,63 @@ export function purgeDeletedMediaItems(
 
   tx();
   return result;
+}
+
+/**
+ * Hard-delete specific catalog rows that are already soft-deleted (`deleted_at` set),
+ * including faces, embeddings, and related rows (same cascade as grace-period purge).
+ */
+export function hardPurgeSoftDeletedMediaItemsByIds(
+  mediaItemIds: string[],
+  libraryId = DEFAULT_LIBRARY_ID,
+): PurgeResult {
+  if (mediaItemIds.length === 0) {
+    return { ...EMPTY_PURGE };
+  }
+
+  const db = getDesktopDatabase();
+  const unique = [...new Set(mediaItemIds)];
+  const rows: Array<{ id: string; source_path: string }> = [];
+  const CHUNK = 400;
+
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    const chunk = unique.slice(i, i + CHUNK);
+    const placeholders = chunk.map(() => "?").join(", ");
+    const found = db
+      .prepare(
+        `SELECT id, source_path
+         FROM media_items
+         WHERE library_id = ? AND deleted_at IS NOT NULL AND id IN (${placeholders})`,
+      )
+      .all(libraryId, ...chunk) as Array<{ id: string; source_path: string }>;
+    rows.push(...found);
+  }
+
+  return runHardPurgeForMediaRows(libraryId, rows);
+}
+
+/**
+ * Hard-delete media_items that have been soft-deleted for longer than the
+ * grace period, along with all their child rows in dependent tables.
+ */
+export function purgeDeletedMediaItems(
+  libraryId = DEFAULT_LIBRARY_ID,
+  gracePeriodMs = PURGE_GRACE_PERIOD_MS,
+): PurgeResult {
+  const db = getDesktopDatabase();
+  const cutoff = new Date(Date.now() - gracePeriodMs).toISOString();
+
+  const expired = db
+    .prepare(
+      `SELECT id, source_path
+       FROM media_items
+       WHERE library_id = ? AND deleted_at IS NOT NULL AND deleted_at < ?`,
+    )
+    .all(libraryId, cutoff) as Array<{ id: string; source_path: string }>;
+
+  if (expired.length === 0) {
+    return { ...EMPTY_PURGE };
+  }
+
+  return runHardPurgeForMediaRows(libraryId, expired);
 }

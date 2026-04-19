@@ -96,8 +96,9 @@ async function persistObservedFileIntoFsObjects(params: {
   item: ObservedFile;
   persistence: ReturnType<typeof getFsObjectPersistence>;
   recentTombstoneThreshold: string;
+  onPathMove?: (previousPath: string, newPath: string) => void;
 }): Promise<string | null> {
-  const { libraryId, item, persistence: p, recentTombstoneThreshold } = params;
+  const { libraryId, item, persistence: p, recentTombstoneThreshold, onPathMove } = params;
   const now = new Date().toISOString();
   const strongHash = await maybeComputeStrongHash(item.absolutePath, item.stats.size);
 
@@ -121,6 +122,7 @@ async function persistObservedFileIntoFsObjects(params: {
     );
 
     if (oldPath !== item.absolutePath) {
+      onPathMove?.(oldPath, item.absolutePath);
       propagatePathChange(oldPath, item.absolutePath, libraryId);
     }
     return strongHash;
@@ -255,15 +257,36 @@ export interface ObservedFileState {
   lastSeenAt: string;
 }
 
+/**
+ * After a metadata scan has called `observeFiles` on every folder with
+ * `deferFolderTombstone: true`, run this once so `fs_objects` rows that truly
+ * disappeared from disk are tombstoned. Deferring avoids marking a moved file’s
+ * identity row deleted when the source folder is observed before the destination
+ * folder (same inode, new path not yet indexed).
+ */
+export function finalizeObserveFilesTombstonesForScan(
+  entriesByFolder: Map<string, string[]>,
+  libraryId = DEFAULT_LIBRARY_ID,
+): void {
+  for (const [folderPath, paths] of entriesByFolder.entries()) {
+    markFolderFilesDeleted(folderPath, new Set(paths), libraryId);
+  }
+}
+
 export async function observeFiles(
   filePaths: string[],
   folderPath: string,
   libraryId = DEFAULT_LIBRARY_ID,
   onProgress?: (processed: number, total: number) => void,
   isCancelled?: () => boolean,
+  onPathMove?: (previousPath: string, newPath: string) => void,
+  /** When true, skip per-folder tombstoning; call `finalizeObserveFilesTombstonesForScan` after all folders. */
+  deferFolderTombstone = false,
 ): Promise<void> {
   if (filePaths.length === 0) {
-    markFolderFilesDeleted(folderPath, new Set<string>(), libraryId);
+    if (!deferFolderTombstone) {
+      markFolderFilesDeleted(folderPath, new Set<string>(), libraryId);
+    }
     onProgress?.(0, 0);
     return;
   }
@@ -302,7 +325,7 @@ export async function observeFiles(
   // console.log(`[observeFiles][${ts()}] stat loop DONE discovered=${discovered} observed=${observed.length}`);
 
   if (observed.length === 0) {
-    if (!isCancelled?.()) {
+    if (!isCancelled?.() && !deferFolderTombstone) {
       markFolderFilesDeleted(folderPath, new Set<string>(), libraryId);
     }
     return;
@@ -324,6 +347,7 @@ export async function observeFiles(
       item,
       persistence: p,
       recentTombstoneThreshold,
+      onPathMove,
     });
     if (strongHash) {
       touchedStrongHashes.add(strongHash);
@@ -334,7 +358,7 @@ export async function observeFiles(
     refreshDuplicateGrouping(strongHash, libraryId);
   }
 
-  if (!isCancelled?.()) {
+  if (!isCancelled?.() && !deferFolderTombstone) {
     markFolderFilesDeleted(folderPath, activeSeenPaths, libraryId);
   }
   // console.log(`[observeFiles][${ts()}] END`);

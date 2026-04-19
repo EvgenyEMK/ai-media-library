@@ -62,7 +62,6 @@ interface SidebarTreeProps {
   childrenByPath: Record<string, FolderNode[]>;
   folderAnalysisByPath: Record<string, FolderAnalysisStatus>;
   folderRollupByPath: Record<string, FolderAiSidebarRollup>;
-  foldersWithCatalogChanges: Record<string, boolean>;
   collapsed: boolean;
   onToggleExpand: (folderPath: string) => void;
   onSelectFolder: (folderPath: string) => void;
@@ -87,7 +86,6 @@ export function SidebarTree({
   childrenByPath,
   folderAnalysisByPath,
   folderRollupByPath,
-  foldersWithCatalogChanges,
   collapsed,
   onToggleExpand,
   onSelectFolder,
@@ -133,7 +131,6 @@ export function SidebarTree({
           childrenByPath={childrenByPath}
           folderAnalysisByPath={folderAnalysisByPath}
           folderRollupByPath={folderRollupByPath}
-          foldersWithCatalogChanges={foldersWithCatalogChanges}
           collapsed={collapsed}
           level={0}
           onToggleExpand={onToggleExpand}
@@ -274,7 +271,6 @@ interface TreeNodeProps {
   childrenByPath: Record<string, FolderNode[]>;
   folderAnalysisByPath: Record<string, FolderAnalysisStatus>;
   folderRollupByPath: Record<string, FolderAiSidebarRollup>;
-  foldersWithCatalogChanges: Record<string, boolean>;
   collapsed: boolean;
   level: number;
   onToggleExpand: (folderPath: string) => void;
@@ -303,7 +299,6 @@ function TreeNode({
   childrenByPath,
   folderAnalysisByPath,
   folderRollupByPath,
-  foldersWithCatalogChanges,
   collapsed,
   level,
   onToggleExpand,
@@ -413,8 +408,6 @@ function TreeNode({
   const rowClassName = cn(
     "group relative flex w-full items-center gap-0 rounded-md py-1 pl-1 pr-0",
     selectedFolder === folderPath && "bg-[#222a3d]",
-    foldersWithCatalogChanges[folderPath] &&
-      "shadow-[inset_0_0_0_1px_rgba(245,158,11,0.45)] rounded-md",
   );
   const isLibraryRoot = level === 0;
   const openMenuAt = useCallback(
@@ -650,7 +643,6 @@ function TreeNode({
               childrenByPath={childrenByPath}
               folderAnalysisByPath={folderAnalysisByPath}
               folderRollupByPath={folderRollupByPath}
-              foldersWithCatalogChanges={foldersWithCatalogChanges}
               collapsed={collapsed}
               level={level + 1}
               onToggleExpand={onToggleExpand}

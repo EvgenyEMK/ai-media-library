@@ -1,8 +1,10 @@
+import path from "node:path";
 import { exiftool } from "exiftool-vendored";
 import {
   starsToExifIfd0Rating,
   starsToWindowsRatingPercent,
 } from "@emk/media-metadata-core";
+import { VIDEO_EXTENSIONS } from "../../src/shared/ipc";
 
 function exifToolWriteTimeoutMs(): number {
   const raw = process.env.EMK_EXIFTOOL_WRITE_TIMEOUT_MS?.trim();
@@ -77,4 +79,39 @@ export async function writeStarRatingToImageFile(
     timeoutMs,
     "ExifTool star rating write",
   );
+}
+
+/**
+ * Image: XMP + Windows-friendly EXIF. Video containers: XMP rating + timestamps only (no IFD0 EXIF).
+ */
+export async function writeStarRatingToMediaFile(
+  absolutePath: string,
+  starRating: number,
+): Promise<void> {
+  if (VIDEO_EXTENSIONS.has(path.extname(absolutePath).toLowerCase())) {
+    if (!Number.isInteger(starRating) || starRating < 0 || starRating > 5) {
+      throw new Error("writeStarRatingToMediaFile: starRating must be 0–5.");
+    }
+    const now = xmpNowForExifTool();
+    const timeoutMs = exifToolWriteTimeoutMs();
+    await withTimeout(
+      exiftool.write(
+        absolutePath,
+        {
+          "XMP:Rating": starRating,
+          "XMP:ModifyDate": now,
+          "XMP:MetadataDate": now,
+        } as Record<string, string | number>,
+        {
+          writeArgs: ["-overwrite_original"],
+          useMWG: true,
+          ignoreMinorErrors: true,
+        },
+      ),
+      timeoutMs,
+      "ExifTool video star rating write",
+    );
+    return;
+  }
+  await writeStarRatingToImageFile(absolutePath, starRating);
 }

@@ -6,7 +6,14 @@ import {
   type AppSettings,
   type FolderAnalysisStatus,
 } from "../../src/shared/ipc";
-import { listFolderImages, listFolderMedia, readFolderChildren, streamFolderImages, streamFolderMedia } from "../fs-media";
+import {
+  listFolderImages,
+  listFolderMedia,
+  listFolderVideos,
+  readFolderChildren,
+  streamFolderImages,
+  streamFolderMedia,
+} from "../fs-media";
 import { readSettings, writeSettings } from "../storage";
 import {
   getFolderAnalysisStatuses,
@@ -69,17 +76,25 @@ export function registerFsHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.listFolderImages, async (_event, folderPath: string) => {
     const images = await listFolderImages(folderPath);
-    const knownImageEntries = images.map((image) => ({
-      folderPath,
-      path: image.path,
-      name: image.name,
-    }));
+    const videos = await listFolderVideos(folderPath);
+    const knownCatalogEntries = [
+      ...images.map((image) => ({
+        folderPath,
+        path: image.path,
+        name: image.name,
+      })),
+      ...videos.map((video) => ({
+        folderPath,
+        path: video.path,
+        name: video.name,
+      })),
+    ];
     const settings = await readSettings(app.getPath("userData"));
-    if (images.length < settings.folderScanning.autoMetadataScanOnSelectMaxFiles) {
+    if (knownCatalogEntries.length < settings.folderScanning.autoMetadataScanOnSelectMaxFiles) {
       void runMetadataScanJob({
         folderPath,
         recursive: false,
-        knownImageEntries,
+        knownCatalogEntries,
       }).catch(() => undefined);
     }
     return images;
@@ -170,7 +185,7 @@ async function runFolderMediaStream(
   folderPath: string,
 ): Promise<void> {
   let loaded = 0;
-  const observedImagePaths: string[] = [];
+  const observedCatalogPaths: string[] = [];
   const startedAt = Date.now();
 
   emitFolderMediaProgress(browserWindow, {
@@ -191,9 +206,7 @@ async function runFolderMediaStream(
             `[folder-stream][main][${ts()}] media-batch requestId=${requestId} loaded=${loaded} (+${items.length}) folder="${folderPath}"`,
           );
         }
-        observedImagePaths.push(
-          ...items.filter((item) => item.mediaKind === "image").map((item) => item.path),
-        );
+        observedCatalogPaths.push(...items.map((item) => item.path));
         emitFolderMediaProgress(browserWindow, {
           type: "batch",
           requestId,
@@ -223,18 +236,18 @@ async function runFolderMediaStream(
     for (const job of runningMetadataScanJobs.values()) {
       job.cancelled = true;
     }
-    const knownImageEntries = observedImagePaths.map((p) => ({
+    const knownCatalogEntries = observedCatalogPaths.map((p) => ({
       folderPath,
       path: p,
       name: path.basename(p),
     }));
     const settings = await readSettings(app.getPath("userData"));
-    if (knownImageEntries.length < settings.folderScanning.autoMetadataScanOnSelectMaxFiles) {
+    if (knownCatalogEntries.length < settings.folderScanning.autoMetadataScanOnSelectMaxFiles) {
       setTimeout(() => {
         void runMetadataScanJob({
           folderPath,
           recursive: false,
-          knownImageEntries,
+          knownCatalogEntries,
         }).catch(() => undefined);
       }, 300);
     }
@@ -313,13 +326,21 @@ async function runFolderImagesStream(
       job.cancelled = true;
     }
 
-    const knownImageEntries = observedPaths.map((p) => ({
-      folderPath,
-      path: p,
-      name: path.basename(p),
-    }));
+    const videos = await listFolderVideos(folderPath);
+    const knownCatalogEntries = [
+      ...observedPaths.map((p) => ({
+        folderPath,
+        path: p,
+        name: path.basename(p),
+      })),
+      ...videos.map((v) => ({
+        folderPath,
+        path: v.path,
+        name: v.name,
+      })),
+    ];
     const settings = await readSettings(app.getPath("userData"));
-    if (result.loaded < settings.folderScanning.autoMetadataScanOnSelectMaxFiles) {
+    if (knownCatalogEntries.length < settings.folderScanning.autoMetadataScanOnSelectMaxFiles) {
       // Delay scan start so the renderer can complete its pending
       // getMediaItemsByPaths calls for the final stream batches before the
       // scan's synchronous DB work starts competing for the main thread.
@@ -327,7 +348,7 @@ async function runFolderImagesStream(
         void runMetadataScanJob({
           folderPath,
           recursive: false,
-          knownImageEntries,
+          knownCatalogEntries,
         }).catch(() => undefined);
       }, 300);
     }

@@ -105,7 +105,8 @@ export function useFilteredMediaItems(quickFilters: ThumbnailQuickFilterState): 
           metadata?.photoTakenPrecision ?? null,
         ),
         starRating: typeof metadata?.starRating === "number" ? metadata.starRating : null,
-        mediaType: item.mediaType === "video" ? "video" : "image",
+        mediaType:
+          metadata?.mediaKind === "video" || item.mediaType === "video" ? "video" : "image",
       };
     });
   }, [mediaItems, mediaMetadataByItemId]);
@@ -179,7 +180,8 @@ export function useFilteredMediaItems(quickFilters: ThumbnailQuickFilterState): 
         width: metadata?.width ?? null,
         height: metadata?.height ?? null,
         sourcePath: image.id,
-        mediaType: image.mediaType === "video" ? "video" : "image",
+        mediaType:
+          metadata?.mediaKind === "video" || image.mediaType === "video" ? "video" : "image",
       };
     });
   }, [

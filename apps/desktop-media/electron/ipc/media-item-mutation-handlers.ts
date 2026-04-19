@@ -7,7 +7,7 @@ import {
 } from "../db/media-item-metadata";
 import { DEFAULT_LIBRARY_ID } from "../db/folder-analysis-status";
 import { refreshObservedStateForPaths } from "../db/file-identity";
-import { writeStarRatingToImageFile } from "../lib/write-star-rating-exiftool";
+import { writeStarRatingToMediaFile } from "../lib/write-star-rating-exiftool";
 import { readSettings } from "../storage";
 
 /**
@@ -66,7 +66,7 @@ export function registerMediaItemMutationHandlers(): void {
         // instantly and the renderer can update the grid immediately.
         void (async () => {
           try {
-            await writeStarRatingToImageFile(sourcePath, starRating);
+            await writeStarRatingToMediaFile(sourcePath, starRating);
             const refreshed = await refreshObservedStateForPaths([sourcePath], libraryId);
             const observedState = refreshed[sourcePath];
             await upsertMediaItemFromFilePath({

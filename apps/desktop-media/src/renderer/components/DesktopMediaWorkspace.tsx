@@ -13,7 +13,8 @@ import { DesktopFaceModelDownloadBanner } from "./DesktopFaceModelDownloadBanner
 import { DesktopMediaItemActionsMenu } from "./DesktopMediaItemActionsMenu";
 import { DesktopMediaItemListRow } from "./DesktopMediaItemListRow";
 import { DesktopFolderAiSummaryView } from "./DesktopFolderAiSummaryView";
-import { DesktopMetadataScanFollowUpBanner } from "./DesktopMetadataScanFollowUpBanner";
+import { DesktopMetadataScanFollowUpBar } from "./DesktopMetadataScanFollowUpBar";
+import { DesktopMetadataManualScanResultPanel } from "./DesktopMetadataManualScanResultPanel";
 import { SemanticSearchPanel } from "./SemanticSearchPanel";
 import type { DesktopPipelineHandlers } from "../hooks/use-desktop-pipeline-handlers";
 import { useMediaItemStarRatingChange } from "../hooks/use-media-item-star-rating-change";
@@ -69,7 +70,6 @@ interface DesktopMediaWorkspaceProps {
   setMainPaneViewMode: Dispatch<SetStateAction<MainPaneViewMode>>;
   selectedFolder: string | null;
   semanticPanelOpen: boolean;
-  metadataScanFollowUp: DesktopStoreState["metadataScanFollowUp"];
   faceModelDownload: DesktopStoreState["faceModelDownload"];
   pipeline: DesktopPipelineHandlers;
   handleOpenFolderAiSummary: (folderPath: string) => void;
@@ -94,7 +94,6 @@ export function DesktopMediaWorkspace({
   setMainPaneViewMode,
   selectedFolder,
   semanticPanelOpen,
-  metadataScanFollowUp,
   faceModelDownload,
   pipeline,
   handleOpenFolderAiSummary,
@@ -113,6 +112,8 @@ export function DesktopMediaWorkspace({
   openFolderViewerById: _openFolderViewerById,
 }: DesktopMediaWorkspaceProps): ReactElement {
   const mediaMetadataByItemId = useDesktopStore((s) => s.mediaMetadataByItemId);
+  const metadataManualScanResult = useDesktopStore((s) => s.metadataManualScanResult);
+  const metadataScanFollowUp = useDesktopStore((s) => s.metadataScanFollowUp);
   const commitStarRating = useMediaItemStarRatingChange();
   const onStarRatingChangeForPath = useCallback(
     (path: string) => (next: number) => {
@@ -153,31 +154,12 @@ export function DesktopMediaWorkspace({
   );
 
   return (
-    <>
-      {metadataScanFollowUp ? (
-        <DesktopMetadataScanFollowUpBanner
-          scanRootFolderPath={metadataScanFollowUp.scanRootFolderPath}
-          filesNeedingAiPipelineFollowUp={metadataScanFollowUp.filesNeedingAiPipelineFollowUp}
-          foldersNeedingAiFollowUpCount={metadataScanFollowUp.foldersNeedingAiFollowUpCount}
-          onRunPhotoMissing={() => {
-            const root = store.getState().metadataScanFollowUp?.scanRootFolderPath;
-            if (root) void pipeline.handleAnalyzePhotos(root, true, false);
-            store.getState().clearMetadataScanFollowUp();
-          }}
-          onRunFaceMissing={() => {
-            const root = store.getState().metadataScanFollowUp?.scanRootFolderPath;
-            if (root) void pipeline.handleDetectFaces(root, true, false);
-            store.getState().clearMetadataScanFollowUp();
-          }}
-          onRunSemanticMissing={() => {
-            const root = store.getState().metadataScanFollowUp?.scanRootFolderPath;
-            if (root) void pipeline.handleIndexSemantic(root, true, false);
-            store.getState().clearMetadataScanFollowUp();
-          }}
-          onDismiss={() => store.getState().clearMetadataScanFollowUp()}
-        />
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      {!metadataManualScanResult && metadataScanFollowUp ? (
+        <DesktopMetadataScanFollowUpBar layout="compact" pipeline={pipeline} />
       ) : null}
       {faceModelDownload.visible && faceModelDownload.status === "running" ? (
+        <div className="shrink-0">
         <DesktopFaceModelDownloadBanner
           message={faceModelDownload.message || "Downloading AI face detection and recognition models..."}
           filename={faceModelDownload.filename}
@@ -185,12 +167,16 @@ export function DesktopMediaWorkspace({
           downloadedBytes={faceModelDownload.downloadedBytes}
           totalBytes={faceModelDownload.totalBytes}
         />
+        </div>
       ) : null}
 
       {mainPaneViewMode === "media" && semanticPanelOpen ? (
         <SemanticSearchPanel onSearch={() => void pipeline.handleSemanticSearch()} />
       ) : null}
 
+      {metadataManualScanResult ? (
+        <DesktopMetadataManualScanResultPanel pipeline={pipeline} />
+      ) : (
       <div className="min-h-0 flex-1 overflow-auto">
         {mainPaneViewMode === "imageEditSuggestions" ? (
           <ImageEditSuggestionsView
@@ -272,7 +258,7 @@ export function DesktopMediaWorkspace({
                       starRating: typeof meta?.starRating === "number" ? meta.starRating : null,
                       onStarRatingChange: onStarRatingChangeForPath(image.id),
                       starRatingShowRejected: STAR_RATING_SHOW_REJECTED_UI,
-                      mediaType: "image",
+                      mediaType: meta?.mediaKind === "video" ? "video" : "image",
                     };
                   })}
                   onItemClick={(index) => store.getState().openViewer(index, "search")}
@@ -317,26 +303,34 @@ export function DesktopMediaWorkspace({
             ) : null}
             {semanticModeActive && viewMode === "list" && filteredSemanticListItems.length > 0 ? (
               <div className="grid grid-cols-1 gap-2 overflow-visible p-4 lg:grid-cols-2 lg:gap-3">
-                {filteredSemanticListItems.map((image, index) => (
-                  <DesktopMediaItemListRow
-                    key={image.id}
-                    title={image.title}
-                    onRowClick={() => store.getState().openViewer(index, "search")}
-                    metadataLine={image.photoTakenDisplay}
-                    folderLine={image.subtitle}
-                    filePath={image.id}
-                    mediaType="image"
-                    starRating={image.starRating}
-                    onStarRatingChange={onStarRatingChangeForPath(image.id)}
-                    starRatingShowRejected={STAR_RATING_SHOW_REJECTED_UI}
-                    thumbnail={renderListThumbnail(image.imageUrl, image.title, "image")}
-                  />
-                ))}
+                {filteredSemanticListItems.map((image, index) => {
+                  const meta = lookupMediaMetadataByItemId<DesktopMediaItemMetadata>(
+                    image.id,
+                    mediaMetadataByItemId,
+                  );
+                  const rowMediaType = meta?.mediaKind === "video" ? "video" : "image";
+                  return (
+                    <DesktopMediaItemListRow
+                      key={image.id}
+                      title={image.title}
+                      onRowClick={() => store.getState().openViewer(index, "search")}
+                      metadataLine={image.photoTakenDisplay}
+                      folderLine={image.subtitle}
+                      filePath={image.id}
+                      mediaType={rowMediaType}
+                      starRating={image.starRating}
+                      onStarRatingChange={onStarRatingChangeForPath(image.id)}
+                      starRatingShowRejected={STAR_RATING_SHOW_REJECTED_UI}
+                      thumbnail={renderListThumbnail(image.imageUrl, image.title, rowMediaType)}
+                    />
+                  );
+                })}
               </div>
             ) : null}
           </>
         )}
       </div>
-    </>
+      )}
+    </div>
   );
 }

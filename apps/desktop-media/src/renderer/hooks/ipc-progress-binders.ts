@@ -285,6 +285,7 @@ export function bindMetadataScanProgress(store: DesktopStore): () => void {
         s.metadataPhaseTotal = event.total;
         s.metadataItemOrder = [];
         s.metadataItemsByKey = {};
+        s.metadataManualScanResult = null;
       });
       console.log(`[metadata-scan][renderer][${new Date().toISOString()}] job-started state updated`);
       return;
@@ -320,10 +321,30 @@ export function bindMetadataScanProgress(store: DesktopStore): () => void {
       );
       const wasRunning = store.getState().metadataStatus === "running";
       const completedJobId = event.jobId;
-      const hadChanges = event.created > 0 || event.updated > 0;
+      const hasDockRelevantChanges =
+        event.created > 0 ||
+        event.updated > 0 ||
+        event.failed > 0 ||
+        event.cancelled > 0 ||
+        event.pathMoves.length > 0 ||
+        event.filesDeleted.length > 0;
+      const hadCatalogMutations =
+        event.created > 0 ||
+        event.updated > 0 ||
+        event.failed > 0 ||
+        event.pathMoves.length > 0 ||
+        event.filesDeleted.length > 0;
       const foldersNeedingAiFollowUpCount = event.foldersTouched.filter(
         (ft) => ft.needsAiFollowUp > 0,
       ).length;
+
+      const manualDetailEligible =
+        event.triggerSource === "manual" &&
+        (event.filesCreated.length > 0 ||
+          event.filesUpdated.length > 0 ||
+          event.filesFailed.length > 0 ||
+          event.pathMoves.length > 0 ||
+          event.filesDeleted.length > 0);
 
       store.setState((s) => {
         s.metadataStatus = "completed";
@@ -339,13 +360,6 @@ export function bindMetadataScanProgress(store: DesktopStore): () => void {
           failed: event.failed,
           cancelled: event.cancelled,
         };
-        if (event.foldersTouched.length > 0) {
-          for (const ft of event.foldersTouched) {
-            if (ft.created > 0 || ft.updated > 0) {
-              s.foldersWithCatalogChanges[ft.folderPath] = true;
-            }
-          }
-        }
         if (event.filesNeedingAiPipelineFollowUp > 0) {
           s.metadataScanFollowUp = {
             scanRootFolderPath: event.folderPath,
@@ -353,9 +367,22 @@ export function bindMetadataScanProgress(store: DesktopStore): () => void {
             foldersNeedingAiFollowUpCount,
           };
         }
+        if (manualDetailEligible) {
+          s.metadataManualScanResult = {
+            jobId: event.jobId,
+            folderPath: event.folderPath,
+            recursive: event.recursive,
+            scanCancelled: event.scanCancelled,
+            filesCreated: event.filesCreated,
+            filesUpdated: event.filesUpdated,
+            filesFailed: event.filesFailed,
+            pathMoves: event.pathMoves,
+            filesDeleted: event.filesDeleted,
+          };
+        }
       });
 
-      if (wasRunning && event.created === 0 && event.updated === 0) {
+      if (wasRunning && !hasDockRelevantChanges) {
         clearMetadataAutoHideTimer();
         metadataAutoHideTimer = window.setTimeout(() => {
           metadataAutoHideTimer = null;
@@ -370,7 +397,7 @@ export function bindMetadataScanProgress(store: DesktopStore): () => void {
         }, METADATA_AUTO_HIDE_DELAY_MS);
       }
 
-      if (hadChanges) {
+      if (hadCatalogMutations) {
         const images = store.getState().mediaItems;
         if (images.length > 0) {
           void refreshMetadataForItems(store, images);
