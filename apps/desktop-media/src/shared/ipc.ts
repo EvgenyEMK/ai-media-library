@@ -180,9 +180,11 @@ export interface DatabaseLocationInfo {
 
 export interface PathExtractionSettings {
   extractDates: boolean;
-  extractLocation: boolean;
   useLlm: boolean;
-  llmModel: string;
+  /** First Ollama text model id to try for path-metadata LLM (must match `ollama list` names). */
+  llmModelPrimary: string;
+  /** Second choice if the primary id is not installed locally. */
+  llmModelFallback: string;
 }
 
 export interface FaceDetectionSettings {
@@ -225,11 +227,16 @@ export interface PhotoAnalysisSettings {
 
 /** Single-folder image count threshold for automatic metadata scan after folder selection. */
 export interface FolderScanningSettings {
+  /**
+   * When true, selecting a folder with no direct media files but with sub-folders opens the Folder AI analysis summary
+   * (same as the folder right-click action). Ignored when the folder has no sub-folders.
+   */
+  showFolderAiSummaryWhenSelectingEmptyFolder: boolean;
   /** Run automatic scan only when image count in the selected folder (non-recursive) is strictly less than this. */
   autoMetadataScanOnSelectMaxFiles: number;
   /**
    * When true, propagate rating (and future title/description) edits into embedded file metadata via ExifTool.
-   * Default off so the catalog can diverge from files until the user opts in.
+   * Default off so the database can diverge from files until the user opts in.
    */
   writeEmbeddedMetadataOnUserEdit: boolean;
   /**
@@ -289,6 +296,7 @@ export const DEFAULT_PHOTO_ANALYSIS_SETTINGS: PhotoAnalysisSettings = {
 };
 
 export const DEFAULT_FOLDER_SCANNING_SETTINGS: FolderScanningSettings = {
+  showFolderAiSummaryWhenSelectingEmptyFolder: true,
   autoMetadataScanOnSelectMaxFiles: 100,
   writeEmbeddedMetadataOnUserEdit: false,
   detectLocationFromGps: false,
@@ -305,10 +313,9 @@ export const DEFAULT_AI_IMAGE_SEARCH_SETTINGS: AiImageSearchSettings = {
 
 export const DEFAULT_PATH_EXTRACTION_SETTINGS: PathExtractionSettings = {
   extractDates: true,
-  extractLocation: true,
   useLlm: false,
-  /** Empty: main process picks first installed Qwen via /api/tags (same as AI search query understanding). */
-  llmModel: "",
+  llmModelPrimary: "qwen2.5vl:3b",
+  llmModelFallback: "qwen3.5:9b",
 };
 
 export const DEFAULT_MEDIA_VIEWER_SETTINGS: MediaViewerSettings = {

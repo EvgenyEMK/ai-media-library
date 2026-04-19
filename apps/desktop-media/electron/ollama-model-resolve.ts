@@ -20,6 +20,10 @@ export function getOllamaBaseUrlForModelResolve(): string {
 export interface ResolveOllamaTextChatModelOptions {
   /** Exact name from `ollama list`; must appear in `/api/tags` or it is skipped with a warning. */
   preferred?: string | null;
+  /** Overrides default primary (defaults to {@link OLLAMA_TEXT_PRIMARY_MODEL}). */
+  primaryModelId?: string | null;
+  /** Overrides default fallback (defaults to {@link OLLAMA_TEXT_FALLBACK_MODEL}). */
+  fallbackModelId?: string | null;
 }
 
 /**
@@ -30,6 +34,8 @@ export async function resolveOllamaTextChatModel(
   options: ResolveOllamaTextChatModelOptions = {},
 ): Promise<string | null> {
   const preferred = options.preferred?.trim();
+  const primaryConfigured = options.primaryModelId?.trim() || OLLAMA_TEXT_PRIMARY_MODEL;
+  const fallbackConfigured = options.fallbackModelId?.trim() || OLLAMA_TEXT_FALLBACK_MODEL;
   try {
     const url = `${getOllamaBaseUrlForModelResolve()}/api/tags`;
     const res = await fetch(url, { signal: AbortSignal.timeout(TAGS_LIST_TIMEOUT_MS) });
@@ -49,11 +55,11 @@ export async function resolveOllamaTextChatModel(
       );
     }
 
-    if (names.includes(OLLAMA_TEXT_PRIMARY_MODEL)) {
-      return OLLAMA_TEXT_PRIMARY_MODEL;
+    if (names.includes(primaryConfigured)) {
+      return primaryConfigured;
     }
-    if (names.includes(OLLAMA_TEXT_FALLBACK_MODEL)) {
-      return OLLAMA_TEXT_FALLBACK_MODEL;
+    if (names.includes(fallbackConfigured)) {
+      return fallbackConfigured;
     }
     if (names.includes("qwen2.5:3b")) {
       return "qwen2.5:3b";

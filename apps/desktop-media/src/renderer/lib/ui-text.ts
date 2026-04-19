@@ -8,7 +8,7 @@ export const UI_TEXT = {
   sectionSettings: "Settings",
   noFolder: "Select a folder to view media",
   noPhotos: "No images or videos found in selected folder",
-  analyzePhotos: "Analyze photos",
+  analyzePhotos: "Analyze images",
   analysisPanelTitle: "Local AI analysis",
   faceDetectionPanelTitle: "Local face detection",
   analysisIdle: "Select a folder and run analysis.",
@@ -37,7 +37,7 @@ export const UI_TEXT = {
   filterMultiChoice: "Mutli-choice:",
   filterClearAll: "Clear all filters",
   filterSummaryPrefix: "Filtered",
-  noPhotosForFilters: "No photos match current filters",
+  noPhotosForFilters: "No images match current filters",
   albumActions: "Album actions",
   faceDetection: "Face detection",
   photoAIAnalysis: "Image AI analysis",
@@ -45,7 +45,7 @@ export const UI_TEXT = {
   scanForFileChanges: "Scan for file changes",
   folderAiAnalysisSummary: "Folder AI analysis summary",
   folderAiSummaryTitle: "Folder AI analysis summary",
-  folderAiSummaryBack: "Back to photos",
+  folderAiSummaryBack: "Back to images",
   folderAiSummaryColumnFolder: "Folder",
   folderAiSummaryColumnImages: "Images",
   folderAiSummaryColumnFace: "Face detection",
@@ -78,7 +78,7 @@ export const UI_TEXT = {
   cancelFaceDetection: "Cancel face detection",
   cancelPhotoAnalysis: "Cancel image AI analysis",
   onlyIfMissing: "Only if missing",
-  allPhotos: "All photos",
+  allPhotos: "All images",
   semanticPanelTitle: "AI image search",
   semanticSearchPlaceholder: "e.g. Bald man with a woman on a beach...",
   semanticSearch: "Search",
@@ -109,15 +109,15 @@ export const UI_TEXT = {
   metadataScanFailed: "Metadata scan failed.",
   /** Shown above the progress bar while recording file identity before reading metadata. */
   metadataScanPreparing: "Checking files on disk",
-  /** Second phase: read sidecar/embedded metadata and upsert catalog rows. */
-  metadataScanScanning: "Reading metadata and updating catalog",
+  /** Second phase: read sidecar/embedded metadata and upsert database rows. */
+  metadataScanScanning: "Reading metadata and updating database",
   /** Card heading when the scan is idle, completed, or the phase is not shown separately. */
   metadataScanCardTitle: "Media metadata scan",
   /** Card heading during the file-identity / observe phase (folder name is appended by the UI). */
   metadataPreparingCardTitle: "Media metadata scan - Indexing file identity",
-  /** Card heading while processing each file’s metadata against the catalog. */
-  metadataScanScanningCardTitle: "Media metadata scan - updating catalog",
-  loadingFolder: "Loading folder photos...",
+  /** Card heading while processing each file’s metadata against the database. */
+  metadataScanScanningCardTitle: "Media metadata scan - updating database",
+  loadingFolder: "Loading folder images...",
   progressPanelTitle: "Background operations",
   progressPathAnalysisTitle: "Path metadata (LLM)",
   pathAnalysisMenuTitle: "Extract path metadata (LLM)",
@@ -138,7 +138,7 @@ export const UI_TEXT = {
   copyFilePath: "Copy file path",
   videoAiUnavailable: "AI analysis is not available for videos yet",
   gpsLocationDetectionTitle: "Detect Country / City from GPS coordinates",
-  gpsLocationDetectionDescription: `When enabled, photos with GPS coordinates are reverse-geocoded during metadata scan to fill in Country, State/Province, and City. This data is used in search filters, folder/album views, and smart albums.
+  gpsLocationDetectionDescription: `When enabled, images with GPS coordinates are reverse-geocoded during metadata scan to fill in Country, State/Province, and City. This data is used in search filters, folder/album views, and smart albums.
 
 First-time setup downloads ~2 GB of GeoNames geographic data (cached locally for future use).`,
   gpsLocationDetectionConfirmTitle: "Download location data?",

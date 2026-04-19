@@ -118,8 +118,8 @@ export interface VisionModelOption {
 }
 
 export const VISION_MODEL_OPTIONS: VisionModelOption[] = [
-  { id: "qwen3.5:9b", label: "Qwen 3.5 9B (installed)", supportsThinking: true },
-  { id: "qwen2.5vl:3b", label: "Qwen 2.5 VL 3B (faster baseline)", supportsThinking: false },
+  { id: "qwen3.5:9b", label: "Qwen 3.5 9B (recommended default)", supportsThinking: true },
+  { id: "qwen2.5vl:3b", label: "Qwen 2.5 VL 3B (lighter / faster)", supportsThinking: false },
 ];
 
 export function supportsThinkingMode(model: string): boolean {

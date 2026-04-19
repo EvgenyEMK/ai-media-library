@@ -132,6 +132,7 @@ export function App(): ReactElement {
     mergeMetadataForPaths,
     activeFolderRequestIdRef,
     lastCompletedFolderRequestIdRef,
+    setMainPaneViewMode,
   );
 
   const folderTree = useFolderTreeHandlers({

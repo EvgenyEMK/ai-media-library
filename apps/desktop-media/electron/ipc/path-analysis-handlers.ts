@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { ipcMain } from "electron";
+import { app, ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../src/shared/ipc";
 import { getDesktopDatabase } from "../db/client";
 import { DEFAULT_LIBRARY_ID } from "../db/folder-analysis-status";
@@ -29,12 +29,8 @@ import type {
   PathLocationExtraction,
   SourcedLocation,
 } from "../path-extraction/types";
-import {
-  getOllamaBaseUrlForModelResolve,
-  resolveOllamaTextChatModel,
-  OLLAMA_TEXT_FALLBACK_MODEL,
-  OLLAMA_TEXT_PRIMARY_MODEL,
-} from "../ollama-model-resolve";
+import { getOllamaBaseUrlForModelResolve, resolveOllamaTextChatModel } from "../ollama-model-resolve";
+import { readSettings } from "../storage";
 
 /** Deduped, normalized paths (order preserved) for stable catalog + LLM batches. */
 function normalizePathList(imagePaths: string[]): string[] {
@@ -218,12 +214,25 @@ export function registerPathAnalysisHandlers(): void {
       );
 
       const userModel = request.model?.trim() || null;
-      const ollamaModel = await resolveOllamaTextChatModel({ preferred: userModel });
+      let primaryModelId: string | null = null;
+      let fallbackModelId: string | null = null;
+      try {
+        const appSettings = await readSettings(app.getPath("userData"));
+        primaryModelId = appSettings.pathExtraction.llmModelPrimary;
+        fallbackModelId = appSettings.pathExtraction.llmModelFallback;
+      } catch {
+        // Use resolver defaults for primary/fallback ids.
+      }
+      const ollamaModel = await resolveOllamaTextChatModel({
+        preferred: userModel,
+        primaryModelId,
+        fallbackModelId,
+      });
       if (!ollamaModel) {
         throw new Error(
           `No suitable Ollama text model found at ${getOllamaBaseUrlForModelResolve()}. ` +
-            `Pull e.g. "${OLLAMA_TEXT_PRIMARY_MODEL}" or "${OLLAMA_TEXT_FALLBACK_MODEL}" (ollama pull …), ` +
-            `or set Path extraction → LLM model in Settings to an installed model id.`,
+            `Pull the models set under Folder scanning & file metadata → Detect location from file paths using AI (LLM), ` +
+            `or enter ids that match ollama list.`,
         );
       }
       pathExtractionDebugLog(

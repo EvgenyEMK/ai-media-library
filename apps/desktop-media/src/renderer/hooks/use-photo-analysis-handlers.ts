@@ -1,7 +1,8 @@
 import { useMemo, useRef } from "react";
-import { VISION_MODEL_OPTIONS, supportsThinkingMode } from "../../shared/photo-analysis-prompt";
+import { supportsThinkingMode } from "../../shared/photo-analysis-prompt";
 import { UI_TEXT } from "../lib/ui-text";
 import type { DesktopStore, DesktopStoreState } from "../stores/desktop-store";
+import { DEFAULT_PHOTO_ANALYSIS_SETTINGS } from "../../shared/ipc";
 
 const DEBUG_PHOTO_AI =
   typeof process !== "undefined" && process.env?.EMK_DEBUG_PHOTO_AI === "1";
@@ -46,11 +47,7 @@ export function usePhotoAnalysisHandlers(opts: {
     ): Promise<void> => {
       const folderPath = targetFolderPath ?? selectedFolder;
       if (!folderPath) return;
-      const desiredModel = photoAnalysisSettings.model ?? aiSelectedModel;
-      const resolvedModel = VISION_MODEL_OPTIONS.some((o) => o.id === desiredModel)
-        ? desiredModel
-        : VISION_MODEL_OPTIONS[0]?.id;
-      if (!resolvedModel) return;
+      const resolvedModel = (photoAnalysisSettings.model ?? aiSelectedModel).trim() || DEFAULT_PHOTO_ANALYSIS_SETTINGS.model;
       if (resolvedModel !== store.getState().aiSelectedModel) store.getState().setAiSelectedModel(resolvedModel);
 
       store.setState((s) => {

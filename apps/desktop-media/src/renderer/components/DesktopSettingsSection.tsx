@@ -23,7 +23,6 @@ import {
   INVOICE_DATA_EXTRACTION_PROMPT_VERSION,
   PHOTO_ANALYSIS_PROMPT,
   PHOTO_ANALYSIS_PROMPT_VERSION,
-  VISION_MODEL_OPTIONS,
 } from "../../shared/photo-analysis-prompt";
 
 interface DesktopSettingsSectionProps {
@@ -47,7 +46,7 @@ interface DesktopSettingsSectionProps {
     key: K,
     value: FolderScanningSettings[K],
   ) => void;
-  onResetFolderScanningSettings: () => void;
+  onResetFolderScanningSectionSettings: () => void;
   onAiImageSearchSettingChange: <K extends keyof AiImageSearchSettings>(
     key: K,
     value: AiImageSearchSettings[K],
@@ -63,28 +62,22 @@ interface DesktopSettingsSectionProps {
     key: K,
     value: PathExtractionSettings[K],
   ) => void;
-  onResetPathExtractionSettings: () => void;
 }
 
 const UI_TEXT = {
   title: "Settings",
   scanForFileChanges: "Scan for file changes",
-  fileMetadataManagement: "File metadata management",
-  pathFromFilenamesTitle: "Dates and places from file paths",
-  pathExtractDatesTitle: "Fast extraction: infer event dates from paths",
-  pathExtractDatesDescription: `Why: Folder and file names often encode years or trip segments.
-
-How: During metadata scan, run lightweight rules (no network) to fill catalog event dates when EXIF is missing.`,
-  pathExtractLocationTitle: "Fast extraction: infer location hints from paths",
-  pathExtractLocationDescription: `Why: Some libraries encode country or city in folder names.
-
-How: During metadata scan, map obvious tokens into catalog location fields when empty.`,
-  pathUseLlmTitle: "LLM path analysis (folder menu)",
-  pathUseLlmDescription: `Why: Complex paths need reasoning beyond regex.
-
-How: When enabled, the folder context menu offers “Extract path metadata (LLM)” using your local Ollama text model. Requires Ollama running.`,
-  pathLlmModelTitle: "LLM model name (Ollama)",
-  pathLlmModelDescription: `Optional. Leave blank to auto-pick an installed Qwen model via Ollama’s /api/tags — same logic as Advanced AI search query understanding (prefers qwen2.5vl:3b, then qwen3.5:9b). Or set an exact id from ollama list if you want a specific model.`,
+  /** Shorter than “folder change scanning and file metadata management”; covers scan policy + embedded writes + path helpers. */
+  fileMetadataManagement: "Folder scanning & file metadata",
+  emptyFolderAiSummaryTitle: "On empty folder selection show AI analysis status summary for subfolders",
+  emptyFolderAiSummaryDescription: `When the folder you select has no images or videos in it directly but it contains sub-folders, open the Folder AI analysis summary in the main pane—the same view as “Folder AI analysis summary” on the folder’s right-click menu. It shows a table with face detection, AI image analysis, and AI search index status for this folder and all sub-folders (large trees may take a few seconds). If the folder has no sub-folders, this summary is not shown.`,
+  pathExtractDatesTitle: "Extract date(s) from file path",
+  pathExtractDatesDescription: `During a metadata scan, the app parses the file name and path. It looks for common patterns: YYYY-MM-DD; multi-day spans on one line; year-only or year-to-year ranges; YYYY-MM; eight-digit dates such as YYYYMMDD (including after camera-style prefixes like IMG_ or DSC_). If both an embedded capture date from the file and a path-derived date exist, the app compares calendar years: when the path-derived year is earlier than the embedded capture year, the event date from the path is used (typical when scans of old prints inherit a newer file date). Otherwise the embedded capture date wins. If neither exists, the file creation time may be used as a last resort. Results are stored in the database.`,
+  pathUseLlmTitle: "Detect location and dates from file paths using AI (LLM)",
+  pathUseLlmDescription: `When enabled, the folder’s right-click menu offers “Extract path metadata (LLM)”: the app sends folder and file path text to your local Ollama model to infer dates, places, and titles that simple rules cannot—useful for messy paths. Requires Ollama running with a compatible text model. The app picks an installed model by trying the Primary id first, then the Fallback id (see Ollama’s /api/tags).`,
+  pathLlmModelPrimaryLabel: "Primary (Ollama model id)",
+  pathLlmModelFallbackLabel: "Fallback (Ollama model id)",
+  pathLlmModelDescription: `Use exact names from ollama list / ollama pull. If the Primary model is not installed locally, the app tries the Fallback, then other compatible Qwen-style tags.`,
   databaseLocation: "Application data files",
   databaseFolder: "Database folder",
   databaseFile: "Database file",
@@ -93,21 +86,20 @@ How: When enabled, the folder context menu offers “Extract path metadata (LLM)
   notAvailable: "Not available",
   faceDetection: "Face detection",
   faceRecognition: "Face recognition",
-  photoAnalysis: "Image analysis",
+  photoAnalysis: "AI image analysis",
   aiImageSearch: "AI image search",
   mediaViewer: "Image / Video viewer",
-  folderScanWithoutSubfoldersNote: "Without sub-folders",
   photoAnalysisPromptTitle: "Prompt used",
   invoicePromptTitle: "Invoice extraction prompt",
   photoAnalysisModelTitle: "AI model",
+  photoAnalysisModelInstallNote: `The dropdown is not live-checked against Ollama in Settings. When you run Image AI analysis, the app sends images to Ollama using the model id you picked; if that model is not installed locally, Ollama fails the request. Labels such as “recommended default” name our built-in presets, not automatic detection of what is installed.`,
+  photoAnalysisModelFutureNote: `Possible improvement: allow any Ollama vision model id (keeping our defaults as shortcuts), a “Test model” action that calls Ollama (for example /api/tags or a tiny request), and a clear reachable / missing result before a long batch.`,
   folderIconWhenPhotoPendingTitle: "Image analysis pending — folder icon",
   folderIconWhenPhotoPendingDescription: `Image analysis on a large library can take a long time. When face detection and AI search indexing are already complete for a folder but image analysis is not, choose how the folder icon is tinted so the sidebar does not show every folder as urgent red.`,
   folderIconWhenPhotoPendingRed: "Red (urgent)",
   folderIconWhenPhotoPendingAmber: "Amber (moderate)",
   folderIconWhenPhotoPendingGreen: "Green (same as fully complete)",
-  photoAnalysisModelDescription: `Why: Different models balance speed, quality, and what your machine can run comfortably.
-
-How: This is the vision model used when you start Image AI analysis from the folder menus.`,
+  photoAnalysisModelDescription: `Choose the vision model Ollama uses when you run Image AI analysis from folder menus. Larger models are often more accurate; smaller ones are faster and use less VRAM.`,
   twoPassRotationTitle: "Two-pass analysis for rotated images",
   twoPassRotationDescription: `Why: One pass on the original image can miss or misread metadata when the photo still needs rotation.
 
@@ -121,7 +113,7 @@ How: When faces are detected, use the spatial relationship between eyes and nose
 
 How: If image category is invoice_or_receipt, run a second prompt to extract issuer, invoice number/date, client number, totals, currency, and VAT fields into top-level metadata.document_data.`,
   gpsLocationDetectionTitle: "Detect Country / City from GPS coordinates",
-  gpsLocationDetectionDescription: `Why: Photos with GPS coordinates can be automatically tagged with Country, State/Province, and City for use in search filters, folder/album views, and smart albums.
+  gpsLocationDetectionDescription: `Why: Images with GPS coordinates can be automatically tagged with Country, State/Province, and City for use in search filters, folder/album views, and smart albums.
 
 How: During metadata scan, reverse-geocode GPS lat/lon using offline GeoNames data (cities with population >= 1000). First-time setup downloads ~2 GB of geographic data (cached locally).`,
   gpsLocationDetectionConfirmTitle: "Download location data?",
@@ -154,16 +146,16 @@ export function DesktopSettingsSection({
   onPhotoAnalysisSettingChange,
   onResetPhotoAnalysisSettings,
   onFolderScanningSettingChange,
-  onResetFolderScanningSettings,
+  onResetFolderScanningSectionSettings,
   onAiImageSearchSettingChange,
   onResetAiImageSearchSettings,
   onMediaViewerSettingChange,
   onResetMediaViewerSettings,
   pathExtractionSettings,
   onPathExtractionSettingChange,
-  onResetPathExtractionSettings,
 }: DesktopSettingsSectionProps): ReactElement {
   const [showGpsConfirm, setShowGpsConfirm] = useState(false);
+  const [showAiModelHelp, setShowAiModelHelp] = useState(false);
   const [databaseLocation, setDatabaseLocation] = useState<{
     appDataPath: string;
     userDataPath: string;
@@ -250,11 +242,18 @@ export function DesktopSettingsSection({
 
       <SettingsSectionCard title={UI_TEXT.fileMetadataManagement}>
         <div className="space-y-3">
+          <SettingsCheckboxField
+            title={UI_TEXT.emptyFolderAiSummaryTitle}
+            description={UI_TEXT.emptyFolderAiSummaryDescription}
+            checked={folderScanningSettings.showFolderAiSummaryWhenSelectingEmptyFolder}
+            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+            onChange={(next) =>
+              onFolderScanningSettingChange("showFolderAiSummaryWhenSelectingEmptyFolder", next)
+            }
+          />
           <SettingsNumberField
             title="Automatically scan folder for changes on selection if number of files less than"
-            description={`Why: Opening a folder can start an automatic metadata and file-identity pass on images in that folder only (not subfolders), which often exceeds 30 seconds when there are many files.
-
-How: If the direct image count in the opened folder is at least this number, that automatic pass is skipped and thumbnails still load. To refresh the catalog yourself, use "${UI_TEXT.scanForFileChanges}" on the folder—leave "Include sub-folders" checked to scan the whole tree under that folder, or turn it off to scan only that folder’s files.`}
+            description={`When you open a folder, the app can automatically scan the files in that folder (not sub-folders) to refresh the database and detect new or moved images. On large folders this scan may take more than 10 seconds. If the number of images here is greater than or equal to this value, the automatic scan is skipped (thumbnails still load). To refresh the database yourself, use “${UI_TEXT.scanForFileChanges}” on the folder—use “Include sub-folders” to scan the whole tree, or turn it off to scan only this folder’s files.`}
             value={folderScanningSettings.autoMetadataScanOnSelectMaxFiles}
             min={0}
             max={1_000_000}
@@ -268,9 +267,7 @@ How: If the direct image count in the opened folder is at least this number, tha
           />
           <SettingsCheckboxField
             title="Update file metadata on change of Rating, Title, Description"
-            description={`Why: Keeping embedded XMP/EXIF in the image file helps other apps (Lightroom, Explorer) see the same rating. Writes go through ExifTool after the catalog is updated.
-
-How: When enabled, changing star rating in the app updates XMP Rating, ModifyDate, MetadataDate, and Windows-friendly EXIF Rating / RatingPercent. Title and description will use the same switch when in-app editors write to files. Turn off if you want the catalog only, or to avoid touching originals.`}
+            description={`XMP and EXIF are standard metadata blocks inside many image and video files; other apps (Lightroom, Windows) read them for star ratings and titles. When this option is on, after your change is saved in the database the app runs ExifTool to mirror rating into the file. When off, edits stay in the database only—original files on disk are not modified (recommended).`}
             checked={folderScanningSettings.writeEmbeddedMetadataOnUserEdit}
             checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
             onChange={(next) => onFolderScanningSettingChange("writeEmbeddedMetadataOnUserEdit", next)}
@@ -308,10 +305,6 @@ How: When enabled, changing star rating in the app updates XMP Rating, ModifyDat
               </div>
             </div>
           ) : null}
-          <p className="m-0 text-sm text-muted-foreground md:text-base">
-            {UI_TEXT.folderScanWithoutSubfoldersNote}
-          </p>
-          <p className="m-0 pt-2 text-base font-medium text-foreground">{UI_TEXT.pathFromFilenamesTitle}</p>
           <SettingsCheckboxField
             title={UI_TEXT.pathExtractDatesTitle}
             description={UI_TEXT.pathExtractDatesDescription}
@@ -320,67 +313,60 @@ How: When enabled, changing star rating in the app updates XMP Rating, ModifyDat
             onChange={(next) => onPathExtractionSettingChange("extractDates", next)}
           />
           <SettingsCheckboxField
-            title={UI_TEXT.pathExtractLocationTitle}
-            description={UI_TEXT.pathExtractLocationDescription}
-            checked={pathExtractionSettings.extractLocation}
-            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
-            onChange={(next) => onPathExtractionSettingChange("extractLocation", next)}
-          />
-          <SettingsCheckboxField
             title={UI_TEXT.pathUseLlmTitle}
             description={UI_TEXT.pathUseLlmDescription}
             checked={pathExtractionSettings.useLlm}
             checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
             onChange={(next) => onPathExtractionSettingChange("useLlm", next)}
           />
-          <div
-            className={`rounded-md border border-border/70 bg-background/40 p-3 ${!pathExtractionSettings.useLlm ? "opacity-50" : ""}`}
-          >
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <h4 className="m-0 text-base font-medium text-foreground">{UI_TEXT.pathLlmModelTitle}</h4>
+          {pathExtractionSettings.useLlm ? (
+            <div className="rounded-md border border-border/70 bg-background/40 p-3">
+              <div className="flex flex-col gap-3">
+                <p className="m-0 text-sm text-muted-foreground">{UI_TEXT.pathLlmModelDescription}</p>
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-foreground">{UI_TEXT.pathLlmModelPrimaryLabel}</span>
+                  <input
+                    type="text"
+                    value={pathExtractionSettings.llmModelPrimary}
+                    onChange={(e) => onPathExtractionSettingChange("llmModelPrimary", e.target.value)}
+                    className="h-9 w-full max-w-md rounded-md border border-border bg-background px-2 text-base"
+                    autoComplete="off"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-foreground">{UI_TEXT.pathLlmModelFallbackLabel}</span>
+                  <input
+                    type="text"
+                    value={pathExtractionSettings.llmModelFallback}
+                    onChange={(e) => onPathExtractionSettingChange("llmModelFallback", e.target.value)}
+                    className="h-9 w-full max-w-md rounded-md border border-border bg-background px-2 text-base"
+                    autoComplete="off"
+                  />
+                </label>
               </div>
-              <p className="m-0 text-sm text-muted-foreground">{UI_TEXT.pathLlmModelDescription}</p>
-              <input
-                type="text"
-                disabled={!pathExtractionSettings.useLlm}
-                value={pathExtractionSettings.llmModel}
-                onChange={(e) => onPathExtractionSettingChange("llmModel", e.target.value)}
-                className="mt-1 h-9 w-full max-w-md rounded-md border border-border bg-background px-2 text-base disabled:cursor-not-allowed"
-                autoComplete="off"
-              />
             </div>
-          </div>
+          ) : null}
           <div className="pt-1">
             <button
               type="button"
               className="inline-flex h-10 items-center rounded-md border border-border px-3 text-base"
-              onClick={onResetFolderScanningSettings}
+              onClick={onResetFolderScanningSectionSettings}
               disabled={
+                folderScanningSettings.showFolderAiSummaryWhenSelectingEmptyFolder ===
+                  DEFAULT_FOLDER_SCANNING_SETTINGS.showFolderAiSummaryWhenSelectingEmptyFolder &&
                 folderScanningSettings.autoMetadataScanOnSelectMaxFiles ===
                   DEFAULT_FOLDER_SCANNING_SETTINGS.autoMetadataScanOnSelectMaxFiles &&
                 folderScanningSettings.writeEmbeddedMetadataOnUserEdit ===
                   DEFAULT_FOLDER_SCANNING_SETTINGS.writeEmbeddedMetadataOnUserEdit &&
                 folderScanningSettings.detectLocationFromGps ===
-                  DEFAULT_FOLDER_SCANNING_SETTINGS.detectLocationFromGps
+                  DEFAULT_FOLDER_SCANNING_SETTINGS.detectLocationFromGps &&
+                pathExtractionSettings.extractDates === DEFAULT_PATH_EXTRACTION_SETTINGS.extractDates &&
+                pathExtractionSettings.useLlm === DEFAULT_PATH_EXTRACTION_SETTINGS.useLlm &&
+                pathExtractionSettings.llmModelPrimary === DEFAULT_PATH_EXTRACTION_SETTINGS.llmModelPrimary &&
+                pathExtractionSettings.llmModelFallback === DEFAULT_PATH_EXTRACTION_SETTINGS.llmModelFallback
               }
             >
               {UI_TEXT.resetToDefaults}
-            </button>
-          </div>
-          <div className="pt-1">
-            <button
-              type="button"
-              className="inline-flex h-10 items-center rounded-md border border-border px-3 text-base"
-              onClick={onResetPathExtractionSettings}
-              disabled={
-                pathExtractionSettings.extractDates === DEFAULT_PATH_EXTRACTION_SETTINGS.extractDates &&
-                pathExtractionSettings.extractLocation === DEFAULT_PATH_EXTRACTION_SETTINGS.extractLocation &&
-                pathExtractionSettings.useLlm === DEFAULT_PATH_EXTRACTION_SETTINGS.useLlm &&
-                pathExtractionSettings.llmModel === DEFAULT_PATH_EXTRACTION_SETTINGS.llmModel
-              }
-            >
-              {UI_TEXT.resetToDefaults} (path extraction)
             </button>
           </div>
         </div>
@@ -686,26 +672,32 @@ How: After you click “Find groups” under People → Untagged faces, any draf
           <div className="rounded-md border border-border/70 bg-background/40 p-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <h4 className="m-0 text-base font-medium text-foreground">
-                  {UI_TEXT.photoAnalysisModelTitle}
-                </h4>
-                <p className="mt-1 whitespace-pre-line text-sm leading-6 text-muted-foreground">
-                  {UI_TEXT.photoAnalysisModelDescription}
-                </p>
+                <div className="flex items-center gap-2">
+                  <h4 className="m-0 text-base font-medium text-foreground">{UI_TEXT.photoAnalysisModelTitle}</h4>
+                  <button
+                    type="button"
+                    aria-label={`Toggle description for ${UI_TEXT.photoAnalysisModelTitle}`}
+                    className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border text-sm text-muted-foreground"
+                    onClick={() => setShowAiModelHelp((v) => !v)}
+                  >
+                    ?
+                  </button>
+                </div>
+                {showAiModelHelp ? (
+                  <div className="mt-1 space-y-2 whitespace-pre-line text-sm leading-6 text-muted-foreground">
+                    <div>{UI_TEXT.photoAnalysisModelDescription}</div>
+                    <div>{UI_TEXT.photoAnalysisModelInstallNote}</div>
+                    <div>{UI_TEXT.photoAnalysisModelFutureNote}</div>
+                  </div>
+                ) : null}
               </div>
-              <select
+              <input
+                type="text"
                 className="h-10 min-w-[260px] rounded-md border border-border bg-background px-2 text-sm text-foreground"
                 value={photoAnalysisSettings.model}
-                onChange={(event) =>
-                  onPhotoAnalysisSettingChange("model", event.target.value)
-                }
-              >
-                {VISION_MODEL_OPTIONS.map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(event) => onPhotoAnalysisSettingChange("model", event.target.value)}
+                autoComplete="off"
+              />
             </div>
           </div>
           <SettingsNumberField

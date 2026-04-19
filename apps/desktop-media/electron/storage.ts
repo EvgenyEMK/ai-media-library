@@ -133,6 +133,10 @@ function sanitizeFaceDetectionSettings(candidate: unknown): FaceDetectionSetting
 function sanitizeFolderScanningSettings(candidate: unknown): FolderScanningSettings {
   const value = isRecord(candidate) ? candidate : {};
   return {
+    showFolderAiSummaryWhenSelectingEmptyFolder:
+      typeof value.showFolderAiSummaryWhenSelectingEmptyFolder === "boolean"
+        ? value.showFolderAiSummaryWhenSelectingEmptyFolder
+        : DEFAULT_FOLDER_SCANNING_SETTINGS.showFolderAiSummaryWhenSelectingEmptyFolder,
     autoMetadataScanOnSelectMaxFiles: clampToRange(
       asNumber(value.autoMetadataScanOnSelectMaxFiles),
       0,
@@ -239,23 +243,26 @@ function sanitizePhotoPendingTint(raw: unknown): PhotoPendingFolderIconTint {
 
 function sanitizePathExtractionSettings(candidate: unknown): PathExtractionSettings {
   const value = isRecord(candidate) ? candidate : {};
+  const legacyLlm =
+    typeof value.llmModel === "string" && value.llmModel.trim().length > 0 ? value.llmModel.trim() : null;
+  const primaryRaw = typeof value.llmModelPrimary === "string" ? value.llmModelPrimary.trim() : "";
+  const fallbackRaw = typeof value.llmModelFallback === "string" ? value.llmModelFallback.trim() : "";
+
   return {
     extractDates:
       typeof value.extractDates === "boolean"
         ? value.extractDates
         : DEFAULT_PATH_EXTRACTION_SETTINGS.extractDates,
-    extractLocation:
-      typeof value.extractLocation === "boolean"
-        ? value.extractLocation
-        : DEFAULT_PATH_EXTRACTION_SETTINGS.extractLocation,
     useLlm:
       typeof value.useLlm === "boolean"
         ? value.useLlm
         : DEFAULT_PATH_EXTRACTION_SETTINGS.useLlm,
-    llmModel:
-      typeof value.llmModel === "string" && value.llmModel.trim().length > 0
-        ? value.llmModel.trim()
-        : DEFAULT_PATH_EXTRACTION_SETTINGS.llmModel,
+    llmModelPrimary:
+      primaryRaw.length > 0
+        ? primaryRaw
+        : legacyLlm ?? DEFAULT_PATH_EXTRACTION_SETTINGS.llmModelPrimary,
+    llmModelFallback:
+      fallbackRaw.length > 0 ? fallbackRaw : DEFAULT_PATH_EXTRACTION_SETTINGS.llmModelFallback,
   };
 }
 

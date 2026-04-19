@@ -13,6 +13,13 @@ interface SettingsSectionCardProps {
   className?: string;
 }
 
+const SETTINGS_SECTION_CARD_CLASS =
+  "group rounded-lg border border-border/70 bg-card/40 p-0 shadow-sm [&_summary::-webkit-details-marker]:hidden";
+const SETTINGS_SECTION_HEADER_CLASS =
+  "flex cursor-pointer list-none items-center gap-2 rounded-t-lg border-b border-border/60 bg-muted/35 px-4 py-3 text-base font-medium text-foreground transition-colors hover:bg-muted/55 group-open:bg-muted/55";
+const SETTINGS_SECTION_BODY_CLASS = "mt-3 px-4 pb-4";
+const SETTINGS_FIELD_SURFACE_CLASS = "rounded-md border border-border/70 bg-background/40 p-3";
+
 export function SettingsSectionCard({
   title,
   children,
@@ -21,13 +28,10 @@ export function SettingsSectionCard({
 }: SettingsSectionCardProps): ReactElement {
   return (
     <details
-      className={joinClasses(
-        "group rounded-md border border-border/70 bg-card/40 px-4 py-3 [&_summary::-webkit-details-marker]:hidden",
-        className,
-      )}
+      className={joinClasses(SETTINGS_SECTION_CARD_CLASS, className)}
       open={defaultOpen}
     >
-      <summary className="flex cursor-pointer list-none items-center gap-2 text-base font-medium text-foreground">
+      <summary className={SETTINGS_SECTION_HEADER_CLASS}>
         <span
           aria-hidden="true"
           className="inline-flex h-5 w-5 items-center justify-center text-muted-foreground transition-transform group-open:rotate-90"
@@ -43,7 +47,7 @@ export function SettingsSectionCard({
         </span>
         <span>{title}</span>
       </summary>
-      <div className="mt-3">{children}</div>
+      <div className={SETTINGS_SECTION_BODY_CLASS}>{children}</div>
     </details>
   );
 }
@@ -94,7 +98,7 @@ export function SettingsNumberField({
   return (
     <div
       className={joinClasses(
-        "rounded-md border border-border/70 bg-background/40 p-3",
+        SETTINGS_FIELD_SURFACE_CLASS,
         disabled && "opacity-50",
       )}
     >
@@ -165,7 +169,7 @@ export function SettingsCheckboxField({
   const fieldId = useId();
 
   return (
-    <div className="rounded-md border border-border/70 bg-background/40 p-3">
+    <div className={SETTINGS_FIELD_SURFACE_CLASS}>
       <div className="flex items-start gap-3">
         <input
           id={fieldId}

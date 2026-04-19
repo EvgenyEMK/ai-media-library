@@ -161,7 +161,10 @@ export function DesktopAppMain({
             onFolderScanningSettingChange={(key, value) =>
               store.getState().updateFolderScanningSetting(key, value)
             }
-            onResetFolderScanningSettings={() => store.getState().resetFolderScanningSettings()}
+            onResetFolderScanningSectionSettings={() => {
+              store.getState().resetFolderScanningSettings();
+              store.getState().resetPathExtractionSettings();
+            }}
             onAiImageSearchSettingChange={(key, value) =>
               store.getState().updateAiImageSearchSetting(key, value)
             }
@@ -174,7 +177,6 @@ export function DesktopAppMain({
             onPathExtractionSettingChange={(key, value) =>
               store.getState().updatePathExtractionSetting(key, value)
             }
-            onResetPathExtractionSettings={() => store.getState().resetPathExtractionSettings()}
           />
         </div>
       ) : (
