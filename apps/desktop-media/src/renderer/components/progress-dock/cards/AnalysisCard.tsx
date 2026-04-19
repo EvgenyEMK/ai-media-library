@@ -83,6 +83,9 @@ export function AnalysisCard({
             {analysisEta.analysisCounts.cancelled > 0
               ? ` | Cancelled: ${formatCount(analysisEta.analysisCounts.cancelled)}`
               : ""}
+            <span className="ml-4 font-medium text-amber-200/95">
+              May take several minutes per file depending on settings and hardware
+            </span>
           </div>
         </div>
       ) : null}

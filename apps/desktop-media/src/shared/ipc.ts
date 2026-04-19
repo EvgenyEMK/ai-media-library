@@ -661,6 +661,8 @@ export interface AnalyzeFolderPhotosRequest {
   useFaceFeaturesForRotation?: boolean;
   extractInvoiceData?: boolean;
   mode?: "missing" | "all";
+  /** Internal option: when true, exclude files that previously failed this pipeline. */
+  skipPreviouslyFailed?: boolean;
   recursive?: boolean;
   concurrency?: number;
 }
@@ -750,6 +752,8 @@ export interface FaceDetectionItemState {
 export interface DetectFolderFacesRequest {
   folderPath: string;
   mode?: "missing" | "all";
+  /** Internal option: when true, exclude files that previously failed this pipeline. */
+  skipPreviouslyFailed?: boolean;
   recursive?: boolean;
   concurrency?: number;
   faceDetectionSettings?: FaceDetectionSettings;
@@ -1095,6 +1099,8 @@ export interface SemanticIndexItemState {
 export interface IndexFolderSemanticRequest {
   folderPath: string;
   mode?: "missing" | "all";
+  /** Internal option: when true, exclude files that previously failed this pipeline. */
+  skipPreviouslyFailed?: boolean;
   recursive?: boolean;
 }
 

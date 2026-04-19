@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState, type ReactElement } from "react";
 import { Check, CircleDashed, Loader2, Play, RefreshCw, X } from "lucide-react";
 import type {
+  ActiveJobStatuses,
   FolderAiCoverageReport,
   FolderAiPipelineCounts,
   FolderAiSummaryReport,
 } from "../../shared/ipc";
 import { cn } from "../lib/cn";
 import { UI_TEXT } from "../lib/ui-text";
-import { useDesktopStore } from "../stores/desktop-store";
+import { useDesktopStoreApi } from "../stores/desktop-store";
 
 type SummaryPipelineKind = "semantic" | "face" | "photo";
 
@@ -39,6 +40,9 @@ function formatPartialPercent(doneCount: number, totalImages: number): string {
 interface DesktopFolderAiSummaryViewProps {
   folderPath: string;
   onBackToPhotos: () => void;
+  onRunSemanticPipeline?: (folderPath: string, recursive: boolean, overrideExisting: boolean) => Promise<void> | void;
+  onRunFacePipeline?: (folderPath: string, recursive: boolean, overrideExisting: boolean) => Promise<void> | void;
+  onRunPhotoPipeline?: (folderPath: string, recursive: boolean, overrideExisting: boolean) => Promise<void> | void;
   /** Same as sidebar row menu "Folder AI analysis summary" for the given path. */
   onOpenFolderSummary?: (folderPath: string) => void;
 }
@@ -77,14 +81,20 @@ function PipelineStatusCell({
     total > 0 &&
     (pipeline.label === "partial" || pipeline.label === "not_done") &&
     !noPendingWork;
+  const pipelineActionLabel =
+    actionPipeline === "semantic"
+      ? "Run AI search index for this folder and sub-folders"
+      : actionPipeline === "face"
+        ? "Run face detection for this folder and sub-folders"
+        : "Run AI image analysis for this folder and sub-folders";
   const actionButton = canRunPipelineAction ? (
     <button
       type="button"
       className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-border bg-transparent p-0 text-muted-foreground shadow-none transition-colors duration-150 hover:border-indigo-500 hover:bg-[#1e2a40] disabled:cursor-not-allowed disabled:opacity-50"
       onClick={() => onRunPipeline?.(actionPipeline as SummaryPipelineKind)}
       disabled={actionPending}
-      title="Run pipeline for this folder and sub-folders"
-      aria-label="Run pipeline for this folder and sub-folders"
+      title={pipelineActionLabel}
+      aria-label={pipelineActionLabel}
     >
       {actionPending ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Play size={14} aria-hidden="true" />}
     </button>
@@ -217,11 +227,12 @@ function SummaryRow({
 export function DesktopFolderAiSummaryView({
   folderPath,
   onBackToPhotos,
+  onRunSemanticPipeline,
+  onRunFacePipeline,
+  onRunPhotoPipeline,
   onOpenFolderSummary,
 }: DesktopFolderAiSummaryViewProps): ReactElement {
-  const aiStatus = useDesktopStore((s) => s.aiStatus);
-  const faceStatus = useDesktopStore((s) => s.faceStatus);
-  const semanticIndexStatus = useDesktopStore((s) => s.semanticIndexStatus);
+  const store = useDesktopStoreApi();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showPipelineBlockedDialog, setShowPipelineBlockedDialog] = useState(false);
@@ -253,41 +264,154 @@ export function DesktopFolderAiSummaryView({
     void load();
   }, [load]);
 
+  const hasAnyActiveAiPipeline = (active: ActiveJobStatuses): boolean =>
+    Boolean(active.photoAnalysis || active.faceDetection || active.semanticIndex);
+
+  const markPipelineStartingInUi = (pipeline: SummaryPipelineKind): void => {
+    if (pipeline === "semantic") {
+      store.setState((s) => {
+        s.semanticIndexError = null;
+        s.semanticIndexStatus = "running";
+        s.semanticIndexPanelVisible = true;
+        s.semanticIndexJobId = null;
+        s.semanticIndexItemOrder = [];
+        s.semanticIndexItemsByKey = {};
+        s.semanticIndexAverageSecondsPerFile = null;
+        s.semanticIndexCurrentFolderPath = null;
+        s.semanticIndexPhase = null;
+      });
+      return;
+    }
+    if (pipeline === "face") {
+      store.setState((s) => {
+        s.faceError = null;
+        s.faceStatus = "running";
+        s.facePanelVisible = true;
+        s.faceJobId = null;
+        s.faceItemOrder = [];
+        s.faceItemsByKey = {};
+        s.faceAverageSecondsPerFile = null;
+        s.faceCurrentFolderPath = null;
+      });
+      return;
+    }
+    store.setState((s) => {
+      s.aiError = null;
+      s.aiStatus = "running";
+      s.aiPanelVisible = true;
+      s.aiJobId = null;
+      s.aiItemOrder = [];
+      s.aiItemsByKey = {};
+      s.aiAverageSecondsPerFile = null;
+      s.aiCurrentFolderPath = null;
+      s.aiPhase = null;
+    });
+  };
+
+  const markPipelineStartFailedInUi = (pipeline: SummaryPipelineKind, message: string): void => {
+    if (pipeline === "semantic") {
+      store.setState((s) => {
+        s.semanticIndexError = message;
+        s.semanticIndexStatus = "failed";
+        s.semanticIndexPhase = null;
+      });
+      return;
+    }
+    if (pipeline === "face") {
+      store.setState((s) => {
+        s.faceError = message;
+        s.faceStatus = "failed";
+      });
+      return;
+    }
+    store.setState((s) => {
+      s.aiError = message;
+      s.aiStatus = "failed";
+      s.aiPhase = null;
+    });
+  };
+
   const runPipelineForFolderWithSubfolders = useCallback(
     async (pipeline: SummaryPipelineKind): Promise<void> => {
       if (!folderPath || actionPendingPipeline) return;
-      const hasRunningAiPipeline =
-        aiStatus === "running" || faceStatus === "running" || semanticIndexStatus === "running";
-      if (hasRunningAiPipeline) {
+      const liveState = store.getState();
+      const hasRunningPipelineInStoreNow =
+        liveState.aiStatus === "running" ||
+        liveState.faceStatus === "running" ||
+        liveState.semanticIndexStatus === "running";
+      if (hasRunningPipelineInStoreNow) {
         setShowPipelineBlockedDialog(true);
         return;
+      }
+      try {
+        const activeJobs = await window.desktopApi.getActiveJobStatuses();
+        if (hasAnyActiveAiPipeline(activeJobs)) {
+          setShowPipelineBlockedDialog(true);
+          return;
+        }
+      } catch {
+        // Keep running even if active-job check fails; store guard already protects common cases.
       }
       setActionPendingPipeline(pipeline);
       try {
         if (pipeline === "semantic") {
-          await window.desktopApi.indexFolderSemanticEmbeddings({
-            folderPath,
-            recursive: true,
-            mode: "missing",
-          });
+          if (onRunSemanticPipeline) {
+            await onRunSemanticPipeline(folderPath, true, false);
+          } else {
+            markPipelineStartingInUi("semantic");
+            const result = await window.desktopApi.indexFolderSemanticEmbeddings({
+              folderPath,
+              recursive: true,
+              mode: "missing",
+            });
+            store.setState((s) => {
+              s.semanticIndexJobId = result.jobId;
+            });
+          }
         } else if (pipeline === "face") {
-          await window.desktopApi.detectFolderFaces({
-            folderPath,
-            recursive: true,
-            mode: "missing",
-          });
+          if (onRunFacePipeline) {
+            await onRunFacePipeline(folderPath, true, false);
+          } else {
+            markPipelineStartingInUi("face");
+            const result = await window.desktopApi.detectFolderFaces({
+              folderPath,
+              recursive: true,
+              mode: "missing",
+            });
+            store.setState((s) => {
+              s.faceJobId = result.jobId;
+            });
+          }
         } else {
-          await window.desktopApi.analyzeFolderPhotos({
-            folderPath,
-            recursive: true,
-            mode: "missing",
-          });
+          if (onRunPhotoPipeline) {
+            await onRunPhotoPipeline(folderPath, true, false);
+          } else {
+            markPipelineStartingInUi("photo");
+            const result = await window.desktopApi.analyzeFolderPhotos({
+              folderPath,
+              recursive: true,
+              mode: "missing",
+            });
+            store.setState((s) => {
+              s.aiJobId = result.jobId;
+            });
+          }
         }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Could not start pipeline.";
+        markPipelineStartFailedInUi(pipeline, message);
       } finally {
         setActionPendingPipeline(null);
       }
     },
-    [actionPendingPipeline, aiStatus, faceStatus, folderPath, semanticIndexStatus],
+    [
+      actionPendingPipeline,
+      folderPath,
+      onRunFacePipeline,
+      onRunPhotoPipeline,
+      onRunSemanticPipeline,
+      store,
+    ],
   );
 
   const iconBtnClass =
@@ -406,7 +530,7 @@ export function DesktopFolderAiSummaryView({
 
       {showPipelineBlockedDialog ? (
         <div
-          className="absolute inset-0 z-20 flex items-center justify-center bg-black/45 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
           role="dialog"
           aria-modal="true"
           aria-label="Pipeline already running"

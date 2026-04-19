@@ -72,6 +72,62 @@ export function getAlreadyFaceDetectedPhotoPaths(
   return result;
 }
 
+export function getPhotoAnalysisFailedPaths(
+  photoPaths: string[],
+  libraryId = DEFAULT_LIBRARY_ID,
+): Set<string> {
+  if (photoPaths.length === 0) {
+    return new Set<string>();
+  }
+  const db = getDesktopDatabase();
+  const failed = new Set<string>();
+  const sqlPrefix = `SELECT source_path
+    FROM media_items
+    WHERE library_id = ?
+      AND photo_analysis_failed_at IS NOT NULL
+      AND source_path IN (`;
+  const sqlSuffix = `)`;
+  for (let i = 0; i < photoPaths.length; i += IN_CHUNK_SIZE) {
+    const chunk = photoPaths.slice(i, i + IN_CHUNK_SIZE);
+    const placeholders = chunk.map(() => "?").join(", ");
+    const rows = db
+      .prepare(sqlPrefix + placeholders + sqlSuffix)
+      .all(libraryId, ...chunk) as Array<{ source_path: string }>;
+    for (const row of rows) {
+      failed.add(row.source_path);
+    }
+  }
+  return failed;
+}
+
+export function getFaceDetectionFailedPaths(
+  photoPaths: string[],
+  libraryId = DEFAULT_LIBRARY_ID,
+): Set<string> {
+  if (photoPaths.length === 0) {
+    return new Set<string>();
+  }
+  const db = getDesktopDatabase();
+  const failed = new Set<string>();
+  const sqlPrefix = `SELECT source_path
+    FROM media_items
+    WHERE library_id = ?
+      AND face_detection_failed_at IS NOT NULL
+      AND source_path IN (`;
+  const sqlSuffix = `)`;
+  for (let i = 0; i < photoPaths.length; i += IN_CHUNK_SIZE) {
+    const chunk = photoPaths.slice(i, i + IN_CHUNK_SIZE);
+    const placeholders = chunk.map(() => "?").join(", ");
+    const rows = db
+      .prepare(sqlPrefix + placeholders + sqlSuffix)
+      .all(libraryId, ...chunk) as Array<{ source_path: string }>;
+    for (const row of rows) {
+      failed.add(row.source_path);
+    }
+  }
+  return failed;
+}
+
 export function upsertPhotoAnalysisResult(
   photoPath: string,
   result: PhotoAnalysisOutput,

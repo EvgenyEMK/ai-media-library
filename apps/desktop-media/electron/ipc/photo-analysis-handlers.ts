@@ -13,6 +13,7 @@ import { analyzePhotoWithOptionalTwoPass, getPrimaryRotateAngle } from "../photo
 import { readSettings } from "../storage";
 import {
   getAlreadyAnalyzedPhotoPaths,
+  getPhotoAnalysisFailedPaths,
   markPhotoAnalysisFailed,
   upsertPhotoAnalysisResult,
   upsertRotationPipelineFaces,
@@ -31,6 +32,7 @@ import { runningJobs, analyzedPhotosByFolder, vectorStore } from "./state";
 import type { RunningAnalysisJob } from "./types";
 import { collectFoldersRecursively, clampConcurrency, ensureCatalogForImages, ensureMetadataForImage } from "./folder-utils";
 import { acquirePowerSave, releasePowerSave } from "./power-save-manager";
+import { orderPendingPipelineItems, type PipelineImageItem } from "./pipeline-item-order";
 
 function ts(): string {
   return new Date().toISOString();
@@ -58,8 +60,11 @@ export function registerPhotoAnalysisHandlers(): void {
         : [folderPath];
 
       const mode = request.mode === "missing" ? "missing" : "all";
+      const skipPreviouslyFailed = request.skipPreviouslyFailed === true;
       const selectedImages: Array<{ path: string; name: string; folderPath: string }> = [];
       const initialItems: PhotoAnalysisItemState[] = [];
+      const pendingCandidates: PipelineImageItem[] = [];
+      const globallyFailedPaths = new Set<string>();
 
       for (const folder of folders) {
         let images: Awaited<ReturnType<typeof listFolderImages>>;
@@ -72,39 +77,45 @@ export function registerPhotoAnalysisHandlers(): void {
           continue;
         }
         if (mode === "missing") {
+          const imagePaths = images.map((image) => image.path);
           const inMemoryAnalyzed = analyzedPhotosByFolder.get(folder) ?? new Set<string>();
           const persistedAnalyzed = getAlreadyAnalyzedPhotoPaths(
             folder,
-            images.map((image) => image.path),
+            imagePaths,
           );
+          const previouslyFailed = getPhotoAnalysisFailedPaths(imagePaths);
+          for (const failedPath of previouslyFailed) {
+            globallyFailedPaths.add(failedPath);
+          }
           const previouslyAnalyzed = new Set<string>([...inMemoryAnalyzed, ...persistedAnalyzed]);
           for (const image of images) {
-            if (previouslyAnalyzed.has(image.path)) {
-              initialItems.push({
-                path: image.path,
-                name: image.name,
-                status: "success",
-                elapsedSeconds: 0,
-              });
-            } else {
-              initialItems.push({
-                path: image.path,
-                name: image.name,
-                status: "pending",
-              });
-              selectedImages.push({ path: image.path, name: image.name, folderPath: folder });
-            }
+            if (previouslyAnalyzed.has(image.path)) continue;
+            pendingCandidates.push({ path: image.path, name: image.name, folderPath: folder });
           }
         } else {
+          const imagePaths = images.map((image) => image.path);
+          const previouslyFailed = getPhotoAnalysisFailedPaths(imagePaths);
+          for (const failedPath of previouslyFailed) {
+            globallyFailedPaths.add(failedPath);
+          }
           for (const image of images) {
-            initialItems.push({
-              path: image.path,
-              name: image.name,
-              status: "pending",
-            });
-            selectedImages.push({ path: image.path, name: image.name, folderPath: folder });
+            pendingCandidates.push({ path: image.path, name: image.name, folderPath: folder });
           }
         }
+      }
+
+      const orderedPending = orderPendingPipelineItems(
+        pendingCandidates,
+        globallyFailedPaths,
+        skipPreviouslyFailed,
+      );
+      for (const item of orderedPending) {
+        initialItems.push({
+          path: item.path,
+          name: item.name,
+          status: "pending",
+        });
+        selectedImages.push(item);
       }
 
       ensureCatalogForImages(initialItems.map((item) => item.path));

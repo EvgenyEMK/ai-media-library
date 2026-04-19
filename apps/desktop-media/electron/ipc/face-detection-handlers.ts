@@ -12,6 +12,7 @@ import { detectFacesInPhoto } from "../face-detection";
 import { readSettings } from "../storage";
 import {
   getAlreadyFaceDetectedPhotoPaths,
+  getFaceDetectionFailedPaths,
   markFaceDetectionFailed,
   upsertFaceDetectionResult,
 } from "../db/media-analysis";
@@ -34,6 +35,7 @@ import type { RunningAnalysisJob, RunningFaceDetectionJobContext } from "./types
 import { collectFoldersRecursively, clampConcurrency, ensureCatalogForImages, ensureMetadataForImage } from "./folder-utils";
 import { autoChainEmbeddings } from "./face-embedding-handlers";
 import { acquirePowerSave, releasePowerSave } from "./power-save-manager";
+import { orderPendingPipelineItems, type PipelineImageItem } from "./pipeline-item-order";
 
 
 export function registerFaceDetectionHandlers(): void {
@@ -64,8 +66,11 @@ export function registerFaceDetectionHandlers(): void {
         : [folderPath];
 
       const mode = request.mode === "missing" ? "missing" : "all";
+      const skipPreviouslyFailed = request.skipPreviouslyFailed === true;
       const allSelectedImages: Array<{ path: string; name: string; folderPath: string }> = [];
       const initialItems: FaceDetectionItemState[] = [];
+      const pendingCandidates: PipelineImageItem[] = [];
+      const globallyFailedPaths = new Set<string>();
 
       for (const folder of folders) {
         let images: Awaited<ReturnType<typeof listFolderImages>>;
@@ -78,39 +83,45 @@ export function registerFaceDetectionHandlers(): void {
           continue;
         }
         if (mode === "missing") {
+          const imagePaths = images.map((image) => image.path);
           const inMemoryDetected = detectedFacesByFolder.get(folder) ?? new Set<string>();
           const persistedDetected = getAlreadyFaceDetectedPhotoPaths(
             folder,
-            images.map((image) => image.path),
+            imagePaths,
           );
+          const previouslyFailed = getFaceDetectionFailedPaths(imagePaths);
+          for (const failedPath of previouslyFailed) {
+            globallyFailedPaths.add(failedPath);
+          }
           const previouslyDetected = new Set<string>([...inMemoryDetected, ...persistedDetected]);
           for (const image of images) {
-            if (previouslyDetected.has(image.path)) {
-              initialItems.push({
-                path: image.path,
-                name: image.name,
-                status: "success",
-                elapsedSeconds: 0,
-              });
-            } else {
-              initialItems.push({
-                path: image.path,
-                name: image.name,
-                status: "pending",
-              });
-              allSelectedImages.push({ path: image.path, name: image.name, folderPath: folder });
-            }
+            if (previouslyDetected.has(image.path)) continue;
+            pendingCandidates.push({ path: image.path, name: image.name, folderPath: folder });
           }
         } else {
+          const imagePaths = images.map((image) => image.path);
+          const previouslyFailed = getFaceDetectionFailedPaths(imagePaths);
+          for (const failedPath of previouslyFailed) {
+            globallyFailedPaths.add(failedPath);
+          }
           for (const image of images) {
-            initialItems.push({
-              path: image.path,
-              name: image.name,
-              status: "pending",
-            });
-            allSelectedImages.push({ path: image.path, name: image.name, folderPath: folder });
+            pendingCandidates.push({ path: image.path, name: image.name, folderPath: folder });
           }
         }
+      }
+
+      const orderedPending = orderPendingPipelineItems(
+        pendingCandidates,
+        globallyFailedPaths,
+        skipPreviouslyFailed,
+      );
+      for (const item of orderedPending) {
+        initialItems.push({
+          path: item.path,
+          name: item.name,
+          status: "pending",
+        });
+        allSelectedImages.push(item);
       }
 
       ensureCatalogForImages(initialItems.map((item) => item.path));

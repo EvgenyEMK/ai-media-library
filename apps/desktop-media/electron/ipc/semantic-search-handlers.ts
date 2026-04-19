@@ -27,6 +27,7 @@ import {
   clearVectorCache,
   clearDescriptionVectorCache,
   getCachedDescriptionVector,
+  getFailedImageEmbeddingPaths,
   getCachedImageVector,
   ensureMediaItemForPath,
   getIndexedImageMediaIdsByPaths,
@@ -94,10 +95,18 @@ export function registerSemanticSearchHandlers(): void {
       ensureCatalogForImages(allImages.map((img) => img.path));
 
       const mode = request.mode === "all" ? "all" : "missing";
+      const skipPreviouslyFailed = request.skipPreviouslyFailed === true;
       const existing = getIndexedImageMediaIdsByPaths(allImages.map((img) => img.path));
-      const selected = mode === "missing"
-        ? allImages.filter((img) => !existing.has(img.path))
-        : allImages;
+      const previouslyFailed = getFailedImageEmbeddingPaths(allImages.map((img) => img.path));
+      const selectedBase =
+        mode === "missing"
+          ? allImages.filter((img) => !existing.has(img.path))
+          : allImages;
+      const selectedFresh = selectedBase.filter((img) => !previouslyFailed.has(img.path));
+      const selectedFailed = selectedBase.filter((img) => previouslyFailed.has(img.path));
+      const selected = skipPreviouslyFailed
+        ? selectedFresh
+        : [...selectedFresh, ...selectedFailed];
 
       const items: SemanticIndexItemState[] = selected.map((img) => ({
         path: img.path,
