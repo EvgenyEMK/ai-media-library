@@ -99,6 +99,10 @@ export const UI_TEXT = {
   semanticCancelIndex: "Cancel indexing",
   semanticOpen: "Open AI image search",
   semanticClose: "Close AI image search",
+  /** List view: cosine vs vision embedding (VLM) vs query. */
+  semanticListVlmScoreLabel: "Visual similarity score (VLM):",
+  /** List view: cosine vs AI caption text embedding (not a chat LLM). */
+  semanticListDescriptionScoreLabel: "AI description match score (LLM):",
   semanticIndexTitle: "Index images for AI search",
   semanticIndexPanelTitle: "AI search indexing",
   semanticIndexLoadingVisionModel: "Loading vision embedding model…",

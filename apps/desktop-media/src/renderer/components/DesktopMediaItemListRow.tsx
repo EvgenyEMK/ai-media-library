@@ -7,6 +7,7 @@ interface DesktopMediaItemListRowProps {
   onRowClick: () => void;
   metadataLine?: string;
   folderLine?: string;
+  extraLines?: string[];
   filePath: string;
   mediaType?: "image" | "video";
   thumbnail: ReactNode;
@@ -20,6 +21,7 @@ export function DesktopMediaItemListRow({
   onRowClick,
   metadataLine,
   folderLine,
+  extraLines,
   filePath,
   mediaType = "image",
   thumbnail,
@@ -35,6 +37,7 @@ export function DesktopMediaItemListRow({
       onClick={onRowClick}
       metadataLine={metadataLine}
       folderLine={folderLine}
+      extraLines={extraLines}
       starRating={starRating}
       onStarRatingChange={onStarRatingChange}
       starRatingShowRejected={starRatingShowRejected}

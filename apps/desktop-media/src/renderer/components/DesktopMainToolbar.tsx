@@ -93,7 +93,10 @@ export function DesktopMainToolbar({
           ariaExpanded={semanticPanelOpen}
           ariaPressed={semanticModeActive}
           isActive={semanticModeActive}
-          onClick={() => store.getState().toggleSemanticPanel()}
+          onClick={() => {
+            setMainPaneViewMode("media");
+            store.getState().toggleSemanticPanel();
+          }}
         >
           <Search size={16} aria-hidden="true" />
         </ToolbarIconButton>

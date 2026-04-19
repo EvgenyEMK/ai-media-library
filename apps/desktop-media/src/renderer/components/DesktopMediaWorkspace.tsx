@@ -18,6 +18,7 @@ import { DesktopMetadataManualScanResultPanel } from "./DesktopMetadataManualSca
 import { SemanticSearchPanel } from "./SemanticSearchPanel";
 import type { DesktopPipelineHandlers } from "../hooks/use-desktop-pipeline-handlers";
 import { useMediaItemStarRatingChange } from "../hooks/use-media-item-star-rating-change";
+import { formatSemanticCosinePercent } from "../lib/format-semantic-similarity";
 import { MEDIA_PANE_EMPTY_STATE_CLASS } from "../lib/media-pane-ui";
 import { lookupMediaMetadataByItemId } from "../lib/media-metadata-lookup";
 import { UI_TEXT } from "../lib/ui-text";
@@ -325,6 +326,10 @@ export function DesktopMediaWorkspace({
                       onRowClick={() => store.getState().openViewer(index, "search")}
                       metadataLine={image.photoTakenDisplay}
                       folderLine={image.subtitle}
+                      extraLines={[
+                        `${UI_TEXT.semanticListVlmScoreLabel} ${formatSemanticCosinePercent(image.vlmSimilarity)}`,
+                        `${UI_TEXT.semanticListDescriptionScoreLabel} ${formatSemanticCosinePercent(image.descriptionSimilarity)}`,
+                      ]}
                       filePath={image.id}
                       mediaType={rowMediaType}
                       starRating={image.starRating}

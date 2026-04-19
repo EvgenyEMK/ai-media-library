@@ -12,6 +12,8 @@ export interface MediaItemListRowProps {
   metadataLine?: string;
   /** Optional folder / path line (e.g. search results). */
   folderLine?: string;
+  /** Extra detail lines (e.g. AI search similarity scores). */
+  extraLines?: string[];
   starRating?: number | null;
   onStarRatingChange?: (next: number) => void;
   starRatingShowRejected?: boolean;
@@ -84,6 +86,7 @@ export function MediaItemListRow({
   thumbnail,
   metadataLine,
   folderLine,
+  extraLines,
   starRating,
   onStarRatingChange,
   starRatingShowRejected = false,
@@ -145,6 +148,11 @@ export function MediaItemListRow({
         <h3 style={styles.title}>{title}</h3>
         {metadataLine ? <p style={styles.meta}>{metadataLine}</p> : null}
         {folderLine ? <p style={styles.folder}>{folderLine}</p> : null}
+        {extraLines?.map((line, index) => (
+          <p key={index} style={styles.folder}>
+            {line}
+          </p>
+        ))}
       </div>
       {actions ? (
         <div
