@@ -139,6 +139,7 @@ export const IPC_CHANNELS = {
   purgeDeletedMediaItems: "media:purge-deleted-media-items",
   purgeSoftDeletedMediaItemsByIds: "media:purge-soft-deleted-media-items-by-ids",
   getFolderAiSummaryReport: "media:get-folder-ai-summary-report",
+  getFolderAiFailedFiles: "media:get-folder-ai-failed-files",
   getFolderAiCoverage: "media:get-folder-ai-coverage",
   getFolderAiRollupsBatch: "media:get-folder-ai-rollups-batch",
   faceModelDownloadProgress: "media:face-model-download-progress",
@@ -214,6 +215,13 @@ export interface PhotoAnalysisSettings {
   /** Default vision model to use for folder Image AI analysis runs. */
   model: string;
   analysisTimeoutPerImageSec: number;
+  /**
+   * When true, shrink images so the longest edge is at most `downscaleLongestSidePx` before base64-encoding for Ollama.
+   * Reduces memory use and failures on very large files.
+   */
+  downscaleBeforeLlm: boolean;
+  /** Longest edge in pixels when `downscaleBeforeLlm` is true (typical range 512–2048). */
+  downscaleLongestSidePx: number;
   enableTwoPassRotationConsistency: boolean;
   useFaceFeaturesForRotation: boolean;
   extractInvoiceData: boolean;
@@ -289,6 +297,8 @@ export const DEFAULT_FACE_DETECTION_SETTINGS: FaceDetectionSettings = {
 export const DEFAULT_PHOTO_ANALYSIS_SETTINGS: PhotoAnalysisSettings = {
   model: "qwen3.5:9b",
   analysisTimeoutPerImageSec: 120,
+  downscaleBeforeLlm: true,
+  downscaleLongestSidePx: 1024,
   enableTwoPassRotationConsistency: true,
   useFaceFeaturesForRotation: true,
   extractInvoiceData: true,
@@ -533,6 +543,16 @@ export interface FolderAiSummaryReport {
   }>;
 }
 
+export type FolderAiPipelineKind = "photo" | "face" | "semantic";
+
+export interface FolderAiFailedFileItem {
+  path: string;
+  name: string;
+  mediaKind: MediaKind;
+  failedAt: string | null;
+  error: string | null;
+}
+
 export interface PhotoAnalysisModelInfo {
   model: string;
   promptVersion: string;
@@ -657,6 +677,10 @@ export interface AnalyzeFolderPhotosRequest {
   model?: string;
   think?: boolean;
   timeoutMsPerImage?: number;
+  /** When set, overrides saved settings for this run. */
+  downscaleBeforeLlm?: boolean;
+  /** When set, overrides saved settings for this run (longest edge, pixels). */
+  downscaleLongestSidePx?: number;
   enableTwoPassRotationConsistency?: boolean;
   useFaceFeaturesForRotation?: boolean;
   extractInvoiceData?: boolean;
@@ -1306,6 +1330,11 @@ export interface DesktopApi {
   saveSettings: (settings: AppSettings) => Promise<void>;
   getFolderAnalysisStatuses: () => Promise<Record<string, FolderAnalysisStatus>>;
   getFolderAiSummaryReport: (folderPath: string) => Promise<FolderAiSummaryReport>;
+  getFolderAiFailedFiles: (
+    folderPath: string,
+    pipeline: FolderAiPipelineKind,
+    recursive: boolean,
+  ) => Promise<FolderAiFailedFileItem[]>;
   getFolderAiCoverage: (folderPath: string, recursive: boolean) => Promise<FolderAiCoverageReport>;
   getFolderAiRollupsBatch: (folderPaths: string[]) => Promise<Record<string, FolderAiSidebarRollup>>;
   analyzeFolderPhotos: (

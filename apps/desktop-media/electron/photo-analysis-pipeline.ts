@@ -24,6 +24,9 @@ export interface AnalyzePhotoWithOptionalTwoPassParams {
   think: boolean | undefined;
   timeoutMs: number | undefined;
   signal: AbortSignal;
+  /** Resize large images before base64 for Ollama (from settings / IPC). */
+  downscaleBeforeLlm: boolean;
+  downscaleLongestSidePx: number;
   enableTwoPassRotationConsistency: boolean;
   useFaceFeaturesForRotation: boolean;
   extractInvoiceData: boolean;
@@ -90,11 +93,14 @@ export async function analyzePhotoWithOptionalTwoPass(
     think,
     timeoutMs,
     signal,
+    downscaleBeforeLlm,
+    downscaleLongestSidePx,
     enableTwoPassRotationConsistency,
     useFaceFeaturesForRotation,
     extractInvoiceData,
     onRotationPipelineFacesDetected,
   } = params;
+  const llmImageOpts = { downscaleBeforeLlm, downscaleLongestSidePx };
   const fileName = fileNameFromPath(imagePath);
 
   const decision: RotationDecisionInfo = {
@@ -130,7 +136,14 @@ export async function analyzePhotoWithOptionalTwoPass(
         //   ` confidence=${existingFaceCheck.landmarkResult?.confidence?.toFixed(2) ?? "?"}` +
         //   ` faceCount=${existingFaceCheck.landmarkResult?.faceCount ?? "?"}`,
         // );
-        const firstPass = await analyzePhotoWithOllama({ imagePath, model, think, timeoutMs, signal });
+        const firstPass = await analyzePhotoWithOllama({
+          imagePath,
+          model,
+          think,
+          timeoutMs,
+          signal,
+          ...llmImageOpts,
+        });
         decision.tier = "tier1-face-existing";
         decision.finalAngle = existingFaceCheck.finalAngle;
         decision.vlmFirstPassAngle = getPrimaryRotateAngle(firstPass);
@@ -142,6 +155,7 @@ export async function analyzePhotoWithOptionalTwoPass(
           timeoutMs,
           signal,
           extractInvoiceData,
+          ...llmImageOpts,
         });
         return {
           output: finalOutput,
@@ -154,7 +168,7 @@ export async function analyzePhotoWithOptionalTwoPass(
     }
   }
 
-  const firstPass = await analyzePhotoWithOllama({ imagePath, model, think, timeoutMs, signal });
+  const firstPass = await analyzePhotoWithOllama({ imagePath, model, think, timeoutMs, signal, ...llmImageOpts });
   const firstAngle = getPrimaryRotateAngle(firstPass);
   decision.vlmFirstPassAngle = firstAngle;
 
@@ -169,6 +183,7 @@ export async function analyzePhotoWithOptionalTwoPass(
       timeoutMs,
       signal,
       extractInvoiceData,
+      ...llmImageOpts,
     });
     return { output: finalOutput, rotationDecision: decision };
   }
@@ -200,6 +215,7 @@ export async function analyzePhotoWithOptionalTwoPass(
           timeoutMs,
           signal,
           extractInvoiceData,
+          ...llmImageOpts,
         });
 
         return {
@@ -231,6 +247,7 @@ export async function analyzePhotoWithOptionalTwoPass(
       timeoutMs,
       signal,
       extractInvoiceData,
+      ...llmImageOpts,
     });
     return { output: finalOutput, rotationDecision: decision };
   }
@@ -239,7 +256,12 @@ export async function analyzePhotoWithOptionalTwoPass(
     const rotated = await createRotatedTempImage(imagePath, firstAngle);
     try {
       const secondPass = await analyzePhotoWithOllama({
-        imagePath: rotated.path, model, think, timeoutMs, signal,
+        imagePath: rotated.path,
+        model,
+        think,
+        timeoutMs,
+        signal,
+        ...llmImageOpts,
       });
       const merged = mergeTwoPassPhotoAnalysis(firstPass, secondPass, firstAngle);
       decision.tier = "tier3-vlm-two-pass";
@@ -253,6 +275,7 @@ export async function analyzePhotoWithOptionalTwoPass(
         timeoutMs,
         signal,
         extractInvoiceData,
+        ...llmImageOpts,
       });
       return { output: finalOutput, rotationDecision: decision };
     } finally {
@@ -283,6 +306,7 @@ export async function analyzePhotoWithOptionalTwoPass(
       timeoutMs,
       signal,
       extractInvoiceData,
+      ...llmImageOpts,
     });
     return { output: finalOutput, rotationDecision: decision };
   }
@@ -296,8 +320,11 @@ async function maybeAttachInvoiceDocumentData(params: {
   timeoutMs: number | undefined;
   signal: AbortSignal;
   extractInvoiceData: boolean;
+  downscaleBeforeLlm: boolean;
+  downscaleLongestSidePx: number;
 }): Promise<PhotoAnalysisOutput> {
-  const { output, imagePath, model, think, timeoutMs, signal, extractInvoiceData } = params;
+  const { output, imagePath, model, think, timeoutMs, signal, extractInvoiceData, downscaleBeforeLlm, downscaleLongestSidePx } =
+    params;
   if (!extractInvoiceData || output.image_category !== "invoice_or_receipt") {
     return output;
   }
@@ -308,6 +335,8 @@ async function maybeAttachInvoiceDocumentData(params: {
       think,
       timeoutMs,
       signal,
+      downscaleBeforeLlm,
+      downscaleLongestSidePx,
     });
     if (!documentData) {
       return output;

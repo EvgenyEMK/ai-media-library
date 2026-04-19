@@ -78,6 +78,8 @@ export function usePhotoAnalysisHandlers(opts: {
             10_000,
             Math.round(photoAnalysisSettings.analysisTimeoutPerImageSec * 1000),
           ),
+          downscaleBeforeLlm: photoAnalysisSettings.downscaleBeforeLlm,
+          downscaleLongestSidePx: photoAnalysisSettings.downscaleLongestSidePx,
           enableTwoPassRotationConsistency: photoAnalysisSettings.enableTwoPassRotationConsistency,
           useFaceFeaturesForRotation: photoAnalysisSettings.useFaceFeaturesForRotation,
           extractInvoiceData: photoAnalysisSettings.extractInvoiceData,

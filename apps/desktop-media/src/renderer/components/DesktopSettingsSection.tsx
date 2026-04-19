@@ -100,6 +100,10 @@ const UI_TEXT = {
   folderIconWhenPhotoPendingAmber: "Amber (moderate)",
   folderIconWhenPhotoPendingGreen: "Green (same as fully complete)",
   photoAnalysisModelDescription: `Choose the vision model Ollama uses when you run Image AI analysis from folder menus. Larger models are often more accurate; smaller ones are faster and use less VRAM.`,
+  photoAnalysisDownscaleTitle: "Downscale image dimensions before passing to LLM",
+  photoAnalysisDownscaleDescription: `Very large photos can overwhelm the local AI service (Ollama) that analyzes images, or cause slow runs, failures, or connection errors. When this option is on, the app shrinks each photo so its longest side is at most the size below before sending it to the model. That usually makes analysis more reliable and faster, with a small trade-off in fine detail. Turn it off only when you truly need full resolution for a special case.`,
+  photoAnalysisDownscaleLongestTitle: "Maximum length of the longest side (pixels)",
+  photoAnalysisDownscaleLongestDescription: `Applies only when downscaling is enabled. Lower values use less memory and are often faster; higher values preserve more detail in the image.`,
   twoPassRotationTitle: "Two-pass analysis for rotated images",
   twoPassRotationDescription: `Why: One pass on the original image can miss or misread metadata when the photo still needs rotation.
 
@@ -717,6 +721,24 @@ How: If analysis of a single image exceeds this many seconds, it is marked faile
             }
           />
           <SettingsCheckboxField
+            title={UI_TEXT.photoAnalysisDownscaleTitle}
+            description={UI_TEXT.photoAnalysisDownscaleDescription}
+            checked={photoAnalysisSettings.downscaleBeforeLlm}
+            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+            onChange={(next) => onPhotoAnalysisSettingChange("downscaleBeforeLlm", next)}
+          />
+          <SettingsNumberField
+            title={UI_TEXT.photoAnalysisDownscaleLongestTitle}
+            description={UI_TEXT.photoAnalysisDownscaleLongestDescription}
+            value={photoAnalysisSettings.downscaleLongestSidePx}
+            min={256}
+            max={8192}
+            step={1}
+            onChange={(nextValue) =>
+              onPhotoAnalysisSettingChange("downscaleLongestSidePx", Math.round(nextValue))
+            }
+          />
+          <SettingsCheckboxField
             title={UI_TEXT.twoPassRotationTitle}
             description={UI_TEXT.twoPassRotationDescription}
             checked={photoAnalysisSettings.enableTwoPassRotationConsistency}
@@ -753,6 +775,10 @@ How: If analysis of a single image exceeds this many seconds, it is marked faile
                   DEFAULT_PHOTO_ANALYSIS_SETTINGS.model &&
                 photoAnalysisSettings.analysisTimeoutPerImageSec ===
                   DEFAULT_PHOTO_ANALYSIS_SETTINGS.analysisTimeoutPerImageSec &&
+                photoAnalysisSettings.downscaleBeforeLlm ===
+                  DEFAULT_PHOTO_ANALYSIS_SETTINGS.downscaleBeforeLlm &&
+                photoAnalysisSettings.downscaleLongestSidePx ===
+                  DEFAULT_PHOTO_ANALYSIS_SETTINGS.downscaleLongestSidePx &&
                 photoAnalysisSettings.enableTwoPassRotationConsistency ===
                   DEFAULT_PHOTO_ANALYSIS_SETTINGS.enableTwoPassRotationConsistency &&
                 photoAnalysisSettings.useFaceFeaturesForRotation ===

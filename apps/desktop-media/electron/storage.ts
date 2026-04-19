@@ -214,6 +214,16 @@ function sanitizePhotoAnalysisSettings(candidate: unknown): PhotoAnalysisSetting
       1800,
       DEFAULT_PHOTO_ANALYSIS_SETTINGS.analysisTimeoutPerImageSec,
     ),
+    downscaleBeforeLlm:
+      typeof value.downscaleBeforeLlm === "boolean"
+        ? value.downscaleBeforeLlm
+        : DEFAULT_PHOTO_ANALYSIS_SETTINGS.downscaleBeforeLlm,
+    downscaleLongestSidePx: clampToRange(
+      asNumber(value.downscaleLongestSidePx),
+      256,
+      8192,
+      DEFAULT_PHOTO_ANALYSIS_SETTINGS.downscaleLongestSidePx,
+    ),
     enableTwoPassRotationConsistency:
       typeof value.enableTwoPassRotationConsistency === "boolean"
         ? value.enableTwoPassRotationConsistency

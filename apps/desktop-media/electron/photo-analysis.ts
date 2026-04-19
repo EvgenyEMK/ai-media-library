@@ -25,6 +25,12 @@ interface AnalyzeWithOllamaParams {
   think?: boolean;
   timeoutMs?: number;
   signal?: AbortSignal;
+  /**
+   * When true (default), large images are resized so the longest edge is at most `downscaleLongestSidePx` before sending to Ollama.
+   */
+  downscaleBeforeLlm?: boolean;
+  /** Longest edge in pixels when downscaling (default 1024). Ignored when downscaling is off. */
+  downscaleLongestSidePx?: number;
 }
 
 interface AnalyzeWithCustomPromptParams extends AnalyzeWithOllamaParams {
@@ -161,6 +167,8 @@ export async function analyzePhotoWithOllama({
   think,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   signal,
+  downscaleBeforeLlm,
+  downscaleLongestSidePx,
 }: AnalyzeWithOllamaParams): Promise<PhotoAnalysisOutput> {
   const rawContent = await analyzePhotoWithOllamaPrompt({
     imagePath,
@@ -168,6 +176,8 @@ export async function analyzePhotoWithOllama({
     think,
     timeoutMs,
     signal,
+    downscaleBeforeLlm,
+    downscaleLongestSidePx,
     prompt: PHOTO_ANALYSIS_PROMPT,
   });
   const parsed = parseAnalysisJson(rawContent);
@@ -189,6 +199,8 @@ export async function extractInvoiceDocumentDataWithOllama({
   think,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   signal,
+  downscaleBeforeLlm,
+  downscaleLongestSidePx,
 }: AnalyzeWithOllamaParams): Promise<DocumentData | null> {
   const rawContent = await analyzePhotoWithOllamaPrompt({
     imagePath,
@@ -196,6 +208,8 @@ export async function extractInvoiceDocumentDataWithOllama({
     think,
     timeoutMs,
     signal,
+    downscaleBeforeLlm,
+    downscaleLongestSidePx,
     prompt: INVOICE_DATA_EXTRACTION_PROMPT,
   });
   const parsed = parseJsonObjectFromModelContent(rawContent);
@@ -214,20 +228,79 @@ export async function extractInvoiceDocumentDataWithOllama({
   };
 }
 
+/**
+ * Returns new width/height when the image must be shrunk so max(w,h) <= longestSidePx, else null.
+ * Exported for unit tests.
+ */
+export function computeDownscaledPixelDimensionsForLlm(
+  width: number,
+  height: number,
+  longestSidePx: number,
+): { width: number; height: number } | null {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return null;
+  }
+  const maxSide = Math.max(width, height);
+  if (maxSide <= longestSidePx) {
+    return null;
+  }
+  const scale = longestSidePx / maxSide;
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
+}
+
+function clampLlmLongestSidePx(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 1024;
+  }
+  return Math.min(8192, Math.max(256, Math.round(value)));
+}
+
+async function encodeImageBase64ForOllamaChat(
+  imagePath: string,
+  downscaleEnabled: boolean,
+  longestSidePx: number,
+): Promise<string> {
+  const imageBytes = await fs.readFile(imagePath);
+  if (!downscaleEnabled) {
+    return imageBytes.toString("base64");
+  }
+  const longest = clampLlmLongestSidePx(longestSidePx);
+  try {
+    const image = await Jimp.read(imageBytes);
+    const w = image.width;
+    const h = image.height;
+    const dims = computeDownscaledPixelDimensionsForLlm(w, h, longest);
+    if (!dims) {
+      return imageBytes.toString("base64");
+    }
+    const resized = await image.resize({ w: dims.width, h: dims.height });
+    const buf = await resized.getBuffer("image/jpeg", { quality: 88 });
+    return buf.toString("base64");
+  } catch {
+    return imageBytes.toString("base64");
+  }
+}
+
 async function analyzePhotoWithOllamaPrompt({
   imagePath,
   model = DEFAULT_MODEL,
   think,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   signal,
+  downscaleBeforeLlm,
+  downscaleLongestSidePx,
   prompt,
 }: AnalyzeWithCustomPromptParams): Promise<string> {
   const promptForRequest =
     process.env.EMK_E2E_ANALYSIS_APPENDED_BASENAME === "1"
       ? `${prompt}\n\nFilename: ${path.basename(imagePath)}`
       : prompt;
-  const imageBytes = await fs.readFile(imagePath);
-  const imageBase64 = imageBytes.toString("base64");
+  const enableDownscale = downscaleBeforeLlm !== false;
+  const longestSide = downscaleLongestSidePx ?? 1024;
+  const imageBase64 = await encodeImageBase64ForOllamaChat(imagePath, enableDownscale, longestSide);
   const ollamaOptions = getOllamaRequestOptionsFromEnv();
   const debug = process.env.EMK_DEBUG_PHOTO_AI === "1";
 

@@ -170,6 +170,16 @@ export function registerPhotoAnalysisHandlers(): void {
         typeof request.extractInvoiceData === "boolean"
           ? request.extractInvoiceData
           : savedSettings.photoAnalysis.extractInvoiceData;
+      const downscaleBeforeLlm =
+        typeof request.downscaleBeforeLlm === "boolean"
+          ? request.downscaleBeforeLlm
+          : savedSettings.photoAnalysis.downscaleBeforeLlm;
+      const downscaleLongestSidePx =
+        typeof request.downscaleLongestSidePx === "number" &&
+        Number.isFinite(request.downscaleLongestSidePx) &&
+        request.downscaleLongestSidePx > 0
+          ? Math.round(request.downscaleLongestSidePx)
+          : savedSettings.photoAnalysis.downscaleLongestSidePx;
       const concurrency = clampConcurrency(request.concurrency);
 
       if (useFaceFeaturesForRotation) {
@@ -244,6 +254,8 @@ export function registerPhotoAnalysisHandlers(): void {
           enableTwoPassRotationConsistency,
           useFaceFeaturesForRotation,
           extractInvoiceData,
+          downscaleBeforeLlm,
+          downscaleLongestSidePx,
           concurrency,
         );
       })().finally(() => {
@@ -314,6 +326,8 @@ async function runPhotoAnalysisJob(
   enableTwoPassRotationConsistency: boolean,
   useFaceFeaturesForRotation: boolean,
   extractInvoiceData: boolean,
+  downscaleBeforeLlm: boolean,
+  downscaleLongestSidePx: number,
   concurrency: number,
 ): Promise<void> {
   const job = runningJobs.get(jobId);
@@ -381,6 +395,8 @@ async function runPhotoAnalysisJob(
           think,
           timeoutMs: timeoutMsPerImage,
           signal: controller.signal,
+          downscaleBeforeLlm,
+          downscaleLongestSidePx,
           enableTwoPassRotationConsistency,
           useFaceFeaturesForRotation,
           extractInvoiceData,

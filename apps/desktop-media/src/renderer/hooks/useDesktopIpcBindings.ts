@@ -256,6 +256,10 @@ export function useDesktopSettingsPersistence(): void {
             prev.photoAnalysisSettings.analysisTimeoutPerImageSec ||
           state.photoAnalysisSettings.model !==
             prev.photoAnalysisSettings.model ||
+          state.photoAnalysisSettings.downscaleBeforeLlm !==
+            prev.photoAnalysisSettings.downscaleBeforeLlm ||
+          state.photoAnalysisSettings.downscaleLongestSidePx !==
+            prev.photoAnalysisSettings.downscaleLongestSidePx ||
           state.photoAnalysisSettings.enableTwoPassRotationConsistency !==
             prev.photoAnalysisSettings.enableTwoPassRotationConsistency ||
           state.photoAnalysisSettings.useFaceFeaturesForRotation !==
