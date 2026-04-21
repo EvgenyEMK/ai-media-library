@@ -2,6 +2,7 @@ import { useEffect, useId, useState, type ReactElement } from "react";
 import { Square } from "lucide-react";
 import { SettingsCheckboxField, SettingsNumberField, SettingsSectionCard } from "@emk/media-viewer";
 import {
+  AUX_MODEL_OPTIONS,
   DEFAULT_AI_IMAGE_SEARCH_SETTINGS,
   DEFAULT_FACE_DETECTION_SETTINGS,
   DEFAULT_FOLDER_SCANNING_SETTINGS,
@@ -10,9 +11,14 @@ import {
   DEFAULT_PHOTO_ANALYSIS_SETTINGS,
   FACE_DETECTOR_MODEL_OPTIONS,
   type AiImageSearchSettings,
+  type AuxModelId,
+  type AuxModelKind,
+  type FaceAgeGenderModelId,
   type FaceDetectionSettings,
   type FaceDetectorModelId,
+  type FaceLandmarkModelId,
   type FolderScanningSettings,
+  type ImageOrientationModelId,
   type MediaViewerSettings,
   type PathExtractionSettings,
   type PhotoAnalysisSettings,
@@ -639,6 +645,70 @@ How: When on, previously-tagged face boxes with no newly-detected match are kept
             }
           />
 
+          <AuxModelToggleRow
+            title="Image orientation detection"
+            kind="orientation"
+            description={`Why: Detects photos rotated by 90/180/270° even when no faces are visible. The predicted correction angle is surfaced as a "Rotate" suggestion on the image.
+
+How: Runs a small ImageNet-trained classifier (EfficientNetV2) before face detection. When enabled for the first time, the ONNX weights are downloaded (no cloud traffic).`}
+            enabled={faceDetectionSettings.imageOrientationDetection.enabled}
+            modelId={faceDetectionSettings.imageOrientationDetection.model}
+            onEnabledChange={(enabled) =>
+              onFaceDetectionSettingChange("imageOrientationDetection", {
+                ...faceDetectionSettings.imageOrientationDetection,
+                enabled,
+              })
+            }
+            onModelChange={(next) =>
+              onFaceDetectionSettingChange("imageOrientationDetection", {
+                ...faceDetectionSettings.imageOrientationDetection,
+                model: next as ImageOrientationModelId,
+              })
+            }
+          />
+          <AuxModelToggleRow
+            title="Face landmark refinement"
+            kind="landmarks"
+            description={`Why: Adds precise 5-point facial landmarks (eyes, nose, mouth corners) on top of YOLO detections. Landmarks enable more accurate face alignment, similarity matching and rotation estimation from faces.
+
+How: Runs a tiny PFLD-GhostOne model on each detected face crop and reduces its 98 landmarks to 5 canonical points.`}
+            enabled={faceDetectionSettings.faceLandmarkRefinement.enabled}
+            modelId={faceDetectionSettings.faceLandmarkRefinement.model}
+            onEnabledChange={(enabled) =>
+              onFaceDetectionSettingChange("faceLandmarkRefinement", {
+                ...faceDetectionSettings.faceLandmarkRefinement,
+                enabled,
+              })
+            }
+            onModelChange={(next) =>
+              onFaceDetectionSettingChange("faceLandmarkRefinement", {
+                ...faceDetectionSettings.faceLandmarkRefinement,
+                model: next as FaceLandmarkModelId,
+              })
+            }
+          />
+          <AuxModelToggleRow
+            title="Face age & gender estimation"
+            kind="age-gender"
+            description={`Why: Populates estimated age and gender for each detected face to power search and filter features.
+
+How: Runs a lightweight ONNX classifier on each detected face crop. Estimates are approximate and stored alongside the face record.`}
+            enabled={faceDetectionSettings.faceAgeGenderDetection.enabled}
+            modelId={faceDetectionSettings.faceAgeGenderDetection.model}
+            onEnabledChange={(enabled) =>
+              onFaceDetectionSettingChange("faceAgeGenderDetection", {
+                ...faceDetectionSettings.faceAgeGenderDetection,
+                enabled,
+              })
+            }
+            onModelChange={(next) =>
+              onFaceDetectionSettingChange("faceAgeGenderDetection", {
+                ...faceDetectionSettings.faceAgeGenderDetection,
+                model: next as FaceAgeGenderModelId,
+              })
+            }
+          />
+
           <div className="pt-1">
             <button
               type="button"
@@ -660,7 +730,19 @@ How: When on, previously-tagged face boxes with no newly-detected match are kept
                 faceDetectionSettings.preserveTaggedFacesMinIoU ===
                   DEFAULT_FACE_DETECTION_SETTINGS.preserveTaggedFacesMinIoU &&
                 faceDetectionSettings.keepUnmatchedTaggedFaces ===
-                  DEFAULT_FACE_DETECTION_SETTINGS.keepUnmatchedTaggedFaces
+                  DEFAULT_FACE_DETECTION_SETTINGS.keepUnmatchedTaggedFaces &&
+                faceDetectionSettings.imageOrientationDetection.enabled ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.imageOrientationDetection.enabled &&
+                faceDetectionSettings.imageOrientationDetection.model ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.imageOrientationDetection.model &&
+                faceDetectionSettings.faceLandmarkRefinement.enabled ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.faceLandmarkRefinement.enabled &&
+                faceDetectionSettings.faceLandmarkRefinement.model ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.faceLandmarkRefinement.model &&
+                faceDetectionSettings.faceAgeGenderDetection.enabled ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.faceAgeGenderDetection.enabled &&
+                faceDetectionSettings.faceAgeGenderDetection.model ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.faceAgeGenderDetection.model
               }
             >
               {UI_TEXT.resetToDefaults}
@@ -1010,6 +1092,89 @@ How: If analysis of a single image exceeds this many seconds, it is marked faile
           </div>
         </div>
       </SettingsSectionCard>
+    </div>
+  );
+}
+
+interface AuxModelToggleRowProps {
+  title: string;
+  kind: AuxModelKind;
+  description: string;
+  enabled: boolean;
+  modelId: AuxModelId;
+  onEnabledChange: (next: boolean) => void;
+  onModelChange: (next: AuxModelId) => void;
+}
+
+function AuxModelToggleRow({
+  title,
+  kind,
+  description,
+  enabled,
+  modelId,
+  onEnabledChange,
+  onModelChange,
+}: AuxModelToggleRowProps): ReactElement {
+  const optionsForKind = AUX_MODEL_OPTIONS.filter(
+    (option) => option.kind === kind,
+  );
+  const activeOption = optionsForKind.find((o) => o.id === modelId);
+
+  return (
+    <div className="rounded-md border border-border/70 bg-background/40 p-3">
+      <div className="flex flex-col gap-2">
+        <SettingsCheckboxField
+          title={title}
+          description={description}
+          checked={enabled}
+          checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+          onChange={(next) => {
+            onEnabledChange(next);
+            if (next) {
+              void window.desktopApi
+                .ensureAuxModel(kind, modelId)
+                .catch(() => {
+                  // Errors surface via the face-model-download-progress channel
+                });
+            }
+          }}
+        />
+        {optionsForKind.length > 1 ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <select
+              className="h-9 min-w-[260px] rounded-md border border-border bg-background px-2 text-sm text-foreground"
+              value={modelId}
+              disabled={!enabled}
+              onChange={(event) => {
+                const nextId = event.target.value as AuxModelId;
+                onModelChange(nextId);
+                if (enabled) {
+                  void window.desktopApi.ensureAuxModel(kind, nextId).catch(() => {
+                    // Errors surface via the face-model-download-progress channel
+                  });
+                }
+              }}
+            >
+              {optionsForKind.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label} (~{option.approxSizeMb} MB)
+                </option>
+              ))}
+            </select>
+            {activeOption ? (
+              <p className="m-0 text-xs text-muted-foreground">
+                {activeOption.description} {activeOption.licenseNote}
+              </p>
+            ) : null}
+          </div>
+        ) : activeOption ? (
+          <p className="m-0 text-xs text-muted-foreground">
+            Model: <span className="font-medium">{activeOption.label}</span> (~
+            {activeOption.approxSizeMb} MB). {activeOption.description}{" "}
+            {activeOption.licenseNote}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }

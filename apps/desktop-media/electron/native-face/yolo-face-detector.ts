@@ -38,6 +38,8 @@ import {
   type LetterboxMapping,
 } from "./yolo-output-decode";
 import { classifyFaceSubjectRoles } from "./subject-role";
+import { isLandmarkRefinerReady, refineLandmarks } from "./landmark-refiner";
+import { estimateAgeGender, isAgeGenderEstimatorReady } from "./age-gender-estimator";
 import type { FaceDetector, NativeDetectParams } from "./detector";
 
 const YOLO_INPUT_SIZE = 640;
@@ -249,6 +251,15 @@ function resolveSettings(
     keepUnmatchedTaggedFaces:
       settings?.keepUnmatchedTaggedFaces ??
       DEFAULT_FACE_DETECTION_SETTINGS.keepUnmatchedTaggedFaces,
+    imageOrientationDetection:
+      settings?.imageOrientationDetection ??
+      DEFAULT_FACE_DETECTION_SETTINGS.imageOrientationDetection,
+    faceLandmarkRefinement:
+      settings?.faceLandmarkRefinement ??
+      DEFAULT_FACE_DETECTION_SETTINGS.faceLandmarkRefinement,
+    faceAgeGenderDetection:
+      settings?.faceAgeGenderDetection ??
+      DEFAULT_FACE_DETECTION_SETTINGS.faceAgeGenderDetection,
   };
 }
 
@@ -398,6 +409,63 @@ async function detectFacesYolo(
       return { bbox_xyxy: bbox, score: scores[k], landmarks_5: landmarks };
     })
     .filter((face) => passesFaceFilters(face, resolvedSettings, imgW, imgH));
+
+  if (
+    resolvedSettings.faceLandmarkRefinement.enabled &&
+    isLandmarkRefinerReady(resolvedSettings.faceLandmarkRefinement.model)
+  ) {
+    for (const face of rawFaces) {
+      if (Array.isArray(face.landmarks_5) && face.landmarks_5.length === 5) {
+        continue;
+      }
+      if (signal?.aborted) throw new Error("Face detection cancelled");
+      try {
+        const refined = await refineLandmarks({
+          image,
+          bbox: face.bbox_xyxy,
+          model: resolvedSettings.faceLandmarkRefinement.model,
+          signal,
+        });
+        face.landmarks_5 = refined;
+      } catch (err) {
+        // Non-fatal: leave landmarks empty and continue.
+        // eslint-disable-next-line no-console
+        console.warn(
+          "[yolo-face-detector] landmark refinement failed:",
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+  }
+
+  if (
+    resolvedSettings.faceAgeGenderDetection.enabled &&
+    isAgeGenderEstimatorReady(resolvedSettings.faceAgeGenderDetection.model)
+  ) {
+    for (const face of rawFaces) {
+      if (signal?.aborted) throw new Error("Face detection cancelled");
+      try {
+        const estimate = await estimateAgeGender({
+          image,
+          bbox: face.bbox_xyxy,
+          model: resolvedSettings.faceAgeGenderDetection.model,
+          signal,
+        });
+        face.ageGender = {
+          ageYears: estimate.ageYears,
+          gender: estimate.gender,
+          genderConfidence: estimate.genderConfidence,
+          model: estimate.model,
+        };
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          "[yolo-face-detector] age/gender estimation failed:",
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+  }
 
   const imageSize = { width: imgW, height: imgH };
   const faces = classifyFaceSubjectRoles(rawFaces, imageSize, {

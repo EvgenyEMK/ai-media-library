@@ -562,6 +562,15 @@ const MIGRATIONS: Array<{ id: string; sql: string }> = [
         ON media_face_instances (library_id, subject_role);
     `,
   },
+  {
+    id: "021_face_age_gender",
+    sql: `
+      ALTER TABLE media_face_instances ADD COLUMN estimated_age_years REAL;
+      ALTER TABLE media_face_instances ADD COLUMN estimated_gender TEXT;
+      ALTER TABLE media_face_instances ADD COLUMN age_gender_confidence REAL;
+      ALTER TABLE media_face_instances ADD COLUMN age_gender_model TEXT;
+    `,
+  },
 ];
 
 let db: SQLiteDatabase | null = null;

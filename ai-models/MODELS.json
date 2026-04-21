@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Inventory of ONNX / embedding weights used by ai-media-library (desktop). Resolve URLs are Hugging Face or GitHub direct links as of 2026-04.",
+  "models": [
+    {
+      "id": "arcface-w600k-r50",
+      "paths": ["w600k_r50.onnx"],
+      "purpose": "ArcFace face embedding (512-D) for similarity / person clustering.",
+      "sources": [
+        "https://huggingface.co/maze/faceX/resolve/main/w600k_r50.onnx",
+        "https://huggingface.co/ll00292007/easyphoto/resolve/main/w600k_r50.onnx"
+      ],
+      "upstream": "https://github.com/deepinsight/insightface (weights community mirrors on Hugging Face)"
+    },
+    {
+      "id": "retinaface-mv2",
+      "paths": ["retinaface_mv2.onnx"],
+      "purpose": "RetinaFace face detection (optional detector backend).",
+      "sources": [
+        "https://github.com/yakhyo/retinaface-pytorch/releases/download/v0.0.1/retinaface_mv2.onnx"
+      ],
+      "upstream": "https://github.com/yakhyo/retinaface-pytorch"
+    },
+    {
+      "id": "yolov12-face",
+      "paths": [
+        "yolov12n-face.onnx",
+        "yolov12s-face.onnx",
+        "yolov12m-face.onnx",
+        "yolov12l-face.onnx"
+      ],
+      "purpose": "YOLOv12 face detection variants (user-selectable detector).",
+      "sources": [
+        "https://github.com/akanametov/yolo-face/releases/download/1.0.0/yolov12n-face.onnx",
+        "https://github.com/akanametov/yolo-face/releases/download/1.0.0/yolov12s-face.onnx",
+        "https://github.com/akanametov/yolo-face/releases/download/1.0.0/yolov12m-face.onnx",
+        "https://github.com/akanametov/yolo-face/releases/download/1.0.0/yolov12l-face.onnx"
+      ],
+      "upstream": "https://github.com/akanametov/yolo-face"
+    },
+    {
+      "id": "deep-image-orientation",
+      "paths": ["deep-image-orientation.onnx"],
+      "purpose": "Full-image orientation classifier (auxiliary; suggests rotation before face pipeline).",
+      "sources": [
+        "https://huggingface.co/DuarteBarbosa/deep-image-orientation-detection/resolve/main/orientation_model_v2_0.9882.onnx"
+      ],
+      "upstream": "https://huggingface.co/DuarteBarbosa/deep-image-orientation-detection"
+    },
+    {
+      "id": "pfld-landmarks",
+      "paths": ["pfld_ghostone.onnx"],
+      "purpose": "PFLD-style 98-point landmarks → reduced 5-point alignment for ArcFace (auxiliary).",
+      "sources": [
+        "https://huggingface.co/shadow-cann/hispark-modelzoo-pfld/resolve/main/pfld-sim.onnx",
+        "https://huggingface.co/AnthonyF333/PFLD_GhostOne/resolve/main/pfld_ghostone.onnx",
+        "https://github.com/AnthonyF333/PFLD_GhostOne/releases/download/v1.0/pfld_ghostone.onnx"
+      ],
+      "upstream": "https://github.com/AnthonyF333/PFLD_GhostOne"
+    },
+    {
+      "id": "age-gender-onnx",
+      "paths": ["age-gender.onnx"],
+      "purpose": "Age / gender estimation on face crops (auxiliary; Face Tags).",
+      "sources": [
+        "https://huggingface.co/onnx-community/age-gender-prediction-ONNX/resolve/main/onnx/model.onnx"
+      ],
+      "upstream": "https://huggingface.co/onnx-community/age-gender-prediction-ONNX"
+    },
+    {
+      "id": "nomic-embed-vision-v1.5",
+      "paths": [
+        "nomic-embed-vision-v1.5/config.json",
+        "nomic-embed-vision-v1.5/preprocessor_config.json",
+        "nomic-embed-vision-v1.5/onnx/model_quantized.onnx"
+      ],
+      "purpose": "Image feature vectors for semantic search / vision-side indexing (@huggingface/transformers, quantized ONNX).",
+      "sources": [
+        "https://huggingface.co/nomic-ai/nomic-embed-vision-v1.5/tree/main",
+        "https://huggingface.co/nomic-ai/nomic-embed-vision-v1.5/resolve/main/config.json",
+        "https://huggingface.co/nomic-ai/nomic-embed-vision-v1.5/resolve/main/preprocessor_config.json",
+        "https://huggingface.co/nomic-ai/nomic-embed-vision-v1.5/resolve/main/onnx/model_quantized.onnx"
+      ],
+      "upstream": "https://huggingface.co/nomic-ai/nomic-embed-vision-v1.5"
+    },
+    {
+      "id": "nomic-embed-text-v1.5",
+      "paths": [
+        "nomic-embed-text-v1.5/config.json",
+        "nomic-embed-text-v1.5/config_sentence_transformers.json",
+        "nomic-embed-text-v1.5/modules.json",
+        "nomic-embed-text-v1.5/sentence_bert_config.json",
+        "nomic-embed-text-v1.5/special_tokens_map.json",
+        "nomic-embed-text-v1.5/tokenizer.json",
+        "nomic-embed-text-v1.5/tokenizer_config.json",
+        "nomic-embed-text-v1.5/vocab.txt",
+        "nomic-embed-text-v1.5/1_Pooling/config.json",
+        "nomic-embed-text-v1.5/onnx/model_quantized.onnx"
+      ],
+      "purpose": "Text (and text-pair) embeddings for semantic search / keyword rerank (@huggingface/transformers, quantized ONNX).",
+      "sources": [
+        "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5/tree/main",
+        "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5/resolve/main/onnx/model_quantized.onnx",
+        "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5/resolve/main/tokenizer.json",
+        "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5/resolve/main/config.json"
+      ],
+      "upstream": "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5"
+    }
+  ],
+  "not_copied_here": [
+    {
+      "id": "ollama-llms",
+      "purpose": "Photo analysis, captions, multimodal text embed via Ollama API.",
+      "note": "Install with `ollama pull` (see repo README); weights live in Ollama's model store."
+    },
+    {
+      "id": "ollama-multimodal-embed",
+      "purpose": "Optional text embedding model id DC1LEX/nomic-embed-text-v1.5-multimodal over Ollama /api/embed.",
+      "note": "Not a static file in this repo; pulled by Ollama."
+    }
+  ]
+}

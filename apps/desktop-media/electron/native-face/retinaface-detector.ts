@@ -27,6 +27,7 @@ import { nms } from "./nms";
 import { loadImageRgb, rgbToBgrFloat32CHW } from "./image-utils";
 import { getModelPath, isModelDownloaded } from "./model-manager";
 import { classifyFaceSubjectRoles } from "./subject-role";
+import { estimateAgeGender, isAgeGenderEstimatorReady } from "./age-gender-estimator";
 import type { FaceDetector, NativeDetectParams } from "./detector";
 
 const RETINAFACE_MODEL_FILE = "retinaface_mv2.onnx";
@@ -172,6 +173,35 @@ export async function detectFacesNative(
       passesFaceFilters(face, resolvedSettings, imgW, imgH),
     );
 
+  if (
+    resolvedSettings.faceAgeGenderDetection.enabled &&
+    isAgeGenderEstimatorReady(resolvedSettings.faceAgeGenderDetection.model)
+  ) {
+    for (const face of rawFaces) {
+      if (signal?.aborted) throw new Error("Face detection cancelled");
+      try {
+        const estimate = await estimateAgeGender({
+          image,
+          bbox: face.bbox_xyxy,
+          model: resolvedSettings.faceAgeGenderDetection.model,
+          signal,
+        });
+        face.ageGender = {
+          ageYears: estimate.ageYears,
+          gender: estimate.gender,
+          genderConfidence: estimate.genderConfidence,
+          model: estimate.model,
+        };
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          "[retinaface-detector] age/gender estimation failed:",
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+  }
+
   const imageSize = { width: imgW, height: imgH };
   const faces = classifyFaceSubjectRoles(rawFaces, imageSize, {
     minSizeRatioToLargest: resolvedSettings.mainSubjectMinSizeRatioToLargest,
@@ -294,6 +324,15 @@ function resolveSettings(
     keepUnmatchedTaggedFaces:
       settings?.keepUnmatchedTaggedFaces ??
       DEFAULT_FACE_DETECTION_SETTINGS.keepUnmatchedTaggedFaces,
+    imageOrientationDetection:
+      settings?.imageOrientationDetection ??
+      DEFAULT_FACE_DETECTION_SETTINGS.imageOrientationDetection,
+    faceLandmarkRefinement:
+      settings?.faceLandmarkRefinement ??
+      DEFAULT_FACE_DETECTION_SETTINGS.faceLandmarkRefinement,
+    faceAgeGenderDetection:
+      settings?.faceAgeGenderDetection ??
+      DEFAULT_FACE_DETECTION_SETTINGS.faceAgeGenderDetection,
   };
 }
 

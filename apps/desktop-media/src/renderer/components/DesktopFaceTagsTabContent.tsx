@@ -60,6 +60,32 @@ function getGenderLabel(gender?: string | null): string | null {
   return map[gender.toLowerCase()] ?? gender;
 }
 
+function formatFaceAgeGenderLine(faceInstance: DesktopFaceInstance | undefined): string | null {
+  if (!faceInstance) return null;
+  const genderLabel = getGenderLabel(faceInstance.estimated_gender);
+  const genderConfidence =
+    typeof faceInstance.age_gender_confidence === "number"
+      ? Math.round(faceInstance.age_gender_confidence * 100)
+      : null;
+  const ageYears =
+    typeof faceInstance.estimated_age_years === "number"
+      ? Math.round(faceInstance.estimated_age_years)
+      : null;
+
+  if (!genderLabel && ageYears == null) {
+    return null;
+  }
+
+  const parts: string[] = [];
+  if (ageYears != null) {
+    parts.push(`AI age: ${ageYears}`);
+  }
+  if (genderLabel) {
+    parts.push(genderConfidence != null ? `${genderLabel} (${genderConfidence}%)` : genderLabel);
+  }
+  return parts.join(", ");
+}
+
 interface DesktopFaceTagsTabContentProps {
   mediaItemId: string | null;
   sourcePath: string;
@@ -402,6 +428,7 @@ export function DesktopFaceTagsTabContent({
               faceInstance && selectValue === SELECT_NONE
                 ? embeddingSuggestions[faceInstance.id] ?? null
                 : null;
+            const ageGenderLine = formatFaceAgeGenderLine(faceInstance);
 
             return (
               <FaceTagsEntryCard
@@ -489,6 +516,7 @@ export function DesktopFaceTagsTabContent({
                       <div>{getCategoryLabel(box.person_category)}</div>
                     ) : null}
                     {box.gender ? <div>{getGenderLabel(box.gender)}</div> : null}
+                    {ageGenderLine ? <div>{ageGenderLine}</div> : null}
                   </div>
                 }
               />

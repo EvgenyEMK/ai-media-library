@@ -468,6 +468,7 @@ export async function autoChainEmbeddings(
   imagePath: string,
   _detectionResult: FaceDetectionOutput,
   signal?: AbortSignal,
+  preferredRotationClockwise?: 0 | 90 | 180 | 270,
 ): Promise<void> {
   const instances = listFaceInstancesByMediaItem(mediaItemId);
   if (instances.length === 0) return;
@@ -488,6 +489,7 @@ export async function autoChainEmbeddings(
           (inst.bounding_box.y ?? 0) + (inst.bounding_box.height ?? 0),
         ] as [number, number, number, number],
         landmarks_5: inst.landmarks_5 ?? undefined,
+        preferredRotationClockwise,
       });
       embeddableInstances.push(inst);
     }

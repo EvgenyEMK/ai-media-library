@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
+  AUX_MODEL_OPTIONS,
   DEFAULT_AI_IMAGE_SEARCH_SETTINGS,
   DEFAULT_APP_SETTINGS,
   DEFAULT_FACE_DETECTION_SETTINGS,
@@ -12,9 +13,13 @@ import {
   FACE_DETECTOR_MODEL_OPTIONS,
   type AiImageSearchSettings,
   type AppSettings,
+  type AuxModelKind,
+  type FaceAgeGenderModelId,
   type FaceDetectionSettings,
   type FaceDetectorModelId,
+  type FaceLandmarkModelId,
   type FolderScanningSettings,
+  type ImageOrientationModelId,
   type MediaViewerSettings,
   type PathExtractionSettings,
   type PhotoAnalysisSettings,
@@ -163,6 +168,42 @@ function sanitizeFaceDetectionSettings(candidate: unknown): FaceDetectionSetting
       typeof value.keepUnmatchedTaggedFaces === "boolean"
         ? value.keepUnmatchedTaggedFaces
         : DEFAULT_FACE_DETECTION_SETTINGS.keepUnmatchedTaggedFaces,
+    imageOrientationDetection: sanitizeAuxToggle(
+      value.imageOrientationDetection,
+      "orientation",
+      DEFAULT_FACE_DETECTION_SETTINGS.imageOrientationDetection,
+    ),
+    faceLandmarkRefinement: sanitizeAuxToggle(
+      value.faceLandmarkRefinement,
+      "landmarks",
+      DEFAULT_FACE_DETECTION_SETTINGS.faceLandmarkRefinement,
+    ),
+    faceAgeGenderDetection: sanitizeAuxToggle(
+      value.faceAgeGenderDetection,
+      "age-gender",
+      DEFAULT_FACE_DETECTION_SETTINGS.faceAgeGenderDetection,
+    ),
+  };
+}
+
+function sanitizeAuxToggle<
+  Id extends ImageOrientationModelId | FaceLandmarkModelId | FaceAgeGenderModelId,
+>(
+  candidate: unknown,
+  kind: AuxModelKind,
+  fallback: { enabled: boolean; model: Id },
+): { enabled: boolean; model: Id } {
+  const value = isRecord(candidate) ? candidate : {};
+  const validIds = new Set<string>(
+    AUX_MODEL_OPTIONS.filter((option) => option.kind === kind).map((option) => option.id),
+  );
+  const modelCandidate =
+    typeof value.model === "string" && validIds.has(value.model)
+      ? (value.model as Id)
+      : fallback.model;
+  return {
+    enabled: typeof value.enabled === "boolean" ? value.enabled : fallback.enabled,
+    model: modelCandidate,
   };
 }
 

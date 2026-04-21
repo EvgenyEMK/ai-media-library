@@ -8,7 +8,7 @@ import {
   type FaceDetectionServiceStatus,
 } from "../../src/shared/ipc";
 import { listFolderImages } from "../fs-media";
-import { detectFacesInPhoto } from "../face-detection";
+import { detectFacesInPhoto, detectFacesInPhotoWithOrientation } from "../face-detection";
 import { readSettings } from "../storage";
 import {
   getAlreadyFaceDetectedPhotoPaths,
@@ -25,8 +25,18 @@ import {
   ensureFaceDetectionServiceRunning,
   getFaceDetectionServiceStatus,
 } from "../face-service";
-import type { FaceDetectorModelId, FaceModelDownloadProgressEvent } from "../../src/shared/ipc";
-import { ensureDetectorModel, isDetectorModelDownloaded } from "../native-face";
+import type {
+  AuxModelId,
+  AuxModelKind,
+  FaceDetectorModelId,
+  FaceModelDownloadProgressEvent,
+} from "../../src/shared/ipc";
+import {
+  ensureAuxModel,
+  ensureDetectorModel,
+  isAuxModelDownloaded,
+  isDetectorModelDownloaded,
+} from "../native-face";
 import { emitFaceDetectionProgress } from "./progress-emitters";
 import {
   runningJobs,
@@ -39,6 +49,33 @@ import { autoChainEmbeddings } from "./face-embedding-handlers";
 import { acquirePowerSave, releasePowerSave } from "./power-save-manager";
 import { orderPendingPipelineItems, type PipelineImageItem } from "./pipeline-item-order";
 
+
+async function ensureEnabledAuxModelsForFaceDetection(
+  settings: AppSettings["faceDetection"],
+): Promise<void> {
+  const ensureOne = async (kind: AuxModelKind, modelId: AuxModelId) => {
+    try {
+      await ensureAuxModel(kind, modelId);
+    } catch (error) {
+      // Non-fatal: detection pipeline can continue without optional auxiliary models.
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[face-detection] optional aux model unavailable (${kind}/${modelId}):`,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  };
+
+  if (settings.imageOrientationDetection.enabled) {
+    await ensureOne("orientation", settings.imageOrientationDetection.model);
+  }
+  if (settings.faceLandmarkRefinement.enabled) {
+    await ensureOne("landmarks", settings.faceLandmarkRefinement.model);
+  }
+  if (settings.faceAgeGenderDetection.enabled) {
+    await ensureOne("age-gender", settings.faceAgeGenderDetection.model);
+  }
+}
 
 export function registerFaceDetectionHandlers(): void {
   ipcMain.handle(
@@ -227,17 +264,35 @@ export function registerFaceDetectionHandlers(): void {
       const resolvedSettings =
         faceDetectionSettings ??
         (await readSettings(app.getPath("userData"))).faceDetection;
+      await ensureEnabledAuxModelsForFaceDetection(resolvedSettings);
 
-      const result = await detectFacesInPhoto({ imagePath, settings: resolvedSettings });
+      const { faces: result, imageOrientation } =
+        await detectFacesInPhotoWithOrientation({
+          imagePath,
+          settings: resolvedSettings,
+        });
       const mediaId = upsertFaceDetectionResult(
         imagePath,
         result,
         undefined,
         resolvedSettings,
+        imageOrientation
+          ? {
+              correctionAngleClockwise: imageOrientation.correctionClockwise,
+              confidence: imageOrientation.confidence,
+              model: imageOrientation.model,
+            }
+          : null,
       );
 
       if (mediaId && result.faceCount > 0) {
-        await autoChainEmbeddings(mediaId, imagePath, result);
+        await autoChainEmbeddings(
+          mediaId,
+          imagePath,
+          result,
+          undefined,
+          imageOrientation?.correctionClockwise,
+        );
       }
 
       return { success: true, faceCount: result.faceCount };
@@ -310,6 +365,79 @@ export function registerFaceDetectionHandlers(): void {
           durationMs: Date.now() - startedAt,
           error,
           message: `Failed to download face detector model (${detectorModel}).`,
+        });
+        return { success: false, alreadyPresent: false, error };
+      }
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.ensureAuxModel,
+    async (event, kind: AuxModelKind, modelId: AuxModelId) => {
+      const label = `${kind} model (${modelId})`;
+      if (process.env.EMK_E2E_FAIL_FACE_MODEL_DOWNLOAD === "1") {
+        const senderWindow = BrowserWindow.fromWebContents(event.sender);
+        const error = "Simulated face-model download failure (EMK_E2E_FAIL_FACE_MODEL_DOWNLOAD=1)";
+        try {
+          senderWindow?.webContents.send(IPC_CHANNELS.faceModelDownloadProgress, {
+            type: "started",
+            filename: null,
+            message: `Downloading ${label}...`,
+            startedAtIso: new Date().toISOString(),
+          } satisfies FaceModelDownloadProgressEvent);
+          senderWindow?.webContents.send(IPC_CHANNELS.faceModelDownloadProgress, {
+            type: "failed",
+            durationMs: 0,
+            error,
+            message: `Failed to download ${label}.`,
+          } satisfies FaceModelDownloadProgressEvent);
+        } catch {
+          // ignore disposed window
+        }
+        return { success: false, alreadyPresent: false, error };
+      }
+      if (isAuxModelDownloaded(kind, modelId)) {
+        return { success: true, alreadyPresent: true };
+      }
+      const senderWindow = BrowserWindow.fromWebContents(event.sender);
+      const emit = (e: FaceModelDownloadProgressEvent) => {
+        try {
+          senderWindow?.webContents.send(IPC_CHANNELS.faceModelDownloadProgress, e);
+        } catch {
+          // ignore disposed window
+        }
+      };
+      const startedAt = Date.now();
+      emit({
+        type: "started",
+        filename: null,
+        message: `Downloading ${label}...`,
+        startedAtIso: new Date().toISOString(),
+      });
+      try {
+        await ensureAuxModel(kind, modelId, (progress) => {
+          emit({
+            type: "progress",
+            filename: progress.filename,
+            downloadedBytes: progress.downloadedBytes,
+            totalBytes: progress.totalBytes,
+            percent: progress.percent,
+            message: `Downloading ${label}...`,
+          });
+        });
+        emit({
+          type: "completed",
+          durationMs: Date.now() - startedAt,
+          message: `${label} is ready.`,
+        });
+        return { success: true, alreadyPresent: false };
+      } catch (err) {
+        const error = err instanceof Error ? err.message : String(err);
+        emit({
+          type: "failed",
+          durationMs: Date.now() - startedAt,
+          error,
+          message: `Failed to download ${label}.`,
         });
         return { success: false, alreadyPresent: false, error };
       }
@@ -400,6 +528,8 @@ async function runFaceDetectionJob(
     }
   }
 
+  await ensureEnabledAuxModelsForFaceDetection(faceDetectionSettings);
+
   const runWorker = async (): Promise<void> => {
     while (true) {
       if (faceJobContext.finalized) {
@@ -440,11 +570,12 @@ async function runFaceDetectionJob(
 
       try {
         await ensureMetadataForImage(photo.path);
-        const result = await detectFacesInPhoto({
-          imagePath: photo.path,
-          signal: controller.signal,
-          settings: faceDetectionSettings,
-        });
+        const { faces: result, imageOrientation } =
+          await detectFacesInPhotoWithOrientation({
+            imagePath: photo.path,
+            signal: controller.signal,
+            settings: faceDetectionSettings,
+          });
         if (faceJobContext.finalized || job.cancelled) {
           return;
         }
@@ -460,6 +591,13 @@ async function runFaceDetectionJob(
           result,
           undefined,
           faceDetectionSettings,
+          imageOrientation
+            ? {
+                correctionAngleClockwise: imageOrientation.correctionClockwise,
+                confidence: imageOrientation.confidence,
+                model: imageOrientation.model,
+              }
+            : null,
         );
         if (mediaId) {
           appendSyncOperation({
@@ -479,6 +617,7 @@ async function runFaceDetectionJob(
               photo.path,
               result,
               controller.signal,
+              imageOrientation?.correctionClockwise,
             );
           }
         }

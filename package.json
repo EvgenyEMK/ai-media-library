@@ -10,7 +10,8 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "test:e2e": "pnpm --filter @emk/desktop-media test:e2e",
-    "test:all": "pnpm test && pnpm test:e2e"
+    "test:all": "pnpm test && pnpm test:e2e",
+    "download-ai-models": "node scripts/download-ai-models.mjs"
   },
   "devDependencies": {
     "turbo": "^2.8.14",

@@ -27,6 +27,10 @@ export interface DesktopFaceInstance {
   embedding_status: string | null;
   cluster_id: string | null;
   crop_path: string | null;
+  estimated_age_years: number | null;
+  estimated_gender: string | null;
+  age_gender_confidence: number | null;
+  age_gender_model: string | null;
 }
 
 export function listPersonTags(libraryId = DEFAULT_LIBRARY_ID): DesktopPersonTag[] {
@@ -266,6 +270,10 @@ export function listFaceInstancesByMediaItem(
          fi.embedding_status,
          fi.cluster_id,
          fi.crop_path,
+         fi.estimated_age_years,
+         fi.estimated_gender,
+         fi.age_gender_confidence,
+         fi.age_gender_model,
          ${FACE_BBOX_REF_WIDTH_SQL} AS ref_image_width,
          ${FACE_BBOX_REF_HEIGHT_SQL} AS ref_image_height,
          t.id AS tag_id_ref,
@@ -292,6 +300,10 @@ export function listFaceInstancesByMediaItem(
     embedding_status: string | null;
     cluster_id: string | null;
     crop_path: string | null;
+    estimated_age_years: number | null;
+    estimated_gender: string | null;
+    age_gender_confidence: number | null;
+    age_gender_model: string | null;
     ref_image_width: number | null;
     ref_image_height: number | null;
     tag_id_ref: string | null;
@@ -326,6 +338,10 @@ export function listFaceInstancesByMediaItem(
     embedding_status: row.embedding_status,
     cluster_id: row.cluster_id,
     crop_path: row.crop_path,
+    estimated_age_years: row.estimated_age_years,
+    estimated_gender: row.estimated_gender,
+    age_gender_confidence: row.age_gender_confidence,
+    age_gender_model: row.age_gender_model,
   }));
 }
 

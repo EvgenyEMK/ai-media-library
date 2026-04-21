@@ -289,6 +289,15 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
         DEFAULT_FACE_DETECTION_SETTINGS.preserveTaggedFacesMinIoU;
       state.faceDetectionSettings.keepUnmatchedTaggedFaces =
         DEFAULT_FACE_DETECTION_SETTINGS.keepUnmatchedTaggedFaces;
+      state.faceDetectionSettings.imageOrientationDetection = {
+        ...DEFAULT_FACE_DETECTION_SETTINGS.imageOrientationDetection,
+      };
+      state.faceDetectionSettings.faceLandmarkRefinement = {
+        ...DEFAULT_FACE_DETECTION_SETTINGS.faceLandmarkRefinement,
+      };
+      state.faceDetectionSettings.faceAgeGenderDetection = {
+        ...DEFAULT_FACE_DETECTION_SETTINGS.faceAgeGenderDetection,
+      };
     }),
 
   resetFaceRecognitionOnlySettings: () =>

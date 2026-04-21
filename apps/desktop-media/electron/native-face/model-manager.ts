@@ -4,7 +4,11 @@ import path from "node:path";
 import { pipeline as streamPipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
 
-import type { FaceDetectorModelId } from "../../src/shared/ipc";
+import type {
+  AuxModelId,
+  AuxModelKind,
+  FaceDetectorModelId,
+} from "../../src/shared/ipc";
 
 /**
  * Models that every face-related feature depends on regardless of which
@@ -60,6 +64,55 @@ const DETECTOR_MODELS: Record<FaceDetectorModelId, DetectorModelDescriptor> = {
   },
 };
 
+interface AuxModelDescriptor {
+  filename: string;
+  urls: string[];
+}
+
+/**
+ * Auxiliary models for the face pipeline (optional, configurable per-setting).
+ * Keyed by aux kind → model id → descriptor. Apache-2.0/MIT weights only.
+ *
+ * Notes on URLs:
+ * - Orientation: DuarteBarbosa/deep-image-orientation-detection (EfficientNetV2, Apache-2.0).
+ * - Landmarks: PFLD 98-point ONNX (WFLW-style [1,196] output). Primary mirror:
+ *   shadow-cann/hispark-modelzoo-pfld (public `resolve` URL; license trace in
+ *   that repo README). Fallback: AnthonyF333/PFLD_GhostOne when HF allows
+ *   anonymous access.
+ * - Age/gender: onnx-community/age-gender-prediction-ONNX (Apache-2.0).
+ *
+ * Secondary mirrors are added when known. The exact asset filenames below are
+ * the canonical names published by the upstream projects.
+ */
+const AUX_MODELS: Record<AuxModelKind, Record<string, AuxModelDescriptor>> = {
+  orientation: {
+    "deep-image-orientation-v1": {
+      filename: "deep-image-orientation.onnx",
+      urls: [
+        "https://huggingface.co/DuarteBarbosa/deep-image-orientation-detection/resolve/main/orientation_model_v2_0.9882.onnx",
+      ],
+    },
+  },
+  landmarks: {
+    "pfld-ghostone": {
+      filename: "pfld_ghostone.onnx",
+      urls: [
+        "https://huggingface.co/shadow-cann/hispark-modelzoo-pfld/resolve/main/pfld-sim.onnx",
+        "https://huggingface.co/AnthonyF333/PFLD_GhostOne/resolve/main/pfld_ghostone.onnx",
+        "https://github.com/AnthonyF333/PFLD_GhostOne/releases/download/v1.0/pfld_ghostone.onnx",
+      ],
+    },
+  },
+  "age-gender": {
+    "onnx-age-gender-v1": {
+      filename: "age-gender.onnx",
+      urls: [
+        "https://huggingface.co/onnx-community/age-gender-prediction-ONNX/resolve/main/onnx/model.onnx",
+      ],
+    },
+  },
+};
+
 let modelsDir: string | null = null;
 
 export function setModelsDirectory(dir: string): void {
@@ -99,6 +152,35 @@ export function listCoreModelFilenames(): string[] {
   return Object.keys(CORE_MODEL_URLS);
 }
 
+export function getAuxModelDescriptor(
+  kind: AuxModelKind,
+  modelId: AuxModelId,
+): AuxModelDescriptor {
+  const forKind = AUX_MODELS[kind];
+  if (!forKind) {
+    throw new Error(`Unknown auxiliary model kind: ${kind}`);
+  }
+  const descriptor = forKind[modelId];
+  if (!descriptor) {
+    throw new Error(`Unknown auxiliary model id for kind '${kind}': ${modelId}`);
+  }
+  return descriptor;
+}
+
+export function getAuxModelFilename(
+  kind: AuxModelKind,
+  modelId: AuxModelId,
+): string {
+  return getAuxModelDescriptor(kind, modelId).filename;
+}
+
+export function isAuxModelDownloaded(
+  kind: AuxModelKind,
+  modelId: AuxModelId,
+): boolean {
+  return isModelDownloaded(getAuxModelFilename(kind, modelId));
+}
+
 /**
  * Combined lookup for the download function below.
  */
@@ -106,6 +188,11 @@ function resolveUrls(filename: string): string[] | null {
   if (CORE_MODEL_URLS[filename]) return CORE_MODEL_URLS[filename];
   for (const descriptor of Object.values(DETECTOR_MODELS)) {
     if (descriptor.filename === filename) return descriptor.urls;
+  }
+  for (const byKind of Object.values(AUX_MODELS)) {
+    for (const descriptor of Object.values(byKind)) {
+      if (descriptor.filename === filename) return descriptor.urls;
+    }
   }
   return null;
 }
@@ -222,6 +309,31 @@ export async function ensureDetectorModel(
   }
   await downloadModel(filename, onProgress, signal);
   return { alreadyPresent: false };
+}
+
+/**
+ * Ensure the ONNX weights for the given auxiliary model are on disk, downloading
+ * them if needed. No-op when already cached.
+ */
+export async function ensureAuxModel(
+  kind: AuxModelKind,
+  modelId: AuxModelId,
+  onProgress?: DownloadProgressCallback,
+  signal?: AbortSignal,
+): Promise<{ alreadyPresent: boolean }> {
+  const filename = getAuxModelFilename(kind, modelId);
+  if (isModelDownloaded(filename)) {
+    return { alreadyPresent: true };
+  }
+  await downloadModel(filename, onProgress, signal);
+  return { alreadyPresent: false };
+}
+
+export function getAuxModelPath(
+  kind: AuxModelKind,
+  modelId: AuxModelId,
+): string {
+  return getModelPath(getAuxModelFilename(kind, modelId));
 }
 
 export function areCoreModelsDownloaded(): boolean {

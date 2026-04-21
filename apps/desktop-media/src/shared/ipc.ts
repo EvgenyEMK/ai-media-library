@@ -144,6 +144,12 @@ export const IPC_CHANNELS = {
   getFolderAiRollupsBatch: "media:get-folder-ai-rollups-batch",
   faceModelDownloadProgress: "media:face-model-download-progress",
   ensureDetectorModel: "media:ensure-detector-model",
+  /**
+   * Ensure an auxiliary face-pipeline ONNX model (orientation classifier,
+   * landmark refiner, or age/gender estimator) is on disk. Emits progress
+   * on the shared `faceModelDownloadProgress` channel.
+   */
+  ensureAuxModel: "media:ensure-aux-model",
   getActiveJobStatuses: "media:get-active-job-statuses",
   analyzeFolderPathMetadata: "media:analyze-folder-path-metadata",
   cancelPathAnalysis: "media:cancel-path-analysis",
@@ -244,7 +250,87 @@ export interface FaceDetectionSettings {
    * When false, re-running detection replaces all `source='auto'` rows (old behavior).
    */
   keepUnmatchedTaggedFaces: boolean;
+  /**
+   * Whole-image orientation classifier (EfficientNetV2). When enabled, runs before the face
+   * detector and rotates the image in memory if a non-zero correction is suggested.
+   * Also usable as a standalone folder pipeline ("Detect wrongly rotated images").
+   */
+  imageOrientationDetection: {
+    enabled: boolean;
+    model: ImageOrientationModelId;
+  };
+  /**
+   * Per-face 5-point landmark refinement (PFLD_GhostOne). Runs after bbox detection on YOLO
+   * models that emit no landmarks; produces aligned crops for ArcFace and fills
+   * `detected_features` so similarity scoring works on all detectors.
+   */
+  faceLandmarkRefinement: {
+    enabled: boolean;
+    model: FaceLandmarkModelId;
+  };
+  /**
+   * Estimates age and gender per detected face (ViT, Apache-2.0). Persisted to
+   * `media_face_instances` and displayed in the Face tags panel.
+   */
+  faceAgeGenderDetection: {
+    enabled: boolean;
+    model: FaceAgeGenderModelId;
+  };
 }
+
+/** Auxiliary (non-detector) face-pipeline model categories. */
+export type AuxModelKind = "orientation" | "landmarks" | "age-gender";
+
+export type ImageOrientationModelId = "deep-image-orientation-v1";
+export type FaceLandmarkModelId = "pfld-ghostone";
+export type FaceAgeGenderModelId = "onnx-age-gender-v1";
+
+export type AuxModelId =
+  | ImageOrientationModelId
+  | FaceLandmarkModelId
+  | FaceAgeGenderModelId;
+
+export interface AuxModelOption {
+  kind: AuxModelKind;
+  id: AuxModelId;
+  label: string;
+  approxSizeMb: number;
+  description: string;
+  licenseNote: string;
+}
+
+/**
+ * Static catalog of auxiliary models the app may download. Entries are keyed by `{kind, id}`
+ * and mirrored in `electron/native-face/model-manager.ts` for download URLs.
+ */
+export const AUX_MODEL_OPTIONS: readonly AuxModelOption[] = [
+  {
+    kind: "orientation",
+    id: "deep-image-orientation-v1",
+    label: "Deep Image Orientation (EfficientNetV2)",
+    approxSizeMb: 80,
+    description:
+      "Classifies the whole image into 0°/90°/180°/270° and suggests the correction angle.",
+    licenseNote: "Apache-2.0",
+  },
+  {
+    kind: "landmarks",
+    id: "pfld-ghostone",
+    label: "PFLD GhostOne (98-point landmarks)",
+    approxSizeMb: 3,
+    description:
+      "Refines 5-point face landmarks for ArcFace alignment and fills `detected_features`.",
+    licenseNote: "Apache-2.0",
+  },
+  {
+    kind: "age-gender",
+    id: "onnx-age-gender-v1",
+    label: "Age + Gender (ViT)",
+    approxSizeMb: 90,
+    description: "Estimates age and gender per detected face.",
+    licenseNote: "Apache-2.0",
+  },
+] as const;
 
 export interface FaceDetectorModelOption {
   id: FaceDetectorModelId;
@@ -375,6 +461,18 @@ export const DEFAULT_FACE_DETECTION_SETTINGS: FaceDetectionSettings = {
   mainSubjectMinImageAreaRatio: 0.01,
   preserveTaggedFacesMinIoU: 0.5,
   keepUnmatchedTaggedFaces: true,
+  imageOrientationDetection: {
+    enabled: true,
+    model: "deep-image-orientation-v1",
+  },
+  faceLandmarkRefinement: {
+    enabled: true,
+    model: "pfld-ghostone",
+  },
+  faceAgeGenderDetection: {
+    enabled: true,
+    model: "onnx-age-gender-v1",
+  },
 };
 
 export const DEFAULT_PHOTO_ANALYSIS_SETTINGS: PhotoAnalysisSettings = {
@@ -824,6 +922,23 @@ export interface FaceDetectionBox {
   bboxAreaImageRatio?: number | null;
   /** Classification used by filters (e.g. "2 main subjects"). */
   subjectRole?: FaceSubjectRole;
+  /**
+   * Optional age/gender estimate from an auxiliary ONNX model.
+   * Populated when the `faceAgeGenderDetection` toggle is enabled and the
+   * model is available on disk.
+   */
+  ageGender?: FaceAgeGenderPrediction | null;
+}
+
+export interface FaceAgeGenderPrediction {
+  /** Estimated age in years (0-100). */
+  ageYears: number;
+  /** "male" or "female" (case as stored). */
+  gender: "male" | "female";
+  /** Confidence in [0, 1] for the gender class. */
+  genderConfidence: number;
+  /** Identifier of the ONNX model that produced the estimate. */
+  model: FaceAgeGenderModelId;
 }
 
 export type { CanonicalBoundingBox, FaceBeingBoundingBox, ProviderRawBoundingBoxReference };
@@ -1089,6 +1204,10 @@ export interface DesktopFaceInstance {
   embedding_status: FaceEmbeddingStatus | null;
   cluster_id: string | null;
   crop_path: string | null;
+  estimated_age_years: number | null;
+  estimated_gender: string | null;
+  age_gender_confidence: number | null;
+  age_gender_model: string | null;
 }
 
 export interface EmbedFolderFacesRequest {
@@ -1454,6 +1573,19 @@ export interface DesktopApi {
    * Emits progress via `faceModelDownloadProgress`. Resolves when cached or downloaded.
    */
   ensureDetectorModel: (detectorModel: FaceDetectorModelId) => Promise<{
+    success: boolean;
+    alreadyPresent: boolean;
+    error?: string;
+  }>;
+  /**
+   * Ensure the ONNX weights for an auxiliary face-pipeline model (orientation classifier,
+   * landmark refiner, or age/gender estimator) are present on disk.
+   * Emits progress via `faceModelDownloadProgress`.
+   */
+  ensureAuxModel: (
+    kind: AuxModelKind,
+    modelId: AuxModelId,
+  ) => Promise<{
     success: boolean;
     alreadyPresent: boolean;
     error?: string;

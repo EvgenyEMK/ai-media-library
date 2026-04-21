@@ -365,11 +365,18 @@ interface ExistingFaceRow {
   bbox_ref_height: number | null;
 }
 
+export interface ImageOrientationClassifierResult {
+  correctionAngleClockwise: 0 | 90 | 180 | 270;
+  confidence: number;
+  model: string;
+}
+
 export function upsertFaceDetectionResult(
   photoPath: string,
   result: FaceDetectionOutput,
   libraryId = DEFAULT_LIBRARY_ID,
   faceDetectionSettings?: FaceDetectionSettings,
+  imageOrientationClassifier?: ImageOrientationClassifierResult | null,
 ): string | null {
   const db = getDesktopDatabase();
   const now = new Date().toISOString();
@@ -442,6 +449,28 @@ export function upsertFaceDetectionResult(
     faceOrientation,
     "face-detection",
   );
+
+  if (imageOrientationClassifier) {
+    const classifierOrientation: FaceOrientationMetadata = {
+      orientation:
+        imageOrientationClassifier.correctionAngleClockwise === 0
+          ? "upright"
+          : imageOrientationClassifier.correctionAngleClockwise === 90
+            ? "rotated_90_cw"
+            : imageOrientationClassifier.correctionAngleClockwise === 180
+              ? "rotated_180"
+              : "rotated_270_cw",
+      correction_angle_clockwise:
+        imageOrientationClassifier.correctionAngleClockwise,
+      confidence: imageOrientationClassifier.confidence,
+      face_count: 0,
+    };
+    merged.edit_suggestions = mergeRotationEditSuggestion(
+      merged.edit_suggestions,
+      classifierOrientation,
+      "image-orientation-classifier",
+    );
+  }
 
   const nextAiMetadata = JSON.stringify(merged);
 
@@ -559,9 +588,13 @@ export function upsertFaceDetectionResult(
         subject_role,
         detector_model,
         landmarks_json,
+        estimated_age_years,
+        estimated_gender,
+        age_gender_confidence,
+        age_gender_model,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, 'auto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, 'auto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     const refW = result.imageSizeForBoundingBoxes?.width ?? null;
@@ -597,6 +630,10 @@ export function upsertFaceDetectionResult(
         face.subjectRole ?? null,
         detectorModelId,
         landmarksJson,
+        face.ageGender?.ageYears ?? null,
+        face.ageGender?.gender ?? null,
+        face.ageGender?.genderConfidence ?? null,
+        face.ageGender?.model ?? null,
         now,
         now,
       );
@@ -633,10 +670,28 @@ function detectorModelToFaceDetectionMethod(
  * or non-rotation edits). Previous rotation entries tagged with the same
  * `source` are replaced.
  */
+export type RotationSuggestionSource =
+  | "face-detection"
+  | "photo-analysis"
+  | "image-orientation-classifier";
+
+function reasonForRotationSource(source: RotationSuggestionSource): string {
+  switch (source) {
+    case "face-detection":
+      return "Face-landmark orientation detected during face detection.";
+    case "photo-analysis":
+      return "Rotation suggested by photo-analysis pipeline.";
+    case "image-orientation-classifier":
+      return "Image orientation classifier predicted a non-zero rotation.";
+    default:
+      return "Rotation suggestion.";
+  }
+}
+
 export function mergeRotationEditSuggestion(
   existing: unknown,
   faceOrientation: FaceOrientationMetadata | null,
-  source: "face-detection" | "photo-analysis",
+  source: RotationSuggestionSource,
 ): unknown[] | null {
   const filtered: unknown[] = Array.isArray(existing)
     ? existing.filter((entry) => {
@@ -652,10 +707,7 @@ export function mergeRotationEditSuggestion(
       edit_type: "rotate",
       source,
       priority: "high",
-      reason:
-        source === "face-detection"
-          ? "Face-landmark orientation detected during face detection."
-          : "Rotation suggested by photo-analysis pipeline.",
+      reason: reasonForRotationSource(source),
       confidence: faceOrientation.confidence ?? null,
       auto_apply_safe: true,
       rotation: {

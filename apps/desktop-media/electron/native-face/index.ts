@@ -27,13 +27,42 @@ export {
   ensureModelsDownloaded,
   ensureActiveModels,
   ensureDetectorModel,
+  ensureAuxModel,
   downloadModel,
   getModelFilenames,
   getDetectorModelFilename,
   isDetectorModelDownloaded,
+  isAuxModelDownloaded,
+  getAuxModelFilename,
+  getAuxModelPath,
   type DownloadProgressCallback,
 } from "./model-manager";
 export { isNativeBackendReady, isDetectorBackendReady } from "./backend-switch";
+export {
+  predictOrientation,
+  isOrientationClassifierReady,
+  resetOrientationClassifier,
+  getOrientationClassifierModelFilename,
+  type OrientationPrediction,
+  type OrientationPredictParams,
+} from "./orientation-classifier";
+export {
+  refineLandmarks,
+  reduce98To5,
+  isLandmarkRefinerReady,
+  resetLandmarkRefiner,
+  getLandmarkRefinerModelFilename,
+  type RefineLandmarksParams,
+} from "./landmark-refiner";
+export {
+  estimateAgeGender,
+  interpretAgeGenderLogits,
+  isAgeGenderEstimatorReady,
+  resetAgeGenderEstimator,
+  getAgeGenderEstimatorModelFilename,
+  type AgeGenderEstimate,
+  type EstimateAgeGenderParams,
+} from "./age-gender-estimator";
 export {
   classifyFaceSubjectRoles,
   type FaceWithSubjectRole,

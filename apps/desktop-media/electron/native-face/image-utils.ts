@@ -83,6 +83,62 @@ export function cropRgb(
 }
 
 /**
+ * Rotate an RGB image clockwise by 90, 180, or 270 degrees. Pass 0 to get
+ * an identity clone.
+ */
+export function rotateRgb(image: RawImage, degrees: 0 | 90 | 180 | 270): RawImage {
+  const { width: w, height: h, data: src } = image;
+  if (degrees === 0) {
+    return { data: new Uint8Array(src), width: w, height: h, channels: 3 };
+  }
+  if (degrees === 180) {
+    const out = new Uint8Array(w * h * 3);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const srcOff = (y * w + x) * 3;
+        const dstOff = ((h - 1 - y) * w + (w - 1 - x)) * 3;
+        out[dstOff] = src[srcOff];
+        out[dstOff + 1] = src[srcOff + 1];
+        out[dstOff + 2] = src[srcOff + 2];
+      }
+    }
+    return { data: out, width: w, height: h, channels: 3 };
+  }
+  // 90 and 270 swap width/height.
+  const outW = h;
+  const outH = w;
+  const out = new Uint8Array(outW * outH * 3);
+  if (degrees === 90) {
+    // Clockwise 90: (x, y) -> (h - 1 - y, x)
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const srcOff = (y * w + x) * 3;
+        const dstX = h - 1 - y;
+        const dstY = x;
+        const dstOff = (dstY * outW + dstX) * 3;
+        out[dstOff] = src[srcOff];
+        out[dstOff + 1] = src[srcOff + 1];
+        out[dstOff + 2] = src[srcOff + 2];
+      }
+    }
+  } else {
+    // Clockwise 270 (= counter-clockwise 90): (x, y) -> (y, w - 1 - x)
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const srcOff = (y * w + x) * 3;
+        const dstX = y;
+        const dstY = w - 1 - x;
+        const dstOff = (dstY * outW + dstX) * 3;
+        out[dstOff] = src[srcOff];
+        out[dstOff + 1] = src[srcOff + 1];
+        out[dstOff + 2] = src[srcOff + 2];
+      }
+    }
+  }
+  return { data: out, width: outW, height: outH, channels: 3 };
+}
+
+/**
  * Resize an RGB image to target dimensions using bilinear interpolation.
  */
 export function resizeRgb(
