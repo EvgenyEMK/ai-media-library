@@ -45,5 +45,13 @@
   "rotationBwSamples": {
     "notes": "Paired B&W JPEGs in this folder (rotated-bw-01 from legacy dated filename; rotated-bw-02 renamed from scan0014.jpg). Not asserted by Playwright today; keep names stable for local rotation or path-metadata checks.",
     "files": ["rotated-bw-01.jpg", "rotated-bw-02.jpg"]
+  },
+  "yoloFaceDetection": {
+    "notes": "Images that must yield at least one face when running local ONNX YOLOv12 Small (akanametov/yolo-face). Requires downloading yolov12s-face.onnx on first run.",
+    "requiredFiles": [
+      "face-detect-sample-01.jpg",
+      "20230810_141737.jpg",
+      "20191013_142053.jpg"
+    ]
   }
 }

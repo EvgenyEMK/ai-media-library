@@ -25,6 +25,8 @@ import {
   ensureFaceDetectionServiceRunning,
   getFaceDetectionServiceStatus,
 } from "../face-service";
+import type { FaceDetectorModelId, FaceModelDownloadProgressEvent } from "../../src/shared/ipc";
+import { ensureDetectorModel, isDetectorModelDownloaded } from "../native-face";
 import { emitFaceDetectionProgress } from "./progress-emitters";
 import {
   runningJobs,
@@ -227,13 +229,69 @@ export function registerFaceDetectionHandlers(): void {
         (await readSettings(app.getPath("userData"))).faceDetection;
 
       const result = await detectFacesInPhoto({ imagePath, settings: resolvedSettings });
-      const mediaId = upsertFaceDetectionResult(imagePath, result);
+      const mediaId = upsertFaceDetectionResult(
+        imagePath,
+        result,
+        undefined,
+        resolvedSettings,
+      );
 
       if (mediaId && result.faceCount > 0) {
         await autoChainEmbeddings(mediaId, imagePath, result);
       }
 
       return { success: true, faceCount: result.faceCount };
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.ensureDetectorModel,
+    async (event, detectorModel: FaceDetectorModelId) => {
+      if (isDetectorModelDownloaded(detectorModel)) {
+        return { success: true, alreadyPresent: true };
+      }
+      const senderWindow = BrowserWindow.fromWebContents(event.sender);
+      const emit = (e: FaceModelDownloadProgressEvent) => {
+        try {
+          senderWindow?.webContents.send(IPC_CHANNELS.faceModelDownloadProgress, e);
+        } catch {
+          // ignore disposed window
+        }
+      };
+      const startedAt = Date.now();
+      emit({
+        type: "started",
+        filename: null,
+        message: `Downloading face detector model (${detectorModel})...`,
+        startedAtIso: new Date().toISOString(),
+      });
+      try {
+        await ensureDetectorModel(detectorModel, (progress) => {
+          emit({
+            type: "progress",
+            filename: progress.filename,
+            downloadedBytes: progress.downloadedBytes,
+            totalBytes: progress.totalBytes,
+            percent: progress.percent,
+            message: `Downloading face detector model (${detectorModel})...`,
+          });
+        });
+        emit({
+          type: "completed",
+          durationMs: Date.now() - startedAt,
+          message: `Face detector model (${detectorModel}) is ready.`,
+        });
+        return { success: true, alreadyPresent: false };
+      } catch (err) {
+        const error = err instanceof Error ? err.message : String(err);
+        emit({
+          type: "failed",
+          durationMs: Date.now() - startedAt,
+          error,
+          message: `Failed to download face detector model (${detectorModel}).`,
+        });
+        return { success: false, alreadyPresent: false, error };
+      }
     },
   );
 }
@@ -376,7 +434,12 @@ async function runFaceDetectionJob(
         runtimeItem.status = "settled";
         folderDone.set(photo.folderPath, (folderDone.get(photo.folderPath) ?? 0) + 1);
         upsertDetectedFacePhoto(photo.folderPath, photo.path);
-        const mediaId = upsertFaceDetectionResult(photo.path, result);
+        const mediaId = upsertFaceDetectionResult(
+          photo.path,
+          result,
+          undefined,
+          faceDetectionSettings,
+        );
         if (mediaId) {
           appendSyncOperation({
             mediaId,

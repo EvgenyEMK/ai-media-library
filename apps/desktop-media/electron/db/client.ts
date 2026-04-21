@@ -551,6 +551,17 @@ const MIGRATIONS: Array<{ id: string; sql: string }> = [
       UPDATE media_items SET media_kind = 'image' WHERE lower(filename) LIKE '%.jpg' OR lower(filename) LIKE '%.jpeg' OR lower(filename) LIKE '%.png' OR lower(filename) LIKE '%.gif' OR lower(filename) LIKE '%.bmp' OR lower(filename) LIKE '%.webp' OR lower(filename) LIKE '%.tif' OR lower(filename) LIKE '%.tiff'
     `,
   },
+  {
+    id: "020_face_subject_classification",
+    sql: `
+      ALTER TABLE media_face_instances ADD COLUMN bbox_area_image_ratio REAL;
+      ALTER TABLE media_face_instances ADD COLUMN bbox_short_side_ratio_to_largest REAL;
+      ALTER TABLE media_face_instances ADD COLUMN subject_role TEXT;
+      ALTER TABLE media_face_instances ADD COLUMN detector_model TEXT;
+      CREATE INDEX IF NOT EXISTS idx_media_face_instances_subject_role
+        ON media_face_instances (library_id, subject_role);
+    `,
+  },
 ];
 
 let db: SQLiteDatabase | null = null;

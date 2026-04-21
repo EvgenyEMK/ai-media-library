@@ -8,8 +8,10 @@ import {
   DEFAULT_MEDIA_VIEWER_SETTINGS,
   DEFAULT_PATH_EXTRACTION_SETTINGS,
   DEFAULT_PHOTO_ANALYSIS_SETTINGS,
+  FACE_DETECTOR_MODEL_OPTIONS,
   type AiImageSearchSettings,
   type FaceDetectionSettings,
+  type FaceDetectorModelId,
   type FolderScanningSettings,
   type MediaViewerSettings,
   type PathExtractionSettings,
@@ -505,6 +507,38 @@ How: When enabled, the AI image search panel shows a "Matching method" control n
 
       <SettingsSectionCard title={UI_TEXT.faceDetection}>
         <div className="space-y-3">
+          <div className="rounded-md border border-border/70 bg-background/40 p-3">
+            <h4 className="m-0 text-base font-medium text-foreground">
+              Face detection model
+            </h4>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              RetinaFace (MobileNetV2) is the stable default. YOLO variants are newer and often more accurate; larger variants are slower. The ONNX weights are downloaded on demand the first time a variant is selected (no data is sent to any cloud service).
+            </p>
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <select
+                className="h-9 min-w-[260px] rounded-md border border-border bg-background px-2 text-sm text-foreground"
+                value={faceDetectionSettings.detectorModel}
+                onChange={(event) => {
+                  const nextId = event.target.value as FaceDetectorModelId;
+                  onFaceDetectionSettingChange("detectorModel", nextId);
+                  void window.desktopApi.ensureDetectorModel(nextId).catch(() => {
+                    // Errors surface via the face-model-download-progress channel
+                  });
+                }}
+              >
+                {FACE_DETECTOR_MODEL_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label} (~{option.approxSizeMb} MB)
+                  </option>
+                ))}
+              </select>
+              <p className="m-0 text-xs text-muted-foreground">
+                {FACE_DETECTOR_MODEL_OPTIONS.find(
+                  (o) => o.id === faceDetectionSettings.detectorModel,
+                )?.description ?? ""}
+              </p>
+            </div>
+          </div>
           <SettingsNumberField
             title="Minimum confidence threshold"
             description={`Why: Removes weak detections that are often false positives (patterns that look like faces).
@@ -545,18 +579,88 @@ How: If overlap area is higher than this ratio (relative to either box), boxes a
             }
           />
 
+          <SettingsNumberField
+            title="Main subject: min face size ratio vs. largest face"
+            description={`Why: In group shots the main subjects are usually larger than background faces. Filters like "images with two people" can then include photos where only two are main subjects and others are in the background.
+
+How: A face is classified as a "main subject" only if its short side is at least this fraction of the largest detected face's short side. Example: 0.5 means half as tall as the biggest face still counts as main; 1.0 means only the single largest face is main.`}
+            value={faceDetectionSettings.mainSubjectMinSizeRatioToLargest}
+            min={0}
+            max={1}
+            step={0.05}
+            onChange={(nextValue) =>
+              onFaceDetectionSettingChange(
+                "mainSubjectMinSizeRatioToLargest",
+                nextValue,
+              )
+            }
+          />
+          <SettingsNumberField
+            title="Main subject: min area fraction of the image"
+            description={`Why: A secondary safeguard: when all detected faces are tiny (e.g. a crowd photo), none of them should be called "main".
+
+How: A face is classified as a main subject only if its bounding-box area is at least this fraction of the whole image area. 0.01 ≈ 1% of the image. Lower values make the rule more permissive.`}
+            value={faceDetectionSettings.mainSubjectMinImageAreaRatio}
+            min={0}
+            max={1}
+            step={0.005}
+            onChange={(nextValue) =>
+              onFaceDetectionSettingChange(
+                "mainSubjectMinImageAreaRatio",
+                nextValue,
+              )
+            }
+          />
+          <SettingsNumberField
+            title="Preserve person tags on re-detection: min IoU"
+            description={`Why: When you re-run face detection on an image that already has tagged faces, the app matches each newly-detected face to the existing tagged faces so the tag is kept.
+
+How: Matching uses IoU (Intersection over Union). A pair matches only if IoU ≥ this value. 0 disables tag preservation (every run replaces all auto-detected faces).`}
+            value={faceDetectionSettings.preserveTaggedFacesMinIoU}
+            min={0}
+            max={1}
+            step={0.05}
+            onChange={(nextValue) =>
+              onFaceDetectionSettingChange(
+                "preserveTaggedFacesMinIoU",
+                nextValue,
+              )
+            }
+          />
+          <SettingsCheckboxField
+            title="Keep tagged faces even when the new detector misses them"
+            description={`Why: Models disagree. Switching to a less sensitive detector should not silently drop a face you already named.
+
+How: When on, previously-tagged face boxes with no newly-detected match are kept in the database. When off, re-running face detection replaces all auto-detected faces (any tag on an unmatched box is lost).`}
+            checked={faceDetectionSettings.keepUnmatchedTaggedFaces}
+            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+            onChange={(next) =>
+              onFaceDetectionSettingChange("keepUnmatchedTaggedFaces", next)
+            }
+          />
+
           <div className="pt-1">
             <button
               type="button"
               className="inline-flex h-10 items-center rounded-md border border-border px-3 text-base"
               onClick={onResetFaceDetectionOnlySettings}
               disabled={
+                faceDetectionSettings.detectorModel ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.detectorModel &&
                 faceDetectionSettings.minConfidenceThreshold ===
                   DEFAULT_FACE_DETECTION_SETTINGS.minConfidenceThreshold &&
                 faceDetectionSettings.minFaceBoxShortSideRatio ===
                   DEFAULT_FACE_DETECTION_SETTINGS.minFaceBoxShortSideRatio &&
                 faceDetectionSettings.faceBoxOverlapMergeRatio ===
-                  DEFAULT_FACE_DETECTION_SETTINGS.faceBoxOverlapMergeRatio
+                  DEFAULT_FACE_DETECTION_SETTINGS.faceBoxOverlapMergeRatio &&
+                faceDetectionSettings.mainSubjectMinSizeRatioToLargest ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.mainSubjectMinSizeRatioToLargest &&
+                faceDetectionSettings.mainSubjectMinImageAreaRatio ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.mainSubjectMinImageAreaRatio &&
+                faceDetectionSettings.preserveTaggedFacesMinIoU ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.preserveTaggedFacesMinIoU &&
+                faceDetectionSettings.keepUnmatchedTaggedFaces ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.keepUnmatchedTaggedFaces
               }
             >
               {UI_TEXT.resetToDefaults}

@@ -2,7 +2,8 @@ import type {
   FaceDetectionOutput,
   FaceDetectionSettings,
 } from "../src/shared/ipc";
-import { detectFacesNative } from "./native-face/retinaface-detector";
+import { getDetector } from "./native-face/detector-registry";
+import { DEFAULT_FACE_DETECTION_SETTINGS } from "../src/shared/ipc";
 
 interface DetectFacesParams {
   imagePath: string;
@@ -15,5 +16,8 @@ export async function detectFacesInPhoto({
   signal,
   settings,
 }: DetectFacesParams): Promise<FaceDetectionOutput> {
-  return detectFacesNative({ imagePath, signal, settings });
+  const detectorId =
+    settings?.detectorModel ?? DEFAULT_FACE_DETECTION_SETTINGS.detectorModel;
+  const detector = getDetector(detectorId);
+  return detector.detect({ imagePath, signal, settings });
 }

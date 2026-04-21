@@ -9,9 +9,11 @@ import {
   DEFAULT_MEDIA_VIEWER_SETTINGS,
   DEFAULT_PATH_EXTRACTION_SETTINGS,
   DEFAULT_PHOTO_ANALYSIS_SETTINGS,
+  FACE_DETECTOR_MODEL_OPTIONS,
   type AiImageSearchSettings,
   type AppSettings,
   type FaceDetectionSettings,
+  type FaceDetectorModelId,
   type FolderScanningSettings,
   type MediaViewerSettings,
   type PathExtractionSettings,
@@ -86,9 +88,21 @@ function getSettingsPath(userDataPath: string): string {
   return path.join(userDataPath, "media-settings.json");
 }
 
+const VALID_DETECTOR_IDS = new Set<FaceDetectorModelId>(
+  FACE_DETECTOR_MODEL_OPTIONS.map((option) => option.id),
+);
+
+function sanitizeDetectorModel(candidate: unknown): FaceDetectorModelId {
+  if (typeof candidate === "string" && VALID_DETECTOR_IDS.has(candidate as FaceDetectorModelId)) {
+    return candidate as FaceDetectorModelId;
+  }
+  return DEFAULT_FACE_DETECTION_SETTINGS.detectorModel;
+}
+
 function sanitizeFaceDetectionSettings(candidate: unknown): FaceDetectionSettings {
   const value = isRecord(candidate) ? candidate : {};
   return {
+    detectorModel: sanitizeDetectorModel(value.detectorModel),
     minConfidenceThreshold: clampToRange(
       asNumber(value.minConfidenceThreshold),
       0,
@@ -127,6 +141,28 @@ function sanitizeFaceDetectionSettings(candidate: unknown): FaceDetectionSetting
         DEFAULT_FACE_DETECTION_SETTINGS.faceGroupMinSize,
       ),
     ),
+    mainSubjectMinSizeRatioToLargest: clampToRange(
+      asNumber(value.mainSubjectMinSizeRatioToLargest),
+      0,
+      1,
+      DEFAULT_FACE_DETECTION_SETTINGS.mainSubjectMinSizeRatioToLargest,
+    ),
+    mainSubjectMinImageAreaRatio: clampToRange(
+      asNumber(value.mainSubjectMinImageAreaRatio),
+      0,
+      1,
+      DEFAULT_FACE_DETECTION_SETTINGS.mainSubjectMinImageAreaRatio,
+    ),
+    preserveTaggedFacesMinIoU: clampToRange(
+      asNumber(value.preserveTaggedFacesMinIoU),
+      0,
+      1,
+      DEFAULT_FACE_DETECTION_SETTINGS.preserveTaggedFacesMinIoU,
+    ),
+    keepUnmatchedTaggedFaces:
+      typeof value.keepUnmatchedTaggedFaces === "boolean"
+        ? value.keepUnmatchedTaggedFaces
+        : DEFAULT_FACE_DETECTION_SETTINGS.keepUnmatchedTaggedFaces,
   };
 }
 
