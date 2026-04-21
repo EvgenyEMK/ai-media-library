@@ -613,8 +613,6 @@ function detectorModelToFaceDetectionMethod(
   switch (detectorModelId) {
     case "retinaface":
       return "retinaface";
-    case "yolov11n-face":
-      return "yolov11n-face";
     case "yolov12n-face":
       return "yolov12n-face";
     case "yolov12s-face":
@@ -831,7 +829,7 @@ function normalizeFaceBeingBoxes(boxes: FaceDetectionOutput["peopleBoundingBoxes
     gender: box.gender ?? null,
     person_bounding_box: box.person_bounding_box ?? undefined,
     person_face_bounding_box: box.person_face_bounding_box ?? null,
-    provider_raw_bounding_box: box.provider_raw_bounding_box ?? null,
+    provider_raw_bounding_box: box.provider_raw_bounding_box ?? undefined,
     azureFaceAttributes: box.azureFaceAttributes ?? null,
     detected_features: box.detected_features ?? null,
   }));

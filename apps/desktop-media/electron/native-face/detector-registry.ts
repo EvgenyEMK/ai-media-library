@@ -5,7 +5,6 @@ import { createYoloFaceDetector } from "./yolo-face-detector";
 
 const DETECTORS: Record<FaceDetectorModelId, FaceDetector> = {
   retinaface: retinafaceDetector,
-  "yolov11n-face": createYoloFaceDetector("yolov11n-face"),
   "yolov12n-face": createYoloFaceDetector("yolov12n-face"),
   "yolov12s-face": createYoloFaceDetector("yolov12s-face"),
   "yolov12m-face": createYoloFaceDetector("yolov12m-face"),

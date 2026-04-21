@@ -79,6 +79,7 @@ export interface DecodedYoloCandidates {
   pixelBoxes: Float32Array;
   scores: Float32Array;
   pixelLandmarks: Float32Array;
+  hasTrueLandmarks: boolean;
 }
 
 /**
@@ -134,7 +135,7 @@ export function decodeChannelMajorPose20(
     }
   }
 
-  return { pixelBoxes, scores, pixelLandmarks };
+  return { pixelBoxes, scores, pixelLandmarks, hasTrueLandmarks: true };
 }
 
 /**
@@ -150,7 +151,12 @@ export function decodeEnd2EndSix(
     [];
 
   if (dims.length !== 3) {
-    return { pixelBoxes: new Float32Array(0), scores: new Float32Array(0), pixelLandmarks: new Float32Array(0) };
+    return {
+      pixelBoxes: new Float32Array(0),
+      scores: new Float32Array(0),
+      pixelLandmarks: new Float32Array(0),
+      hasTrueLandmarks: false,
+    };
   }
 
   const d1 = dims[1]!;
@@ -183,7 +189,12 @@ export function decodeEnd2EndSix(
       rows.push({ ...box, conf, cls });
     }
   } else {
-    return { pixelBoxes: new Float32Array(0), scores: new Float32Array(0), pixelLandmarks: new Float32Array(0) };
+    return {
+      pixelBoxes: new Float32Array(0),
+      scores: new Float32Array(0),
+      pixelLandmarks: new Float32Array(0),
+      hasTrueLandmarks: false,
+    };
   }
 
   rows = rows.filter((r) => {
@@ -216,7 +227,7 @@ export function decodeEnd2EndSix(
     }
   }
 
-  return { pixelBoxes, scores, pixelLandmarks };
+  return { pixelBoxes, scores, pixelLandmarks, hasTrueLandmarks: false };
 }
 
 export function runNmsOnDecoded(

@@ -31,6 +31,8 @@ import type { FaceDetector, NativeDetectParams } from "./detector";
 
 const RETINAFACE_MODEL_FILE = "retinaface_mv2.onnx";
 const config = RETINAFACE_MOBILENETV2;
+const PROVIDER_RAW_BBOX_DEBUG =
+  process.env.EMK_DESKTOP_FACE_INCLUDE_PROVIDER_RAW_BOX === "1";
 
 let sessionPromise: Promise<ort.InferenceSession> | null = null;
 let loadError: string | null = null;
@@ -183,10 +185,12 @@ export async function detectFacesNative(
       gender: null,
       person_bounding_box: null,
       person_face_bounding_box: fromXyxyPixelBox(face.bbox_xyxy, imageSize),
-      provider_raw_bounding_box: buildProviderRawBoundingBoxReference(
-        "retinaface-native",
-        toRawPixelBoundingBox(face.bbox_xyxy, imageSize),
-      ),
+      provider_raw_bounding_box: PROVIDER_RAW_BBOX_DEBUG
+        ? buildProviderRawBoundingBoxReference(
+            "retinaface-native",
+            toRawPixelBoundingBox(face.bbox_xyxy, imageSize),
+          )
+        : null,
       azureFaceAttributes: null,
       detected_features: detectLandmarkFeatures(face.landmarks_5),
     })),

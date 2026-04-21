@@ -2,7 +2,7 @@ import { embedFacesNative, getNativeEmbeddingModelInfo } from "./native-face/arc
 
 export interface FaceForEmbedding {
   bbox_xyxy: [number, number, number, number];
-  landmarks_5: Array<[number, number]>;
+  landmarks_5?: Array<[number, number]>;
 }
 
 export interface FaceEmbeddingResult {

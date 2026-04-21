@@ -477,10 +477,9 @@ export async function autoChainEmbeddings(
     if (!modelInfo?.loaded) return;
 
     const facesForEmbed: FaceForEmbedding[] = [];
-    const instancesWithLandmarks: typeof instances = [];
+    const embeddableInstances: typeof instances = [];
 
     for (const inst of instances) {
-      if (!inst.landmarks_5 || inst.landmarks_5.length !== 5) continue;
       facesForEmbed.push({
         bbox_xyxy: [
           inst.bounding_box.x ?? 0,
@@ -488,14 +487,14 @@ export async function autoChainEmbeddings(
           (inst.bounding_box.x ?? 0) + (inst.bounding_box.width ?? 0),
           (inst.bounding_box.y ?? 0) + (inst.bounding_box.height ?? 0),
         ] as [number, number, number, number],
-        landmarks_5: inst.landmarks_5,
+        landmarks_5: inst.landmarks_5 ?? undefined,
       });
-      instancesWithLandmarks.push(inst);
+      embeddableInstances.push(inst);
     }
 
     if (facesForEmbed.length === 0) return;
 
-    for (const inst of instancesWithLandmarks) {
+    for (const inst of embeddableInstances) {
       markFaceEmbeddingStatus(inst.id, "indexing");
     }
 
@@ -505,8 +504,8 @@ export async function autoChainEmbeddings(
       signal,
     });
 
-    for (let i = 0; i < instancesWithLandmarks.length; i++) {
-      const inst = instancesWithLandmarks[i];
+    for (let i = 0; i < embeddableInstances.length; i++) {
+      const inst = embeddableInstances[i];
       const embedding = embedResult.embeddings.find((e) => e.face_index === i);
       if (embedding) {
         upsertFaceEmbedding(
@@ -597,7 +596,17 @@ async function runFaceEmbeddingJob(
 
       try {
         const facesForApi: FaceForEmbedding[] = groupFaces.map((face) => {
-          const landmarks = JSON.parse(face.landmarks_json) as Array<[number, number]>;
+          let landmarks: Array<[number, number]> | undefined;
+          if (face.landmarks_json) {
+            try {
+              const parsed = JSON.parse(face.landmarks_json) as Array<[number, number]>;
+              if (Array.isArray(parsed) && parsed.length === 5) {
+                landmarks = parsed;
+              }
+            } catch {
+              landmarks = undefined;
+            }
+          }
           return {
             bbox_xyxy: [
               face.bbox_x,

@@ -34,12 +34,6 @@ const DETECTOR_MODELS: Record<FaceDetectorModelId, DetectorModelDescriptor> = {
       "https://github.com/yakhyo/retinaface-pytorch/releases/download/v0.0.1/retinaface_mv2.onnx",
     ],
   },
-  "yolov11n-face": {
-    filename: "yolov11n-face.onnx",
-    urls: [
-      "https://github.com/akanametov/yolo-face/releases/download/1.0.0/yolov11n-face.onnx",
-    ],
-  },
   "yolov12n-face": {
     filename: "yolov12n-face.onnx",
     urls: [

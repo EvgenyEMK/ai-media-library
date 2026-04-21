@@ -196,7 +196,6 @@ export interface PathExtractionSettings {
  */
 export type FaceDetectorModelId =
   | "retinaface"
-  | "yolov11n-face"
   | "yolov12n-face"
   | "yolov12s-face"
   | "yolov12m-face"
@@ -259,13 +258,7 @@ export const FACE_DETECTOR_MODEL_OPTIONS: readonly FaceDetectorModelOption[] = [
     id: "retinaface",
     label: "RetinaFace (MobileNetV2)",
     approxSizeMb: 7,
-    description: "Lightweight MobileNetV2 RetinaFace. Stable default.",
-  },
-  {
-    id: "yolov11n-face",
-    label: "YOLOv11 Nano",
-    approxSizeMb: 11,
-    description: "Fastest YOLO variant; good for quick bulk runs.",
+    description: "Old lightweight model. Research use only (see license).",
   },
   {
     id: "yolov12n-face",
@@ -371,9 +364,9 @@ export interface AiImageSearchSettings {
 }
 
 export const DEFAULT_FACE_DETECTION_SETTINGS: FaceDetectionSettings = {
-  detectorModel: "retinaface",
+  detectorModel: "yolov12s-face",
   minConfidenceThreshold: 0.75,
-  minFaceBoxShortSideRatio: 0.05,
+  minFaceBoxShortSideRatio: 0.03,
   faceBoxOverlapMergeRatio: 0.5,
   faceRecognitionSimilarityThreshold: 0.38,
   faceGroupPairwiseSimilarityThreshold: 0.55,

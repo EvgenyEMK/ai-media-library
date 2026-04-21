@@ -247,6 +247,27 @@ export function registerFaceDetectionHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.ensureDetectorModel,
     async (event, detectorModel: FaceDetectorModelId) => {
+      if (process.env.EMK_E2E_FAIL_FACE_MODEL_DOWNLOAD === "1") {
+        const senderWindow = BrowserWindow.fromWebContents(event.sender);
+        const error = "Simulated face-model download failure (EMK_E2E_FAIL_FACE_MODEL_DOWNLOAD=1)";
+        try {
+          senderWindow?.webContents.send(IPC_CHANNELS.faceModelDownloadProgress, {
+            type: "started",
+            filename: null,
+            message: `Downloading face detector model (${detectorModel})...`,
+            startedAtIso: new Date().toISOString(),
+          } satisfies FaceModelDownloadProgressEvent);
+          senderWindow?.webContents.send(IPC_CHANNELS.faceModelDownloadProgress, {
+            type: "failed",
+            durationMs: 0,
+            error,
+            message: `Failed to download face detector model (${detectorModel}).`,
+          } satisfies FaceModelDownloadProgressEvent);
+        } catch {
+          // ignore disposed window
+        }
+        return { success: false, alreadyPresent: false, error };
+      }
       if (isDetectorModelDownloaded(detectorModel)) {
         return { success: true, alreadyPresent: true };
       }

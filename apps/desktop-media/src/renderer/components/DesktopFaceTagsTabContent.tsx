@@ -172,8 +172,15 @@ export function DesktopFaceTagsTabContent({
   }, [resolveMediaItemId]);
 
   useEffect(() => {
+    // Clear stale per-image state immediately on item switch. Without this,
+    // a just-opened no-face image can briefly reuse previous image face rows
+    // and synthesize overlays before the async DB fetch resolves.
+    setFaceInstances([]);
+    setEmbeddingSuggestions({});
+    setPendingFaceId(null);
+    setErrorMessage(null);
     void loadFaceInstances();
-  }, [loadFaceInstances]);
+  }, [loadFaceInstances, mediaItemId, sourcePath]);
 
   useEffect(() => {
     if (faceInstances.length === 0 || boundingBoxes.length > 0) return;
@@ -191,7 +198,7 @@ export function DesktopFaceTagsTabContent({
           image_width: inst.ref_image_width ?? undefined,
           image_height: inst.ref_image_height ?? undefined,
         },
-        provider_raw_bounding_box: null,
+        provider_raw_bounding_box: undefined,
         azureFaceAttributes: null,
       }));
       onBoundingBoxesReplace(synthesized);

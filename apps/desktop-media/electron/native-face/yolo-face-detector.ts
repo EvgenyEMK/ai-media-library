@@ -9,8 +9,7 @@
  * 1. **Pose / channel-major** `[1, 20, N]` — cx, cy, w, h, conf, then 5×(x, y, vis) keypoints
  *    in letterbox space; keypoint order matches RetinaFace.
  * 2. **End-to-end NMS** `[1, N, 6]` or `[1, 6, N]` — `x1, y1, x2, y2, score, class_id` in
- *    letterbox space (often 300 rows; padded rows have score 0). No keypoints: we synthesize
- *    approximate 5-point landmarks from each box for downstream orientation heuristics.
+ *    letterbox space (often 300 rows; padded rows have score 0). No keypoints in this layout.
  *
  * Pre-processing: letterbox resize + pad to 640×640, then map boxes back to the original image.
  */
@@ -47,6 +46,8 @@ const YOLO_PAD_VALUE = 114;
 const YOLO_DEFAULT_CONF = 0.35;
 const YOLO_DEFAULT_NMS = 0.45;
 const YOLO_MAX_POST_NMS = 750;
+const PROVIDER_RAW_BBOX_DEBUG =
+  process.env.EMK_DESKTOP_FACE_INCLUDE_PROVIDER_RAW_BOX === "1";
 
 interface YoloSessionState {
   promise: Promise<ort.InferenceSession> | null;
@@ -66,8 +67,6 @@ function getState(id: FaceDetectorModelId): YoloSessionState {
 
 function modelFilenameFor(id: FaceDetectorModelId): string {
   switch (id) {
-    case "yolov11n-face":
-      return "yolov11n-face.onnx";
     case "yolov12n-face":
       return "yolov12n-face.onnx";
     case "yolov12s-face":
@@ -390,13 +389,12 @@ async function detectFacesYolo(
         pixelBoxes[k * 4 + 2],
         pixelBoxes[k * 4 + 3],
       ];
-      const landmarks: Array<[number, number]> = [];
-      for (let p = 0; p < 5; p++) {
-        landmarks.push([
-          pixelLandmarks[k * 10 + p * 2],
-          pixelLandmarks[k * 10 + p * 2 + 1],
-        ]);
-      }
+      const landmarks: Array<[number, number]> = decoded.hasTrueLandmarks
+        ? Array.from({ length: 5 }, (_, p) => [
+            pixelLandmarks[k * 10 + p * 2],
+            pixelLandmarks[k * 10 + p * 2 + 1],
+          ] as [number, number])
+        : [];
       return { bbox_xyxy: bbox, score: scores[k], landmarks_5: landmarks };
     })
     .filter((face) => passesFaceFilters(face, resolvedSettings, imgW, imgH));
@@ -415,10 +413,12 @@ async function detectFacesYolo(
       gender: null,
       person_bounding_box: null,
       person_face_bounding_box: fromXyxyPixelBox(face.bbox_xyxy, imageSize),
-      provider_raw_bounding_box: buildProviderRawBoundingBoxReference(
-        `${id}-native`,
-        toRawPixelBoundingBox(face.bbox_xyxy, imageSize),
-      ),
+      provider_raw_bounding_box: PROVIDER_RAW_BBOX_DEBUG
+        ? buildProviderRawBoundingBoxReference(
+            `${id}-native`,
+            toRawPixelBoundingBox(face.bbox_xyxy, imageSize),
+          )
+        : null,
       azureFaceAttributes: null,
       detected_features: detectLandmarkFeatures(face.landmarks_5),
     })),
