@@ -59,3 +59,8 @@ playwright-report/
 
 # vitest
 coverage/
+
+# Local model weights; keep inventory docs in git (see scripts/download-ai-models.mjs)
+/ai-models/**
+!/ai-models/README.md
+!/ai-models/MODELS.json

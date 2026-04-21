@@ -2,15 +2,23 @@ import { useEffect, useId, useState, type ReactElement } from "react";
 import { Square } from "lucide-react";
 import { SettingsCheckboxField, SettingsNumberField, SettingsSectionCard } from "@emk/media-viewer";
 import {
+  AUX_MODEL_OPTIONS,
   DEFAULT_AI_IMAGE_SEARCH_SETTINGS,
   DEFAULT_FACE_DETECTION_SETTINGS,
   DEFAULT_FOLDER_SCANNING_SETTINGS,
   DEFAULT_MEDIA_VIEWER_SETTINGS,
   DEFAULT_PATH_EXTRACTION_SETTINGS,
   DEFAULT_PHOTO_ANALYSIS_SETTINGS,
+  FACE_DETECTOR_MODEL_OPTIONS,
   type AiImageSearchSettings,
+  type AuxModelId,
+  type AuxModelKind,
+  type FaceAgeGenderModelId,
   type FaceDetectionSettings,
+  type FaceDetectorModelId,
+  type FaceLandmarkModelId,
   type FolderScanningSettings,
+  type ImageOrientationModelId,
   type MediaViewerSettings,
   type PathExtractionSettings,
   type PhotoAnalysisSettings,
@@ -505,6 +513,38 @@ How: When enabled, the AI image search panel shows a "Matching method" control n
 
       <SettingsSectionCard title={UI_TEXT.faceDetection}>
         <div className="space-y-3">
+          <div className="rounded-md border border-border/70 bg-background/40 p-3">
+            <h4 className="m-0 text-base font-medium text-foreground">
+              Face detection model
+            </h4>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              RetinaFace (MobileNetV2) is the stable default. YOLO variants are newer and often more accurate; larger variants are slower. The ONNX weights are downloaded on demand the first time a variant is selected (no data is sent to any cloud service).
+            </p>
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <select
+                className="h-9 min-w-[260px] rounded-md border border-border bg-background px-2 text-sm text-foreground"
+                value={faceDetectionSettings.detectorModel}
+                onChange={(event) => {
+                  const nextId = event.target.value as FaceDetectorModelId;
+                  onFaceDetectionSettingChange("detectorModel", nextId);
+                  void window.desktopApi.ensureDetectorModel(nextId).catch(() => {
+                    // Errors surface via the face-model-download-progress channel
+                  });
+                }}
+              >
+                {FACE_DETECTOR_MODEL_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label} (~{option.approxSizeMb} MB)
+                  </option>
+                ))}
+              </select>
+              <p className="m-0 text-xs text-muted-foreground">
+                {FACE_DETECTOR_MODEL_OPTIONS.find(
+                  (o) => o.id === faceDetectionSettings.detectorModel,
+                )?.description ?? ""}
+              </p>
+            </div>
+          </div>
           <SettingsNumberField
             title="Minimum confidence threshold"
             description={`Why: Removes weak detections that are often false positives (patterns that look like faces).
@@ -545,18 +585,164 @@ How: If overlap area is higher than this ratio (relative to either box), boxes a
             }
           />
 
+          <SettingsNumberField
+            title="Main subject: min face size ratio vs. largest face"
+            description={`Why: In group shots the main subjects are usually larger than background faces. Filters like "images with two people" can then include photos where only two are main subjects and others are in the background.
+
+How: A face is classified as a "main subject" only if its short side is at least this fraction of the largest detected face's short side. Example: 0.5 means half as tall as the biggest face still counts as main; 1.0 means only the single largest face is main.`}
+            value={faceDetectionSettings.mainSubjectMinSizeRatioToLargest}
+            min={0}
+            max={1}
+            step={0.05}
+            onChange={(nextValue) =>
+              onFaceDetectionSettingChange(
+                "mainSubjectMinSizeRatioToLargest",
+                nextValue,
+              )
+            }
+          />
+          <SettingsNumberField
+            title="Main subject: min area fraction of the image"
+            description={`Why: A secondary safeguard: when all detected faces are tiny (e.g. a crowd photo), none of them should be called "main".
+
+How: A face is classified as a main subject only if its bounding-box area is at least this fraction of the whole image area. 0.01 ≈ 1% of the image. Lower values make the rule more permissive.`}
+            value={faceDetectionSettings.mainSubjectMinImageAreaRatio}
+            min={0}
+            max={1}
+            step={0.005}
+            onChange={(nextValue) =>
+              onFaceDetectionSettingChange(
+                "mainSubjectMinImageAreaRatio",
+                nextValue,
+              )
+            }
+          />
+          <SettingsNumberField
+            title="Preserve person tags on re-detection: min IoU"
+            description={`Why: When you re-run face detection on an image that already has tagged faces, the app matches each newly-detected face to the existing tagged faces so the tag is kept.
+
+How: Matching uses IoU (Intersection over Union). A pair matches only if IoU ≥ this value. 0 disables tag preservation (every run replaces all auto-detected faces).`}
+            value={faceDetectionSettings.preserveTaggedFacesMinIoU}
+            min={0}
+            max={1}
+            step={0.05}
+            onChange={(nextValue) =>
+              onFaceDetectionSettingChange(
+                "preserveTaggedFacesMinIoU",
+                nextValue,
+              )
+            }
+          />
+          <SettingsCheckboxField
+            title="Keep tagged faces even when the new detector misses them"
+            description={`Why: Models disagree. Switching to a less sensitive detector should not silently drop a face you already named.
+
+How: When on, previously-tagged face boxes with no newly-detected match are kept in the database. When off, re-running face detection replaces all auto-detected faces (any tag on an unmatched box is lost).`}
+            checked={faceDetectionSettings.keepUnmatchedTaggedFaces}
+            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+            onChange={(next) =>
+              onFaceDetectionSettingChange("keepUnmatchedTaggedFaces", next)
+            }
+          />
+
+          <AuxModelToggleRow
+            title="Image orientation detection"
+            kind="orientation"
+            description={`Why: Detects photos rotated by 90/180/270° even when no faces are visible. The predicted correction angle is surfaced as a "Rotate" suggestion on the image.
+
+How: Runs a small ImageNet-trained classifier (EfficientNetV2) before face detection. When enabled for the first time, the ONNX weights are downloaded (no cloud traffic).`}
+            enabled={faceDetectionSettings.imageOrientationDetection.enabled}
+            modelId={faceDetectionSettings.imageOrientationDetection.model}
+            onEnabledChange={(enabled) =>
+              onFaceDetectionSettingChange("imageOrientationDetection", {
+                ...faceDetectionSettings.imageOrientationDetection,
+                enabled,
+              })
+            }
+            onModelChange={(next) =>
+              onFaceDetectionSettingChange("imageOrientationDetection", {
+                ...faceDetectionSettings.imageOrientationDetection,
+                model: next as ImageOrientationModelId,
+              })
+            }
+          />
+          <AuxModelToggleRow
+            title="Face landmark refinement"
+            kind="landmarks"
+            description={`Why: Adds precise 5-point facial landmarks (eyes, nose, mouth corners) on top of YOLO detections. Landmarks enable more accurate face alignment, similarity matching and rotation estimation from faces.
+
+How: Runs a tiny PFLD-GhostOne model on each detected face crop and reduces its 98 landmarks to 5 canonical points.`}
+            enabled={faceDetectionSettings.faceLandmarkRefinement.enabled}
+            modelId={faceDetectionSettings.faceLandmarkRefinement.model}
+            onEnabledChange={(enabled) =>
+              onFaceDetectionSettingChange("faceLandmarkRefinement", {
+                ...faceDetectionSettings.faceLandmarkRefinement,
+                enabled,
+              })
+            }
+            onModelChange={(next) =>
+              onFaceDetectionSettingChange("faceLandmarkRefinement", {
+                ...faceDetectionSettings.faceLandmarkRefinement,
+                model: next as FaceLandmarkModelId,
+              })
+            }
+          />
+          <AuxModelToggleRow
+            title="Face age & gender estimation"
+            kind="age-gender"
+            description={`Why: Populates estimated age and gender for each detected face to power search and filter features.
+
+How: Runs a lightweight ONNX classifier on each detected face crop. Estimates are approximate and stored alongside the face record.`}
+            enabled={faceDetectionSettings.faceAgeGenderDetection.enabled}
+            modelId={faceDetectionSettings.faceAgeGenderDetection.model}
+            onEnabledChange={(enabled) =>
+              onFaceDetectionSettingChange("faceAgeGenderDetection", {
+                ...faceDetectionSettings.faceAgeGenderDetection,
+                enabled,
+              })
+            }
+            onModelChange={(next) =>
+              onFaceDetectionSettingChange("faceAgeGenderDetection", {
+                ...faceDetectionSettings.faceAgeGenderDetection,
+                model: next as FaceAgeGenderModelId,
+              })
+            }
+          />
+
           <div className="pt-1">
             <button
               type="button"
               className="inline-flex h-10 items-center rounded-md border border-border px-3 text-base"
               onClick={onResetFaceDetectionOnlySettings}
               disabled={
+                faceDetectionSettings.detectorModel ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.detectorModel &&
                 faceDetectionSettings.minConfidenceThreshold ===
                   DEFAULT_FACE_DETECTION_SETTINGS.minConfidenceThreshold &&
                 faceDetectionSettings.minFaceBoxShortSideRatio ===
                   DEFAULT_FACE_DETECTION_SETTINGS.minFaceBoxShortSideRatio &&
                 faceDetectionSettings.faceBoxOverlapMergeRatio ===
-                  DEFAULT_FACE_DETECTION_SETTINGS.faceBoxOverlapMergeRatio
+                  DEFAULT_FACE_DETECTION_SETTINGS.faceBoxOverlapMergeRatio &&
+                faceDetectionSettings.mainSubjectMinSizeRatioToLargest ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.mainSubjectMinSizeRatioToLargest &&
+                faceDetectionSettings.mainSubjectMinImageAreaRatio ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.mainSubjectMinImageAreaRatio &&
+                faceDetectionSettings.preserveTaggedFacesMinIoU ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.preserveTaggedFacesMinIoU &&
+                faceDetectionSettings.keepUnmatchedTaggedFaces ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.keepUnmatchedTaggedFaces &&
+                faceDetectionSettings.imageOrientationDetection.enabled ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.imageOrientationDetection.enabled &&
+                faceDetectionSettings.imageOrientationDetection.model ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.imageOrientationDetection.model &&
+                faceDetectionSettings.faceLandmarkRefinement.enabled ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.faceLandmarkRefinement.enabled &&
+                faceDetectionSettings.faceLandmarkRefinement.model ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.faceLandmarkRefinement.model &&
+                faceDetectionSettings.faceAgeGenderDetection.enabled ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.faceAgeGenderDetection.enabled &&
+                faceDetectionSettings.faceAgeGenderDetection.model ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.faceAgeGenderDetection.model
               }
             >
               {UI_TEXT.resetToDefaults}
@@ -906,6 +1092,89 @@ How: If analysis of a single image exceeds this many seconds, it is marked faile
           </div>
         </div>
       </SettingsSectionCard>
+    </div>
+  );
+}
+
+interface AuxModelToggleRowProps {
+  title: string;
+  kind: AuxModelKind;
+  description: string;
+  enabled: boolean;
+  modelId: AuxModelId;
+  onEnabledChange: (next: boolean) => void;
+  onModelChange: (next: AuxModelId) => void;
+}
+
+function AuxModelToggleRow({
+  title,
+  kind,
+  description,
+  enabled,
+  modelId,
+  onEnabledChange,
+  onModelChange,
+}: AuxModelToggleRowProps): ReactElement {
+  const optionsForKind = AUX_MODEL_OPTIONS.filter(
+    (option) => option.kind === kind,
+  );
+  const activeOption = optionsForKind.find((o) => o.id === modelId);
+
+  return (
+    <div className="rounded-md border border-border/70 bg-background/40 p-3">
+      <div className="flex flex-col gap-2">
+        <SettingsCheckboxField
+          title={title}
+          description={description}
+          checked={enabled}
+          checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+          onChange={(next) => {
+            onEnabledChange(next);
+            if (next) {
+              void window.desktopApi
+                .ensureAuxModel(kind, modelId)
+                .catch(() => {
+                  // Errors surface via the face-model-download-progress channel
+                });
+            }
+          }}
+        />
+        {optionsForKind.length > 1 ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <select
+              className="h-9 min-w-[260px] rounded-md border border-border bg-background px-2 text-sm text-foreground"
+              value={modelId}
+              disabled={!enabled}
+              onChange={(event) => {
+                const nextId = event.target.value as AuxModelId;
+                onModelChange(nextId);
+                if (enabled) {
+                  void window.desktopApi.ensureAuxModel(kind, nextId).catch(() => {
+                    // Errors surface via the face-model-download-progress channel
+                  });
+                }
+              }}
+            >
+              {optionsForKind.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label} (~{option.approxSizeMb} MB)
+                </option>
+              ))}
+            </select>
+            {activeOption ? (
+              <p className="m-0 text-xs text-muted-foreground">
+                {activeOption.description} {activeOption.licenseNote}
+              </p>
+            ) : null}
+          </div>
+        ) : activeOption ? (
+          <p className="m-0 text-xs text-muted-foreground">
+            Model: <span className="font-medium">{activeOption.label}</span> (~
+            {activeOption.approxSizeMb} MB). {activeOption.description}{" "}
+            {activeOption.licenseNote}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }

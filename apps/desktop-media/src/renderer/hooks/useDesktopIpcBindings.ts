@@ -252,6 +252,18 @@ export function useDesktopSettingsPersistence(): void {
             prev.faceDetectionSettings.faceGroupPairwiseSimilarityThreshold ||
           state.faceDetectionSettings.faceGroupMinSize !==
             prev.faceDetectionSettings.faceGroupMinSize ||
+          state.faceDetectionSettings.imageOrientationDetection.enabled !==
+            prev.faceDetectionSettings.imageOrientationDetection.enabled ||
+          state.faceDetectionSettings.imageOrientationDetection.model !==
+            prev.faceDetectionSettings.imageOrientationDetection.model ||
+          state.faceDetectionSettings.faceLandmarkRefinement.enabled !==
+            prev.faceDetectionSettings.faceLandmarkRefinement.enabled ||
+          state.faceDetectionSettings.faceLandmarkRefinement.model !==
+            prev.faceDetectionSettings.faceLandmarkRefinement.model ||
+          state.faceDetectionSettings.faceAgeGenderDetection.enabled !==
+            prev.faceDetectionSettings.faceAgeGenderDetection.enabled ||
+          state.faceDetectionSettings.faceAgeGenderDetection.model !==
+            prev.faceDetectionSettings.faceAgeGenderDetection.model ||
           state.photoAnalysisSettings.analysisTimeoutPerImageSec !==
             prev.photoAnalysisSettings.analysisTimeoutPerImageSec ||
           state.photoAnalysisSettings.model !==

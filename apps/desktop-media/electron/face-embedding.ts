@@ -2,7 +2,9 @@ import { embedFacesNative, getNativeEmbeddingModelInfo } from "./native-face/arc
 
 export interface FaceForEmbedding {
   bbox_xyxy: [number, number, number, number];
-  landmarks_5: Array<[number, number]>;
+  landmarks_5?: Array<[number, number]>;
+  /** Optional known correction angle (clockwise) for the source image. */
+  preferredRotationClockwise?: 0 | 90 | 180 | 270;
 }
 
 export interface FaceEmbeddingResult {

@@ -273,12 +273,31 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
 
   resetFaceDetectionOnlySettings: () =>
     set((state) => {
+      state.faceDetectionSettings.detectorModel =
+        DEFAULT_FACE_DETECTION_SETTINGS.detectorModel;
       state.faceDetectionSettings.minConfidenceThreshold =
         DEFAULT_FACE_DETECTION_SETTINGS.minConfidenceThreshold;
       state.faceDetectionSettings.minFaceBoxShortSideRatio =
         DEFAULT_FACE_DETECTION_SETTINGS.minFaceBoxShortSideRatio;
       state.faceDetectionSettings.faceBoxOverlapMergeRatio =
         DEFAULT_FACE_DETECTION_SETTINGS.faceBoxOverlapMergeRatio;
+      state.faceDetectionSettings.mainSubjectMinSizeRatioToLargest =
+        DEFAULT_FACE_DETECTION_SETTINGS.mainSubjectMinSizeRatioToLargest;
+      state.faceDetectionSettings.mainSubjectMinImageAreaRatio =
+        DEFAULT_FACE_DETECTION_SETTINGS.mainSubjectMinImageAreaRatio;
+      state.faceDetectionSettings.preserveTaggedFacesMinIoU =
+        DEFAULT_FACE_DETECTION_SETTINGS.preserveTaggedFacesMinIoU;
+      state.faceDetectionSettings.keepUnmatchedTaggedFaces =
+        DEFAULT_FACE_DETECTION_SETTINGS.keepUnmatchedTaggedFaces;
+      state.faceDetectionSettings.imageOrientationDetection = {
+        ...DEFAULT_FACE_DETECTION_SETTINGS.imageOrientationDetection,
+      };
+      state.faceDetectionSettings.faceLandmarkRefinement = {
+        ...DEFAULT_FACE_DETECTION_SETTINGS.faceLandmarkRefinement,
+      };
+      state.faceDetectionSettings.faceAgeGenderDetection = {
+        ...DEFAULT_FACE_DETECTION_SETTINGS.faceAgeGenderDetection,
+      };
     }),
 
   resetFaceRecognitionOnlySettings: () =>

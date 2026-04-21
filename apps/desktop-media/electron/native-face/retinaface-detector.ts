@@ -1,6 +1,7 @@
 import * as ort from "onnxruntime-node";
 import {
   DEFAULT_FACE_DETECTION_SETTINGS,
+  type FaceDetectionBox,
   type FaceDetectionOutput,
   type FaceDetectionSettings,
 } from "../../src/shared/ipc";
@@ -25,9 +26,14 @@ import { decodeBoxes, decodeLandmarks } from "./decode";
 import { nms } from "./nms";
 import { loadImageRgb, rgbToBgrFloat32CHW } from "./image-utils";
 import { getModelPath, isModelDownloaded } from "./model-manager";
+import { classifyFaceSubjectRoles } from "./subject-role";
+import { estimateAgeGender, isAgeGenderEstimatorReady } from "./age-gender-estimator";
+import type { FaceDetector, NativeDetectParams } from "./detector";
 
 const RETINAFACE_MODEL_FILE = "retinaface_mv2.onnx";
 const config = RETINAFACE_MOBILENETV2;
+const PROVIDER_RAW_BBOX_DEBUG =
+  process.env.EMK_DESKTOP_FACE_INCLUDE_PROVIDER_RAW_BOX === "1";
 
 let sessionPromise: Promise<ort.InferenceSession> | null = null;
 let loadError: string | null = null;
@@ -64,13 +70,7 @@ export function resetNativeDetector(): void {
   loadError = null;
 }
 
-export interface NativeDetectParams {
-  imagePath: string;
-  signal?: AbortSignal;
-  settings?: FaceDetectionSettings;
-  confThreshold?: number;
-  nmsThreshold?: number;
-}
+export type { NativeDetectParams } from "./detector";
 
 export async function detectFacesNative(
   params: NativeDetectParams,
@@ -152,7 +152,7 @@ export async function detectFacesNative(
   const postNmsKept = kept.slice(0, RETINAFACE_DEFAULT_POST_NMS_TOPK);
 
   const resolvedSettings = resolveSettings(settings);
-  const faces = postNmsKept
+  const rawFaces: FaceDetectionBox[] = postNmsKept
     .map((k) => {
       const bbox: [number, number, number, number] = [
         pixelBoxes[k * 4],
@@ -173,7 +173,40 @@ export async function detectFacesNative(
       passesFaceFilters(face, resolvedSettings, imgW, imgH),
     );
 
+  if (
+    resolvedSettings.faceAgeGenderDetection.enabled &&
+    isAgeGenderEstimatorReady(resolvedSettings.faceAgeGenderDetection.model)
+  ) {
+    for (const face of rawFaces) {
+      if (signal?.aborted) throw new Error("Face detection cancelled");
+      try {
+        const estimate = await estimateAgeGender({
+          image,
+          bbox: face.bbox_xyxy,
+          model: resolvedSettings.faceAgeGenderDetection.model,
+          signal,
+        });
+        face.ageGender = {
+          ageYears: estimate.ageYears,
+          gender: estimate.gender,
+          genderConfidence: estimate.genderConfidence,
+          model: estimate.model,
+        };
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          "[retinaface-detector] age/gender estimation failed:",
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+  }
+
   const imageSize = { width: imgW, height: imgH };
+  const faces = classifyFaceSubjectRoles(rawFaces, imageSize, {
+    minSizeRatioToLargest: resolvedSettings.mainSubjectMinSizeRatioToLargest,
+    minImageAreaRatio: resolvedSettings.mainSubjectMinImageAreaRatio,
+  });
   return {
     faceCount: faces.length,
     faces,
@@ -182,10 +215,12 @@ export async function detectFacesNative(
       gender: null,
       person_bounding_box: null,
       person_face_bounding_box: fromXyxyPixelBox(face.bbox_xyxy, imageSize),
-      provider_raw_bounding_box: buildProviderRawBoundingBoxReference(
-        "retinaface-native",
-        toRawPixelBoundingBox(face.bbox_xyxy, imageSize),
-      ),
+      provider_raw_bounding_box: PROVIDER_RAW_BBOX_DEBUG
+        ? buildProviderRawBoundingBoxReference(
+            "retinaface-native",
+            toRawPixelBoundingBox(face.bbox_xyxy, imageSize),
+          )
+        : null,
       azureFaceAttributes: null,
       detected_features: detectLandmarkFeatures(face.landmarks_5),
     })),
@@ -198,6 +233,14 @@ export async function detectFacesNative(
     },
   };
 }
+
+export const retinafaceDetector: FaceDetector = {
+  id: "retinaface",
+  modelFilename: RETINAFACE_MODEL_FILE,
+  isReady: isNativeDetectorReady,
+  reset: resetNativeDetector,
+  detect: detectFacesNative,
+};
 
 function passesFaceFilters(
   face: { bbox_xyxy: [number, number, number, number]; score: number },
@@ -224,6 +267,8 @@ function resolveSettings(
   const envRatio = parseEnvFloat("EMK_DESKTOP_FACE_MIN_BOX_SHORT_SIDE_RATIO");
   const envOverlap = parseEnvFloat("EMK_DESKTOP_FACE_BOX_OVERLAP_MERGE_RATIO");
   return {
+    detectorModel:
+      settings?.detectorModel ?? DEFAULT_FACE_DETECTION_SETTINGS.detectorModel,
     minConfidenceThreshold: clamp(
       settings?.minConfidenceThreshold ?? envConf ?? 0.75,
       0,
@@ -258,6 +303,36 @@ function resolveSettings(
         500,
       ),
     ),
+    mainSubjectMinSizeRatioToLargest: clamp(
+      settings?.mainSubjectMinSizeRatioToLargest ??
+        DEFAULT_FACE_DETECTION_SETTINGS.mainSubjectMinSizeRatioToLargest,
+      0,
+      1,
+    ),
+    mainSubjectMinImageAreaRatio: clamp(
+      settings?.mainSubjectMinImageAreaRatio ??
+        DEFAULT_FACE_DETECTION_SETTINGS.mainSubjectMinImageAreaRatio,
+      0,
+      1,
+    ),
+    preserveTaggedFacesMinIoU: clamp(
+      settings?.preserveTaggedFacesMinIoU ??
+        DEFAULT_FACE_DETECTION_SETTINGS.preserveTaggedFacesMinIoU,
+      0,
+      1,
+    ),
+    keepUnmatchedTaggedFaces:
+      settings?.keepUnmatchedTaggedFaces ??
+      DEFAULT_FACE_DETECTION_SETTINGS.keepUnmatchedTaggedFaces,
+    imageOrientationDetection:
+      settings?.imageOrientationDetection ??
+      DEFAULT_FACE_DETECTION_SETTINGS.imageOrientationDetection,
+    faceLandmarkRefinement:
+      settings?.faceLandmarkRefinement ??
+      DEFAULT_FACE_DETECTION_SETTINGS.faceLandmarkRefinement,
+    faceAgeGenderDetection:
+      settings?.faceAgeGenderDetection ??
+      DEFAULT_FACE_DETECTION_SETTINGS.faceAgeGenderDetection,
   };
 }
 

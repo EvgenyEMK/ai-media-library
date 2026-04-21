@@ -118,6 +118,10 @@ const api: DesktopApi = {
       ipcRenderer.removeListener(IPC_CHANNELS.faceModelDownloadProgress, wrapped);
     };
   },
+  ensureDetectorModel: (detectorModel) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ensureDetectorModel, detectorModel),
+  ensureAuxModel: (kind, modelId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.ensureAuxModel, kind, modelId),
   getSemanticEmbeddingStatus: () =>
     ipcRenderer.invoke(IPC_CHANNELS.getSemanticEmbeddingStatus),
   semanticSearchPhotos: (request) =>

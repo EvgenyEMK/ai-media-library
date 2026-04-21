@@ -24,9 +24,11 @@ import { registerMediaItemMutationHandlers } from "./ipc/media-item-mutation-han
 import { registerGeocoderHandlers } from "./ipc/geocoder-handlers";
 import { releaseAllPowerSave } from "./ipc/power-save-manager";
 import {
-  ensureModelsDownloaded,
+  ensureActiveModels,
   setModelsDirectory,
 } from "./native-face";
+import { readSettings } from "./storage";
+import { DEFAULT_FACE_DETECTION_SETTINGS } from "../src/shared/ipc";
 import {
   IPC_CHANNELS,
   type ActiveJobStatuses,
@@ -120,7 +122,16 @@ app.whenReady().then(async () => {
     message: "Downloading AI face detection and recognition models...",
     startedAtIso: new Date().toISOString(),
   });
-  void ensureModelsDownloaded((progress) => {
+  const activeDetectorId = await (async () => {
+    try {
+      const s = await readSettings(app.getPath("userData"));
+      return s.faceDetection.detectorModel;
+    } catch {
+      return DEFAULT_FACE_DETECTION_SETTINGS.detectorModel;
+    }
+  })();
+
+  void ensureActiveModels(activeDetectorId, (progress) => {
     emitFaceModelDownloadProgress({
       type: "progress",
       filename: progress.filename,

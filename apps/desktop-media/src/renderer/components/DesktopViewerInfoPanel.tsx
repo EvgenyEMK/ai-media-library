@@ -292,7 +292,7 @@ function synthesizedBoundingBoxesFromFaceInstances(instances: DesktopFaceInstanc
       image_width: inst.ref_image_width ?? undefined,
       image_height: inst.ref_image_height ?? undefined,
     },
-    provider_raw_bounding_box: null,
+    provider_raw_bounding_box: undefined,
     azureFaceAttributes: null,
   }));
 }
@@ -346,7 +346,6 @@ export function DesktopViewerInfoPanel({
 
   /** When `ai_metadata` has no people boxes but the catalog has face rows, keep synthesized boxes (see Face tags tab). */
   useEffect(() => {
-    if (peopleBoundingBoxes.length === 0) return;
     setCurrentBoundingBoxes(peopleBoundingBoxes);
   }, [peopleBoundingBoxes]);
 

@@ -101,6 +101,10 @@ export type FaceDetectionMethod =
   | 'azure-face'
   | 'google-vision'
   | 'retinaface'
+  | 'yolov12n-face'
+  | 'yolov12s-face'
+  | 'yolov12m-face'
+  | 'yolov12l-face'
   | 'amazon-rekognition'
   | 'unknown';
 

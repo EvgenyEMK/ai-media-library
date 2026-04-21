@@ -20,6 +20,8 @@ interface AppOptions {
    * Use for Playwright tests of the settings/download UX without multi‑GB downloads.
    */
   e2eGeocoderStub?: boolean;
+  /** Force model download failure path for ensureDetectorModel in test mode. */
+  e2eFailFaceModelDownload?: boolean;
 }
 
 /**
@@ -33,8 +35,12 @@ export const test = base.extend<AppFixtures & AppOptions>({
   ollamaMock: [{ failFirstChatRequests: 0 }, { option: true }],
   e2eFilenameInAnalysisPrompt: [false, { option: true }],
   e2eGeocoderStub: [false, { option: true }],
+  e2eFailFaceModelDownload: [false, { option: true }],
 
-  electronApp: async ({ ollamaMock, e2eFilenameInAnalysisPrompt, e2eGeocoderStub }, use) => {
+  electronApp: async (
+    { ollamaMock, e2eFilenameInAnalysisPrompt, e2eGeocoderStub, e2eFailFaceModelDownload },
+    use,
+  ) => {
     const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), "emk-e2e-userdata-"));
     const ollama = await startMockOllamaServer(ollamaMock);
     const app = await electron.launch({
@@ -46,6 +52,7 @@ export const test = base.extend<AppFixtures & AppOptions>({
         EMK_OLLAMA_BASE_URL: ollama.baseUrl,
         ...(e2eFilenameInAnalysisPrompt ? { EMK_E2E_ANALYSIS_APPENDED_BASENAME: "1" } : {}),
         ...(e2eGeocoderStub ? { EMK_E2E_GEOCODER_STUB: "1" } : {}),
+        ...(e2eFailFaceModelDownload ? { EMK_E2E_FAIL_FACE_MODEL_DOWNLOAD: "1" } : {}),
       },
     });
 

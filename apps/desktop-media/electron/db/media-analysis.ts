@@ -1,14 +1,26 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import type { FaceDetectionOutput, PhotoAnalysisOutput } from "../../src/shared/ipc";
+import type {
+  FaceDetectionOutput,
+  FaceDetectionSettings,
+  FaceDetectorModelId,
+  PhotoAnalysisOutput,
+} from "../../src/shared/ipc";
+import { DEFAULT_FACE_DETECTION_SETTINGS } from "../../src/shared/ipc";
 import {
   mergeMetadataV2,
   type BeingBoundingBox,
+  type FaceDetectionMethod,
   type FaceOrientationMetadata,
   type MediaImageCategory,
   type PersonInfo,
 } from "@emk/media-metadata-core";
-import { estimateRotationFromFaceLandmarks } from "@emk/shared-contracts";
+import {
+  estimateRotationFromFaceLandmarks,
+  greedyMatchBoxesByIou,
+  rescaleBoxToImageSize,
+  type PixelXyxyBox,
+} from "@emk/shared-contracts";
 import { getDesktopDatabase } from "./client";
 import { DEFAULT_LIBRARY_ID } from "./folder-analysis-status";
 import { getFtsFieldsFromAiMetadata, starRatingToFtsTokens, upsertFtsEntry } from "./keyword-search";
@@ -341,14 +353,37 @@ function inferAgeRange(result: PhotoAnalysisOutput): { ageMin: number | null; ag
   };
 }
 
+interface ExistingFaceRow {
+  id: string;
+  tag_id: string | null;
+  cluster_id: string | null;
+  bbox_x: number | null;
+  bbox_y: number | null;
+  bbox_width: number | null;
+  bbox_height: number | null;
+  bbox_ref_width: number | null;
+  bbox_ref_height: number | null;
+}
+
+export interface ImageOrientationClassifierResult {
+  correctionAngleClockwise: 0 | 90 | 180 | 270;
+  confidence: number;
+  model: string;
+}
+
 export function upsertFaceDetectionResult(
   photoPath: string,
   result: FaceDetectionOutput,
   libraryId = DEFAULT_LIBRARY_ID,
+  faceDetectionSettings?: FaceDetectionSettings,
+  imageOrientationClassifier?: ImageOrientationClassifierResult | null,
 ): string | null {
   const db = getDesktopDatabase();
   const now = new Date().toISOString();
   const filename = path.basename(photoPath);
+
+  const settings = faceDetectionSettings ?? DEFAULT_FACE_DETECTION_SETTINGS;
+  const detectorModelId: FaceDetectorModelId = settings.detectorModel;
 
   db.prepare(
     `INSERT INTO media_items (
@@ -384,13 +419,14 @@ export function upsertFaceDetectionResult(
     .get(mediaItem.id) as { ai_metadata: string | null } | undefined;
 
   const faceOrientation = computeFaceOrientation(result);
+  const faceDetectionMethod = detectorModelToFaceDetectionMethod(detectorModelId);
 
   const merged = mergeMetadataV2(parseJson(existingAiMetadata?.ai_metadata), {
     schema_version: "2.0",
     people: {
       number_of_people: result.faceCount > 0 ? result.faceCount : null,
       detections: {
-        face_detection_method: "retinaface",
+        face_detection_method: faceDetectionMethod,
         image_size_for_bounding_boxes: result.imageSizeForBoundingBoxes,
         people_bounding_boxes:
           result.peopleBoundingBoxes.length > 0
@@ -408,17 +444,32 @@ export function upsertFaceDetectionResult(
     },
   });
 
-  if (faceOrientation && faceOrientation.correction_angle_clockwise !== 0) {
-    merged.edit_suggestions = [
-      {
-        edit_type: "rotate",
-        priority: "high",
-        reason: "Face-landmark orientation detected during face detection.",
-        confidence: null,
-        auto_apply_safe: true,
-        rotation: { angle_degrees_clockwise: faceOrientation.correction_angle_clockwise },
-      },
-    ];
+  merged.edit_suggestions = mergeRotationEditSuggestion(
+    merged.edit_suggestions,
+    faceOrientation,
+    "face-detection",
+  );
+
+  if (imageOrientationClassifier) {
+    const classifierOrientation: FaceOrientationMetadata = {
+      orientation:
+        imageOrientationClassifier.correctionAngleClockwise === 0
+          ? "upright"
+          : imageOrientationClassifier.correctionAngleClockwise === 90
+            ? "rotated_90_cw"
+            : imageOrientationClassifier.correctionAngleClockwise === 180
+              ? "rotated_180"
+              : "rotated_270_cw",
+      correction_angle_clockwise:
+        imageOrientationClassifier.correctionAngleClockwise,
+      confidence: imageOrientationClassifier.confidence,
+      face_count: 0,
+    };
+    merged.edit_suggestions = mergeRotationEditSuggestion(
+      merged.edit_suggestions,
+      classifierOrientation,
+      "image-orientation-classifier",
+    );
   }
 
   const nextAiMetadata = JSON.stringify(merged);
@@ -437,10 +488,85 @@ export function upsertFaceDetectionResult(
       mediaItem.id,
     );
 
-    db.prepare(
-      `DELETE FROM media_face_instances
-       WHERE library_id = ? AND media_item_id = ? AND source = 'auto'`,
-    ).run(libraryId, mediaItem.id);
+    const existingAutoRows = db
+      .prepare(
+        `SELECT id, tag_id, cluster_id, bbox_x, bbox_y, bbox_width, bbox_height,
+                bbox_ref_width, bbox_ref_height
+         FROM media_face_instances
+         WHERE library_id = ? AND media_item_id = ? AND source = 'auto'`,
+      )
+      .all(libraryId, mediaItem.id) as ExistingFaceRow[];
+
+    const imageSize = result.imageSizeForBoundingBoxes ?? null;
+
+    const newBoxesForMatching = result.faces.map((face, idx) => ({
+      item: { face, idx },
+      box: {
+        x1: face.bbox_xyxy[0],
+        y1: face.bbox_xyxy[1],
+        x2: face.bbox_xyxy[2],
+        y2: face.bbox_xyxy[3],
+      } as PixelXyxyBox,
+    }));
+
+    const oldBoxesForMatching = existingAutoRows
+      .map((row, idx) => {
+        if (
+          row.bbox_x == null ||
+          row.bbox_y == null ||
+          row.bbox_width == null ||
+          row.bbox_height == null
+        ) {
+          return null;
+        }
+        return {
+          item: { row, idx },
+          box: rescaleBoxToImageSize(
+            {
+              x: row.bbox_x,
+              y: row.bbox_y,
+              width: row.bbox_width,
+              height: row.bbox_height,
+              refWidth: row.bbox_ref_width,
+              refHeight: row.bbox_ref_height,
+            },
+            imageSize,
+          ),
+        };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+    const matches = greedyMatchBoxesByIou(
+      newBoxesForMatching,
+      oldBoxesForMatching,
+      settings.preserveTaggedFacesMinIoU,
+    );
+
+    const matchedOriginalRowIndices = new Set<number>();
+    for (const m of matches.values()) {
+      const matchedEntry = oldBoxesForMatching[m.oldIndex];
+      matchedOriginalRowIndices.add(matchedEntry.item.idx);
+    }
+
+    const rowIdsToDelete = new Set<string>();
+    for (let i = 0; i < existingAutoRows.length; i++) {
+      const row = existingAutoRows[i];
+      const isMatched = matchedOriginalRowIndices.has(i);
+      const keepAsTaggedUnmatched =
+        !isMatched && settings.keepUnmatchedTaggedFaces && row.tag_id !== null;
+      if (!keepAsTaggedUnmatched) {
+        rowIdsToDelete.add(row.id);
+      }
+    }
+
+    if (rowIdsToDelete.size > 0) {
+      const ids = Array.from(rowIdsToDelete);
+      const placeholders = ids.map(() => "?").join(", ");
+      db.prepare(
+        `DELETE FROM media_face_instances
+         WHERE library_id = ? AND media_item_id = ? AND source = 'auto' AND id IN (${placeholders})`,
+      ).run(libraryId, mediaItem.id, ...ids);
+    }
 
     const insertFace = db.prepare(
       `INSERT INTO media_face_instances (
@@ -448,6 +574,8 @@ export function upsertFaceDetectionResult(
         library_id,
         media_item_id,
         source,
+        tag_id,
+        cluster_id,
         confidence,
         bbox_x,
         bbox_y,
@@ -455,25 +583,41 @@ export function upsertFaceDetectionResult(
         bbox_height,
         bbox_ref_width,
         bbox_ref_height,
+        bbox_area_image_ratio,
+        bbox_short_side_ratio_to_largest,
+        subject_role,
+        detector_model,
         landmarks_json,
+        estimated_age_years,
+        estimated_gender,
+        age_gender_confidence,
+        age_gender_model,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, 'auto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, 'auto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     const refW = result.imageSizeForBoundingBoxes?.width ?? null;
     const refH = result.imageSizeForBoundingBoxes?.height ?? null;
 
-    for (const face of result.faces) {
+    for (let i = 0; i < result.faces.length; i++) {
+      const face = result.faces[i];
       const [left, top, right, bottom] = face.bbox_xyxy;
       const landmarksJson =
         Array.isArray(face.landmarks_5) && face.landmarks_5.length === 5
           ? JSON.stringify(face.landmarks_5)
           : null;
+      const preserved = matches.get(i);
+      const preservedEntry = preserved ? oldBoxesForMatching[preserved.oldIndex] : null;
+      const preservedRow = preservedEntry
+        ? existingAutoRows[preservedEntry.item.idx]
+        : null;
       insertFace.run(
         randomUUID(),
         libraryId,
         mediaItem.id,
+        preservedRow?.tag_id ?? null,
+        preservedRow?.cluster_id ?? null,
         face.score,
         left,
         top,
@@ -481,7 +625,15 @@ export function upsertFaceDetectionResult(
         Math.max(0, bottom - top),
         refW,
         refH,
+        face.bboxAreaImageRatio ?? null,
+        face.bboxShortSideRatioToLargest ?? null,
+        face.subjectRole ?? null,
+        detectorModelId,
         landmarksJson,
+        face.ageGender?.ageYears ?? null,
+        face.ageGender?.gender ?? null,
+        face.ageGender?.genderConfidence ?? null,
+        face.ageGender?.model ?? null,
         now,
         now,
       );
@@ -490,6 +642,81 @@ export function upsertFaceDetectionResult(
 
   tx();
   return mediaItem.id;
+}
+
+function detectorModelToFaceDetectionMethod(
+  detectorModelId: FaceDetectorModelId,
+): FaceDetectionMethod {
+  switch (detectorModelId) {
+    case "retinaface":
+      return "retinaface";
+    case "yolov12n-face":
+      return "yolov12n-face";
+    case "yolov12s-face":
+      return "yolov12s-face";
+    case "yolov12m-face":
+      return "yolov12m-face";
+    case "yolov12l-face":
+      return "yolov12l-face";
+    default:
+      return "unknown";
+  }
+}
+
+/**
+ * Merge a face-detection-sourced rotation suggestion into an existing
+ * `edit_suggestions` array without clobbering unrelated suggestions
+ * (e.g. rotation suggestions coming from the VLM photo-analysis pipeline,
+ * or non-rotation edits). Previous rotation entries tagged with the same
+ * `source` are replaced.
+ */
+export type RotationSuggestionSource =
+  | "face-detection"
+  | "photo-analysis"
+  | "image-orientation-classifier";
+
+function reasonForRotationSource(source: RotationSuggestionSource): string {
+  switch (source) {
+    case "face-detection":
+      return "Face-landmark orientation detected during face detection.";
+    case "photo-analysis":
+      return "Rotation suggested by photo-analysis pipeline.";
+    case "image-orientation-classifier":
+      return "Image orientation classifier predicted a non-zero rotation.";
+    default:
+      return "Rotation suggestion.";
+  }
+}
+
+export function mergeRotationEditSuggestion(
+  existing: unknown,
+  faceOrientation: FaceOrientationMetadata | null,
+  source: RotationSuggestionSource,
+): unknown[] | null {
+  const filtered: unknown[] = Array.isArray(existing)
+    ? existing.filter((entry) => {
+        if (!entry || typeof entry !== "object") return false;
+        const record = entry as Record<string, unknown>;
+        if (record.edit_type !== "rotate") return true;
+        return record.source !== source;
+      })
+    : [];
+
+  if (faceOrientation && faceOrientation.correction_angle_clockwise !== 0) {
+    filtered.push({
+      edit_type: "rotate",
+      source,
+      priority: "high",
+      reason: reasonForRotationSource(source),
+      confidence: faceOrientation.confidence ?? null,
+      auto_apply_safe: true,
+      rotation: {
+        angle_degrees_clockwise: faceOrientation.correction_angle_clockwise,
+      },
+    });
+  }
+
+  return filtered.length > 0 ? filtered : null;
 }
 
 const ROTATION_PIPELINE_SOURCE = "auto-rotation-pipeline";
@@ -589,18 +816,11 @@ export function upsertRotationPipelineFaces(
       },
     });
 
-    if (rotFaceOrientation && rotFaceOrientation.correction_angle_clockwise !== 0) {
-      rotMerged.edit_suggestions = [
-        {
-          edit_type: "rotate",
-          priority: "high",
-          reason: "Face-landmark orientation detected during face detection.",
-          confidence: null,
-          auto_apply_safe: true,
-          rotation: { angle_degrees_clockwise: rotFaceOrientation.correction_angle_clockwise },
-        },
-      ];
-    }
+    rotMerged.edit_suggestions = mergeRotationEditSuggestion(
+      rotMerged.edit_suggestions,
+      rotFaceOrientation,
+      "face-detection",
+    );
 
     const nextAiMetadata = JSON.stringify(rotMerged);
 
@@ -661,7 +881,7 @@ function normalizeFaceBeingBoxes(boxes: FaceDetectionOutput["peopleBoundingBoxes
     gender: box.gender ?? null,
     person_bounding_box: box.person_bounding_box ?? undefined,
     person_face_bounding_box: box.person_face_bounding_box ?? null,
-    provider_raw_bounding_box: box.provider_raw_bounding_box ?? null,
+    provider_raw_bounding_box: box.provider_raw_bounding_box ?? undefined,
     azureFaceAttributes: box.azureFaceAttributes ?? null,
     detected_features: box.detected_features ?? null,
   }));

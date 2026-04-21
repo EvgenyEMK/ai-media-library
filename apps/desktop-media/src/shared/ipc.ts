@@ -143,6 +143,13 @@ export const IPC_CHANNELS = {
   getFolderAiCoverage: "media:get-folder-ai-coverage",
   getFolderAiRollupsBatch: "media:get-folder-ai-rollups-batch",
   faceModelDownloadProgress: "media:face-model-download-progress",
+  ensureDetectorModel: "media:ensure-detector-model",
+  /**
+   * Ensure an auxiliary face-pipeline ONNX model (orientation classifier,
+   * landmark refiner, or age/gender estimator) is on disk. Emits progress
+   * on the shared `faceModelDownloadProgress` channel.
+   */
+  ensureAuxModel: "media:ensure-aux-model",
   getActiveJobStatuses: "media:get-active-job-statuses",
   analyzeFolderPathMetadata: "media:analyze-folder-path-metadata",
   cancelPathAnalysis: "media:cancel-path-analysis",
@@ -188,7 +195,21 @@ export interface PathExtractionSettings {
   llmModelFallback: string;
 }
 
+/**
+ * Identifier for the face-detection model variant.
+ * All variants produce 5-point landmarks in RetinaFace order so rotation
+ * inference works identically across them.
+ */
+export type FaceDetectorModelId =
+  | "retinaface"
+  | "yolov12n-face"
+  | "yolov12s-face"
+  | "yolov12m-face"
+  | "yolov12l-face";
+
 export interface FaceDetectionSettings {
+  /** Active face-detection model; switching triggers an on-demand download if not yet cached. */
+  detectorModel: FaceDetectorModelId;
   minConfidenceThreshold: number;
   minFaceBoxShortSideRatio: number;
   faceBoxOverlapMergeRatio: number;
@@ -206,7 +227,150 @@ export interface FaceDetectionSettings {
    * Minimum number of faces in a provisional group after “Find groups”; smaller groups are discarded.
    */
   faceGroupMinSize: number;
+  /**
+   * A face is classified as `main` subject when its short side is at least this fraction
+   * of the largest detected face's short side. Otherwise it is `background`.
+   * Example: with 0.5, a face half as tall as the biggest face is still `main`.
+   */
+  mainSubjectMinSizeRatioToLargest: number;
+  /**
+   * Absolute floor: a face must also cover at least this fraction of the full image area
+   * to qualify as `main`. Protects against photos where all faces are tiny background faces.
+   */
+  mainSubjectMinImageAreaRatio: number;
+  /**
+   * Minimum IoU between a newly-detected face box and a previously-tagged face box required
+   * to carry the person tag (and cached embedding) over to the newly-detected instance when
+   * re-running the pipeline with "Override existing".
+   */
+  preserveTaggedFacesMinIoU: number;
+  /**
+   * When true, previously-tagged face boxes that do NOT match any newly-detected box are kept
+   * in the DB (so the user does not silently lose a person tag if the new detector misses a face).
+   * When false, re-running detection replaces all `source='auto'` rows (old behavior).
+   */
+  keepUnmatchedTaggedFaces: boolean;
+  /**
+   * Whole-image orientation classifier (EfficientNetV2). When enabled, runs before the face
+   * detector and rotates the image in memory if a non-zero correction is suggested.
+   * Also usable as a standalone folder pipeline ("Detect wrongly rotated images").
+   */
+  imageOrientationDetection: {
+    enabled: boolean;
+    model: ImageOrientationModelId;
+  };
+  /**
+   * Per-face 5-point landmark refinement (PFLD_GhostOne). Runs after bbox detection on YOLO
+   * models that emit no landmarks; produces aligned crops for ArcFace and fills
+   * `detected_features` so similarity scoring works on all detectors.
+   */
+  faceLandmarkRefinement: {
+    enabled: boolean;
+    model: FaceLandmarkModelId;
+  };
+  /**
+   * Estimates age and gender per detected face (ViT, Apache-2.0). Persisted to
+   * `media_face_instances` and displayed in the Face tags panel.
+   */
+  faceAgeGenderDetection: {
+    enabled: boolean;
+    model: FaceAgeGenderModelId;
+  };
 }
+
+/** Auxiliary (non-detector) face-pipeline model categories. */
+export type AuxModelKind = "orientation" | "landmarks" | "age-gender";
+
+export type ImageOrientationModelId = "deep-image-orientation-v1";
+export type FaceLandmarkModelId = "pfld-ghostone";
+export type FaceAgeGenderModelId = "onnx-age-gender-v1";
+
+export type AuxModelId =
+  | ImageOrientationModelId
+  | FaceLandmarkModelId
+  | FaceAgeGenderModelId;
+
+export interface AuxModelOption {
+  kind: AuxModelKind;
+  id: AuxModelId;
+  label: string;
+  approxSizeMb: number;
+  description: string;
+  licenseNote: string;
+}
+
+/**
+ * Static catalog of auxiliary models the app may download. Entries are keyed by `{kind, id}`
+ * and mirrored in `electron/native-face/model-manager.ts` for download URLs.
+ */
+export const AUX_MODEL_OPTIONS: readonly AuxModelOption[] = [
+  {
+    kind: "orientation",
+    id: "deep-image-orientation-v1",
+    label: "Deep Image Orientation (EfficientNetV2)",
+    approxSizeMb: 80,
+    description:
+      "Classifies the whole image into 0°/90°/180°/270° and suggests the correction angle.",
+    licenseNote: "Apache-2.0",
+  },
+  {
+    kind: "landmarks",
+    id: "pfld-ghostone",
+    label: "PFLD GhostOne (98-point landmarks)",
+    approxSizeMb: 3,
+    description:
+      "Refines 5-point face landmarks for ArcFace alignment and fills `detected_features`.",
+    licenseNote: "Apache-2.0",
+  },
+  {
+    kind: "age-gender",
+    id: "onnx-age-gender-v1",
+    label: "Age + Gender (ViT)",
+    approxSizeMb: 90,
+    description: "Estimates age and gender per detected face.",
+    licenseNote: "Apache-2.0",
+  },
+] as const;
+
+export interface FaceDetectorModelOption {
+  id: FaceDetectorModelId;
+  label: string;
+  approxSizeMb: number;
+  description: string;
+}
+
+export const FACE_DETECTOR_MODEL_OPTIONS: readonly FaceDetectorModelOption[] = [
+  {
+    id: "retinaface",
+    label: "RetinaFace (MobileNetV2)",
+    approxSizeMb: 7,
+    description: "Old lightweight model. Research use only (see license).",
+  },
+  {
+    id: "yolov12n-face",
+    label: "YOLOv12 Nano",
+    approxSizeMb: 11,
+    description: "YOLOv12 Nano — newest Nano, very fast.",
+  },
+  {
+    id: "yolov12s-face",
+    label: "YOLOv12 Small",
+    approxSizeMb: 38,
+    description: "Recommended YOLO default — balanced accuracy/speed.",
+  },
+  {
+    id: "yolov12m-face",
+    label: "YOLOv12 Medium",
+    approxSizeMb: 79,
+    description: "Higher accuracy on small / distant faces.",
+  },
+  {
+    id: "yolov12l-face",
+    label: "YOLOv12 Large",
+    approxSizeMb: 102,
+    description: "Best accuracy, slowest inference.",
+  },
+] as const;
 
 /** Sidebar folder icon tint when face + AI search are complete but image analysis is still pending. */
 export type PhotoPendingFolderIconTint = "red" | "amber" | "green";
@@ -286,12 +450,29 @@ export interface AiImageSearchSettings {
 }
 
 export const DEFAULT_FACE_DETECTION_SETTINGS: FaceDetectionSettings = {
+  detectorModel: "yolov12s-face",
   minConfidenceThreshold: 0.75,
-  minFaceBoxShortSideRatio: 0.05,
+  minFaceBoxShortSideRatio: 0.03,
   faceBoxOverlapMergeRatio: 0.5,
   faceRecognitionSimilarityThreshold: 0.38,
   faceGroupPairwiseSimilarityThreshold: 0.55,
   faceGroupMinSize: 4,
+  mainSubjectMinSizeRatioToLargest: 0.5,
+  mainSubjectMinImageAreaRatio: 0.01,
+  preserveTaggedFacesMinIoU: 0.5,
+  keepUnmatchedTaggedFaces: true,
+  imageOrientationDetection: {
+    enabled: true,
+    model: "deep-image-orientation-v1",
+  },
+  faceLandmarkRefinement: {
+    enabled: true,
+    model: "pfld-ghostone",
+  },
+  faceAgeGenderDetection: {
+    enabled: true,
+    model: "onnx-age-gender-v1",
+  },
 };
 
 export const DEFAULT_PHOTO_ANALYSIS_SETTINGS: PhotoAnalysisSettings = {
@@ -729,10 +910,35 @@ export type PhotoAnalysisProgressListener = (
   event: PhotoAnalysisProgressEvent,
 ) => void;
 
+export type FaceSubjectRole = "main" | "background";
+
 export interface FaceDetectionBox {
   bbox_xyxy: [number, number, number, number];
   score: number;
   landmarks_5: Array<[number, number]>;
+  /** `shortSide(box) / max(shortSide(all boxes))`. Null when there are no other faces. */
+  bboxShortSideRatioToLargest?: number | null;
+  /** `box_area / image_area`, in [0,1]. */
+  bboxAreaImageRatio?: number | null;
+  /** Classification used by filters (e.g. "2 main subjects"). */
+  subjectRole?: FaceSubjectRole;
+  /**
+   * Optional age/gender estimate from an auxiliary ONNX model.
+   * Populated when the `faceAgeGenderDetection` toggle is enabled and the
+   * model is available on disk.
+   */
+  ageGender?: FaceAgeGenderPrediction | null;
+}
+
+export interface FaceAgeGenderPrediction {
+  /** Estimated age in years (0-100). */
+  ageYears: number;
+  /** "male" or "female" (case as stored). */
+  gender: "male" | "female";
+  /** Confidence in [0, 1] for the gender class. */
+  genderConfidence: number;
+  /** Identifier of the ONNX model that produced the estimate. */
+  model: FaceAgeGenderModelId;
 }
 
 export type { CanonicalBoundingBox, FaceBeingBoundingBox, ProviderRawBoundingBoxReference };
@@ -998,6 +1204,10 @@ export interface DesktopFaceInstance {
   embedding_status: FaceEmbeddingStatus | null;
   cluster_id: string | null;
   crop_path: string | null;
+  estimated_age_years: number | null;
+  estimated_gender: string | null;
+  age_gender_confidence: number | null;
+  age_gender_model: string | null;
 }
 
 export interface EmbedFolderFacesRequest {
@@ -1358,6 +1568,28 @@ export interface DesktopApi {
   onFaceModelDownloadProgress: (
     listener: FaceModelDownloadProgressListener,
   ) => () => void;
+  /**
+   * Ensure the ONNX weights for the given face detector are present on disk.
+   * Emits progress via `faceModelDownloadProgress`. Resolves when cached or downloaded.
+   */
+  ensureDetectorModel: (detectorModel: FaceDetectorModelId) => Promise<{
+    success: boolean;
+    alreadyPresent: boolean;
+    error?: string;
+  }>;
+  /**
+   * Ensure the ONNX weights for an auxiliary face-pipeline model (orientation classifier,
+   * landmark refiner, or age/gender estimator) are present on disk.
+   * Emits progress via `faceModelDownloadProgress`.
+   */
+  ensureAuxModel: (
+    kind: AuxModelKind,
+    modelId: AuxModelId,
+  ) => Promise<{
+    success: boolean;
+    alreadyPresent: boolean;
+    error?: string;
+  }>;
   getSemanticEmbeddingStatus: () => Promise<{
     model: string;
     textEmbeddingReady: boolean;

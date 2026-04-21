@@ -60,6 +60,32 @@ function getGenderLabel(gender?: string | null): string | null {
   return map[gender.toLowerCase()] ?? gender;
 }
 
+function formatFaceAgeGenderLine(faceInstance: DesktopFaceInstance | undefined): string | null {
+  if (!faceInstance) return null;
+  const genderLabel = getGenderLabel(faceInstance.estimated_gender);
+  const genderConfidence =
+    typeof faceInstance.age_gender_confidence === "number"
+      ? Math.round(faceInstance.age_gender_confidence * 100)
+      : null;
+  const ageYears =
+    typeof faceInstance.estimated_age_years === "number"
+      ? Math.round(faceInstance.estimated_age_years)
+      : null;
+
+  if (!genderLabel && ageYears == null) {
+    return null;
+  }
+
+  const parts: string[] = [];
+  if (ageYears != null) {
+    parts.push(`AI age: ${ageYears}`);
+  }
+  if (genderLabel) {
+    parts.push(genderConfidence != null ? `${genderLabel} (${genderConfidence}%)` : genderLabel);
+  }
+  return parts.join(", ");
+}
+
 interface DesktopFaceTagsTabContentProps {
   mediaItemId: string | null;
   sourcePath: string;
@@ -172,8 +198,15 @@ export function DesktopFaceTagsTabContent({
   }, [resolveMediaItemId]);
 
   useEffect(() => {
+    // Clear stale per-image state immediately on item switch. Without this,
+    // a just-opened no-face image can briefly reuse previous image face rows
+    // and synthesize overlays before the async DB fetch resolves.
+    setFaceInstances([]);
+    setEmbeddingSuggestions({});
+    setPendingFaceId(null);
+    setErrorMessage(null);
     void loadFaceInstances();
-  }, [loadFaceInstances]);
+  }, [loadFaceInstances, mediaItemId, sourcePath]);
 
   useEffect(() => {
     if (faceInstances.length === 0 || boundingBoxes.length > 0) return;
@@ -191,7 +224,7 @@ export function DesktopFaceTagsTabContent({
           image_width: inst.ref_image_width ?? undefined,
           image_height: inst.ref_image_height ?? undefined,
         },
-        provider_raw_bounding_box: null,
+        provider_raw_bounding_box: undefined,
         azureFaceAttributes: null,
       }));
       onBoundingBoxesReplace(synthesized);
@@ -395,6 +428,7 @@ export function DesktopFaceTagsTabContent({
               faceInstance && selectValue === SELECT_NONE
                 ? embeddingSuggestions[faceInstance.id] ?? null
                 : null;
+            const ageGenderLine = formatFaceAgeGenderLine(faceInstance);
 
             return (
               <FaceTagsEntryCard
@@ -482,6 +516,7 @@ export function DesktopFaceTagsTabContent({
                       <div>{getCategoryLabel(box.person_category)}</div>
                     ) : null}
                     {box.gender ? <div>{getGenderLabel(box.gender)}</div> : null}
+                    {ageGenderLine ? <div>{ageGenderLine}</div> : null}
                   </div>
                 }
               />
