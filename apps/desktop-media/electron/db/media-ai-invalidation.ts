@@ -1,4 +1,4 @@
-import { MULTIMODAL_EMBED_MODEL } from "../semantic-embeddings";
+import { normalizeMetadata } from "@emk/media-metadata-core";
 import { getDesktopDatabase } from "./client";
 import { DEFAULT_LIBRARY_ID } from "./folder-analysis-status";
 
@@ -29,6 +29,10 @@ export function invalidateMediaItemAiAfterMetadataRefresh(params: {
   const libraryId = params.libraryId ?? DEFAULT_LIBRARY_ID;
   const db = getDesktopDatabase();
   const now = new Date().toISOString();
+  const row = db
+    .prepare(`SELECT ai_metadata FROM media_items WHERE id = ? AND library_id = ? LIMIT 1`)
+    .get(params.mediaItemId, libraryId) as { ai_metadata: string | null } | undefined;
+  const sanitizedAiMetadata = sanitizeAiMetadataAfterContentRefresh(row?.ai_metadata, now);
   db.prepare(
     `UPDATE media_items
      SET photo_analysis_processed_at = NULL,
@@ -37,15 +41,53 @@ export function invalidateMediaItemAiAfterMetadataRefresh(params: {
          face_detection_processed_at = NULL,
          face_detection_failed_at = NULL,
          face_detection_error = NULL,
+         ai_metadata = ?,
          updated_at = ?
      WHERE id = ? AND library_id = ?`,
-  ).run(now, params.mediaItemId, libraryId);
+  ).run(sanitizedAiMetadata, now, params.mediaItemId, libraryId);
 
+  // Remove stale search vectors from the prior file bytes (both image and text embeddings).
   db.prepare(
     `DELETE FROM media_embeddings
      WHERE media_item_id = ?
-       AND library_id = ?
-       AND embedding_type = 'image'
-       AND model_version = ?`,
-  ).run(params.mediaItemId, libraryId, MULTIMODAL_EMBED_MODEL);
+       AND library_id = ?`,
+  ).run(params.mediaItemId, libraryId);
+
+  // Remove stale face detections/tags tied to previous file content at the same path.
+  db.prepare(
+    `DELETE FROM media_face_instances
+     WHERE media_item_id = ?
+       AND library_id = ?`,
+  ).run(params.mediaItemId, libraryId);
+}
+
+function sanitizeAiMetadataAfterContentRefresh(
+  aiMetadataRaw: string | null | undefined,
+  metadataExtractedAt: string,
+): string {
+  const normalized = normalizeMetadata(parseJson(aiMetadataRaw));
+  const next = normalizeMetadata({
+    schema_version: "2.0",
+    technical: normalized.technical ?? undefined,
+    embedded: normalized.embedded ?? undefined,
+    provenance: {
+      ...(normalized.provenance ?? {}),
+      metadata_extracted_at: metadataExtractedAt,
+      sources: {
+        ...(normalized.provenance?.sources ?? {}),
+      },
+    },
+  });
+  return JSON.stringify(next);
+}
+
+function parseJson(value: string | null | undefined): unknown {
+  if (!value) {
+    return null;
+  }
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
 }

@@ -148,9 +148,15 @@ export async function upsertMediaItemFromFilePath(params: {
 
   const currentMtime = observedState?.mtimeMs ?? null;
   const currentSize = observedState?.fileSize ?? null;
+  const contentHashChanged =
+    !!existingByPath &&
+    typeof contentHash === "string" &&
+    contentHash.length > 0 &&
+    contentHash !== existingByPath.content_hash;
   const requiresRefresh =
     isDuplicateLink ||
     !existing ||
+    contentHashChanged ||
     (existingByPath &&
       existingByPath.file_mtime_ms === currentMtime &&
       existingByPath.byte_size === currentSize &&

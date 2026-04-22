@@ -218,6 +218,132 @@ describe.skipIf(!HAS_SQLITE)("upsertMediaItemFromFilePath — duplicate content 
     expect(row.content_hash).toBe(hashB);
   });
 
+  it("updates when hash changes even if mtime and size are unchanged", async () => {
+    const p = path.join(tmpDir, "stable-slot.jpg");
+    fs.copyFileSync(FIXTURE_FACE, p);
+    const hashA = `${"ab".repeat(32)}`;
+    const hashB = `${"cd".repeat(32)}`;
+
+    const initialObserved = observedForPath(p, hashA);
+    const r1 = await dbm.upsertMediaItemFromFilePath({
+      filePath: p,
+      observedState: initialObserved,
+    });
+    expect(r1.status).toBe("created");
+    expect(r1.mediaItemId).toBeTruthy();
+
+    const r2 = await dbm.upsertMediaItemFromFilePath({
+      filePath: p,
+      observedState: {
+        ...initialObserved,
+        strongHash: hashB,
+      },
+    });
+
+    expect(r2.status).toBe("updated");
+    expect(r2.mediaItemId).toBe(r1.mediaItemId);
+
+    const db = dbm.getDesktopDatabase();
+    const row = db
+      .prepare(`SELECT content_hash FROM media_items WHERE library_id = ? AND source_path = ?`)
+      .get(DEFAULT_LIBRARY_ID, p) as { content_hash: string | null };
+    expect(row.content_hash).toBe(hashB);
+  });
+
+  it("clears stale AI payload and face instances when the same path gets new bytes", async () => {
+    const p = path.join(tmpDir, "replace-me.jpg");
+    fs.copyFileSync(FIXTURE_FACE, p);
+    const hashA = `${"01".repeat(32)}`;
+    const hashB = `${"02".repeat(32)}`;
+
+    const first = await dbm.upsertMediaItemFromFilePath({
+      filePath: p,
+      observedState: observedForPath(p, hashA),
+    });
+    expect(first.status).toBe("created");
+    expect(first.mediaItemId).toBeTruthy();
+    const mediaItemId = first.mediaItemId!;
+
+    const db = dbm.getDesktopDatabase();
+    const now = new Date().toISOString();
+    const staleAi = {
+      schema_version: "2.0",
+      ai: {
+        title: "old title",
+        description: "old description",
+      },
+      people: {
+        number_of_people: 2,
+        detections: {
+          people_bounding_boxes: [{ person_category: "adult" }],
+        },
+      },
+      orientation_detection: {
+        source: "image-orientation-classifier",
+        correction_angle_clockwise: 90,
+      },
+      technical: {
+        capture: {
+          camera_make: "OldCam",
+        },
+      },
+      embedded: {
+        title: "old embedded title",
+      },
+    };
+    db.prepare(
+      `UPDATE media_items
+       SET ai_metadata = ?,
+           photo_analysis_processed_at = ?,
+           face_detection_processed_at = ?,
+           updated_at = ?
+       WHERE id = ? AND library_id = ?`,
+    ).run(JSON.stringify(staleAi), now, now, now, mediaItemId, DEFAULT_LIBRARY_ID);
+
+    db.prepare(
+      `INSERT INTO media_face_instances (
+        id, library_id, media_item_id, source, confidence, created_at, updated_at
+      ) VALUES (?, ?, ?, 'auto', ?, ?, ?)`,
+    ).run(randomUUID(), DEFAULT_LIBRARY_ID, mediaItemId, 0.99, now, now);
+
+    fs.copyFileSync(FIXTURE_ID, p);
+    const second = await dbm.upsertMediaItemFromFilePath({
+      filePath: p,
+      observedState: observedForPath(p, hashB),
+    });
+    expect(second.status).toBe("updated");
+    expect(second.mediaItemId).toBe(mediaItemId);
+
+    const refreshed = db
+      .prepare(
+        `SELECT ai_metadata, photo_analysis_processed_at, face_detection_processed_at
+         FROM media_items
+         WHERE id = ? AND library_id = ?`,
+      )
+      .get(mediaItemId, DEFAULT_LIBRARY_ID) as {
+      ai_metadata: string | null;
+      photo_analysis_processed_at: string | null;
+      face_detection_processed_at: string | null;
+    };
+    expect(refreshed.photo_analysis_processed_at).toBeNull();
+    expect(refreshed.face_detection_processed_at).toBeNull();
+    expect(refreshed.ai_metadata).toBeTruthy();
+    const parsed = JSON.parse(refreshed.ai_metadata ?? "{}") as Record<string, unknown>;
+    expect(parsed.orientation_detection).toBeUndefined();
+    expect(parsed.ai).toBeUndefined();
+    const embedded = parsed.embedded as Record<string, unknown> | undefined;
+    expect(embedded?.title).toBeNull();
+
+    const faceRows = db
+      .prepare(
+        `SELECT COUNT(*) AS c
+         FROM media_face_instances
+         WHERE media_item_id = ? AND library_id = ?`,
+      )
+      .get(mediaItemId, DEFAULT_LIBRARY_ID) as { c: number };
+    expect(faceRows.c).toBe(0);
+  });
+
   it("soft-deletes catalog rows when reconcile sees files removed from disk", async () => {
     const p1 = path.join(tmpDir, "keep.jpg");
     const p2 = path.join(tmpDir, "gone.jpg");
