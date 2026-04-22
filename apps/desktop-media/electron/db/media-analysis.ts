@@ -221,6 +221,12 @@ export function upsertPhotoAnalysisResult(
         }
       }
 
+      delete merged.rotation_decision;
+      delete merged.two_pass_rotation_consistency;
+      delete merged.face_rotation_override;
+
+      merged.edit_suggestions = stripRotateEditSuggestions(merged.edit_suggestions);
+
       return merged;
     })(),
   );
@@ -371,6 +377,48 @@ export interface ImageOrientationClassifierResult {
   model: string;
 }
 
+export interface OrientationDetectionState {
+  source: "image-orientation-classifier" | "face_landmarks";
+  correctionAngleClockwise: 0 | 90 | 180 | 270;
+  confidence: number | null;
+  processedAt: string;
+}
+
+export function getOrientationDetectionStateByPath(
+  photoPath: string,
+  libraryId = DEFAULT_LIBRARY_ID,
+): OrientationDetectionState | null {
+  const db = getDesktopDatabase();
+  const row = db
+    .prepare(
+      `SELECT ai_metadata FROM media_items WHERE library_id = ? AND source_path = ? LIMIT 1`,
+    )
+    .get(libraryId, photoPath) as { ai_metadata: string | null } | undefined;
+  const parsed = parseJson(row?.ai_metadata) as Record<string, unknown> | null;
+  if (!parsed || typeof parsed !== "object") return null;
+  const node = parsed.orientation_detection;
+  if (!node || typeof node !== "object") return null;
+  const rec = node as Record<string, unknown>;
+  const source = rec.source;
+  const angle = rec.correction_angle_clockwise;
+  const confidence = rec.confidence;
+  const processedAt = rec.processed_at;
+  if (
+    (source !== "image-orientation-classifier" && source !== "face_landmarks") ||
+    (angle !== 0 && angle !== 90 && angle !== 180 && angle !== 270) ||
+    typeof processedAt !== "string" ||
+    processedAt.trim().length === 0
+  ) {
+    return null;
+  }
+  return {
+    source,
+    correctionAngleClockwise: angle,
+    confidence: typeof confidence === "number" ? confidence : null,
+    processedAt,
+  };
+}
+
 export function upsertFaceDetectionResult(
   photoPath: string,
   result: FaceDetectionOutput,
@@ -418,7 +466,6 @@ export function upsertFaceDetectionResult(
     .prepare(`SELECT ai_metadata FROM media_items WHERE id = ? LIMIT 1`)
     .get(mediaItem.id) as { ai_metadata: string | null } | undefined;
 
-  const faceOrientation = computeFaceOrientation(result);
   const faceDetectionMethod = detectorModelToFaceDetectionMethod(detectorModelId);
 
   const merged = mergeMetadataV2(parseJson(existingAiMetadata?.ai_metadata), {
@@ -432,7 +479,7 @@ export function upsertFaceDetectionResult(
           result.peopleBoundingBoxes.length > 0
             ? normalizeFaceBeingBoxes(result.peopleBoundingBoxes)
             : null,
-        face_orientation: faceOrientation,
+        face_orientation: null,
       },
     },
     provenance: {
@@ -444,33 +491,7 @@ export function upsertFaceDetectionResult(
     },
   });
 
-  merged.edit_suggestions = mergeRotationEditSuggestion(
-    merged.edit_suggestions,
-    faceOrientation,
-    "face-detection",
-  );
-
-  if (imageOrientationClassifier) {
-    const classifierOrientation: FaceOrientationMetadata = {
-      orientation:
-        imageOrientationClassifier.correctionAngleClockwise === 0
-          ? "upright"
-          : imageOrientationClassifier.correctionAngleClockwise === 90
-            ? "rotated_90_cw"
-            : imageOrientationClassifier.correctionAngleClockwise === 180
-              ? "rotated_180"
-              : "rotated_270_cw",
-      correction_angle_clockwise:
-        imageOrientationClassifier.correctionAngleClockwise,
-      confidence: imageOrientationClassifier.confidence,
-      face_count: 0,
-    };
-    merged.edit_suggestions = mergeRotationEditSuggestion(
-      merged.edit_suggestions,
-      classifierOrientation,
-      "image-orientation-classifier",
-    );
-  }
+  merged.edit_suggestions = stripRotateEditSuggestions(merged.edit_suggestions);
 
   const nextAiMetadata = JSON.stringify(merged);
 
@@ -644,6 +665,57 @@ export function upsertFaceDetectionResult(
   return mediaItem.id;
 }
 
+export function upsertOrientationDetectionResult(
+  photoPath: string,
+  input: {
+    source: "image-orientation-classifier" | "face_landmarks";
+    correctionAngleClockwise: 0 | 90 | 180 | 270;
+    confidence: number | null;
+    model?: string | null;
+  },
+  libraryId = DEFAULT_LIBRARY_ID,
+): string | null {
+  const db = getDesktopDatabase();
+  const now = new Date().toISOString();
+  const filename = path.basename(photoPath);
+  db.prepare(
+    `INSERT INTO media_items (
+      id, library_id, source_path, filename, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(library_id, source_path) DO UPDATE SET
+      filename = excluded.filename,
+      updated_at = excluded.updated_at`,
+  ).run(randomUUID(), libraryId, photoPath, filename, now, now);
+
+  const mediaItem = db
+    .prepare(`SELECT id, ai_metadata FROM media_items WHERE library_id = ? AND source_path = ? LIMIT 1`)
+    .get(libraryId, photoPath) as { id: string; ai_metadata: string | null } | undefined;
+  if (!mediaItem) return null;
+
+  const merged = mergeMetadataV2(parseJson(mediaItem.ai_metadata), {
+    schema_version: "2.0",
+  }) as Record<string, unknown>;
+
+  const current = getOrientationDetectionStateByPath(photoPath, libraryId);
+  const currentRank = current?.source === "image-orientation-classifier" ? 2 : current ? 1 : 0;
+  const nextRank = input.source === "image-orientation-classifier" ? 2 : 1;
+  if (nextRank >= currentRank) {
+    merged.orientation_detection = {
+      source: input.source,
+      correction_angle_clockwise: input.correctionAngleClockwise,
+      confidence: input.confidence,
+      model: input.model ?? null,
+      processed_at: now,
+    };
+    merged.edit_suggestions = stripRotateEditSuggestions(merged.edit_suggestions);
+  }
+
+  db.prepare(
+    `UPDATE media_items SET ai_metadata = ?, updated_at = ? WHERE id = ?`,
+  ).run(JSON.stringify(merged), now, mediaItem.id);
+  return mediaItem.id;
+}
+
 function detectorModelToFaceDetectionMethod(
   detectorModelId: FaceDetectorModelId,
 ): FaceDetectionMethod {
@@ -671,13 +743,13 @@ function detectorModelToFaceDetectionMethod(
  * `source` are replaced.
  */
 export type RotationSuggestionSource =
-  | "face-detection"
+  | "face_landmarks"
   | "photo-analysis"
   | "image-orientation-classifier";
 
 function reasonForRotationSource(source: RotationSuggestionSource): string {
   switch (source) {
-    case "face-detection":
+    case "face_landmarks":
       return "Face-landmark orientation detected during face detection.";
     case "photo-analysis":
       return "Rotation suggested by photo-analysis pipeline.";
@@ -791,8 +863,6 @@ export function upsertRotationPipelineFaces(
       .prepare(`SELECT ai_metadata FROM media_items WHERE id = ? LIMIT 1`)
       .get(mediaItem.id) as { ai_metadata: string | null } | undefined;
 
-    const rotFaceOrientation = computeFaceOrientation(faces);
-
     const rotMerged = mergeMetadataV2(parseJson(existingAiMetadata?.ai_metadata), {
       schema_version: "2.0",
       people: {
@@ -804,7 +874,7 @@ export function upsertRotationPipelineFaces(
             faces.peopleBoundingBoxes.length > 0
               ? normalizeFaceBeingBoxes(faces.peopleBoundingBoxes)
               : null,
-          face_orientation: rotFaceOrientation,
+          face_orientation: null,
         },
       },
       provenance: {
@@ -816,11 +886,7 @@ export function upsertRotationPipelineFaces(
       },
     });
 
-    rotMerged.edit_suggestions = mergeRotationEditSuggestion(
-      rotMerged.edit_suggestions,
-      rotFaceOrientation,
-      "face-detection",
-    );
+    rotMerged.edit_suggestions = stripRotateEditSuggestions(rotMerged.edit_suggestions);
 
     const nextAiMetadata = JSON.stringify(rotMerged);
 
@@ -910,6 +976,18 @@ function computeFaceOrientation(result: FaceDetectionOutput): FaceOrientationMet
     confidence: rotation.confidence,
     face_count: rotation.faceCount,
   };
+}
+
+function stripRotateEditSuggestions(input: unknown): unknown {
+  if (!Array.isArray(input)) {
+    return input ?? null;
+  }
+  const kept = input.filter((entry) => {
+    if (!entry || typeof entry !== "object") return true;
+    const rec = entry as Record<string, unknown>;
+    return rec.edit_type !== "rotate";
+  });
+  return kept.length > 0 ? kept : null;
 }
 
 function parseJson(value: string | null | undefined): unknown {

@@ -161,6 +161,7 @@ export const IPC_CHANNELS = {
 export interface AppSettings {
   libraryRoots: string[];
   sidebarCollapsed: boolean;
+  wrongImageRotationDetection: WrongImageRotationDetectionSettings;
   faceDetection: FaceDetectionSettings;
   photoAnalysis: PhotoAnalysisSettings;
   folderScanning: FolderScanningSettings;
@@ -250,13 +251,8 @@ export interface FaceDetectionSettings {
    * When false, re-running detection replaces all `source='auto'` rows (old behavior).
    */
   keepUnmatchedTaggedFaces: boolean;
-  /**
-   * Whole-image orientation classifier (EfficientNetV2). When enabled, runs before the face
-   * detector and rotates the image in memory if a non-zero correction is suggested.
-   * Also usable as a standalone folder pipeline ("Detect wrongly rotated images").
-   */
+  /** Model selection for the global wrong-rotation precheck classifier. */
   imageOrientationDetection: {
-    enabled: boolean;
     model: ImageOrientationModelId;
   };
   /**
@@ -387,7 +383,6 @@ export interface PhotoAnalysisSettings {
   /** Longest edge in pixels when `downscaleBeforeLlm` is true (typical range 512–2048). */
   downscaleLongestSidePx: number;
   enableTwoPassRotationConsistency: boolean;
-  useFaceFeaturesForRotation: boolean;
   extractInvoiceData: boolean;
   /**
    * When face detection and AI search indexing are complete for a subtree but image analysis is not,
@@ -395,6 +390,20 @@ export interface PhotoAnalysisSettings {
    * `green` matches the “all pipelines complete” square (success); use when you want a calm, complete look.
    */
   folderIconWhenPhotoAnalysisPending: PhotoPendingFolderIconTint;
+}
+
+export interface WrongImageRotationDetectionSettings {
+  /**
+   * Analyze image rotation need before running AI pipelines (semantic index,
+   * face detection, AI image analysis). If already processed for a media item,
+   * later pipelines skip re-running the check.
+   */
+  enabled: boolean;
+  /**
+   * Fallback method: if classifier is unavailable or cannot provide a usable
+   * signal, try face landmark features (when available) to infer orientation.
+   */
+  useFaceLandmarkFeaturesFallback: boolean;
 }
 
 /** Single-folder image count threshold for automatic metadata scan after folder selection. */
@@ -462,7 +471,6 @@ export const DEFAULT_FACE_DETECTION_SETTINGS: FaceDetectionSettings = {
   preserveTaggedFacesMinIoU: 0.5,
   keepUnmatchedTaggedFaces: true,
   imageOrientationDetection: {
-    enabled: true,
     model: "deep-image-orientation-v1",
   },
   faceLandmarkRefinement: {
@@ -481,9 +489,13 @@ export const DEFAULT_PHOTO_ANALYSIS_SETTINGS: PhotoAnalysisSettings = {
   downscaleBeforeLlm: true,
   downscaleLongestSidePx: 1024,
   enableTwoPassRotationConsistency: true,
-  useFaceFeaturesForRotation: true,
   extractInvoiceData: true,
   folderIconWhenPhotoAnalysisPending: "amber",
+};
+
+export const DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS: WrongImageRotationDetectionSettings = {
+  enabled: true,
+  useFaceLandmarkFeaturesFallback: true,
 };
 
 export const DEFAULT_FOLDER_SCANNING_SETTINGS: FolderScanningSettings = {
@@ -517,6 +529,7 @@ export const DEFAULT_MEDIA_VIEWER_SETTINGS: MediaViewerSettings = {
 export const DEFAULT_APP_SETTINGS: Omit<AppSettings, "clientId"> = {
   libraryRoots: [],
   sidebarCollapsed: false,
+  wrongImageRotationDetection: DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS,
   faceDetection: DEFAULT_FACE_DETECTION_SETTINGS,
   photoAnalysis: DEFAULT_PHOTO_ANALYSIS_SETTINGS,
   folderScanning: DEFAULT_FOLDER_SCANNING_SETTINGS,

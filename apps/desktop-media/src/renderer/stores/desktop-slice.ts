@@ -6,6 +6,7 @@ import {
   DEFAULT_MEDIA_VIEWER_SETTINGS,
   DEFAULT_PATH_EXTRACTION_SETTINGS,
   DEFAULT_PHOTO_ANALYSIS_SETTINGS,
+  DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS,
   type AiImageSearchSettings,
   type FaceDetectionSettings,
   type FolderAiSidebarRollup,
@@ -17,6 +18,7 @@ import {
   type PathExtractionSettings,
   type PhotoAnalysisSettings,
   type MetadataManualScanResultPayload,
+  type WrongImageRotationDetectionSettings,
 } from "../../shared/ipc";
 
 export interface DesktopSlice {
@@ -40,6 +42,7 @@ export interface DesktopSlice {
 
   isFolderLoading: boolean;
   faceDetectionSettings: FaceDetectionSettings;
+  wrongImageRotationDetectionSettings: WrongImageRotationDetectionSettings;
   photoAnalysisSettings: PhotoAnalysisSettings;
   folderScanningSettings: FolderScanningSettings;
   aiImageSearchSettings: AiImageSearchSettings;
@@ -97,6 +100,11 @@ export interface DesktopSlice {
   setMetadataManualScanResult: (payload: MetadataManualScanResultPayload | null) => void;
   setFolderLoading: (loading: boolean) => void;
   setFaceDetectionSettings: (settings: FaceDetectionSettings) => void;
+  setWrongImageRotationDetectionSettings: (settings: WrongImageRotationDetectionSettings) => void;
+  updateWrongImageRotationDetectionSetting: <K extends keyof WrongImageRotationDetectionSettings>(
+    key: K,
+    value: WrongImageRotationDetectionSettings[K],
+  ) => void;
   updateFaceDetectionSetting: <K extends keyof FaceDetectionSettings>(
     key: K,
     value: FaceDetectionSettings[K],
@@ -153,6 +161,7 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   metadataManualScanResult: null,
   isFolderLoading: false,
   faceDetectionSettings: { ...DEFAULT_FACE_DETECTION_SETTINGS },
+  wrongImageRotationDetectionSettings: { ...DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS },
   photoAnalysisSettings: { ...DEFAULT_PHOTO_ANALYSIS_SETTINGS },
   folderScanningSettings: { ...DEFAULT_FOLDER_SCANNING_SETTINGS },
   aiImageSearchSettings: { ...DEFAULT_AI_IMAGE_SEARCH_SETTINGS },
@@ -264,6 +273,16 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   setFaceDetectionSettings: (settings) =>
     set((state) => {
       state.faceDetectionSettings = settings;
+    }),
+
+  setWrongImageRotationDetectionSettings: (settings) =>
+    set((state) => {
+      state.wrongImageRotationDetectionSettings = settings;
+    }),
+
+  updateWrongImageRotationDetectionSetting: (key, value) =>
+    set((state) => {
+      state.wrongImageRotationDetectionSettings[key] = value;
     }),
 
   updateFaceDetectionSetting: (key, value) =>

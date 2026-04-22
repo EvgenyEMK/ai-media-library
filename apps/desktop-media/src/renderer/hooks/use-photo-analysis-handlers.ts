@@ -81,7 +81,6 @@ export function usePhotoAnalysisHandlers(opts: {
           downscaleBeforeLlm: photoAnalysisSettings.downscaleBeforeLlm,
           downscaleLongestSidePx: photoAnalysisSettings.downscaleLongestSidePx,
           enableTwoPassRotationConsistency: photoAnalysisSettings.enableTwoPassRotationConsistency,
-          useFaceFeaturesForRotation: photoAnalysisSettings.useFaceFeaturesForRotation,
           extractInvoiceData: photoAnalysisSettings.extractInvoiceData,
           concurrency: 2,
         });

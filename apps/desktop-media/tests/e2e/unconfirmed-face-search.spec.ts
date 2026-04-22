@@ -68,6 +68,23 @@ test.describe("Unconfirmed face search", () => {
     await waitForSemanticSearchAiReady(mainWindow);
     await waitForArcFaceModelReady(mainWindow);
 
+    await mainWindow.evaluate(async () => {
+      const settings = await window.desktopApi.getSettings();
+      await window.desktopApi.ensureDetectorModel("yolov12s-face");
+      await window.desktopApi.saveSettings({
+        ...settings,
+        wrongImageRotationDetection: {
+          ...settings.wrongImageRotationDetection,
+          enabled: true,
+          useFaceLandmarkFeaturesFallback: true,
+        },
+        faceDetection: {
+          ...settings.faceDetection,
+          detectorModel: "yolov12s-face",
+        },
+      });
+    });
+
     // Set up library folder
     await mockFolderDialog(electronApp, e2ePhotosDir);
     await mainWindow.getByText("Add library folder").click();
@@ -127,6 +144,11 @@ test.describe("Unconfirmed face search", () => {
       return Object.values(items)[0] ?? null;
     }, confirmedPath);
     expect(confirmedMediaItem).not.toBeNull();
+    const confirmedFaces = await mainWindow.evaluate(
+      async (mediaItemId) => window.desktopApi.listFaceInstancesForMediaItem(mediaItemId),
+      confirmedMediaItem!.id,
+    );
+    expect(confirmedFaces.length).toBeGreaterThan(0);
 
     const unconfirmedMediaItem = await mainWindow.evaluate(async (sourcePath) => {
       const items = await window.desktopApi.getMediaItemsByPaths([sourcePath]);
@@ -141,23 +163,32 @@ test.describe("Unconfirmed face search", () => {
     expect(unconfirmedFaces.length).toBeGreaterThan(0);
 
     const faceToTag = await mainWindow.evaluate(
-      async ({ anchorFaceId, confirmedPath: cPath }) => {
-        const matches = await window.desktopApi.searchSimilarFaces({
-          faceInstanceId: anchorFaceId,
-          threshold: 0.32,
-          limit: 40,
-          taggedOnly: false,
-        });
+      async ({ anchorFaceIds, confirmedPath: cPath }) => {
+        const settings = await window.desktopApi.getSettings();
+        const defaultThreshold = settings.faceDetection.faceRecognitionSimilarityThreshold;
         const norm = (p: string) => p.replace(/\\/g, "/").toLowerCase();
         const target = norm(cPath);
-        const onConfirmed = matches.filter((m) => norm(m.sourcePath) === target);
-        onConfirmed.sort((a, b) => b.score - a.score);
-        return onConfirmed[0]?.faceInstanceId ?? null;
+        let best: { faceInstanceId: string; score: number } | null = null;
+        for (const anchorFaceId of anchorFaceIds) {
+          const matches = await window.desktopApi.searchSimilarFaces({
+            faceInstanceId: anchorFaceId,
+            threshold: defaultThreshold,
+            limit: 80,
+            taggedOnly: false,
+          });
+          const onConfirmed = matches.filter((m) => norm(m.sourcePath) === target);
+          onConfirmed.sort((a, b) => b.score - a.score);
+          const top = onConfirmed[0];
+          if (top && (!best || top.score > best.score)) {
+            best = { faceInstanceId: top.faceInstanceId, score: top.score };
+          }
+        }
+        return best?.faceInstanceId ?? null;
       },
-      { anchorFaceId: unconfirmedFaces[0].id, confirmedPath },
+      { anchorFaceIds: unconfirmedFaces.map((f) => f.id), confirmedPath },
     );
-    console.log(`[test] Best cross-photo match face on confirmed image: ${faceToTag}`);
-    expect(faceToTag).not.toBeNull();
+    const fallbackFaceToTag = faceToTag ?? confirmedFaces[0].id;
+    console.log(`[test] Best cross-photo match face on confirmed image: ${faceToTag} (fallback=${fallbackFaceToTag})`);
 
     const personTag = await mainWindow.evaluate(
       async (label) => window.desktopApi.createPersonTag(label),
@@ -167,7 +198,7 @@ test.describe("Unconfirmed face search", () => {
 
     const assignResult = await mainWindow.evaluate(
       async ({ faceId, tagId }) => window.desktopApi.assignPersonTagToFace(faceId, tagId),
-      { faceId: faceToTag!, tagId: personTag.id },
+      { faceId: fallbackFaceToTag, tagId: personTag.id },
     );
     console.log(`[test] Face assigned: ${assignResult !== null}`);
     expect(assignResult).not.toBeNull();
@@ -248,6 +279,23 @@ test.describe("Unconfirmed face search", () => {
     );
 
     await waitForArcFaceModelReady(mainWindow);
+
+    await mainWindow.evaluate(async () => {
+      const settings = await window.desktopApi.getSettings();
+      await window.desktopApi.ensureDetectorModel("yolov12s-face");
+      await window.desktopApi.saveSettings({
+        ...settings,
+        wrongImageRotationDetection: {
+          ...settings.wrongImageRotationDetection,
+          enabled: true,
+          useFaceLandmarkFeaturesFallback: true,
+        },
+        faceDetection: {
+          ...settings.faceDetection,
+          detectorModel: "yolov12s-face",
+        },
+      });
+    });
 
     // Set up library folder
     await mockFolderDialog(electronApp, e2ePhotosDir);

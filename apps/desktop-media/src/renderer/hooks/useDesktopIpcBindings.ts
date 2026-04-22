@@ -105,6 +105,7 @@ export function useDesktopInitialization(): void {
           s.clientId = settings.clientId;
           s.libraryRoots = settings.libraryRoots;
           s.sidebarCollapsed = settings.sidebarCollapsed;
+          s.wrongImageRotationDetectionSettings = settings.wrongImageRotationDetection;
           s.faceDetectionSettings = settings.faceDetection;
           s.photoAnalysisSettings = {
             ...DEFAULT_PHOTO_ANALYSIS_SETTINGS,
@@ -252,10 +253,12 @@ export function useDesktopSettingsPersistence(): void {
             prev.faceDetectionSettings.faceGroupPairwiseSimilarityThreshold ||
           state.faceDetectionSettings.faceGroupMinSize !==
             prev.faceDetectionSettings.faceGroupMinSize ||
-          state.faceDetectionSettings.imageOrientationDetection.enabled !==
-            prev.faceDetectionSettings.imageOrientationDetection.enabled ||
           state.faceDetectionSettings.imageOrientationDetection.model !==
             prev.faceDetectionSettings.imageOrientationDetection.model ||
+          state.wrongImageRotationDetectionSettings.enabled !==
+            prev.wrongImageRotationDetectionSettings.enabled ||
+          state.wrongImageRotationDetectionSettings.useFaceLandmarkFeaturesFallback !==
+            prev.wrongImageRotationDetectionSettings.useFaceLandmarkFeaturesFallback ||
           state.faceDetectionSettings.faceLandmarkRefinement.enabled !==
             prev.faceDetectionSettings.faceLandmarkRefinement.enabled ||
           state.faceDetectionSettings.faceLandmarkRefinement.model !==
@@ -274,8 +277,6 @@ export function useDesktopSettingsPersistence(): void {
             prev.photoAnalysisSettings.downscaleLongestSidePx ||
           state.photoAnalysisSettings.enableTwoPassRotationConsistency !==
             prev.photoAnalysisSettings.enableTwoPassRotationConsistency ||
-          state.photoAnalysisSettings.useFaceFeaturesForRotation !==
-            prev.photoAnalysisSettings.useFaceFeaturesForRotation ||
           state.photoAnalysisSettings.extractInvoiceData !==
             prev.photoAnalysisSettings.extractInvoiceData ||
           state.photoAnalysisSettings.folderIconWhenPhotoAnalysisPending !==
@@ -317,6 +318,7 @@ export function useDesktopSettingsPersistence(): void {
             clientId: state.clientId,
             libraryRoots: state.libraryRoots,
             sidebarCollapsed: state.sidebarCollapsed,
+            wrongImageRotationDetection: state.wrongImageRotationDetectionSettings,
             faceDetection: state.faceDetectionSettings,
             photoAnalysis: state.photoAnalysisSettings,
             folderScanning: state.folderScanningSettings,

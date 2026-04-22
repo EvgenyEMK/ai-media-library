@@ -10,6 +10,7 @@ import {
   DEFAULT_MEDIA_VIEWER_SETTINGS,
   DEFAULT_PATH_EXTRACTION_SETTINGS,
   DEFAULT_PHOTO_ANALYSIS_SETTINGS,
+  DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS,
   FACE_DETECTOR_MODEL_OPTIONS,
   type AiImageSearchSettings,
   type AppSettings,
@@ -24,6 +25,7 @@ import {
   type PathExtractionSettings,
   type PhotoAnalysisSettings,
   type PhotoPendingFolderIconTint,
+  type WrongImageRotationDetectionSettings,
 } from "../src/shared/ipc";
 
 const DEFAULT_SETTINGS: Omit<AppSettings, "clientId"> = DEFAULT_APP_SETTINGS;
@@ -50,6 +52,11 @@ export async function readSettings(userDataPath: string): Promise<AppSettings> {
       typeof parsed.sidebarCollapsed === "boolean"
         ? parsed.sidebarCollapsed
         : false,
+    wrongImageRotationDetection: sanitizeWrongImageRotationDetectionSettings(
+      parsed.wrongImageRotationDetection,
+      parsed.faceDetection,
+      parsed.photoAnalysis,
+    ),
     faceDetection: sanitizeFaceDetectionSettings(parsed.faceDetection),
     photoAnalysis: sanitizePhotoAnalysisSettings(parsed.photoAnalysis),
     folderScanning: sanitizeFolderScanningSettings(parsed.folderScanning),
@@ -168,11 +175,13 @@ function sanitizeFaceDetectionSettings(candidate: unknown): FaceDetectionSetting
       typeof value.keepUnmatchedTaggedFaces === "boolean"
         ? value.keepUnmatchedTaggedFaces
         : DEFAULT_FACE_DETECTION_SETTINGS.keepUnmatchedTaggedFaces,
-    imageOrientationDetection: sanitizeAuxToggle(
-      value.imageOrientationDetection,
-      "orientation",
-      DEFAULT_FACE_DETECTION_SETTINGS.imageOrientationDetection,
-    ),
+    imageOrientationDetection: {
+      model: sanitizeAuxToggle(
+        value.imageOrientationDetection,
+        "orientation",
+        { enabled: true, model: DEFAULT_FACE_DETECTION_SETTINGS.imageOrientationDetection.model },
+      ).model,
+    },
     faceLandmarkRefinement: sanitizeAuxToggle(
       value.faceLandmarkRefinement,
       "landmarks",
@@ -305,15 +314,43 @@ function sanitizePhotoAnalysisSettings(candidate: unknown): PhotoAnalysisSetting
       typeof value.enableTwoPassRotationConsistency === "boolean"
         ? value.enableTwoPassRotationConsistency
         : DEFAULT_PHOTO_ANALYSIS_SETTINGS.enableTwoPassRotationConsistency,
-    useFaceFeaturesForRotation:
-      typeof value.useFaceFeaturesForRotation === "boolean"
-        ? value.useFaceFeaturesForRotation
-        : DEFAULT_PHOTO_ANALYSIS_SETTINGS.useFaceFeaturesForRotation,
     extractInvoiceData:
       typeof value.extractInvoiceData === "boolean"
         ? value.extractInvoiceData
         : DEFAULT_PHOTO_ANALYSIS_SETTINGS.extractInvoiceData,
     folderIconWhenPhotoAnalysisPending: sanitizePhotoPendingTint(value.folderIconWhenPhotoAnalysisPending),
+  };
+}
+
+function sanitizeWrongImageRotationDetectionSettings(
+  candidate: unknown,
+  legacyFaceDetection: unknown,
+  legacyPhotoAnalysis: unknown,
+): WrongImageRotationDetectionSettings {
+  const value = isRecord(candidate) ? candidate : {};
+  const legacyFace = isRecord(legacyFaceDetection) ? legacyFaceDetection : {};
+  const legacyOrientation = isRecord(legacyFace.imageOrientationDetection)
+    ? legacyFace.imageOrientationDetection
+    : {};
+  const legacyPhoto = isRecord(legacyPhotoAnalysis) ? legacyPhotoAnalysis : {};
+
+  const enabled =
+    typeof value.enabled === "boolean"
+      ? value.enabled
+      : typeof legacyOrientation.enabled === "boolean"
+        ? legacyOrientation.enabled
+        : DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS.enabled;
+
+  const useFaceLandmarkFeaturesFallback =
+    typeof value.useFaceLandmarkFeaturesFallback === "boolean"
+      ? value.useFaceLandmarkFeaturesFallback
+      : typeof legacyPhoto.useFaceFeaturesForRotation === "boolean"
+        ? legacyPhoto.useFaceFeaturesForRotation
+        : DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS.useFaceLandmarkFeaturesFallback;
+
+  return {
+    enabled,
+    useFaceLandmarkFeaturesFallback,
   };
 }
 

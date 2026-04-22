@@ -37,10 +37,6 @@ test.describe("Face detection — Phase 1 auxiliary models (orientation, landmar
         const faceDetection = {
           ...settings.faceDetection,
           detectorModel: "yolov12s-face" as const,
-          imageOrientationDetection: {
-            ...settings.faceDetection.imageOrientationDetection,
-            enabled: true,
-          },
           faceLandmarkRefinement: {
             ...settings.faceDetection.faceLandmarkRefinement,
             enabled: true,
@@ -50,7 +46,15 @@ test.describe("Face detection — Phase 1 auxiliary models (orientation, landmar
             enabled: true,
           },
         };
-        await window.desktopApi.saveSettings({ ...settings, faceDetection });
+        await window.desktopApi.saveSettings({
+          ...settings,
+          faceDetection,
+          wrongImageRotationDetection: {
+            ...settings.wrongImageRotationDetection,
+            enabled: true,
+            useFaceLandmarkFeaturesFallback: true,
+          },
+        });
 
         const ensureDetector = await window.desktopApi.ensureDetectorModel("yolov12s-face");
         if (!ensureDetector.success) {
@@ -117,22 +121,70 @@ test.describe("Face detection — Phase 1 auxiliary models (orientation, landmar
     expect(first.estimated_gender).toMatch(/^(male|female)$/);
     expect(first.age_gender_confidence).toBeGreaterThan(0);
 
-    const editSuggestions = (result.rotatedAiMetadata as { edit_suggestions?: unknown })
-      ?.edit_suggestions;
-    expect(
-      Array.isArray(editSuggestions),
-      "rotated image should carry edit_suggestions from orientation classifier",
-    ).toBe(true);
-    type RotationSuggestion = {
-      edit_type?: string;
-      source?: string;
-      rotation?: { angle_degrees_clockwise?: number };
-    };
-    const list = editSuggestions as RotationSuggestion[];
-    const rotationSuggestion = list.find(
-      (s) => s.edit_type === "rotate" && s.source === "image-orientation-classifier",
-    );
-    expect(rotationSuggestion, "expected a rotation edit suggestion from orientation classifier").toBeTruthy();
-    expect([90, 180, 270]).toContain(rotationSuggestion?.rotation?.angle_degrees_clockwise);
+    const orientationDetection = (result.rotatedAiMetadata as {
+      orientation_detection?: {
+        source?: string;
+        correction_angle_clockwise?: number;
+      };
+    })?.orientation_detection;
+    expect(orientationDetection?.source).toBe("image-orientation-classifier");
+    expect([90, 180, 270]).toContain(orientationDetection?.correction_angle_clockwise);
+  });
+
+  test("orientation precheck is skipped when already processed (face -> semantic)", async ({
+    mainWindow,
+  }) => {
+    test.skip(!assetsPresent(ROTATED_ASSET), `Missing assets under ${e2ePhotosDir}`);
+    const rotatedPath = path.join(e2ePhotosDir, ROTATED_ASSET);
+
+    const result = await mainWindow.evaluate(async ({ rotatedPath, e2ePhotosDir }) => {
+      const settings = await window.desktopApi.getSettings();
+      await window.desktopApi.saveSettings({
+        ...settings,
+        wrongImageRotationDetection: {
+          ...settings.wrongImageRotationDetection,
+          enabled: true,
+          useFaceLandmarkFeaturesFallback: true,
+        },
+      });
+
+      const firstRun = await window.desktopApi.detectFacesForMediaItem(rotatedPath);
+      if (!firstRun.success) {
+        return { ok: false as const, error: "face detection failed" };
+      }
+      const metaAfterFace = (await window.desktopApi.getMediaItemsByPaths([rotatedPath]))[rotatedPath];
+      const firstProcessedAt = (metaAfterFace?.aiMetadata as { orientation_detection?: { processed_at?: string } })
+        ?.orientation_detection?.processed_at;
+      if (!firstProcessedAt) {
+        return { ok: false as const, error: "orientation_detection.processed_at missing after face run" };
+      }
+
+      await window.desktopApi.indexFolderSemanticEmbeddings({
+        folderPath: e2ePhotosDir,
+        mode: "missing",
+        recursive: false,
+      });
+
+      const start = Date.now();
+      while (Date.now() - start < 120_000) {
+        const statuses = await window.desktopApi.getActiveJobStatuses();
+        if (!statuses.semanticIndex) break;
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+
+      const metaAfterSemantic = (await window.desktopApi.getMediaItemsByPaths([rotatedPath]))[rotatedPath];
+      const secondProcessedAt = (metaAfterSemantic?.aiMetadata as { orientation_detection?: { processed_at?: string } })
+        ?.orientation_detection?.processed_at;
+      return {
+        ok: true as const,
+        firstProcessedAt,
+        secondProcessedAt: secondProcessedAt ?? null,
+      };
+    }, { rotatedPath, e2ePhotosDir });
+
+    if (!result.ok) {
+      throw new Error(result.error);
+    }
+    expect(result.secondProcessedAt).toBe(result.firstProcessedAt);
   });
 });

@@ -55,6 +55,17 @@ export type DesktopSemanticListItem = SemanticSearchResult & {
   starRating: number | null;
 };
 
+function getOrientationDetectionRotation(
+  extras: Record<string, unknown>,
+): 90 | 180 | 270 | null {
+  const orientationNode =
+    extras.orientation_detection && typeof extras.orientation_detection === "object"
+      ? (extras.orientation_detection as Record<string, unknown>)
+      : null;
+  const angle = orientationNode?.correction_angle_clockwise;
+  return angle === 90 || angle === 180 || angle === 270 ? angle : null;
+}
+
 export function useFilteredMediaItems(quickFilters: ThumbnailQuickFilterState): {
   filteredMediaItems: DesktopFilteredMediaItem[];
   displaySemanticResults: SemanticSearchResult[];
@@ -203,7 +214,7 @@ export function useFilteredMediaItems(quickFilters: ThumbnailQuickFilterState): 
             .filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null)
             .map((entry): ImageEditSuggestion | null => {
               const editType = typeof entry.edit_type === "string" ? entry.edit_type : null;
-              if (!editType) {
+              if (!editType || editType === "rotate") {
                 return null;
               }
               const priority =
@@ -243,6 +254,16 @@ export function useFilteredMediaItems(quickFilters: ThumbnailQuickFilterState): 
             })
             .filter((entry): entry is ImageEditSuggestion => entry !== null)
         : [];
+      const orientationRotation = getOrientationDetectionRotation(extras);
+      if (orientationRotation !== null) {
+        suggestions.unshift({
+          editType: "rotate",
+          priority: "high",
+          reason: "Orientation detection suggests rotating this image.",
+          rotationAngleClockwise: orientationRotation,
+          cropRel: null,
+        });
+      }
 
       return {
         id: item.id,

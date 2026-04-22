@@ -62,6 +62,9 @@ export function App(): ReactElement {
   const faceStatus = useDesktopStore((s) => s.faceStatus);
   const faceJobId = useDesktopStore((s) => s.faceJobId);
   const faceDetectionSettings = useDesktopStore((s) => s.faceDetectionSettings);
+  const wrongImageRotationDetectionSettings = useDesktopStore(
+    (s) => s.wrongImageRotationDetectionSettings,
+  );
   const photoAnalysisSettings = useDesktopStore((s) => s.photoAnalysisSettings);
   const folderScanningSettings = useDesktopStore((s) => s.folderScanningSettings);
   const aiImageSearchSettings = useDesktopStore((s) => s.aiImageSearchSettings);
@@ -282,6 +285,7 @@ export function App(): ReactElement {
         isSettingsSectionOpen={isSettingsSectionOpen}
         openFacePhotoInViewer={openFacePhotoInViewer}
         faceDetectionSettings={faceDetectionSettings}
+        wrongImageRotationDetectionSettings={wrongImageRotationDetectionSettings}
         photoAnalysisSettings={photoAnalysisSettings}
         folderScanningSettings={folderScanningSettings}
         aiImageSearchSettings={aiImageSearchSettings}

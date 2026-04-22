@@ -48,6 +48,7 @@ test.describe("Rotated face similarity suggestion", () => {
             enabled: true,
           },
         };
+        await window.desktopApi.ensureDetectorModel("yolov12s-face");
         await window.desktopApi.saveSettings({ ...settings, faceDetection });
 
         const baseDetection = await window.desktopApi.detectFacesForMediaItem(
@@ -105,7 +106,7 @@ test.describe("Rotated face similarity suggestion", () => {
           rotatedFaces.map((face) =>
             window.desktopApi.suggestPersonTagForFace({
               faceInstanceId: face.id,
-              threshold: 0.35,
+              threshold: settings.faceDetection.faceRecognitionSimilarityThreshold,
             }),
           ),
         );
@@ -115,7 +116,7 @@ test.describe("Rotated face similarity suggestion", () => {
           extraFaces.map((face) =>
             window.desktopApi.suggestPersonTagForFace({
               faceInstanceId: face.id,
-              threshold: 0.35,
+              threshold: settings.faceDetection.faceRecognitionSimilarityThreshold,
             }),
           ),
         );
