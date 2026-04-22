@@ -319,6 +319,15 @@ The banner states how many files **may need AI pipelines** (new or invalidated-a
 
 When the banner is shown, it offers one-click runs: photo AI (missing), face detection (missing), and AI search indexing (missing) on the **scan root**, scoped recursively with “missing only” behavior (same as before).
 
+### 7.5 Manual metadata scan continuity vs folder-selection auto-scan
+
+When metadata scan is started manually (`Scan for file changes` from sidebar or main-pane actions):
+
+- The scan is treated as a **manual background job** and continues even if the user selects another folder.
+- Selecting another folder still loads that folder's content and keeps the UI interactive.
+- While a manual metadata scan is running, folder-selection **auto metadata scan** for newly selected folders is **skipped**.
+- Auto-scan cancellation-on-selection behavior applies only to **auto-started** metadata scans.
+
 ---
 
 ## 9) Temporary: AI description embedding (migration)

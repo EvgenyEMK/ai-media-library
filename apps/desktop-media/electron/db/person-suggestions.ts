@@ -21,6 +21,17 @@ interface PersonCentroidRow {
   centroid_json: string;
 }
 
+export interface RefreshAllSuggestionsProgress {
+  processedTags: number;
+  totalTags: number;
+  suggestionsWritten: number;
+}
+
+export interface RefreshAllSuggestionsResult {
+  totalSuggestions: number;
+  totalTags: number;
+}
+
 /**
  * Refresh suggestions for a single person tag.
  *
@@ -134,6 +145,13 @@ export function refreshSuggestionsForTag(
 export function refreshAllSuggestions(
   options: { threshold?: number; libraryId?: string } = {},
 ): number {
+  return refreshAllSuggestionsWithProgress(options).totalSuggestions;
+}
+
+export function refreshAllSuggestionsWithProgress(
+  options: { threshold?: number; libraryId?: string } = {},
+  onProgress?: (progress: RefreshAllSuggestionsProgress) => void,
+): RefreshAllSuggestionsResult {
   const libraryId = options.libraryId ?? DEFAULT_LIBRARY_ID;
   const db = getDesktopDatabase();
 
@@ -141,11 +159,16 @@ export function refreshAllSuggestions(
     .prepare(`SELECT tag_id FROM person_centroids WHERE library_id = ?`)
     .all(libraryId) as Array<{ tag_id: string }>;
 
-  let total = 0;
+  const totalTags = tags.length;
+  let totalSuggestions = 0;
+  let processedTags = 0;
+  onProgress?.({ processedTags, totalTags, suggestionsWritten: totalSuggestions });
   for (const tag of tags) {
-    total += refreshSuggestionsForTag(tag.tag_id, { ...options, libraryId });
+    totalSuggestions += refreshSuggestionsForTag(tag.tag_id, { ...options, libraryId });
+    processedTags += 1;
+    onProgress?.({ processedTags, totalTags, suggestionsWritten: totalSuggestions });
   }
-  return total;
+  return { totalSuggestions, totalTags };
 }
 
 /**

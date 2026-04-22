@@ -138,6 +138,7 @@ export function ProgressDockCards({
         <SimilarUntaggedCountsCard
           store={store}
           isSimilarUntaggedCountsRunning={d.isSimilarUntaggedCountsRunning}
+          similarUntaggedCountsJobId={d.similarUntaggedCountsJobId}
           similarUntaggedCountsProgressPercent={d.similarUntaggedCountsProgressPercent}
           similarUntaggedCountsProcessed={d.similarUntaggedCountsProcessed}
           similarUntaggedCountsTotal={d.similarUntaggedCountsTotal}

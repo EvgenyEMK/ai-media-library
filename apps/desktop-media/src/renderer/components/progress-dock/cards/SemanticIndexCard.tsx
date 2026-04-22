@@ -77,19 +77,25 @@ export function SemanticIndexCard({
             />
           </div>
           <div className="text-xs text-muted-foreground">
-            {`Processed: ${formatCountRatio(
-              semanticIndexEta.semanticIndexProcessed,
-              semanticIndexEta.semanticIndexTotal,
-            )}`}
-            {semanticIndexEta.semanticIndexTimeLeftText
-              ? ` | ${UI_TEXT.analysisTimeLeftLabel}: ${semanticIndexEta.semanticIndexTimeLeftText}`
-              : ""}
-            {semanticIndexEta.semanticIndexCounts.failed > 0
-              ? ` | Failed: ${formatCount(semanticIndexEta.semanticIndexCounts.failed)}`
-              : ""}
-            {semanticIndexEta.semanticIndexCounts.cancelled > 0
-              ? ` | Cancelled: ${formatCount(semanticIndexEta.semanticIndexCounts.cancelled)}`
-              : ""}
+            <div className="flex items-center justify-between gap-2">
+              <span>
+                {`Processed: ${formatCountRatio(
+                  semanticIndexEta.semanticIndexProcessed,
+                  semanticIndexEta.semanticIndexTotal,
+                )}`}
+                {semanticIndexEta.semanticIndexCounts.failed > 0
+                  ? ` | Failed: ${formatCount(semanticIndexEta.semanticIndexCounts.failed)}`
+                  : ""}
+                {semanticIndexEta.semanticIndexCounts.cancelled > 0
+                  ? ` | Cancelled: ${formatCount(semanticIndexEta.semanticIndexCounts.cancelled)}`
+                  : ""}
+              </span>
+              {semanticIndexEta.semanticIndexTimeLeftText ? (
+                <span className="shrink-0">
+                  {UI_TEXT.analysisTimeLeftLabel}: {semanticIndexEta.semanticIndexTimeLeftText}
+                </span>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : null}

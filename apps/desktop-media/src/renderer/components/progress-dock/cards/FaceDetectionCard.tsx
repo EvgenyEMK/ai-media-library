@@ -79,14 +79,22 @@ export function FaceDetectionCard({
             />
           </div>
           <div className="text-xs text-muted-foreground">
-            {`Processed: ${formatCountRatio(faceEta.faceProcessed, faceEta.faceTotal)} | Skipped: ${formatCount(faceEta.faceCounts.skipped)} | ${UI_TEXT.faceCountLabel}: ${formatCount(faceEta.faceCounts.faces)}`}
-            {faceEta.faceTimeLeftText
-              ? ` | ${UI_TEXT.analysisTimeLeftLabel}: ${faceEta.faceTimeLeftText}`
-              : ""}
-            {faceEta.faceCounts.failed > 0 ? ` | Failed: ${formatCount(faceEta.faceCounts.failed)}` : ""}
-            {faceEta.faceCounts.cancelled > 0
-              ? ` | Cancelled: ${formatCount(faceEta.faceCounts.cancelled)}`
-              : ""}
+            <div className="flex items-center justify-between gap-2">
+              <span>
+                {`Processed: ${formatCountRatio(faceEta.faceProcessed, faceEta.faceTotal)} | Skipped: ${formatCount(faceEta.faceCounts.skipped)} | ${UI_TEXT.faceCountLabel}: ${formatCount(faceEta.faceCounts.faces)}`}
+                {faceEta.faceCounts.failed > 0
+                  ? ` | Failed: ${formatCount(faceEta.faceCounts.failed)}`
+                  : ""}
+                {faceEta.faceCounts.cancelled > 0
+                  ? ` | Cancelled: ${formatCount(faceEta.faceCounts.cancelled)}`
+                  : ""}
+              </span>
+              {faceEta.faceTimeLeftText ? (
+                <span className="shrink-0">
+                  {UI_TEXT.analysisTimeLeftLabel}: {faceEta.faceTimeLeftText}
+                </span>
+              ) : null}
+            </div>
           </div>
         </div>
       )}

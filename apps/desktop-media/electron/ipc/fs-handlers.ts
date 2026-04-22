@@ -24,12 +24,35 @@ import { runMetadataScanJob } from "./metadata-scan-handlers";
 import { runningMetadataScanJobs } from "./state";
 import { getModelsDirectory } from "../native-face/model-manager";
 import { resolveCacheRoot } from "../app-paths";
+import { releasePowerSave } from "./power-save-manager";
 
 function ts(): string {
   return new Date().toISOString();
 }
 function isDebugEnabled(): boolean {
   return process.env.EMK_DEBUG_PHOTO_AI === "1";
+}
+
+function cancelRunningAutoMetadataScans(): void {
+  for (const job of runningMetadataScanJobs.values()) {
+    if (job.triggerSource !== "auto") {
+      continue;
+    }
+    job.cancelled = true;
+    if (job.powerSaveToken) {
+      releasePowerSave(job.powerSaveToken);
+      job.powerSaveToken = undefined;
+    }
+  }
+}
+
+function hasRunningManualMetadataScan(): boolean {
+  for (const job of runningMetadataScanJobs.values()) {
+    if (job.triggerSource === "manual" && !job.cancelled) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function registerFsHandlers(): void {
@@ -90,7 +113,10 @@ export function registerFsHandlers(): void {
       })),
     ];
     const settings = await readSettings(app.getPath("userData"));
-    if (knownCatalogEntries.length < settings.folderScanning.autoMetadataScanOnSelectMaxFiles) {
+    if (
+      knownCatalogEntries.length < settings.folderScanning.autoMetadataScanOnSelectMaxFiles &&
+      !hasRunningManualMetadataScan()
+    ) {
       void runMetadataScanJob({
         folderPath,
         recursive: false,
@@ -233,16 +259,17 @@ async function runFolderMediaStream(
       );
     }
 
-    for (const job of runningMetadataScanJobs.values()) {
-      job.cancelled = true;
-    }
+    cancelRunningAutoMetadataScans();
     const knownCatalogEntries = observedCatalogPaths.map((p) => ({
       folderPath,
       path: p,
       name: path.basename(p),
     }));
     const settings = await readSettings(app.getPath("userData"));
-    if (knownCatalogEntries.length < settings.folderScanning.autoMetadataScanOnSelectMaxFiles) {
+    if (
+      knownCatalogEntries.length < settings.folderScanning.autoMetadataScanOnSelectMaxFiles &&
+      !hasRunningManualMetadataScan()
+    ) {
       setTimeout(() => {
         void runMetadataScanJob({
           folderPath,
@@ -322,9 +349,7 @@ async function runFolderImagesStream(
       );
     }
 
-    for (const job of runningMetadataScanJobs.values()) {
-      job.cancelled = true;
-    }
+    cancelRunningAutoMetadataScans();
 
     const videos = await listFolderVideos(folderPath);
     const knownCatalogEntries = [
@@ -340,7 +365,10 @@ async function runFolderImagesStream(
       })),
     ];
     const settings = await readSettings(app.getPath("userData"));
-    if (knownCatalogEntries.length < settings.folderScanning.autoMetadataScanOnSelectMaxFiles) {
+    if (
+      knownCatalogEntries.length < settings.folderScanning.autoMetadataScanOnSelectMaxFiles &&
+      !hasRunningManualMetadataScan()
+    ) {
       // Delay scan start so the renderer can complete its pending
       // getMediaItemsByPaths calls for the final stream batches before the
       // scan's synchronous DB work starts competing for the main thread.

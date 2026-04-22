@@ -4,6 +4,7 @@ import { UI_TEXT } from "../../../lib/ui-text";
 import { formatCount, formatCountRatio } from "../../../lib/progress-stats-format";
 import type { DescEmbedBackfillState } from "../types";
 import { ProgressDockCloseButton } from "../ProgressDockCloseButton";
+import { useProgressEta } from "./use-progress-eta";
 
 interface DescEmbedBackfillCardProps {
   descEmbedBackfill: DescEmbedBackfillState;
@@ -20,6 +21,13 @@ export function DescEmbedBackfillCard({
   onCancelDescEmbedBackfill,
   onDismissDescEmbedBackfill,
 }: DescEmbedBackfillCardProps): ReactElement {
+  const descEmbedTimeLeftText = useProgressEta({
+    running: descEmbedRunning,
+    jobId: descEmbedBackfill.jobId,
+    processed: descEmbedBackfill.processed,
+    total: descEmbedBackfill.total,
+  });
+
   return (
     <section className="m-0 rounded-lg border border-border px-2.5 py-2">
       <div className="flex items-center justify-between gap-3">
@@ -57,11 +65,24 @@ export function DescEmbedBackfillCard({
             />
           </div>
           <div className="text-xs text-muted-foreground">
-            {`Processed: ${formatCountRatio(descEmbedBackfill.processed, descEmbedBackfill.total)} | Indexed: ${formatCount(descEmbedBackfill.indexed)}`}
-            {descEmbedBackfill.skipped > 0 ? ` | Skipped: ${formatCount(descEmbedBackfill.skipped)}` : ""}
-            {descEmbedBackfill.failed > 0 ? ` | Failed: ${formatCount(descEmbedBackfill.failed)}` : ""}
-            {descEmbedBackfill.status === "completed" ? " | Done" : ""}
-            {descEmbedBackfill.status === "cancelled" ? " | Cancelled" : ""}
+            <div className="flex items-center justify-between gap-2">
+              <span>
+                {`Processed: ${formatCountRatio(descEmbedBackfill.processed, descEmbedBackfill.total)} | Indexed: ${formatCount(descEmbedBackfill.indexed)}`}
+                {descEmbedBackfill.skipped > 0
+                  ? ` | Skipped: ${formatCount(descEmbedBackfill.skipped)}`
+                  : ""}
+                {descEmbedBackfill.failed > 0
+                  ? ` | Failed: ${formatCount(descEmbedBackfill.failed)}`
+                  : ""}
+                {descEmbedBackfill.status === "completed" ? " | Done" : ""}
+                {descEmbedBackfill.status === "cancelled" ? " | Cancelled" : ""}
+              </span>
+              {descEmbedTimeLeftText ? (
+                <span className="shrink-0">
+                  {UI_TEXT.analysisTimeLeftLabel}: {descEmbedTimeLeftText}
+                </span>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : descEmbedBackfill.status === "completed" ? (

@@ -100,7 +100,11 @@ export function DesktopProgressDock({
       className="absolute bottom-0 left-0 right-0 z-30 flex flex-col border-t border-border bg-[#101623]"
       aria-label={UI_TEXT.progressPanelTitle}
     >
-      <ProgressDockHeader collapsed={collapsed} onToggleCollapsed={onToggleCollapsed} />
+      <ProgressDockHeader
+        collapsed={collapsed}
+        hasAnyRunningOperation={dock.hasAnyRunningOperation}
+        onToggleCollapsed={onToggleCollapsed}
+      />
 
       {!collapsed ? (
         <div className="grid max-h-[180px] gap-2 overflow-auto p-2">
