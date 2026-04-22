@@ -946,11 +946,27 @@ function normalizeFaceBeingBoxes(boxes: FaceDetectionOutput["peopleBoundingBoxes
     person_category: box.person_category ?? null,
     gender: box.gender ?? null,
     person_bounding_box: box.person_bounding_box ?? undefined,
-    person_face_bounding_box: box.person_face_bounding_box ?? null,
+    person_face_bounding_box: normalizeFaceBoxForMetadata(box.person_face_bounding_box ?? null),
     provider_raw_bounding_box: box.provider_raw_bounding_box ?? undefined,
     azureFaceAttributes: box.azureFaceAttributes ?? null,
     detected_features: box.detected_features ?? null,
   }));
+}
+
+function normalizeFaceBoxForMetadata(
+  box: FaceDetectionOutput["peopleBoundingBoxes"][number]["person_face_bounding_box"] | null,
+) {
+  if (!box || typeof box !== "object") {
+    return box ?? null;
+  }
+  const rounded = { ...box } as Record<string, unknown>;
+  if (typeof rounded.width === "number") {
+    rounded.width = Math.round(rounded.width);
+  }
+  if (typeof rounded.height === "number") {
+    rounded.height = Math.round(rounded.height);
+  }
+  return rounded as typeof box;
 }
 
 function computeFaceOrientation(result: FaceDetectionOutput): FaceOrientationMetadata | null {

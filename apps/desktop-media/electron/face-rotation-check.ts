@@ -49,6 +49,8 @@ function getDesktopDatabaseLazy(): MinimalSQLiteDatabase | null {
 const DEFAULT_LIBRARY_ID = "default";
 const HIGH_CONFIDENCE_THRESHOLD = 0.4;
 const MIN_FACES_FOR_STRONG_SIGNAL = 1;
+const PROVIDER_RAW_BBOX_DEBUG =
+  process.env.EMK_DESKTOP_FACE_INCLUDE_PROVIDER_RAW_BOX === "1";
 
 interface ExistingFaceLandmarks {
   landmarks: [number, number][];
@@ -365,10 +367,12 @@ export function transformFacesToOriginalCoordinates(
     gender: null,
     person_bounding_box: null,
     person_face_bounding_box: fromXyxyPixelBox(face.bbox_xyxy, originalSize),
-    provider_raw_bounding_box: buildProviderRawBoundingBoxReference(
-      "retinaface-api",
-      toRawPixelBoundingBox(face.bbox_xyxy, originalSize),
-    ),
+    provider_raw_bounding_box: PROVIDER_RAW_BBOX_DEBUG
+      ? buildProviderRawBoundingBoxReference(
+          detection.modelInfo?.service ?? "face-detector",
+          toRawPixelBoundingBox(face.bbox_xyxy, originalSize),
+        )
+      : null,
     azureFaceAttributes: null,
     detected_features: detection.peopleBoundingBoxes[idx]?.detected_features ?? null,
   }));

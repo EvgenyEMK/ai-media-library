@@ -459,7 +459,7 @@ export interface AiImageSearchSettings {
 }
 
 export const DEFAULT_FACE_DETECTION_SETTINGS: FaceDetectionSettings = {
-  detectorModel: "yolov12s-face",
+  detectorModel: "yolov12l-face",
   minConfidenceThreshold: 0.75,
   minFaceBoxShortSideRatio: 0.03,
   faceBoxOverlapMergeRatio: 0.5,
