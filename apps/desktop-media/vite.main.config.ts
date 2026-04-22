@@ -20,7 +20,7 @@ const external = [
   ...builtinModules.map((moduleName) => `node:${moduleName}`),
 ];
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   resolve: {
     // Force Node.js package entry points so libraries like Jimp use their
     // Node build (file I/O, native buffers) instead of the browser build.
@@ -34,7 +34,7 @@ export default defineConfig({
   build: {
     outDir: "dist-electron",
     emptyOutDir: true,
-    sourcemap: true,
+    sourcemap: mode !== "production",
     target: "node20",
     rollupOptions: {
       external,
@@ -48,4 +48,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

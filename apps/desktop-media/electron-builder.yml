@@ -6,7 +6,7 @@ productName: EMK Desktop Media
 copyright: Copyright © EMK contributors
 
 directories:
-  output: release
+  output: release/artifacts
   buildResources: build-resources
 
 # Native addons are rebuilt for Electron in `pnpm run rebuild:native` before packaging.
@@ -16,13 +16,20 @@ files:
   - dist-electron/**/*
   - dist-renderer/**/*
   - package.json
+  # Exclude caches, sourcemaps, and non-runtime package content.
+  - "!**/*.map"
+  - "!**/node_modules/**/.cache/**"
+  - "!**/node_modules/.ignored/**/.cache/**"
+  - "!**/node_modules/**/{test,tests,__tests__,docs,doc,example,examples}/**"
 
 asar: true
 asarUnpack:
   - "**/*.node"
   - "**/node_modules/exiftool-vendored/**/*"
-  - "**/node_modules/better-sqlite3/**/*"
+  - "**/node_modules/better-sqlite3/**/*.node"
   - "**/node_modules/onnxruntime-node/**/*"
+
+afterPack: scripts/electron-builder-after-pack.mjs
 
 win:
   # Unsigned builds: avoids winCodeSign bundle extraction (symlinks require admin on Windows).
