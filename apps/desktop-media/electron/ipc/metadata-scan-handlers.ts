@@ -94,7 +94,7 @@ export async function runMetadataScanJob(params: {
 }): Promise<{ jobId: string; total: number }> {
   const triggerSource: MetadataScanTriggerSource = params.triggerSource ?? "auto";
   const jobId = randomUUID();
-  const job: RunningMetadataScanJob = { cancelled: false };
+  const job: RunningMetadataScanJob = { cancelled: false, triggerSource };
   job.powerSaveToken = acquirePowerSave(`metadata-scan:${params.folderPath}`);
   runningMetadataScanJobs.set(jobId, job);
 

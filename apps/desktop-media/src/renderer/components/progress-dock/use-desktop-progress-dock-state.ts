@@ -107,7 +107,9 @@ export function useDesktopProgressDockState({
       : 0;
 
   const faceClusteringPhaseLabel =
-    faceClusteringPhase === "persisting"
+    faceClusteringPhase === "refreshing-suggestions"
+      ? UI_TEXT.faceClusteringPhaseRefreshingSuggestions
+      : faceClusteringPhase === "persisting"
       ? UI_TEXT.faceClusteringPhasePersisting
       : faceClusteringPhase === "clustering"
         ? UI_TEXT.faceClusteringPhaseClustering
@@ -169,6 +171,16 @@ export function useDesktopProgressDockState({
     similarUntaggedCountsQualifies ||
     pathAnalysisQualifies ||
     geocoderQualifies;
+  const hasAnyRunningOperation =
+    isAnalyzing ||
+    isDetectingFaces ||
+    isMetadataScanning ||
+    isSemanticIndexing ||
+    isFaceClusteringRunning ||
+    descEmbedRunning ||
+    isSimilarUntaggedCountsRunning ||
+    isPathAnalysisRunning ||
+    isGeocoderInitRunning;
 
   return {
     store,
@@ -182,6 +194,7 @@ export function useDesktopProgressDockState({
     geocoderInitPanelVisible,
     metadataPanelVisible,
     hasAnyQualifyingCard,
+    hasAnyRunningOperation,
     metadataQualifies,
     aiQualifies,
     faceQualifies,

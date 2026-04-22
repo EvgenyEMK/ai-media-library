@@ -1256,7 +1256,11 @@ export type FaceEmbeddingProgressEvent =
 
 export type FaceEmbeddingProgressListener = (event: FaceEmbeddingProgressEvent) => void;
 
-export type FaceClusteringProgressPhase = "loading" | "clustering" | "persisting";
+export type FaceClusteringProgressPhase =
+  | "loading"
+  | "clustering"
+  | "persisting"
+  | "refreshing-suggestions";
 
 export type FaceClusteringProgressEvent =
   | {
@@ -1275,6 +1279,7 @@ export type FaceClusteringProgressEvent =
       type: "job-completed";
       jobId: string;
       clusterCount: number;
+      suggestionsRefreshed?: number;
     }
   | {
       type: "job-failed";

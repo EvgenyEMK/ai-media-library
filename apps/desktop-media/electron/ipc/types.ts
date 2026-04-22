@@ -51,6 +51,7 @@ export interface RunningSemanticIndexJob {
 
 export interface RunningMetadataScanJob {
   cancelled: boolean;
+  triggerSource: "auto" | "manual";
   powerSaveToken?: string;
 }
 

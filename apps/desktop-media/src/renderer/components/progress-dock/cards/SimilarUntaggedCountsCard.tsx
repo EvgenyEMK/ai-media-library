@@ -4,10 +4,12 @@ import { formatCountRatio } from "../../../lib/progress-stats-format";
 import type { DesktopStore } from "../../../stores/desktop-store";
 import type { TaskStatus } from "@emk/media-store";
 import { ProgressDockCloseButton } from "../ProgressDockCloseButton";
+import { useProgressEta } from "./use-progress-eta";
 
 interface SimilarUntaggedCountsCardProps {
   store: DesktopStore;
   isSimilarUntaggedCountsRunning: boolean;
+  similarUntaggedCountsJobId: string | null;
   similarUntaggedCountsProgressPercent: number;
   similarUntaggedCountsProcessed: number;
   similarUntaggedCountsTotal: number;
@@ -19,6 +21,7 @@ interface SimilarUntaggedCountsCardProps {
 export function SimilarUntaggedCountsCard({
   store,
   isSimilarUntaggedCountsRunning,
+  similarUntaggedCountsJobId,
   similarUntaggedCountsProgressPercent,
   similarUntaggedCountsProcessed,
   similarUntaggedCountsTotal,
@@ -26,6 +29,13 @@ export function SimilarUntaggedCountsCard({
   similarUntaggedCountsError,
   onCancelSimilarUntaggedFaceCounts,
 }: SimilarUntaggedCountsCardProps): ReactElement {
+  const similarUntaggedCountsTimeLeftText = useProgressEta({
+    running: isSimilarUntaggedCountsRunning,
+    jobId: similarUntaggedCountsJobId,
+    processed: similarUntaggedCountsProcessed,
+    total: similarUntaggedCountsTotal,
+  });
+
   return (
     <section className="m-0 rounded-lg border border-border px-2.5 py-2">
       <div className="flex items-center justify-between gap-3">
@@ -66,7 +76,16 @@ export function SimilarUntaggedCountsCard({
             />
           </div>
           <div className="text-xs text-muted-foreground">
-            {`People: ${formatCountRatio(similarUntaggedCountsProcessed, similarUntaggedCountsTotal)}`}
+            <div className="flex items-center justify-between gap-2">
+              <span>
+                {`People: ${formatCountRatio(similarUntaggedCountsProcessed, similarUntaggedCountsTotal)}`}
+              </span>
+              {similarUntaggedCountsTimeLeftText ? (
+                <span className="shrink-0">
+                  {UI_TEXT.analysisTimeLeftLabel}: {similarUntaggedCountsTimeLeftText}
+                </span>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : similarUntaggedCountsStatus === "completed" ? (

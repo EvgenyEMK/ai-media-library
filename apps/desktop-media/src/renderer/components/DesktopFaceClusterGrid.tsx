@@ -24,7 +24,7 @@ import type {
   FaceClusterTagSuggestion,
 } from "../../shared/ipc";
 import { PeoplePaginationBar } from "./people-pagination-bar";
-import { useDesktopStore } from "../stores/desktop-store";
+import { useDesktopStore, useDesktopStoreApi } from "../stores/desktop-store";
 import { Input } from "./ui/input";
 import { FaceSelectionFooter } from "./FaceSelectionFooter";
 import { FaceThumbWithPreview } from "./FaceThumbWithPreview";
@@ -125,6 +125,7 @@ export function DesktopFaceClusterGrid({
 }: {
   onOpenFacePhoto: PeopleWorkspaceOpenFacePhotoFn;
 }): ReactElement {
+  const store = useDesktopStoreApi();
   const faceClusteringStatus = useDesktopStore((s) => s.faceClusteringStatus);
   const matchThreshold = useDesktopStore(
     (s) => s.faceDetectionSettings.faceRecognitionSimilarityThreshold,
@@ -555,13 +556,29 @@ export function DesktopFaceClusterGrid({
 
   const handleRunClustering = async () => {
     setErrorMessage(null);
+    // Show immediate feedback in the dock and button before IPC/main work starts.
+    store.setState((s) => {
+      s.faceClusteringPanelVisible = true;
+      s.faceClusteringStatus = "running";
+      s.faceClusteringPhase = "loading";
+      s.faceClusteringProcessed = 0;
+      s.faceClusteringTotal = Math.max(1, s.faceClusteringTotal);
+      s.faceClusteringClusterCount = null;
+      s.faceClusteringError = null;
+    });
     try {
       await window.desktopApi.runFaceClustering({
         similarityThreshold: faceGroupPairwiseSimilarityThreshold,
         minClusterSize: faceGroupMinSize,
       });
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Clustering failed.");
+      const message = error instanceof Error ? error.message : "Clustering failed.";
+      setErrorMessage(message);
+      store.setState((s) => {
+        s.faceClusteringStatus = "failed";
+        s.faceClusteringPhase = null;
+        s.faceClusteringError = message;
+      });
     }
   };
 

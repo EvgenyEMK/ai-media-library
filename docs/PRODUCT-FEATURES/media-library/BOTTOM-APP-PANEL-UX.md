@@ -68,29 +68,31 @@ Some operation cards may show a `Time left` value in the summary line while runn
 
 ### How it is calculated (user-facing behavior)
 
-- The estimate is based on the **recent processing speed** from the latest completed files (a small rolling sample, up to ~5 files).
+- The estimate is based on the **recent processing speed** from the latest completed files (rolling sample, up to ~15 files).
 - `Time left` is recalculated as the job runs, so it can **go down or up** when processing speed changes.
 - For readability and stability, the displayed `Time left` is **rounded up to the next full minute**.
 
 ### How it is displayed
 
 - The value is shown as a compact duration (e.g. `3min`, `1h`, `1h20min`).
+- In running cards, counters stay on the **left** side of the summary line and `Time left` is aligned to the **right** side when available.
 - If the estimate is unavailable, invalid, or effectively zero, the `Time left` label is omitted (to avoid flicker and misleading “0 min” states).
 
 ---
 
 ## 4) Metadata Scan Auto-Show / Auto-Hide on Folder Selection
 
-When the user selects a folder, a non-recursive metadata scan is automatically
+When the user selects a folder, a non-recursive metadata scan may be automatically
 triggered for that folder. The progress card behavior is designed to avoid visual
-noise for fast scans while still giving feedback for slower ones.
+noise for fast scans while still giving feedback for slower ones, while preserving
+manually started scans.
 
 ### Expected behavior
 
 1. **Folder images load** -- the renderer shows a "Loading folder photos..."
    spinner with a running count while images are streamed in batches.
-2. **Scan starts immediately after loading** -- as soon as image streaming
-   completes, the metadata scan card appears with no perceptible gap.
+2. **Auto-scan starts immediately after loading** -- as soon as image streaming
+   completes, the metadata scan card appears with no perceptible gap (when auto-scan is allowed).
 3. **Single progress bar, two phases** -- the same progress card transitions
    through:
    - **Preparing files** (user-friendly label for file identity check and
@@ -105,6 +107,12 @@ noise for fast scans while still giving feedback for slower ones.
 5. **Scan completes with new or updated files** -- the card remains visible so
    the user can review the summary (created / updated counts). It must be
    dismissed manually via the `X` icon.
+6. **Manual scan continuity over folder selection** -- if a metadata scan was started
+   manually (folder menu or main-pane action menu), selecting another folder does
+   **not** cancel that scan. The running manual scan continues in Background operations.
+7. **Auto-scan skip while manual scan is running** -- if a manual scan is running and the
+   user selects a different folder, the newly selected folder's auto metadata scan is skipped.
+   Folder content still loads so the user can continue browsing while the manual scan runs.
 
 ### Design rationale
 
@@ -132,10 +140,14 @@ identity step can take several seconds.
 
 ### Manually triggered scans ("Scan subfolders")
 
-The same auto-hide logic applies. Manual scans may be recursive, so they use
-the full directory enumeration + observe pipeline. The renderer also resets the
-collapsed state of the progress panel immediately when the user clicks the
-button, ensuring the dock is visible before the first IPC event arrives.
+The same auto-hide logic applies after completion. Manual scans may be recursive,
+so they use the full directory enumeration + observe pipeline. The renderer also
+resets the collapsed state of the progress panel immediately when the user clicks
+the button, ensuring the dock is visible before the first IPC event arrives.
+
+Manual scans are treated as user-owned jobs:
+- They continue across folder selection changes.
+- Automatic folder-selection metadata scans never interrupt them.
 
 ---
 

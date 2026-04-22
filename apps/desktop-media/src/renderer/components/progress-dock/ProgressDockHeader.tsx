@@ -1,15 +1,17 @@
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { UI_TEXT } from "../../lib/ui-text";
 import type { ReactElement } from "react";
 
 interface ProgressDockHeaderProps {
   collapsed: boolean;
+  hasAnyRunningOperation: boolean;
   onToggleCollapsed: (collapsed: boolean) => void;
 }
 
 export function ProgressDockHeader({
   collapsed,
+  hasAnyRunningOperation,
   onToggleCollapsed,
 }: ProgressDockHeaderProps): ReactElement {
   return (
@@ -20,7 +22,10 @@ export function ProgressDockHeader({
       )}
     >
       <div className="flex items-center justify-center gap-2.5">
-        <span className="select-none whitespace-nowrap text-[11px] font-semibold tracking-wide text-muted-foreground">
+        <span className="inline-flex select-none items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold tracking-wide text-muted-foreground">
+          {hasAnyRunningOperation ? (
+            <Loader2 size={12} className="animate-spin" aria-hidden="true" />
+          ) : null}
           {UI_TEXT.progressPanelTitle}
         </span>
         <button

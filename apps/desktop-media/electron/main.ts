@@ -7,6 +7,7 @@ import { createMainWindow } from "./window";
 import {
   runningJobs,
   runningFaceDetectionJobs,
+  runningMetadataScanJobs,
   runningPathAnalysisJobs,
   semanticIndexJobRef,
   semanticEmbeddingStatusRef,
@@ -88,7 +89,15 @@ function registerAllIpcHandlers(): void {
       }
     }
 
-    return { photoAnalysis, faceDetection, semanticIndex, metadataScan: null, pathAnalysis };
+    let metadataScan: ActiveJobStatuses["metadataScan"] = null;
+    for (const [jobId, job] of runningMetadataScanJobs) {
+      if (!job.cancelled) {
+        metadataScan = { jobId, folderPath: "" };
+        break;
+      }
+    }
+
+    return { photoAnalysis, faceDetection, semanticIndex, metadataScan, pathAnalysis };
   });
 }
 

@@ -4,6 +4,7 @@ import { UI_TEXT } from "../../../lib/ui-text";
 import { formatCount, formatCountRatio } from "../../../lib/progress-stats-format";
 import type { DesktopStore } from "../../../stores/desktop-store";
 import { ProgressDockCloseButton } from "../ProgressDockCloseButton";
+import { useProgressEta } from "./use-progress-eta";
 
 interface FaceClusteringCardProps {
   store: DesktopStore;
@@ -36,6 +37,13 @@ export function FaceClusteringCard({
   faceClusteringPhaseLabel,
   onCancelFaceClustering,
 }: FaceClusteringCardProps): ReactElement {
+  const faceClusteringTimeLeftText = useProgressEta({
+    running: isFaceClusteringRunning,
+    jobId: faceClusteringJobId,
+    processed: faceClusteringProcessed,
+    total: faceClusteringTotal,
+  });
+
   return (
     <section className="m-0 rounded-lg border border-border px-2.5 py-2">
       <div className="flex items-center justify-between gap-3">
@@ -69,10 +77,19 @@ export function FaceClusteringCard({
             />
           </div>
           <div className="text-xs text-muted-foreground">
-            {`${faceClusteringPhaseLabel} ${formatCountRatio(faceClusteringProcessed, faceClusteringTotal)}`}
-            {faceClusteringTotalFaces > 0 && faceClusteringPhase === "loading"
-              ? ` | ${formatCount(faceClusteringTotalFaces)} faces`
-              : ""}
+            <div className="flex items-center justify-between gap-2">
+              <span>
+                {`${faceClusteringPhaseLabel} ${formatCountRatio(faceClusteringProcessed, faceClusteringTotal)}`}
+                {faceClusteringTotalFaces > 0 && faceClusteringPhase === "loading"
+                  ? ` | ${formatCount(faceClusteringTotalFaces)} faces`
+                  : ""}
+              </span>
+              {faceClusteringTimeLeftText ? (
+                <span className="shrink-0">
+                  {UI_TEXT.analysisTimeLeftLabel}: {faceClusteringTimeLeftText}
+                </span>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : faceClusteringStatus === "completed" && faceClusteringClusterCount !== null ? (

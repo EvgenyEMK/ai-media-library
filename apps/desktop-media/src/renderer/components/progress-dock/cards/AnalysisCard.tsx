@@ -73,17 +73,23 @@ export function AnalysisCard({
             />
           </div>
           <div className="text-xs text-muted-foreground">
-            {`Processed: ${formatCountRatio(analysisEta.analysisProcessed, analysisEta.analysisTotal)} | Skipped: ${formatCount(analysisEta.analysisCounts.skipped)}`}
-            {analysisEta.analysisTimeLeftText
-              ? ` | ${UI_TEXT.analysisTimeLeftLabel}: ${analysisEta.analysisTimeLeftText}`
-              : ""}
-            {analysisEta.analysisCounts.failed > 0
-              ? ` | Failed: ${formatCount(analysisEta.analysisCounts.failed)}`
-              : ""}
-            {analysisEta.analysisCounts.cancelled > 0
-              ? ` | Cancelled: ${formatCount(analysisEta.analysisCounts.cancelled)}`
-              : ""}
-            <span className="ml-4 font-medium text-amber-200/95">
+            <div className="flex items-center justify-between gap-2">
+              <span>
+                {`Processed: ${formatCountRatio(analysisEta.analysisProcessed, analysisEta.analysisTotal)} | Skipped: ${formatCount(analysisEta.analysisCounts.skipped)}`}
+                {analysisEta.analysisCounts.failed > 0
+                  ? ` | Failed: ${formatCount(analysisEta.analysisCounts.failed)}`
+                  : ""}
+                {analysisEta.analysisCounts.cancelled > 0
+                  ? ` | Cancelled: ${formatCount(analysisEta.analysisCounts.cancelled)}`
+                  : ""}
+              </span>
+              {analysisEta.analysisTimeLeftText ? (
+                <span className="shrink-0">
+                  {UI_TEXT.analysisTimeLeftLabel}: {analysisEta.analysisTimeLeftText}
+                </span>
+              ) : null}
+            </div>
+            <span className="font-medium text-amber-200/95">
               May take several minutes per file depending on settings and hardware
             </span>
           </div>

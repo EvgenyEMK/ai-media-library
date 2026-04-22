@@ -3,6 +3,7 @@ import { UI_TEXT } from "../../../lib/ui-text";
 import { formatCountRatio } from "../../../lib/progress-stats-format";
 import type { DesktopStore } from "../../../stores/desktop-store";
 import { ProgressDockCloseButton } from "../ProgressDockCloseButton";
+import { useProgressEta } from "./use-progress-eta";
 
 interface PathAnalysisCardProps {
   store: DesktopStore;
@@ -27,6 +28,12 @@ export function PathAnalysisCard({
 }: PathAnalysisCardProps): ReactElement {
   const pathPercent =
     pathAnalysisTotal > 0 ? Math.min(100, (pathAnalysisProcessed / pathAnalysisTotal) * 100) : 0;
+  const pathAnalysisTimeLeftText = useProgressEta({
+    running: isPathAnalysisRunning,
+    jobId: pathAnalysisJobId,
+    processed: pathAnalysisProcessed,
+    total: pathAnalysisTotal,
+  });
 
   return (
     <section className="m-0 rounded-lg border border-border px-2.5 py-2">
@@ -66,7 +73,14 @@ export function PathAnalysisCard({
             />
           </div>
           <div className="text-xs text-muted-foreground">
-            {formatCountRatio(pathAnalysisProcessed, pathAnalysisTotal)}
+            <div className="flex items-center justify-between gap-2">
+              <span>{formatCountRatio(pathAnalysisProcessed, pathAnalysisTotal)}</span>
+              {pathAnalysisTimeLeftText ? (
+                <span className="shrink-0">
+                  {UI_TEXT.analysisTimeLeftLabel}: {pathAnalysisTimeLeftText}
+                </span>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : null}

@@ -138,6 +138,7 @@ export const UI_TEXT = {
   faceClusteringPhaseLoading: "Loading embeddings…",
   faceClusteringPhaseClustering: "Finding similar faces… Face pairs:",
   faceClusteringPhasePersisting: "Saving face groups…",
+  faceClusteringPhaseRefreshingSuggestions: "Refreshing people suggestions…",
   faceClusteringCancel: "Cancel grouping",
   faceClusteringClose: "Close grouping status",
   similarUntaggedCountsPanelTitle: "People tab: similar face counts",

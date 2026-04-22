@@ -295,19 +295,37 @@ export function registerFaceEmbeddingHandlers(): void {
             return;
           }
 
-          emitFaceClusteringProgress(browserWindow, {
-            type: "job-completed",
-            jobId,
-            clusterCount: result.clusterCount,
-          });
-
           try {
-            const { refreshAllSuggestions } = await import("../db/person-suggestions");
+            const { refreshAllSuggestionsWithProgress } = await import("../db/person-suggestions");
             const suggestionThreshold = await getFaceRecognitionSimilarityThreshold();
-            const suggestCount = refreshAllSuggestions({ threshold: suggestionThreshold });
-            console.log(`[face-clustering] refreshed person suggestions after clustering: ${suggestCount} suggestions`);
+            const suggestionRefresh = refreshAllSuggestionsWithProgress(
+              { threshold: suggestionThreshold },
+              ({ processedTags, totalTags }) => {
+                emitFaceClusteringProgress(browserWindow, {
+                  type: "progress",
+                  jobId,
+                  phase: "refreshing-suggestions",
+                  processed: processedTags,
+                  total: totalTags,
+                });
+              },
+            );
+            console.log(
+              `[face-clustering] refreshed person suggestions after clustering: ${suggestionRefresh.totalSuggestions} suggestions across ${suggestionRefresh.totalTags} tags`,
+            );
+            emitFaceClusteringProgress(browserWindow, {
+              type: "job-completed",
+              jobId,
+              clusterCount: result.clusterCount,
+              suggestionsRefreshed: suggestionRefresh.totalSuggestions,
+            });
           } catch (suggestError) {
             console.warn("[face-clustering] failed to refresh person suggestions:", suggestError);
+            emitFaceClusteringProgress(browserWindow, {
+              type: "job-completed",
+              jobId,
+              clusterCount: result.clusterCount,
+            });
           }
         } catch (error) {
           const message =

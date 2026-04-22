@@ -1,7 +1,11 @@
 import type { StateCreator } from "zustand";
 import type { TaskStatus } from "../types";
 
-export type FaceClusteringProgressPhase = "loading" | "clustering" | "persisting";
+export type FaceClusteringProgressPhase =
+  | "loading"
+  | "clustering"
+  | "persisting"
+  | "refreshing-suggestions";
 
 export interface FaceClusteringSlice {
   faceClusteringJobId: string | null;

@@ -5,6 +5,7 @@ import { UI_TEXT } from "../../../lib/ui-text";
 import { formatCount, formatCountRatio } from "../../../lib/progress-stats-format";
 import type { DesktopStore } from "../../../stores/desktop-store";
 import { ProgressDockCloseButton } from "../ProgressDockCloseButton";
+import { useProgressEta } from "./use-progress-eta";
 
 interface MetadataScanCardProps {
   store: DesktopStore;
@@ -27,6 +28,19 @@ export function MetadataScanCard({
   metadataJobId,
   onCancelMetadataScan,
 }: MetadataScanCardProps): ReactElement {
+  const metadataTimeLeftText = useProgressEta({
+    running: isMetadataScanning,
+    jobId: metadataJobId,
+    processed:
+      metadataPhase === "preparing" || metadataPhase === "scanning"
+        ? metadataPhaseProcessed
+        : metadataProgress.metadataProcessed,
+    total:
+      metadataPhase === "preparing" || metadataPhase === "scanning"
+        ? metadataPhaseTotal
+        : metadataProgress.metadataTotal,
+  });
+
   return (
     <section className="m-0 rounded-lg border border-border px-2.5 py-2">
       <div className="flex items-center justify-between gap-3">
@@ -75,14 +89,23 @@ export function MetadataScanCard({
             />
           </div>
           <div className="text-xs text-muted-foreground">
-            {isMetadataScanning && metadataPhase === "preparing"
-              ? metadataProgress.metadataProgressLabel +
-                " " +
-                formatCountRatio(metadataPhaseProcessed, metadataPhaseTotal)
-              : `${metadataProgress.metadataProgressLabel ? `${metadataProgress.metadataProgressLabel} ` : ""}Processed: ${formatCountRatio(metadataProgress.metadataProcessed, metadataProgress.metadataTotal)} | New: ${formatCount(metadataProgress.metadataCounts.created)} | Updated: ${formatCount(metadataProgress.metadataCounts.updated)}`}
-            {metadataProgress.metadataCounts.failed > 0
-              ? ` | Failed: ${formatCount(metadataProgress.metadataCounts.failed)}`
-              : ""}
+            <div className="flex items-center justify-between gap-2">
+              <span>
+                {isMetadataScanning && metadataPhase === "preparing"
+                  ? metadataProgress.metadataProgressLabel +
+                    " " +
+                    formatCountRatio(metadataPhaseProcessed, metadataPhaseTotal)
+                  : `${metadataProgress.metadataProgressLabel ? `${metadataProgress.metadataProgressLabel} ` : ""}Processed: ${formatCountRatio(metadataProgress.metadataProcessed, metadataProgress.metadataTotal)} | New: ${formatCount(metadataProgress.metadataCounts.created)} | Updated: ${formatCount(metadataProgress.metadataCounts.updated)}`}
+                {metadataProgress.metadataCounts.failed > 0
+                  ? ` | Failed: ${formatCount(metadataProgress.metadataCounts.failed)}`
+                  : ""}
+              </span>
+              {metadataTimeLeftText ? (
+                <span className="shrink-0">
+                  {UI_TEXT.analysisTimeLeftLabel}: {metadataTimeLeftText}
+                </span>
+              ) : null}
+            </div>
           </div>
         </div>
       )}

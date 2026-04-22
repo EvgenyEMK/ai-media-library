@@ -1,4 +1,4 @@
-export const ETA_RECENT_WINDOW_SIZE = 5;
+export const ETA_RECENT_WINDOW_SIZE = 15;
 export const ETA_MIN_RECENT_SAMPLES = 3;
 
 export function formatTimeLeftCompact(totalSeconds: number): string | null {
