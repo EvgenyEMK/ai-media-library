@@ -34,6 +34,7 @@ interface DesktopAppMainProps {
     mediaItemId?: string | null;
   }) => void;
   faceDetectionSettings: DesktopStoreState["faceDetectionSettings"];
+  wrongImageRotationDetectionSettings: DesktopStoreState["wrongImageRotationDetectionSettings"];
   photoAnalysisSettings: DesktopStoreState["photoAnalysisSettings"];
   folderScanningSettings: DesktopStoreState["folderScanningSettings"];
   aiImageSearchSettings: DesktopStoreState["aiImageSearchSettings"];
@@ -90,6 +91,7 @@ export function DesktopAppMain({
   isSettingsSectionOpen,
   openFacePhotoInViewer,
   faceDetectionSettings,
+  wrongImageRotationDetectionSettings,
   photoAnalysisSettings,
   folderScanningSettings,
     aiImageSearchSettings,
@@ -149,6 +151,7 @@ export function DesktopAppMain({
         <div className="min-h-0 flex-1 overflow-auto">
           <DesktopSettingsSection
             faceDetectionSettings={faceDetectionSettings}
+            wrongImageRotationDetectionSettings={wrongImageRotationDetectionSettings}
             photoAnalysisSettings={photoAnalysisSettings}
             folderScanningSettings={folderScanningSettings}
             aiImageSearchSettings={aiImageSearchSettings}
@@ -156,6 +159,9 @@ export function DesktopAppMain({
             onFaceDetectionSettingChange={(key, value) => store.getState().updateFaceDetectionSetting(key, value)}
             onResetFaceDetectionOnlySettings={() => store.getState().resetFaceDetectionOnlySettings()}
             onResetFaceRecognitionOnlySettings={() => store.getState().resetFaceRecognitionOnlySettings()}
+            onWrongImageRotationDetectionSettingChange={(key, value) =>
+              store.getState().updateWrongImageRotationDetectionSetting(key, value)
+            }
             onPhotoAnalysisSettingChange={(key, value) => store.getState().updatePhotoAnalysisSetting(key, value)}
             onResetPhotoAnalysisSettings={() => store.getState().resetPhotoAnalysisSettings()}
             onFolderScanningSettingChange={(key, value) =>

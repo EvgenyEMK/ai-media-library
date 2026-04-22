@@ -1,4 +1,4 @@
-export const PHOTO_ANALYSIS_PROMPT_VERSION = "web-main-3.0";
+export const PHOTO_ANALYSIS_PROMPT_VERSION = "web-main-3.1";
 export const INVOICE_DATA_EXTRACTION_PROMPT_VERSION = "invoice-data-1.0";
 
 export const PHOTO_ANALYSIS_PROMPT = `You are an AI photo-analysis engine for a personal media library app.
@@ -30,16 +30,11 @@ Respond in JSON format with the following structure:
   "quality_issues": ["blur, out_of_focus, motion_blur, overexposed, underexposed, high_noise, compression_artifacts, poor_framing, tilted_horizon, none"],
   "edit_suggestions": [
     {
-      "edit_type": "rotate, crop, straighten, exposure_fix, contrast_fix, white_balance_fix, denoise, sharpen",
+      "edit_type": "crop, straighten, exposure_fix, contrast_fix, white_balance_fix, denoise, sharpen",
       "priority": "high, medium, low",
       "reason": "short reason",
       "confidence": "0..1",
       "auto_apply_safe": "true if deterministic and low-risk",
-      "rotation": {
-        "observed_orientation": "upright, rotated_90_cw, rotated_180, rotated_270_cw, uncertain",
-        "confidence_orientation": "0..1",
-        "angle_degrees_clockwise": "90, 180, 270 (optional if observed_orientation is provided)"
-      },
       "crop_rel": {
         "x": "0..1",
         "y": "0..1",
@@ -76,15 +71,11 @@ Rules:
 - If unsure, use conservative best-effort values and null where appropriate.
 - Keep title concise. Make description detailed and rich with specific visual attributes.
 - The people array must have at most 5 entries. Never emit one object per person in a crowd: use number_of_people for the total count and people only for up to 5 representative or clearly distinct individuals (or fewer).
-- Critical actionable checks (always perform first): evaluate rotate and crop independently before any other edits.
-- If both rotate and crop are needed, return TWO separate suggestion objects (one rotate, one crop).
-- For rotate, prefer rotation.observed_orientation. If you provide angle, use 90/180/270 clockwise.
-- Use rotate ONLY when the image is clearly sideways or upside-down (quarter-turn issue). Do not use rotate for small horizon or vertical tilt.
+- Critical actionable checks (always perform first): evaluate crop independently before any other edits.
 - For small tilt/alignment issues, use straighten only.
-- If uncertain whether rotate or straighten applies, prefer straighten and do not emit rotate.
+- If uncertain whether an alignment fix is needed, prefer no straighten suggestion.
 - For straighten, include only for small angle horizon/vertical alignment and provide signed angle_degrees (+ clockwise, - counterclockwise). Avoid suggesting |angle| < 0.5 unless confidence is high.
 - For crop, always include crop_rel with normalized values in [0,1], and ensure x+width<=1 and y+height<=1.
-- Do not omit crop just because rotation is present.
 - Include only fields relevant to edit_type. Omit unrelated nested fields.
 - Use high-signal values; avoid speculative tags/details.`;
 

@@ -4,15 +4,17 @@ import {
   IPC_CHANNELS,
   type AppSettings,
   type DetectFolderFacesRequest,
+  type FaceDetectionOutput,
   type FaceDetectionItemState,
   type FaceDetectionServiceStatus,
 } from "../../src/shared/ipc";
 import { listFolderImages } from "../fs-media";
-import { detectFacesInPhoto, detectFacesInPhotoWithOrientation } from "../face-detection";
+import { detectFacesInPhotoWithOrientation } from "../face-detection";
 import { readSettings } from "../storage";
 import {
   getAlreadyFaceDetectedPhotoPaths,
   getFaceDetectionFailedPaths,
+  getOrientationDetectionStateByPath,
   markFaceDetectionFailed,
   upsertFaceDetectionResult,
 } from "../db/media-analysis";
@@ -48,10 +50,14 @@ import { collectFoldersRecursively, clampConcurrency, ensureCatalogForImages, en
 import { autoChainEmbeddings } from "./face-embedding-handlers";
 import { acquirePowerSave, releasePowerSave } from "./power-save-manager";
 import { orderPendingPipelineItems, type PipelineImageItem } from "./pipeline-item-order";
+import { runWrongImageRotationPrecheck } from "../orientation-preprocess";
+import { createRotatedTempImage } from "../photo-analysis";
+import { transformFacesToOriginalCoordinates } from "../face-rotation-check";
 
 
 async function ensureEnabledAuxModelsForFaceDetection(
   settings: AppSettings["faceDetection"],
+  enableOrientation: boolean,
 ): Promise<void> {
   const ensureOne = async (kind: AuxModelKind, modelId: AuxModelId) => {
     try {
@@ -66,7 +72,7 @@ async function ensureEnabledAuxModelsForFaceDetection(
     }
   };
 
-  if (settings.imageOrientationDetection.enabled) {
+  if (enableOrientation) {
     await ensureOne("orientation", settings.imageOrientationDetection.model);
   }
   if (settings.faceLandmarkRefinement.enabled) {
@@ -75,6 +81,69 @@ async function ensureEnabledAuxModelsForFaceDetection(
   if (settings.faceAgeGenderDetection.enabled) {
     await ensureOne("age-gender", settings.faceAgeGenderDetection.model);
   }
+}
+
+function deriveOriginalDimensions(
+  rotatedSize: { width: number; height: number } | null,
+  angle: 90 | 180 | 270,
+): { originalImageWidth: number; originalImageHeight: number } {
+  if (!rotatedSize) {
+    return { originalImageWidth: 0, originalImageHeight: 0 };
+  }
+  if (angle === 90 || angle === 270) {
+    return { originalImageWidth: rotatedSize.height, originalImageHeight: rotatedSize.width };
+  }
+  return { originalImageWidth: rotatedSize.width, originalImageHeight: rotatedSize.height };
+}
+
+async function detectFacesUsingOrientationState(params: {
+  imagePath: string;
+  signal?: AbortSignal;
+  settings?: AppSettings["faceDetection"];
+  orientationAngleClockwise?: 0 | 90 | 180 | 270;
+  enableRotationFallback?: boolean;
+}): Promise<FaceDetectionOutput> {
+  const { imagePath, signal, settings, orientationAngleClockwise, enableRotationFallback } = params;
+  const detectOnRotatedCopy = async (angle: 90 | 180 | 270): Promise<FaceDetectionOutput> => {
+    const rotated = await createRotatedTempImage(imagePath, angle);
+    try {
+      const { faces: rotatedFaces } = await detectFacesInPhotoWithOrientation({
+        imagePath: rotated.path,
+        signal,
+        settings,
+      });
+      return transformFacesToOriginalCoordinates({
+        faces: rotatedFaces,
+        rotationAngleUsed: angle,
+        ...deriveOriginalDimensions(rotatedFaces.imageSizeForBoundingBoxes, angle),
+      });
+    } finally {
+      await rotated.cleanup();
+    }
+  };
+  const hasKnownOrientation =
+    orientationAngleClockwise === 90 ||
+    orientationAngleClockwise === 180 ||
+    orientationAngleClockwise === 270;
+  const baseResult = hasKnownOrientation
+    ? await detectOnRotatedCopy(orientationAngleClockwise)
+    : (await detectFacesInPhotoWithOrientation({ imagePath, signal, settings })).faces;
+
+  // Default behavior: single pass only (rotated when orientation is known, otherwise original).
+  if (!enableRotationFallback || baseResult.faceCount > 0) {
+    return baseResult;
+  }
+
+  // Optional fallback mode (kept for future settings toggle): try additional quarter turns.
+  let best = baseResult;
+  for (const angle of [90, 270, 180] as const) {
+    if (orientationAngleClockwise === angle) continue;
+    const candidate = await detectOnRotatedCopy(angle);
+    if (candidate.faceCount > best.faceCount) {
+      best = candidate;
+    }
+  }
+  return best;
 }
 
 export function registerFaceDetectionHandlers(): void {
@@ -204,6 +273,7 @@ export function registerFaceDetectionHandlers(): void {
       const faceDetectionSettings =
         request.faceDetectionSettings ??
         (await readSettings(app.getPath("userData"))).faceDetection;
+      const appSettings = await readSettings(app.getPath("userData"));
 
       void runFaceDetectionJob(
         browserWindow,
@@ -212,6 +282,7 @@ export function registerFaceDetectionHandlers(): void {
         allSelectedImages,
         concurrency,
         faceDetectionSettings,
+        appSettings,
         faceJobContext,
       ).finally(() => {
         if (job.powerSaveToken) {
@@ -264,23 +335,34 @@ export function registerFaceDetectionHandlers(): void {
       const resolvedSettings =
         faceDetectionSettings ??
         (await readSettings(app.getPath("userData"))).faceDetection;
-      await ensureEnabledAuxModelsForFaceDetection(resolvedSettings);
+      const appSettings = await readSettings(app.getPath("userData"));
+      await ensureEnabledAuxModelsForFaceDetection(
+        resolvedSettings,
+        appSettings.wrongImageRotationDetection.enabled,
+      );
 
-      const { faces: result, imageOrientation } =
-        await detectFacesInPhotoWithOrientation({
-          imagePath,
-          settings: resolvedSettings,
-        });
+      await runWrongImageRotationPrecheck({
+        imagePath,
+        settings: appSettings,
+      });
+      const orientationState = getOrientationDetectionStateByPath(imagePath);
+
+      const result = await detectFacesUsingOrientationState({
+        imagePath,
+        settings: resolvedSettings,
+        orientationAngleClockwise: orientationState?.correctionAngleClockwise,
+        enableRotationFallback: false,
+      });
       const mediaId = upsertFaceDetectionResult(
         imagePath,
         result,
         undefined,
         resolvedSettings,
-        imageOrientation
+        orientationState
           ? {
-              correctionAngleClockwise: imageOrientation.correctionClockwise,
-              confidence: imageOrientation.confidence,
-              model: imageOrientation.model,
+              correctionAngleClockwise: orientationState.correctionAngleClockwise,
+              confidence: orientationState.confidence ?? 0,
+              model: resolvedSettings.imageOrientationDetection.model,
             }
           : null,
       );
@@ -291,7 +373,7 @@ export function registerFaceDetectionHandlers(): void {
           imagePath,
           result,
           undefined,
-          imageOrientation?.correctionClockwise,
+          orientationState?.correctionAngleClockwise,
         );
       }
 
@@ -504,6 +586,7 @@ async function runFaceDetectionJob(
   photos: Array<{ path: string; name: string; folderPath: string }>,
   concurrency: number,
   faceDetectionSettings: AppSettings["faceDetection"],
+  appSettings: AppSettings,
   faceJobContext: RunningFaceDetectionJobContext,
 ): Promise<void> {
   const job = runningJobs.get(jobId);
@@ -528,7 +611,10 @@ async function runFaceDetectionJob(
     }
   }
 
-  await ensureEnabledAuxModelsForFaceDetection(faceDetectionSettings);
+  await ensureEnabledAuxModelsForFaceDetection(
+    faceDetectionSettings,
+    appSettings.wrongImageRotationDetection.enabled,
+  );
 
   const runWorker = async (): Promise<void> => {
     while (true) {
@@ -570,12 +656,19 @@ async function runFaceDetectionJob(
 
       try {
         await ensureMetadataForImage(photo.path);
-        const { faces: result, imageOrientation } =
-          await detectFacesInPhotoWithOrientation({
-            imagePath: photo.path,
-            signal: controller.signal,
-            settings: faceDetectionSettings,
-          });
+        await runWrongImageRotationPrecheck({
+          imagePath: photo.path,
+          settings: appSettings,
+          signal: controller.signal,
+        });
+        const orientationState = getOrientationDetectionStateByPath(photo.path);
+        const result = await detectFacesUsingOrientationState({
+          imagePath: photo.path,
+          signal: controller.signal,
+          settings: faceDetectionSettings,
+          orientationAngleClockwise: orientationState?.correctionAngleClockwise,
+          enableRotationFallback: false,
+        });
         if (faceJobContext.finalized || job.cancelled) {
           return;
         }
@@ -591,11 +684,11 @@ async function runFaceDetectionJob(
           result,
           undefined,
           faceDetectionSettings,
-          imageOrientation
+          orientationState
             ? {
-                correctionAngleClockwise: imageOrientation.correctionClockwise,
-                confidence: imageOrientation.confidence,
-                model: imageOrientation.model,
+                correctionAngleClockwise: orientationState.correctionAngleClockwise,
+                confidence: orientationState.confidence ?? 0,
+                model: faceDetectionSettings.imageOrientationDetection.model,
               }
             : null,
         );
@@ -617,7 +710,7 @@ async function runFaceDetectionJob(
               photo.path,
               result,
               controller.signal,
-              imageOrientation?.correctionClockwise,
+              orientationState?.correctionAngleClockwise,
             );
           }
         }

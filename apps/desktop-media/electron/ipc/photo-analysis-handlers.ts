@@ -9,7 +9,7 @@ import {
 import { listFolderImages } from "../fs-media";
 import { getDefaultVisionModel } from "../photo-analysis";
 import { warmupOllamaVisionModel } from "../photo-analysis";
-import { analyzePhotoWithOptionalTwoPass, getPrimaryRotateAngle } from "../photo-analysis-pipeline";
+import { analyzePhotoWithOptionalTwoPass } from "../photo-analysis-pipeline";
 import { readSettings } from "../storage";
 import {
   getAlreadyAnalyzedPhotoPaths,
@@ -33,6 +33,7 @@ import type { RunningAnalysisJob } from "./types";
 import { collectFoldersRecursively, clampConcurrency, ensureCatalogForImages, ensureMetadataForImage } from "./folder-utils";
 import { acquirePowerSave, releasePowerSave } from "./power-save-manager";
 import { orderPendingPipelineItems, type PipelineImageItem } from "./pipeline-item-order";
+import { runWrongImageRotationPrecheck } from "../orientation-preprocess";
 
 function ts(): string {
   return new Date().toISOString();
@@ -159,13 +160,9 @@ export function registerPhotoAnalysisHandlers(): void {
       }
       const savedSettings = await readSettings(app.getPath("userData"));
       const enableTwoPassRotationConsistency =
-        typeof request.enableTwoPassRotationConsistency === "boolean"
-          ? request.enableTwoPassRotationConsistency
-          : savedSettings.photoAnalysis.enableTwoPassRotationConsistency;
+        false;
       const useFaceFeaturesForRotation =
-        typeof request.useFaceFeaturesForRotation === "boolean"
-          ? request.useFaceFeaturesForRotation
-          : savedSettings.photoAnalysis.useFaceFeaturesForRotation;
+        false;
       const extractInvoiceData =
         typeof request.extractInvoiceData === "boolean"
           ? request.extractInvoiceData
@@ -182,7 +179,7 @@ export function registerPhotoAnalysisHandlers(): void {
           : savedSettings.photoAnalysis.downscaleLongestSidePx;
       const concurrency = clampConcurrency(request.concurrency);
 
-      if (useFaceFeaturesForRotation) {
+      if (savedSettings.wrongImageRotationDetection.useFaceLandmarkFeaturesFallback) {
         await ensureFaceDetectionServiceRunning();
       }
 
@@ -257,6 +254,7 @@ export function registerPhotoAnalysisHandlers(): void {
           downscaleBeforeLlm,
           downscaleLongestSidePx,
           concurrency,
+          savedSettings,
         );
       })().finally(() => {
         if (job.powerSaveToken) {
@@ -329,6 +327,7 @@ async function runPhotoAnalysisJob(
   downscaleBeforeLlm: boolean,
   downscaleLongestSidePx: number,
   concurrency: number,
+  appSettings: import("../../src/shared/ipc").AppSettings,
 ): Promise<void> {
   const job = runningJobs.get(jobId);
   if (!job) {
@@ -389,7 +388,12 @@ async function runPhotoAnalysisJob(
 
       try {
         await ensureMetadataForImage(photo.path);
-        const { output: result, rotationDecision } = await analyzePhotoWithOptionalTwoPass({
+        await runWrongImageRotationPrecheck({
+          imagePath: photo.path,
+          settings: appSettings,
+          signal: controller.signal,
+        });
+        const { output: result } = await analyzePhotoWithOptionalTwoPass({
           imagePath: photo.path,
           model,
           think,
@@ -408,18 +412,11 @@ async function runPhotoAnalysisJob(
 
         completed += 1;
         elapsedTotalSeconds += elapsedSeconds;
-        const savedRotation = getPrimaryRotateAngle(result);
-        if (savedRotation || rotationDecision.tier !== "none") {
-          const photoName = photo.path.split(/[\\/]/).pop() ?? photo.path;
-          // console.log(
-          //   `[face-rotation] SAVING "${photoName}": finalRotation=${savedRotation ?? 0}` +
-          //   ` tier=${rotationDecision.tier} faceInDb=${rotationDecision.faceDetectedInDb}` +
-          //   ` vlm1st=${rotationDecision.vlmFirstPassAngle ?? "-"}`,
-          // );
-        }
         const resultWithDecision: PhotoAnalysisOutput = {
           ...result,
-          rotation_decision: rotationDecision,
+          edit_suggestions: Array.isArray(result.edit_suggestions)
+            ? result.edit_suggestions.filter((suggestion) => suggestion.edit_type !== "rotate")
+            : result.edit_suggestions,
         };
         upsertAnalyzedPhoto(photo.folderPath, photo.path);
         const mediaId = upsertPhotoAnalysisResult(photo.path, resultWithDecision);

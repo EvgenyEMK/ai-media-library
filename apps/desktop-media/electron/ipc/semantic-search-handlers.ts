@@ -53,6 +53,9 @@ import { acquirePowerSave, releasePowerSave } from "./power-save-manager";
 import { isVerboseElectronLogsEnabled } from "../verbose-electron-logs";
 import { getFaceRecognitionSimilarityThreshold } from "../face-recognition-threshold";
 import type { SemanticSearchSignalMode } from "@emk/media-store";
+import { readSettings } from "../storage";
+import { app } from "electron";
+import { runWrongImageRotationPrecheck } from "../orientation-preprocess";
 
 const consoleLog = console.log.bind(console);
 
@@ -146,7 +149,8 @@ export function registerSemanticSearchHandlers(): void {
 
       setFolderAnalysisInProgress(folderPath, "semantic", true);
 
-      void runSemanticIndexJob(job, selected).finally(() => {
+      const appSettings = await readSettings(app.getPath("userData"));
+      void runSemanticIndexJob(job, selected, appSettings).finally(() => {
         if (job.powerSaveToken) {
           releasePowerSave(job.powerSaveToken);
           job.powerSaveToken = undefined;
@@ -708,6 +712,7 @@ function finalizeCancelledSemanticJob(job: RunningSemanticIndexJob): void {
 async function runSemanticIndexJob(
   job: RunningSemanticIndexJob,
   selected: Array<{ path: string; name: string; folderPath: string }>,
+  appSettings: import("../../src/shared/ipc").AppSettings,
 ): Promise<void> {
   const { browserWindow, jobId, folderPath } = job;
 
@@ -788,6 +793,10 @@ async function runSemanticIndexJob(
 
     const startMs = Date.now();
     await ensureMetadataForImage(img.path);
+    await runWrongImageRotationPrecheck({
+      imagePath: img.path,
+      settings: appSettings,
+    });
     const mediaItemId = ensureMediaItemForPath(img.path);
     if (!mediaItemId) {
       const elapsedSeconds = (Date.now() - startMs) / 1000;

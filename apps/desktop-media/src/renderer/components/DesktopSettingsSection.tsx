@@ -9,6 +9,7 @@ import {
   DEFAULT_MEDIA_VIEWER_SETTINGS,
   DEFAULT_PATH_EXTRACTION_SETTINGS,
   DEFAULT_PHOTO_ANALYSIS_SETTINGS,
+  DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS,
   FACE_DETECTOR_MODEL_OPTIONS,
   type AiImageSearchSettings,
   type AuxModelId,
@@ -23,6 +24,7 @@ import {
   type PathExtractionSettings,
   type PhotoAnalysisSettings,
   type PhotoPendingFolderIconTint,
+  type WrongImageRotationDetectionSettings,
 } from "../../shared/ipc";
 import { cn } from "../lib/cn";
 import { photoPendingTintToSquareClass } from "../lib/photo-pending-folder-tint";
@@ -35,6 +37,7 @@ import {
 
 interface DesktopSettingsSectionProps {
   faceDetectionSettings: FaceDetectionSettings;
+  wrongImageRotationDetectionSettings: WrongImageRotationDetectionSettings;
   photoAnalysisSettings: PhotoAnalysisSettings;
   folderScanningSettings: FolderScanningSettings;
   aiImageSearchSettings: AiImageSearchSettings;
@@ -45,6 +48,12 @@ interface DesktopSettingsSectionProps {
   ) => void;
   onResetFaceDetectionOnlySettings: () => void;
   onResetFaceRecognitionOnlySettings: () => void;
+  onWrongImageRotationDetectionSettingChange: <
+    K extends keyof WrongImageRotationDetectionSettings,
+  >(
+    key: K,
+    value: WrongImageRotationDetectionSettings[K],
+  ) => void;
   onPhotoAnalysisSettingChange: <K extends keyof PhotoAnalysisSettings>(
     key: K,
     value: PhotoAnalysisSettings[K],
@@ -95,6 +104,7 @@ const UI_TEXT = {
   faceDetection: "Face detection",
   faceRecognition: "Face recognition",
   photoAnalysis: "AI image analysis",
+  wrongImageRotationDetection: "Wrong image rotation detection",
   aiImageSearch: "AI image search",
   mediaViewer: "Image / Video viewer",
   photoAnalysisPromptTitle: "Prompt used",
@@ -112,14 +122,14 @@ const UI_TEXT = {
   /** Checkbox + longest-side input (single section). */
   photoAnalysisDownscaleCombinedDescription: `Very large photos can overwhelm the local AI service (Ollama) that analyzes images, or cause slow runs, failures, or connection errors. When this option is on, the app shrinks each photo so its longest side is at most the value you set below before sending it to the model. Lower values use less memory and are often faster; higher values keep more detail. That usually makes analysis more reliable and faster, with a small trade-off in fine detail. Turn the option off only when you truly need full resolution for a special case.`,
   photoAnalysisDownscaleLongestSideLabel: "Maximum length of the longest side (pixels)",
-  twoPassRotationTitle: "Two-pass analysis for rotated images",
-  twoPassRotationDescription: `Why: One pass on the original image can miss or misread metadata when the photo still needs rotation.
-
-How: If a photo needs 90/180/270 rotation, run a second analysis on the rotated preview to improve metadata reliability (for example crop suggestions). This increases analysis time per rotated photo.`,
-  faceFeaturesRotationTitle: "Use face features to detect photo rotation",
-  faceFeaturesRotationDescription: `Why: EXIF orientation alone is not always enough; faces are a strong hint for “which way is up.”
-
-How: When faces are detected, use the spatial relationship between eyes and nose to verify or correct the suggested rotation direction. Helps prevent upside-down rotation suggestions. May slightly increase analysis time for photos with people.`,
+  detectWrongImageRotationBeforePipelinesTitle:
+    "Analyze image rotation need before running other AI pipelines",
+  detectWrongImageRotationBeforePipelinesDescription:
+    "Runs wrong-rotation detection before AI search index, face detection, and AI image analysis. Already-processed images are skipped automatically.",
+  faceLandmarkFallbackTitle:
+    "Use face landmark features to detect photo rotation (fallback method)",
+  faceLandmarkFallbackDescription:
+    "Fallback only: if the primary image-orientation classifier is unavailable or inconclusive, use detected face landmarks (eyes/nose geometry) to infer rotation.",
   extractInvoiceDataTitle: "Extract invoice data",
   extractInvoiceDataDescription: `Why: Structured fields are easier to search and reuse than text buried in a long description.
 
@@ -148,6 +158,7 @@ const SETTINGS_OPTION_CHECKBOX_CLASS =
 
 export function DesktopSettingsSection({
   faceDetectionSettings,
+  wrongImageRotationDetectionSettings,
   photoAnalysisSettings,
   folderScanningSettings,
   aiImageSearchSettings,
@@ -155,6 +166,7 @@ export function DesktopSettingsSection({
   onFaceDetectionSettingChange,
   onResetFaceDetectionOnlySettings,
   onResetFaceRecognitionOnlySettings,
+  onWrongImageRotationDetectionSettingChange,
   onPhotoAnalysisSettingChange,
   onResetPhotoAnalysisSettings,
   onFolderScanningSettingChange,
@@ -386,6 +398,51 @@ export function DesktopSettingsSection({
                 pathExtractionSettings.useLlm === DEFAULT_PATH_EXTRACTION_SETTINGS.useLlm &&
                 pathExtractionSettings.llmModelPrimary === DEFAULT_PATH_EXTRACTION_SETTINGS.llmModelPrimary &&
                 pathExtractionSettings.llmModelFallback === DEFAULT_PATH_EXTRACTION_SETTINGS.llmModelFallback
+              }
+            >
+              {UI_TEXT.resetToDefaults}
+            </button>
+          </div>
+        </div>
+      </SettingsSectionCard>
+
+      <SettingsSectionCard title={UI_TEXT.wrongImageRotationDetection}>
+        <div className="space-y-3">
+          <SettingsCheckboxField
+            title={UI_TEXT.detectWrongImageRotationBeforePipelinesTitle}
+            description={UI_TEXT.detectWrongImageRotationBeforePipelinesDescription}
+            checked={wrongImageRotationDetectionSettings.enabled}
+            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+            onChange={(next) => onWrongImageRotationDetectionSettingChange("enabled", next)}
+          />
+          <SettingsCheckboxField
+            title={UI_TEXT.faceLandmarkFallbackTitle}
+            description={UI_TEXT.faceLandmarkFallbackDescription}
+            checked={wrongImageRotationDetectionSettings.useFaceLandmarkFeaturesFallback}
+            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+            onChange={(next) =>
+              onWrongImageRotationDetectionSettingChange("useFaceLandmarkFeaturesFallback", next)
+            }
+          />
+          <div className="pt-1">
+            <button
+              type="button"
+              className="inline-flex h-10 items-center rounded-md border border-border px-3 text-base"
+              onClick={() => {
+                onWrongImageRotationDetectionSettingChange(
+                  "enabled",
+                  DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS.enabled,
+                );
+                onWrongImageRotationDetectionSettingChange(
+                  "useFaceLandmarkFeaturesFallback",
+                  DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS.useFaceLandmarkFeaturesFallback,
+                );
+              }}
+              disabled={
+                wrongImageRotationDetectionSettings.enabled ===
+                  DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS.enabled &&
+                wrongImageRotationDetectionSettings.useFaceLandmarkFeaturesFallback ===
+                  DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS.useFaceLandmarkFeaturesFallback
               }
             >
               {UI_TEXT.resetToDefaults}
@@ -646,27 +703,6 @@ How: When on, previously-tagged face boxes with no newly-detected match are kept
           />
 
           <AuxModelToggleRow
-            title="Image orientation detection"
-            kind="orientation"
-            description={`Why: Detects photos rotated by 90/180/270° even when no faces are visible. The predicted correction angle is surfaced as a "Rotate" suggestion on the image.
-
-How: Runs a small ImageNet-trained classifier (EfficientNetV2) before face detection. When enabled for the first time, the ONNX weights are downloaded (no cloud traffic).`}
-            enabled={faceDetectionSettings.imageOrientationDetection.enabled}
-            modelId={faceDetectionSettings.imageOrientationDetection.model}
-            onEnabledChange={(enabled) =>
-              onFaceDetectionSettingChange("imageOrientationDetection", {
-                ...faceDetectionSettings.imageOrientationDetection,
-                enabled,
-              })
-            }
-            onModelChange={(next) =>
-              onFaceDetectionSettingChange("imageOrientationDetection", {
-                ...faceDetectionSettings.imageOrientationDetection,
-                model: next as ImageOrientationModelId,
-              })
-            }
-          />
-          <AuxModelToggleRow
             title="Face landmark refinement"
             kind="landmarks"
             description={`Why: Adds precise 5-point facial landmarks (eyes, nose, mouth corners) on top of YOLO detections. Landmarks enable more accurate face alignment, similarity matching and rotation estimation from faces.
@@ -731,8 +767,6 @@ How: Runs a lightweight ONNX classifier on each detected face crop. Estimates ar
                   DEFAULT_FACE_DETECTION_SETTINGS.preserveTaggedFacesMinIoU &&
                 faceDetectionSettings.keepUnmatchedTaggedFaces ===
                   DEFAULT_FACE_DETECTION_SETTINGS.keepUnmatchedTaggedFaces &&
-                faceDetectionSettings.imageOrientationDetection.enabled ===
-                  DEFAULT_FACE_DETECTION_SETTINGS.imageOrientationDetection.enabled &&
                 faceDetectionSettings.imageOrientationDetection.model ===
                   DEFAULT_FACE_DETECTION_SETTINGS.imageOrientationDetection.model &&
                 faceDetectionSettings.faceLandmarkRefinement.enabled ===
@@ -991,24 +1025,6 @@ How: If analysis of a single image exceeds this many seconds, it is marked faile
             ) : null}
           </div>
           <SettingsCheckboxField
-            title={UI_TEXT.twoPassRotationTitle}
-            description={UI_TEXT.twoPassRotationDescription}
-            checked={photoAnalysisSettings.enableTwoPassRotationConsistency}
-            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
-            onChange={(next) =>
-              onPhotoAnalysisSettingChange("enableTwoPassRotationConsistency", next)
-            }
-          />
-          <SettingsCheckboxField
-            title={UI_TEXT.faceFeaturesRotationTitle}
-            description={UI_TEXT.faceFeaturesRotationDescription}
-            checked={photoAnalysisSettings.useFaceFeaturesForRotation}
-            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
-            onChange={(next) =>
-              onPhotoAnalysisSettingChange("useFaceFeaturesForRotation", next)
-            }
-          />
-          <SettingsCheckboxField
             title={UI_TEXT.extractInvoiceDataTitle}
             description={UI_TEXT.extractInvoiceDataDescription}
             checked={photoAnalysisSettings.extractInvoiceData}
@@ -1031,10 +1047,6 @@ How: If analysis of a single image exceeds this many seconds, it is marked faile
                   DEFAULT_PHOTO_ANALYSIS_SETTINGS.downscaleBeforeLlm &&
                 photoAnalysisSettings.downscaleLongestSidePx ===
                   DEFAULT_PHOTO_ANALYSIS_SETTINGS.downscaleLongestSidePx &&
-                photoAnalysisSettings.enableTwoPassRotationConsistency ===
-                  DEFAULT_PHOTO_ANALYSIS_SETTINGS.enableTwoPassRotationConsistency &&
-                photoAnalysisSettings.useFaceFeaturesForRotation ===
-                  DEFAULT_PHOTO_ANALYSIS_SETTINGS.useFaceFeaturesForRotation &&
                 photoAnalysisSettings.extractInvoiceData ===
                   DEFAULT_PHOTO_ANALYSIS_SETTINGS.extractInvoiceData &&
                 photoAnalysisSettings.folderIconWhenPhotoAnalysisPending ===
