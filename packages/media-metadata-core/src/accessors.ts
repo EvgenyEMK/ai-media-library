@@ -38,6 +38,20 @@ function asNullableString(value: unknown): string | null | undefined {
   return undefined;
 }
 
+function readVlmAnalysisPeopleNode(
+  metadata: MediaMetadataV2,
+): { number_of_people: number | null; has_children: boolean | null; people_detected: PersonInfo[] | null } | null {
+  const node = metadata.people?.vlm_analysis;
+  if (!isRecord(node)) {
+    return null;
+  }
+  return {
+    number_of_people: asNullableNumber(node.number_of_people) ?? null,
+    has_children: asNullableBoolean(node.has_children) ?? null,
+    people_detected: Array.isArray(node.people_detected) ? (node.people_detected as PersonInfo[]) : null,
+  };
+}
+
 export function normalizeMetadata(raw: unknown): MediaMetadataV2 {
   if (!isRecord(raw)) {
     return { schema_version: '2.0' };
@@ -52,6 +66,12 @@ export function normalizeMetadata(raw: unknown): MediaMetadataV2 {
   const normalized: MediaMetadataV2 = {
     schema_version: '2.0',
     people: {
+      face_count: legacy.number_of_people ?? null,
+      vlm_analysis: {
+        number_of_people: legacy.number_of_people ?? null,
+        has_children: legacy.has_children ?? null,
+        people_detected: legacy.people_detected ?? null,
+      },
       number_of_people: legacy.number_of_people ?? null,
       has_children: legacy.has_children ?? null,
       people_detected: legacy.people_detected ?? null,
@@ -133,6 +153,14 @@ export function mergeMetadataV2(
     people: {
       ...(normalizedBase.people ?? {}),
       ...(patch.people ?? {}),
+      ...(patch.people?.vlm_analysis !== undefined
+        ? {
+            vlm_analysis: {
+              ...(normalizedBase.people?.vlm_analysis ?? {}),
+              ...(patch.people?.vlm_analysis ?? {}),
+            },
+          }
+        : {}),
       detections: {
         ...(normalizedBase.people?.detections ?? {}),
         ...(patch.people?.detections ?? {}),
@@ -172,16 +200,28 @@ export function getImageSizeForBoundingBoxes(
 
 export function getNumberOfPeople(metadata: unknown): number | null {
   const normalized = normalizeMetadata(metadata);
+  const vlm = readVlmAnalysisPeopleNode(normalized);
+  if (vlm?.number_of_people != null) {
+    return vlm.number_of_people;
+  }
   return normalized.people?.number_of_people ?? null;
 }
 
 export function getHasChildren(metadata: unknown): boolean | null {
   const normalized = normalizeMetadata(metadata);
+  const vlm = readVlmAnalysisPeopleNode(normalized);
+  if (vlm?.has_children != null) {
+    return vlm.has_children;
+  }
   return normalized.people?.has_children ?? null;
 }
 
 export function getPeopleDetected(metadata: unknown): PersonInfo[] {
   const normalized = normalizeMetadata(metadata);
+  const vlm = readVlmAnalysisPeopleNode(normalized);
+  if (Array.isArray(vlm?.people_detected)) {
+    return vlm.people_detected;
+  }
   return normalized.people?.people_detected ?? [];
 }
 
@@ -274,13 +314,13 @@ export function metadataFromFaceDetectionUpdate(
     faceDetectionMethod: FaceDetectionMethod | null;
     imageSize: ImageSizeForBoundingBoxes | null;
     boxes: BeingBoundingBox[] | null;
-    numberOfPeople: number | null;
+    faceCount: number | null;
   },
   base?: unknown,
 ): MediaMetadataV2 {
   return mergeMetadataV2(base, {
     people: {
-      number_of_people: input.numberOfPeople,
+      face_count: input.faceCount,
       detections: {
         face_detection_method: input.faceDetectionMethod,
         image_size_for_bounding_boxes: input.imageSize,
@@ -309,9 +349,11 @@ export function metadataFromAiAnalysisUpdate(
       ...aiFields,
     },
     people: {
-      number_of_people: numberOfPeople ?? undefined,
-      has_children: hasChildren ?? undefined,
-      people_detected: peopleDetected ?? undefined,
+      vlm_analysis: {
+        number_of_people: numberOfPeople ?? null,
+        has_children: hasChildren ?? null,
+        people_detected: peopleDetected ?? null,
+      },
     },
   });
 }

@@ -83,7 +83,6 @@ export interface BeingBoundingBox {
   person_bounding_box?: BoundingBox;
   person_face_bounding_box?: BoundingBox | null;
   provider_raw_bounding_box?: ProviderBoundingBoxReference | null;
-  azureFaceAttributes?: Record<string, unknown> | null;
   detected_features?: FaceLandmarkFeature[] | null;
 }
 
@@ -300,7 +299,6 @@ export interface MediaPeopleDetectionsMetadata {
   face_detection_method?: FaceDetectionMethod | null;
   image_size_for_bounding_boxes?: ImageSizeForBoundingBoxes | null;
   people_bounding_boxes?: BeingBoundingBox[] | null;
-  face_orientation?: FaceOrientationMetadata | null;
 }
 
 export interface MediaMetadataV2 {
@@ -310,9 +308,15 @@ export interface MediaMetadataV2 {
   };
   embedded?: EmbeddedFileMetadata | null;
   people?: {
+    face_count?: number | null;
     number_of_people?: number | null;
     has_children?: boolean | null;
     people_detected?: PersonInfo[] | null;
+    vlm_analysis?: {
+      number_of_people?: number | null;
+      has_children?: boolean | null;
+      people_detected?: PersonInfo[] | null;
+    } | null;
     detections?: MediaPeopleDetectionsMetadata;
   };
   ai?: {

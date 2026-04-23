@@ -293,7 +293,6 @@ function synthesizedBoundingBoxesFromFaceInstances(instances: DesktopFaceInstanc
       image_height: inst.ref_image_height ?? undefined,
     },
     provider_raw_bounding_box: undefined,
-    azureFaceAttributes: null,
   }));
 }
 
