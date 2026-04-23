@@ -48,7 +48,8 @@ describe("onnx-provider-policy", () => {
     expect(mod.resolveOnnxProviderCandidates("win32")).toEqual(["dml", "cuda", "cpu"]);
   });
 
-  it("falls back from GPU provider to CPU provider", async () => {
+  it("falls back from first provider to next provider", async () => {
+    process.env.EMK_ONNX_PROVIDER_ORDER = "cuda,dml";
     mockCreate
       .mockRejectedValueOnce(new Error("CUDA unavailable"))
       .mockResolvedValueOnce({ inputNames: [], outputNames: [] });
