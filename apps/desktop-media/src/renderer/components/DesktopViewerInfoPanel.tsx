@@ -15,6 +15,7 @@ import { getCategoryLabel, getGenderLabel, toHeadlineLabel } from "../lib/label-
 import { DesktopInfoSection, type DesktopInfoField } from "./DesktopInfoSection";
 import { DesktopViewerInfoRatingRow } from "./DesktopViewerInfoRatingRow";
 import { DesktopFaceTagsTabContent } from "./DesktopFaceTagsTabContent";
+import { DesktopMetadataTree } from "./DesktopMetadataTree";
 import type { DesktopViewerInfoPanelProps, DesktopViewerItem } from "../types/viewer-types";
 import type { DesktopFaceInstance, DesktopMediaItemMetadata } from "../../shared/ipc";
 import { formatPhotoTakenListLabel } from "../lib/photo-date-format";
@@ -571,9 +572,7 @@ export function DesktopViewerInfoPanel({
             <div className="grid gap-3">
               <h3 className="mb-3.5 text-lg text-foreground">Metadata</h3>
               {metadata ? (
-                <pre className="m-0 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-muted p-2.5 text-xs text-foreground">
-                  {JSON.stringify(metadata.aiMetadata ?? metadata, null, 2)}
-                </pre>
+                <DesktopMetadataTree data={metadata.aiMetadata ?? metadata} />
               ) : (
                 <p className="m-0 text-muted-foreground">No metadata available</p>
               )}
