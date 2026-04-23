@@ -70,6 +70,8 @@ export function App(): ReactElement {
   const aiImageSearchSettings = useDesktopStore((s) => s.aiImageSearchSettings);
   const mediaViewerSettings = useDesktopStore((s) => s.mediaViewerSettings);
   const pathExtractionSettings = useDesktopStore((s) => s.pathExtractionSettings);
+  const aiInferencePreferredGpuId = useDesktopStore((s) => s.aiInferencePreferredGpuId);
+  const aiInferenceGpuOptions = useDesktopStore((s) => s.aiInferenceGpuOptions);
   const semanticQuery = useDesktopStore((s) => s.semanticQuery);
   const semanticResults = useDesktopStore((s) => s.semanticResults);
   const semanticPanelOpen = useDesktopStore((s) => s.semanticPanelOpen);
@@ -291,6 +293,8 @@ export function App(): ReactElement {
         aiImageSearchSettings={aiImageSearchSettings}
         mediaViewerSettings={mediaViewerSettings}
         pathExtractionSettings={pathExtractionSettings}
+        aiInferencePreferredGpuId={aiInferencePreferredGpuId}
+        aiInferenceGpuOptions={aiInferenceGpuOptions}
         selectedFolderLabel={selectedFolderLabel}
         quickFiltersActiveCount={quickFiltersActiveCount}
         mediaItemsLength={mediaItems.length}

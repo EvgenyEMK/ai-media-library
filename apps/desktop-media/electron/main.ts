@@ -38,6 +38,10 @@ import {
 import { exiftool } from "exiftool-vendored";
 import { resolveInstalledUserDataPath } from "./install-config";
 import { resolveModelsPath, resolveSessionDataPath } from "./app-paths";
+import {
+  applyAiInferenceGpuPreference,
+  detectAiInferenceGpuOptions,
+} from "./ai-inference-gpu";
 
 const configuredUserDataPath = resolveInstalledUserDataPath();
 if (configuredUserDataPath) {
@@ -134,6 +138,8 @@ app.whenReady().then(async () => {
   const activeDetectorId = await (async () => {
     try {
       const s = await readSettings(app.getPath("userData"));
+      const gpuOptions = await detectAiInferenceGpuOptions();
+      applyAiInferenceGpuPreference(s.aiInferencePreferredGpuId, gpuOptions);
       return s.faceDetection.detectorModel;
     } catch {
       return DEFAULT_FACE_DETECTION_SETTINGS.detectorModel;

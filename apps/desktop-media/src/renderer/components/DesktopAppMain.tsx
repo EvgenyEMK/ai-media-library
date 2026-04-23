@@ -40,6 +40,8 @@ interface DesktopAppMainProps {
   aiImageSearchSettings: DesktopStoreState["aiImageSearchSettings"];
   mediaViewerSettings: DesktopStoreState["mediaViewerSettings"];
   pathExtractionSettings: PathExtractionSettings;
+  aiInferencePreferredGpuId: string | null;
+  aiInferenceGpuOptions: DesktopStoreState["aiInferenceGpuOptions"];
   selectedFolderLabel: string;
   quickFiltersActiveCount: number;
   mediaItemsLength: number;
@@ -97,6 +99,8 @@ export function DesktopAppMain({
     aiImageSearchSettings,
   mediaViewerSettings,
     pathExtractionSettings,
+  aiInferencePreferredGpuId,
+  aiInferenceGpuOptions,
   selectedFolderLabel,
   quickFiltersActiveCount,
   mediaItemsLength,
@@ -180,8 +184,13 @@ export function DesktopAppMain({
             }
             onResetMediaViewerSettings={() => store.getState().resetMediaViewerSettings()}
             pathExtractionSettings={pathExtractionSettings}
+            aiInferencePreferredGpuId={aiInferencePreferredGpuId}
+            aiInferenceGpuOptions={aiInferenceGpuOptions}
             onPathExtractionSettingChange={(key, value) =>
               store.getState().updatePathExtractionSetting(key, value)
+            }
+            onAiInferencePreferredGpuIdChange={(gpuId) =>
+              store.getState().setAiInferencePreferredGpuId(gpuId)
             }
           />
         </div>

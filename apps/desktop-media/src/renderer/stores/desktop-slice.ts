@@ -1,5 +1,6 @@
 import type { StateCreator } from "zustand";
 import {
+  type AiInferenceGpuOption,
   DEFAULT_AI_IMAGE_SEARCH_SETTINGS,
   DEFAULT_FACE_DETECTION_SETTINGS,
   DEFAULT_FOLDER_SCANNING_SETTINGS,
@@ -48,6 +49,8 @@ export interface DesktopSlice {
   aiImageSearchSettings: AiImageSearchSettings;
   mediaViewerSettings: MediaViewerSettings;
   pathExtractionSettings: PathExtractionSettings;
+  aiInferencePreferredGpuId: string | null;
+  aiInferenceGpuOptions: AiInferenceGpuOption[];
   faceModelDownload: {
     visible: boolean;
     message: string;
@@ -141,6 +144,8 @@ export interface DesktopSlice {
     value: PathExtractionSettings[K],
   ) => void;
   resetPathExtractionSettings: () => void;
+  setAiInferencePreferredGpuId: (gpuId: string | null) => void;
+  setAiInferenceGpuOptions: (options: AiInferenceGpuOption[]) => void;
 
   setGeocoderInitStatus: (status: GeocoderInitStatus, error?: string) => void;
   setGeocoderInitPanelVisible: (visible: boolean) => void;
@@ -167,6 +172,8 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   aiImageSearchSettings: { ...DEFAULT_AI_IMAGE_SEARCH_SETTINGS },
   mediaViewerSettings: { ...DEFAULT_MEDIA_VIEWER_SETTINGS },
   pathExtractionSettings: { ...DEFAULT_PATH_EXTRACTION_SETTINGS },
+  aiInferencePreferredGpuId: null,
+  aiInferenceGpuOptions: [],
   faceModelDownload: {
     visible: false,
     message: "",
@@ -402,6 +409,14 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   resetPathExtractionSettings: () =>
     set((state) => {
       state.pathExtractionSettings = { ...DEFAULT_PATH_EXTRACTION_SETTINGS };
+    }),
+  setAiInferencePreferredGpuId: (gpuId) =>
+    set((state) => {
+      state.aiInferencePreferredGpuId = gpuId;
+    }),
+  setAiInferenceGpuOptions: (options) =>
+    set((state) => {
+      state.aiInferenceGpuOptions = options;
     }),
 
   resetSimilarUntaggedCountsJob: () =>

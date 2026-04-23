@@ -47,6 +47,7 @@ const api: DesktopApi = {
   },
   getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.getSettings),
   getDatabaseLocation: () => ipcRenderer.invoke(IPC_CHANNELS.getDatabaseLocation),
+  getAiInferenceGpuOptions: () => ipcRenderer.invoke(IPC_CHANNELS.getAiInferenceGpuOptions),
   saveSettings: (settings) => ipcRenderer.invoke(IPC_CHANNELS.saveSettings, settings),
   getFolderAnalysisStatuses: () =>
     ipcRenderer.invoke(IPC_CHANNELS.getFolderAnalysisStatuses),

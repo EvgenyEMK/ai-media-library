@@ -63,6 +63,7 @@ export const IPC_CHANNELS = {
   getSettings: "media:get-settings",
   getDatabaseLocation: "media:get-database-location",
   saveSettings: "media:save-settings",
+  getAiInferenceGpuOptions: "media:get-ai-inference-gpu-options",
   getFolderAnalysisStatuses: "media:get-folder-analysis-statuses",
   analyzeFolderPhotos: "media:analyze-folder-photos",
   cancelPhotoAnalysis: "media:cancel-photo-analysis",
@@ -158,6 +159,13 @@ export const IPC_CHANNELS = {
   geocoderInitProgress: "media:geocoder-init-progress",
 } as const;
 
+export interface AiInferenceGpuOption {
+  id: string;
+  label: string;
+  dmlDeviceId: number | null;
+  source: "auto" | "detected";
+}
+
 export interface AppSettings {
   libraryRoots: string[];
   sidebarCollapsed: boolean;
@@ -168,6 +176,7 @@ export interface AppSettings {
   aiImageSearch: AiImageSearchSettings;
   mediaViewer: MediaViewerSettings;
   pathExtraction: PathExtractionSettings;
+  aiInferencePreferredGpuId: string | null;
   clientId: string;
 }
 
@@ -536,6 +545,7 @@ export const DEFAULT_APP_SETTINGS: Omit<AppSettings, "clientId"> = {
   aiImageSearch: DEFAULT_AI_IMAGE_SEARCH_SETTINGS,
   mediaViewer: DEFAULT_MEDIA_VIEWER_SETTINGS,
   pathExtraction: DEFAULT_PATH_EXTRACTION_SETTINGS,
+  aiInferencePreferredGpuId: null,
 };
 
 export interface FolderNode {
@@ -1555,6 +1565,7 @@ export interface DesktopApi {
   onFolderMediaProgress: (listener: FolderMediaProgressListener) => () => void;
   getSettings: () => Promise<AppSettings>;
   getDatabaseLocation: () => Promise<DatabaseLocationInfo>;
+  getAiInferenceGpuOptions: () => Promise<AiInferenceGpuOption[]>;
   saveSettings: (settings: AppSettings) => Promise<void>;
   getFolderAnalysisStatuses: () => Promise<Record<string, FolderAnalysisStatus>>;
   getFolderAiSummaryReport: (folderPath: string) => Promise<FolderAiSummaryReport>;

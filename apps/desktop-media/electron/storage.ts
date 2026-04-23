@@ -63,6 +63,7 @@ export async function readSettings(userDataPath: string): Promise<AppSettings> {
     aiImageSearch: sanitizeAiImageSearchSettings(parsed.aiImageSearch),
     mediaViewer: sanitizeMediaViewerSettings(parsed.mediaViewer),
     pathExtraction: sanitizePathExtractionSettings(parsed.pathExtraction),
+    aiInferencePreferredGpuId: sanitizeAiInferencePreferredGpuId(parsed.aiInferencePreferredGpuId),
     clientId,
   };
 
@@ -71,6 +72,21 @@ export async function readSettings(userDataPath: string): Promise<AppSettings> {
   }
 
   return settings;
+}
+
+function sanitizeAiInferencePreferredGpuId(candidate: unknown): string | null {
+  if (typeof candidate !== "string") {
+    return null;
+  }
+  const value = candidate.trim();
+  if (value.length === 0 || value === "auto") {
+    return null;
+  }
+  if (value.startsWith("dml:")) {
+    const idx = Number.parseInt(value.slice(4), 10);
+    return Number.isFinite(idx) && idx >= 0 ? `dml:${idx}` : null;
+  }
+  return null;
 }
 
 function sanitizeMediaViewerSettings(candidate: unknown): MediaViewerSettings {
