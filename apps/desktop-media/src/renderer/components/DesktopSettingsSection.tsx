@@ -1,5 +1,5 @@
 import { useEffect, useId, useState, type ReactElement } from "react";
-import { Square } from "lucide-react";
+import { ChevronDown, Square } from "lucide-react";
 import { SettingsCheckboxField, SettingsNumberField, SettingsSectionCard } from "@emk/media-viewer";
 import {
   AUX_MODEL_OPTIONS,
@@ -12,6 +12,7 @@ import {
   DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS,
   FACE_DETECTOR_MODEL_OPTIONS,
   type AiImageSearchSettings,
+  type AiInferenceGpuOption,
   type AuxModelId,
   type AuxModelKind,
   type FaceAgeGenderModelId,
@@ -79,6 +80,9 @@ interface DesktopSettingsSectionProps {
     key: K,
     value: PathExtractionSettings[K],
   ) => void;
+  aiInferencePreferredGpuId: string | null;
+  aiInferenceGpuOptions: AiInferenceGpuOption[];
+  onAiInferencePreferredGpuIdChange: (gpuId: string | null) => void;
 }
 
 const UI_TEXT = {
@@ -107,6 +111,7 @@ const UI_TEXT = {
   wrongImageRotationDetection: "Wrong image rotation detection",
   aiImageSearch: "AI image search",
   mediaViewer: "Image / Video viewer",
+  aiInferenceGpu: "Graphic card usage (GPU)",
   photoAnalysisPromptTitle: "Prompt used",
   invoicePromptTitle: "Invoice extraction prompt",
   photoAnalysisModelTitle: "AI model",
@@ -177,8 +182,12 @@ export function DesktopSettingsSection({
   onResetMediaViewerSettings,
   pathExtractionSettings,
   onPathExtractionSettingChange,
+  aiInferencePreferredGpuId,
+  aiInferenceGpuOptions,
+  onAiInferencePreferredGpuIdChange,
 }: DesktopSettingsSectionProps): ReactElement {
   const [showGpsConfirm, setShowGpsConfirm] = useState(false);
+  const [showWindowsGpuGuide, setShowWindowsGpuGuide] = useState(false);
   const [showAiModelHelp, setShowAiModelHelp] = useState(false);
   const [showPhotoDownscaleDescription, setShowPhotoDownscaleDescription] = useState(false);
   const [downscaleLongestSideDraft, setDownscaleLongestSideDraft] = useState(() =>
@@ -402,6 +411,75 @@ export function DesktopSettingsSection({
             >
               {UI_TEXT.resetToDefaults}
             </button>
+          </div>
+        </div>
+      </SettingsSectionCard>
+
+      <SettingsSectionCard title={UI_TEXT.aiInferenceGpu}>
+        <div className="space-y-3">
+          <div className="rounded-md border border-border/70 bg-background/40 p-3">
+            <h4 className="m-0 text-base font-medium text-foreground">GPU usage for AI inference</h4>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              Select GPU adapter.
+            </p>
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <select
+                className="h-9 min-w-[260px] rounded-md border border-border bg-background px-2 text-sm text-foreground"
+                value={aiInferencePreferredGpuId ?? "auto"}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  onAiInferencePreferredGpuIdChange(next === "auto" ? null : next);
+                }}
+              >
+                {(aiInferenceGpuOptions.length > 0
+                  ? aiInferenceGpuOptions
+                  : [{ id: "auto", label: "Automatic (runtime default)" } as const]
+                ).map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="m-0 mt-2 text-xs text-muted-foreground">
+              Important: see Windows configuration settings below.
+            </p>
+          </div>
+          <div className="rounded-md border border-border/70 bg-background/40 p-3">
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 text-left"
+              aria-expanded={showWindowsGpuGuide}
+              onClick={() => setShowWindowsGpuGuide((v) => !v)}
+            >
+              <ChevronDown
+                size={18}
+                className={cn(
+                  "shrink-0 text-muted-foreground transition-transform",
+                  showWindowsGpuGuide ? "rotate-180" : "rotate-0",
+                )}
+                aria-hidden="true"
+              />
+              <span className="text-base font-medium text-foreground">
+                Windows settings to enforce GPU use
+              </span>
+            </button>
+            {showWindowsGpuGuide ? (
+              <div className="mt-2 space-y-2 text-sm leading-relaxed text-muted-foreground">
+                <p className="m-0">
+                  Windows may ignore the GPU selection above on some devices. If your computer has multiple GPUs
+                  (for example NVIDIA + built-in Intel Graphics), applying the Windows Graphics setting below is
+                  highly recommended.
+                </p>
+                <ol className="m-0 list-decimal space-y-1 pl-5">
+                  <li>Open Windows Settings -{">"} System -{">"} Display -{">"} Graphics.</li>
+                  <li>Add this app executable if it is not listed.</li>
+                  <li>Open Options for the app and choose High performance.</li>
+                  <li>Save and restart the app.</li>
+                  <li>Run Face detection and check Task Manager (Processes tab) columns GPU and GPU engine.</li>
+                </ol>
+              </div>
+            ) : null}
           </div>
         </div>
       </SettingsSectionCard>

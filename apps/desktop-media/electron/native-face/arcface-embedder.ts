@@ -3,6 +3,7 @@ import type { FaceEmbeddingResult } from "../face-embedding";
 import { cropRgb, loadImageRgb, resizeRgb, rotateRgb } from "./image-utils";
 import { alignFace } from "./affine-warp";
 import { getModelPath, isModelDownloaded } from "./model-manager";
+import { createOrtSessionWithFallback } from "./onnx-provider-policy";
 
 const ARCFACE_MODEL_FILE = "w600k_r50.onnx";
 const ARCFACE_INPUT_SIZE: [number, number] = [112, 112];
@@ -13,9 +14,10 @@ let cachedModelName: string | null = null;
 let cachedDimension: number | null = null;
 
 function createSession(): Promise<ort.InferenceSession> {
-  return ort.InferenceSession.create(getModelPath(ARCFACE_MODEL_FILE), {
-    executionProviders: ["cpu"],
-  });
+  return createOrtSessionWithFallback({
+    modelPath: getModelPath(ARCFACE_MODEL_FILE),
+    sessionName: "arcface-embedder",
+  }).then((result) => result.session);
 }
 
 async function getSession(): Promise<ort.InferenceSession> {

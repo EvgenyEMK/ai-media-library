@@ -41,6 +41,7 @@ import { classifyFaceSubjectRoles } from "./subject-role";
 import { isLandmarkRefinerReady, refineLandmarks } from "./landmark-refiner";
 import { estimateAgeGender, isAgeGenderEstimatorReady } from "./age-gender-estimator";
 import type { FaceDetector, NativeDetectParams } from "./detector";
+import { createOrtSessionWithFallback } from "./onnx-provider-policy";
 
 const YOLO_INPUT_SIZE = 640;
 const YOLO_INPUT_NAME_CANDIDATES = ["images", "input", "images.0"] as const;
@@ -83,9 +84,10 @@ function modelFilenameFor(id: FaceDetectorModelId): string {
 }
 
 function createSession(id: FaceDetectorModelId): Promise<ort.InferenceSession> {
-  return ort.InferenceSession.create(getModelPath(modelFilenameFor(id)), {
-    executionProviders: ["cpu"],
-  });
+  return createOrtSessionWithFallback({
+    modelPath: getModelPath(modelFilenameFor(id)),
+    sessionName: `yolo-face-detector:${id}`,
+  }).then((result) => result.session);
 }
 
 async function getSession(id: FaceDetectorModelId): Promise<ort.InferenceSession> {

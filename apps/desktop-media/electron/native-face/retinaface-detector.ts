@@ -29,6 +29,7 @@ import { getModelPath, isModelDownloaded } from "./model-manager";
 import { classifyFaceSubjectRoles } from "./subject-role";
 import { estimateAgeGender, isAgeGenderEstimatorReady } from "./age-gender-estimator";
 import type { FaceDetector, NativeDetectParams } from "./detector";
+import { createOrtSessionWithFallback } from "./onnx-provider-policy";
 
 const RETINAFACE_MODEL_FILE = "retinaface_mv2.onnx";
 const config = RETINAFACE_MOBILENETV2;
@@ -39,9 +40,10 @@ let sessionPromise: Promise<ort.InferenceSession> | null = null;
 let loadError: string | null = null;
 
 function createSession(): Promise<ort.InferenceSession> {
-  return ort.InferenceSession.create(getModelPath(RETINAFACE_MODEL_FILE), {
-    executionProviders: ["cpu"],
-  });
+  return createOrtSessionWithFallback({
+    modelPath: getModelPath(RETINAFACE_MODEL_FILE),
+    sessionName: "retinaface-detector",
+  }).then((result) => result.session);
 }
 
 async function getSession(): Promise<ort.InferenceSession> {

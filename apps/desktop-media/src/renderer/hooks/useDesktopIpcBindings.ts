@@ -119,6 +119,7 @@ export function useDesktopInitialization(): void {
           s.aiImageSearchSettings = settings.aiImageSearch;
           s.mediaViewerSettings = settings.mediaViewer;
           s.pathExtractionSettings = settings.pathExtraction;
+          s.aiInferencePreferredGpuId = settings.aiInferencePreferredGpuId;
         });
         // Initial refreshFolderAnalysisStatuses runs before libraryRoots are loaded from settings,
         // so rollup batch was empty and sidebar icons stayed on the loading spinner until interaction.
@@ -127,6 +128,21 @@ export function useDesktopInitialization(): void {
       .catch(() => undefined);
 
     void refreshFolderAnalysisStatuses(store);
+    void window.desktopApi
+      .getAiInferenceGpuOptions()
+      .then((options) => {
+        store.getState().setAiInferenceGpuOptions(options);
+      })
+      .catch(() => {
+        store.getState().setAiInferenceGpuOptions([
+          {
+            id: "auto",
+            label: "Automatic (runtime default)",
+            dmlDeviceId: null,
+            source: "auto",
+          },
+        ]);
+      });
 
     void window.desktopApi
       .getActiveJobStatuses()
@@ -312,7 +328,8 @@ export function useDesktopSettingsPersistence(): void {
           state.pathExtractionSettings.llmModelPrimary !==
             prev.pathExtractionSettings.llmModelPrimary ||
           state.pathExtractionSettings.llmModelFallback !==
-            prev.pathExtractionSettings.llmModelFallback
+            prev.pathExtractionSettings.llmModelFallback ||
+          state.aiInferencePreferredGpuId !== prev.aiInferencePreferredGpuId
         ) {
           void window.desktopApi.saveSettings({
             clientId: state.clientId,
@@ -325,6 +342,7 @@ export function useDesktopSettingsPersistence(): void {
             aiImageSearch: state.aiImageSearchSettings,
             mediaViewer: state.mediaViewerSettings,
             pathExtraction: state.pathExtractionSettings,
+            aiInferencePreferredGpuId: state.aiInferencePreferredGpuId,
           });
         }
       },
