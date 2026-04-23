@@ -47,7 +47,12 @@ import { getAiDescription, getAiTitle } from "@emk/media-metadata-core";
 import { markFolderSemanticIndexed, setFolderAnalysisInProgress } from "../db/folder-analysis-status";
 import { vectorStore, semanticIndexJobRef, semanticEmbeddingStatusRef } from "./state";
 import type { RunningSemanticIndexJob } from "./types";
-import { collectFoldersRecursively, collectImageEntriesForFolders, ensureCatalogForImages, ensureMetadataForImage } from "./folder-utils";
+import {
+  collectFoldersRecursivelyWithProgress,
+  collectImageEntriesForFoldersWithProgress,
+  ensureCatalogForImagesWithProgress,
+  ensureMetadataForImage,
+} from "./folder-utils";
 import { emitSemanticIndexProgress } from "./progress-emitters";
 import { acquirePowerSave, releasePowerSave } from "./power-save-manager";
 import { isVerboseElectronLogsEnabled } from "../verbose-electron-logs";
@@ -56,6 +61,7 @@ import type { SemanticSearchSignalMode } from "@emk/media-store";
 import { readSettings } from "../storage";
 import { app } from "electron";
 import { runWrongImageRotationPrecheck } from "../orientation-preprocess";
+import { readSemanticIndexDebugLogTail } from "../semantic-index-debug-log";
 
 const consoleLog = console.log.bind(console);
 
@@ -84,18 +90,17 @@ export function registerSemanticSearchHandlers(): void {
       if (!folderPath) {
         throw new Error("Folder path is required for semantic indexing");
       }
-
       const browserWindow = BrowserWindow.fromWebContents(event.sender);
       if (!browserWindow) {
         throw new Error("No browser window found for semantic indexing");
       }
 
       const folders = request.recursive
-        ? await collectFoldersRecursively(folderPath)
+        ? await collectFoldersRecursivelyWithProgress(folderPath)
         : [folderPath];
-      const allImages = await collectImageEntriesForFolders(folders);
+      const allImages = await collectImageEntriesForFoldersWithProgress(folders);
 
-      ensureCatalogForImages(allImages.map((img) => img.path));
+      await ensureCatalogForImagesWithProgress(allImages.map((img) => img.path));
 
       const mode = request.mode === "all" ? "all" : "missing";
       const skipPreviouslyFailed = request.skipPreviouslyFailed === true;
@@ -207,6 +212,13 @@ export function registerSemanticSearchHandlers(): void {
         currentJobId: semanticIndexJobRef.current?.jobId ?? null,
         currentFolderPath: semanticIndexJobRef.current?.folderPath ?? null,
       };
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.getSemanticIndexDebugLogTail,
+    async (): Promise<{ path: string | null; content: string }> => {
+      return readSemanticIndexDebugLogTail();
     },
   );
 
@@ -696,6 +708,7 @@ function finalizeCancelledSemanticJob(job: RunningSemanticIndexJob): void {
     cancelled: job.cancelledCount,
     averageSecondsPerFile:
       job.completed > 0 ? job.totalElapsedSeconds / job.completed : 0,
+    topFailureReasons: [],
   });
   setFolderAnalysisInProgress(job.folderPath, "semantic", false);
   if (job.completed > 0 || job.failed > 0) {
@@ -709,12 +722,26 @@ function finalizeCancelledSemanticJob(job: RunningSemanticIndexJob): void {
   }
 }
 
+function getTopFailureReasons(
+  failureReasons: Map<string, number>,
+): Array<{ reason: string; count: number }> {
+  return Array.from(failureReasons.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([reason, count]) => ({ reason, count }));
+}
+
 async function runSemanticIndexJob(
   job: RunningSemanticIndexJob,
   selected: Array<{ path: string; name: string; folderPath: string }>,
   appSettings: import("../../src/shared/ipc").AppSettings,
 ): Promise<void> {
   const { browserWindow, jobId, folderPath } = job;
+  const failureReasons = new Map<string, number>();
+  const addFailureReason = (rawReason: string): void => {
+    const reason = rawReason.trim().slice(0, 220) || "Unknown error";
+    failureReasons.set(reason, (failureReasons.get(reason) ?? 0) + 1);
+  };
 
   const folderTotals = new Map<string, number>();
   const folderDone = new Map<string, number>();
@@ -741,6 +768,7 @@ async function runSemanticIndexJob(
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     console.error(`[semantic-index] vision pipeline warmup failed: ${reason}`);
+    addFailureReason(`warmup: ${reason}`);
     for (const img of selected) {
       const runtimeItem = job.itemsByPath.get(img.path);
       if (runtimeItem) runtimeItem.status = "settled";
@@ -753,7 +781,30 @@ async function runSemanticIndexJob(
         currentFolderPath: img.folderPath,
       });
     }
-    finalizeCancelledSemanticJob(job);
+    const topReasonsList = getTopFailureReasons(failureReasons);
+    job.finalized = true;
+    emitSemanticIndexProgress(browserWindow, {
+      type: "job-completed",
+      jobId,
+      folderPath,
+      completed: job.completed,
+      failed: job.failed,
+      cancelled: job.cancelledCount,
+      averageSecondsPerFile: 0,
+      topFailureReasons: topReasonsList,
+    });
+    setFolderAnalysisInProgress(folderPath, "semantic", false);
+    if (job.completed > 0 || job.failed > 0) {
+      markFolderSemanticIndexed(folderPath);
+    }
+    clearVectorCache();
+    clearDescriptionVectorCache();
+    if (job.powerSaveToken) {
+      releasePowerSave(job.powerSaveToken);
+      job.powerSaveToken = undefined;
+    }
+    const topReasons = topReasonsList.map((item) => `${item.count}x ${item.reason}`).join(" | ");
+    logVerbose(`[semantic-index] warmup-fail summary jobId=${jobId} topFailures=${topReasons}`);
     return;
   }
 
@@ -802,6 +853,7 @@ async function runSemanticIndexJob(
       const elapsedSeconds = (Date.now() - startMs) / 1000;
       job.totalElapsedSeconds += elapsedSeconds;
       job.failed += 1;
+      addFailureReason("Failed to create media item");
       if (runtimeItem) runtimeItem.status = "settled";
       folderDone.set(img.folderPath, (folderDone.get(img.folderPath) ?? 0) + 1);
       emitSemanticIndexProgress(browserWindow, {
@@ -850,6 +902,7 @@ async function runSemanticIndexJob(
       }
     } catch (error) {
       itemError = error instanceof Error ? error.message : "Embedding failed";
+      addFailureReason(itemError);
       logVerbose(`[semantic-index] ${img.name}: FAILED - ${itemError}`);
       vectorStore.markEmbeddingFailed({
         mediaItemId,
@@ -916,6 +969,7 @@ async function runSemanticIndexJob(
     failed: job.failed,
     cancelled: job.cancelledCount,
     averageSecondsPerFile: settled > 0 ? job.totalElapsedSeconds / settled : 0,
+    topFailureReasons: getTopFailureReasons(failureReasons),
   });
   setFolderAnalysisInProgress(folderPath, "semantic", false);
   clearVectorCache();
@@ -923,6 +977,12 @@ async function runSemanticIndexJob(
   if (job.completed > 0 || job.failed > 0) {
     markFolderSemanticIndexed(folderPath);
   }
+  const topReasons = getTopFailureReasons(failureReasons)
+    .map((item) => `${item.count}x ${item.reason}`)
+    .join(" | ");
+  logVerbose(
+    `[semantic-index] summary jobId=${jobId} folder="${folderPath}" completed=${job.completed} failed=${job.failed} cancelled=${job.cancelledCount} topFailures=${topReasons || "none"}`,
+  );
 }
 
 interface AnnotatedEntry { name: string; score: number; mediaItemId: string }

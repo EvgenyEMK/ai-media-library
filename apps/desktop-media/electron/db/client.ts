@@ -574,6 +574,7 @@ const MIGRATIONS: Array<{ id: string; sql: string }> = [
 ];
 
 let db: SQLiteDatabase | null = null;
+let mediaEmbeddingsCompatStatus = "not-checked";
 let vectorBackendStatus: {
   requestedMode: VectorBackendMode;
   activeMode: VectorBackendMode;
@@ -686,6 +687,7 @@ export function initDesktopDatabase(userDataPath: string): void {
   runPendingMigrations(nextDb);
   reconcileCriticalSchema(nextDb);
   reconcileFolderAnalysisSemanticColumns(nextDb);
+  reconcileMediaEmbeddingsSchema(nextDb);
   backfillFts5FromAiMetadata(nextDb);
   initializeVectorBackend(nextDb);
   db = nextDb;
@@ -719,6 +721,10 @@ export function getVectorBackendStatus(): {
   lastError: string | null;
 } {
   return vectorBackendStatus;
+}
+
+export function getMediaEmbeddingsCompatStatus(): string {
+  return mediaEmbeddingsCompatStatus;
 }
 
 function runPendingMigrations(database: SQLiteDatabase): void {
@@ -848,6 +854,48 @@ function reconcileFolderAnalysisSemanticColumns(database: SQLiteDatabase): void 
   }
   if (!columns.has("semantic_indexed_at")) {
     database.exec("ALTER TABLE folder_analysis_status ADD COLUMN semantic_indexed_at TEXT");
+  }
+}
+
+function reconcileMediaEmbeddingsSchema(database: SQLiteDatabase): void {
+  const columns = new Set(
+    (
+      database
+        .prepare("PRAGMA table_info(media_embeddings)")
+        .all() as Array<{ name: string }>
+    ).map((column) => column.name),
+  );
+  const added: string[] = [];
+
+  if (!columns.has("embedding_source")) {
+    database.exec(
+      "ALTER TABLE media_embeddings ADD COLUMN embedding_source TEXT NOT NULL DEFAULT 'direct_image'",
+    );
+    added.push("embedding_source");
+  }
+  if (!columns.has("embedding_status")) {
+    database.exec(
+      "ALTER TABLE media_embeddings ADD COLUMN embedding_status TEXT NOT NULL DEFAULT 'ready'",
+    );
+    added.push("embedding_status");
+  }
+  if (!columns.has("indexed_at")) {
+    database.exec("ALTER TABLE media_embeddings ADD COLUMN indexed_at TEXT");
+    added.push("indexed_at");
+  }
+  if (!columns.has("last_error")) {
+    database.exec("ALTER TABLE media_embeddings ADD COLUMN last_error TEXT");
+    added.push("last_error");
+  }
+  database.exec(
+    `CREATE INDEX IF NOT EXISTS idx_media_embeddings_lookup
+      ON media_embeddings (library_id, embedding_type, model_version, embedding_status)`,
+  );
+
+  if (added.length > 0) {
+    mediaEmbeddingsCompatStatus = `reconciled:${added.join(",")}`;
+  } else {
+    mediaEmbeddingsCompatStatus = "ok";
   }
 }
 

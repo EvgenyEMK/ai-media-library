@@ -526,6 +526,7 @@ export function bindSemanticIndexProgress(store: DesktopStore): () => void {
 
     if (event.type === "item-updated") {
       store.setState((s) => {
+        s.semanticIndexPhase = "indexing";
         s.semanticIndexItemsByKey[event.item.path] = {
           path: event.item.path,
           name: event.item.name,
@@ -542,6 +543,12 @@ export function bindSemanticIndexProgress(store: DesktopStore): () => void {
     }
 
     if (event.type === "job-completed") {
+      const topFailureText =
+        event.topFailureReasons && event.topFailureReasons.length > 0
+          ? event.topFailureReasons
+              .map((entry: { reason: string; count: number }) => `${entry.count}x ${entry.reason}`)
+              .join(" | ")
+          : null;
       store.setState((s) => {
         for (const path of s.semanticIndexItemOrder) {
           const item = s.semanticIndexItemsByKey[path];
@@ -555,6 +562,11 @@ export function bindSemanticIndexProgress(store: DesktopStore): () => void {
         s.semanticIndexAverageSecondsPerFile = event.averageSecondsPerFile;
         s.semanticIndexCurrentFolderPath = null;
         s.semanticIndexPhase = null;
+        if (event.failed > 0) {
+          s.semanticIndexError = topFailureText
+            ? `Top failures: ${topFailureText}`
+            : `Semantic indexing failed for ${event.failed} file(s).`;
+        }
       });
       void refreshFolderAnalysisStatuses(store);
     }

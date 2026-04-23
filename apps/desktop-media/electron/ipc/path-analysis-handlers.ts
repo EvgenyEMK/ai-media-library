@@ -18,9 +18,9 @@ import { mergeMetadataV2 } from "@emk/media-metadata-core";
 import { emitPathAnalysisProgress } from "./progress-emitters";
 import { runningPathAnalysisJobs } from "./state";
 import {
-  collectFoldersRecursively,
-  collectImageEntriesForFolders,
-  ensureCatalogForImages,
+  collectFoldersRecursivelyWithProgress,
+  collectImageEntriesForFoldersWithProgress,
+  ensureCatalogForImagesWithProgress,
 } from "./folder-utils";
 import { acquirePowerSave, releasePowerSave } from "./power-save-manager";
 import type { RunningPathAnalysisJob } from "./types";
@@ -202,12 +202,12 @@ export function registerPathAnalysisHandlers(): void {
       }
       const recursive = request.recursive === true;
       const folders = recursive
-        ? await collectFoldersRecursively(folderPath)
+        ? await collectFoldersRecursivelyWithProgress(folderPath)
         : [folderPath];
-      const imageEntries = await collectImageEntriesForFolders(folders);
+      const imageEntries = await collectImageEntriesForFoldersWithProgress(folders);
       const paths = normalizePathList(imageEntries.map((e) => e.path));
 
-      ensureCatalogForImages(paths);
+      await ensureCatalogForImagesWithProgress(paths);
 
       pathExtractionDebugLog(
         `[path-analysis] job prep: folders=${folders.length} imageEntries=${imageEntries.length} uniquePaths=${paths.length}`,

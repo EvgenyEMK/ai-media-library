@@ -46,7 +46,12 @@ import {
   detectedFacesByFolder,
 } from "./state";
 import type { RunningAnalysisJob, RunningFaceDetectionJobContext } from "./types";
-import { collectFoldersRecursively, clampConcurrency, ensureCatalogForImages, ensureMetadataForImage } from "./folder-utils";
+import {
+  collectFoldersRecursivelyWithProgress,
+  clampConcurrency,
+  ensureCatalogForImagesWithProgress,
+  ensureMetadataForImage,
+} from "./folder-utils";
 import { autoChainEmbeddings } from "./face-embedding-handlers";
 import { acquirePowerSave, releasePowerSave } from "./power-save-manager";
 import { orderPendingPipelineItems, type PipelineImageItem } from "./pipeline-item-order";
@@ -170,7 +175,7 @@ export function registerFaceDetectionHandlers(): void {
       }
 
       const folders = request.recursive
-        ? await collectFoldersRecursively(folderPath)
+        ? await collectFoldersRecursivelyWithProgress(folderPath)
         : [folderPath];
 
       const mode = request.mode === "missing" ? "missing" : "all";
@@ -232,7 +237,7 @@ export function registerFaceDetectionHandlers(): void {
         allSelectedImages.push(item);
       }
 
-      ensureCatalogForImages(initialItems.map((item) => item.path));
+      await ensureCatalogForImagesWithProgress(initialItems.map((item) => item.path));
 
       const jobId = randomUUID();
       const job: RunningAnalysisJob = {
