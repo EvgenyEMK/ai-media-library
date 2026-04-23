@@ -6,10 +6,34 @@ import { DEFAULT_LIBRARY_ID } from "../db/folder-analysis-status";
 import { upsertMediaItemFromFilePath } from "../db/media-item-metadata";
 import { DEFAULT_CONCURRENCY, MAX_CONCURRENCY } from "./state";
 
+const PREPARE_YIELD_EVERY = 25;
+
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => {
+    setImmediate(resolve);
+  });
+}
+
+export interface FolderPrepareProgress {
+  step: "collecting-folders" | "collecting-images" | "collecting-library-files" | "ensuring-catalog";
+  processed: number;
+  total: number | null;
+}
+
+type ProgressReporter = (progress: FolderPrepareProgress) => void;
+
 export async function collectFoldersRecursively(rootFolderPath: string): Promise<string[]> {
+  return collectFoldersRecursivelyWithProgress(rootFolderPath);
+}
+
+export async function collectFoldersRecursivelyWithProgress(
+  rootFolderPath: string,
+  onProgress?: ProgressReporter,
+): Promise<string[]> {
   const folders: string[] = [];
   const queue: string[] = [rootFolderPath];
   const seen = new Set<string>();
+  let processed = 0;
 
   while (queue.length > 0) {
     const current = queue.shift();
@@ -19,6 +43,14 @@ export async function collectFoldersRecursively(rootFolderPath: string): Promise
 
     seen.add(current);
     folders.push(current);
+    processed += 1;
+    if (onProgress) {
+      onProgress({
+        step: "collecting-folders",
+        processed,
+        total: null,
+      });
+    }
     try {
       const children = await readFolderChildren(current);
       children.forEach((child) => queue.push(child.path));
@@ -26,6 +58,9 @@ export async function collectFoldersRecursively(rootFolderPath: string): Promise
       console.warn(
         `[folder-utils] readFolderChildren failed for ${current}: ${err instanceof Error ? err.message : String(err)}`,
       );
+    }
+    if (processed % PREPARE_YIELD_EVERY === 0) {
+      await yieldToEventLoop();
     }
   }
 
@@ -35,9 +70,17 @@ export async function collectFoldersRecursively(rootFolderPath: string): Promise
 export async function collectImageEntriesForFolders(
   folderPaths: string[],
 ): Promise<Array<{ folderPath: string; path: string; name: string }>> {
+  return collectImageEntriesForFoldersWithProgress(folderPaths);
+}
+
+export async function collectImageEntriesForFoldersWithProgress(
+  folderPaths: string[],
+  onProgress?: ProgressReporter,
+): Promise<Array<{ folderPath: string; path: string; name: string }>> {
   const allEntries: Array<{ folderPath: string; path: string; name: string }> = [];
 
-  for (const folderPath of folderPaths) {
+  for (let i = 0; i < folderPaths.length; i += 1) {
+    const folderPath = folderPaths[i];
     try {
       const images = await listFolderImages(folderPath);
       allEntries.push(
@@ -50,6 +93,16 @@ export async function collectImageEntriesForFolders(
     } catch {
       // Continue with other folders when one folder cannot be read.
     }
+    if (onProgress) {
+      onProgress({
+        step: "collecting-images",
+        processed: i + 1,
+        total: folderPaths.length,
+      });
+    }
+    if ((i + 1) % PREPARE_YIELD_EVERY === 0) {
+      await yieldToEventLoop();
+    }
   }
 
   return allEntries;
@@ -59,9 +112,17 @@ export async function collectImageEntriesForFolders(
 export async function collectLibraryFileEntriesForFolders(
   folderPaths: string[],
 ): Promise<Array<{ folderPath: string; path: string; name: string }>> {
+  return collectLibraryFileEntriesForFoldersWithProgress(folderPaths);
+}
+
+export async function collectLibraryFileEntriesForFoldersWithProgress(
+  folderPaths: string[],
+  onProgress?: ProgressReporter,
+): Promise<Array<{ folderPath: string; path: string; name: string }>> {
   const allEntries: Array<{ folderPath: string; path: string; name: string }> = [];
 
-  for (const folderPath of folderPaths) {
+  for (let i = 0; i < folderPaths.length; i += 1) {
+    const folderPath = folderPaths[i];
     try {
       const [images, videos] = await Promise.all([
         listFolderImages(folderPath),
@@ -81,6 +142,16 @@ export async function collectLibraryFileEntriesForFolders(
       );
     } catch {
       // Continue with other folders when one folder cannot be read.
+    }
+    if (onProgress) {
+      onProgress({
+        step: "collecting-library-files",
+        processed: i + 1,
+        total: folderPaths.length,
+      });
+    }
+    if ((i + 1) % PREPARE_YIELD_EVERY === 0) {
+      await yieldToEventLoop();
     }
   }
 
@@ -151,6 +222,77 @@ export function ensureCatalogForImages(
   imagePaths: string[],
   libraryId = DEFAULT_LIBRARY_ID,
 ): void {
+  ensureCatalogForImagesCore(imagePaths, libraryId);
+}
+
+export async function ensureCatalogForImagesWithProgress(
+  imagePaths: string[],
+  libraryId = DEFAULT_LIBRARY_ID,
+  onProgress?: ProgressReporter,
+): Promise<void> {
+  if (imagePaths.length === 0) return;
+  const db = getDesktopDatabase();
+  const sqlPrefix = `SELECT source_path FROM media_items WHERE library_id = ? AND deleted_at IS NULL AND source_path IN (`;
+  const sqlSuffix = `)`;
+  const existing = new Set<string>();
+  for (let i = 0; i < imagePaths.length; i += CATALOG_CHUNK) {
+    const chunk = imagePaths.slice(i, i + CATALOG_CHUNK);
+    const placeholders = chunk.map(() => "?").join(", ");
+    const rows = db
+      .prepare(sqlPrefix + placeholders + sqlSuffix)
+      .all(libraryId, ...chunk) as Array<{ source_path: string }>;
+    for (const row of rows) {
+      existing.add(row.source_path);
+    }
+    if (onProgress) {
+      onProgress({
+        step: "ensuring-catalog",
+        processed: Math.min(i + CATALOG_CHUNK, imagePaths.length),
+        total: imagePaths.length,
+      });
+    }
+    await yieldToEventLoop();
+  }
+
+  const missing = imagePaths.filter((p) => !existing.has(p));
+  if (missing.length === 0) return;
+  const now = new Date().toISOString();
+  const insert = db.prepare(
+    `INSERT OR IGNORE INTO media_items (id, library_id, source_path, filename, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  );
+  let revived = 0;
+  let inserted = 0;
+
+  for (let i = 0; i < missing.length; i += CATALOG_CHUNK) {
+    const chunk = missing.slice(i, i + CATALOG_CHUNK);
+    const tx = db.transaction((items: string[]) => {
+      for (const filePath of items) {
+        if (reviveSoftDeletedMediaItemByPath(db, libraryId, filePath, now)) {
+          revived++;
+          continue;
+        }
+        const info = insert.run(randomUUID(), libraryId, filePath, path.basename(filePath), now, now);
+        if (info.changes > 0) {
+          inserted++;
+        }
+      }
+    });
+    tx(chunk);
+    await yieldToEventLoop();
+  }
+  if (revived > 0 || inserted > 0) {
+    console.log(
+      `[folder-utils] ensureCatalogForImages: revived=${revived} inserted=${inserted} (candidate_missing=${missing.length})`,
+    );
+  }
+}
+
+function ensureCatalogForImagesCore(
+  imagePaths: string[],
+  libraryId = DEFAULT_LIBRARY_ID,
+  onProgress?: ProgressReporter,
+): void {
   if (imagePaths.length === 0) return;
   const db = getDesktopDatabase();
   const sqlPrefix = `SELECT source_path FROM media_items WHERE library_id = ? AND deleted_at IS NULL AND source_path IN (`;
@@ -165,6 +307,13 @@ export function ensureCatalogForImages(
       .all(libraryId, ...chunk) as Array<{ source_path: string }>;
     for (const row of rows) {
       existing.add(row.source_path);
+    }
+    if (onProgress) {
+      onProgress({
+        step: "ensuring-catalog",
+        processed: Math.min(i + CATALOG_CHUNK, imagePaths.length),
+        total: imagePaths.length,
+      });
     }
   }
 

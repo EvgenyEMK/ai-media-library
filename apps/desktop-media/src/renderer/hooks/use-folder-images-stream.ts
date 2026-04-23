@@ -30,6 +30,7 @@ export function useFolderImagesStream(
     const pendingMetadataPathsByRequest = new Map<string, string[]>();
     const pendingLoadedByRequest = new Map<string, { loaded: number; total: number | null }>();
     const flushTimersByRequest = new Map<string, ReturnType<typeof setTimeout>>();
+    const watchdogTimersByRequest = new Map<string, ReturnType<typeof setTimeout>>();
 
     const flushPendingForRequest = (requestId: string): void => {
       const timer = flushTimersByRequest.get(requestId);
@@ -66,6 +67,47 @@ export function useFolderImagesStream(
       }
     };
 
+    const clearWatchdogForRequest = (requestId: string): void => {
+      const timer = watchdogTimersByRequest.get(requestId);
+      if (timer) {
+        clearTimeout(timer);
+        watchdogTimersByRequest.delete(requestId);
+      }
+    };
+
+    const scheduleWatchdogForRequest = (requestId: string, folderPath: string): void => {
+      clearWatchdogForRequest(requestId);
+      const timer = setTimeout(() => {
+        if (activeFolderRequestIdRef.current !== requestId) return;
+        if (!store.getState().isFolderLoading) return;
+        void (async () => {
+          try {
+            const media = await window.desktopApi.listFolderMedia(folderPath);
+            store.setState((s) => {
+              s.mediaItems = media.map((item) => ({
+                id: item.path,
+                title: item.name,
+                imageUrl: item.url,
+                mediaType: item.mediaKind,
+              }));
+            });
+            setFolderLoadProgress({ loaded: media.length, total: media.length });
+          } catch {
+            // best-effort
+          } finally {
+            activeFolderRequestIdRef.current = null;
+            store.getState().setFolderLoading(false);
+            if (DEBUG_PHOTO_AI) {
+              console.log(
+                `[folder-stream][renderer][${nowIso()}][warn] watchdog fallback finalized folder="${folderPath}" requestId=${requestId}`,
+              );
+            }
+          }
+        })();
+      }, 12_000);
+      watchdogTimersByRequest.set(requestId, timer);
+    };
+
     const scheduleFlushForRequest = (requestId: string): void => {
       if (flushTimersByRequest.has(requestId)) return;
       const timer = setTimeout(() => flushPendingForRequest(requestId), 80);
@@ -75,9 +117,21 @@ export function useFolderImagesStream(
     const lastLoggedLoadedByRequest = new Map<string, number>();
     const unsubscribe = window.desktopApi.onFolderMediaProgress((event) => {
       const activeRequestId = activeFolderRequestIdRef.current;
-      if (!activeRequestId || event.requestId !== activeRequestId) return;
+      const selectedFolder = store.getState().selectedFolder;
+      const eventMatchesActive = Boolean(activeRequestId && event.requestId === activeRequestId);
+      const canAdoptEvent =
+        !activeRequestId &&
+        selectedFolder === event.folderPath &&
+        (event.type === "started" || event.type === "completed" || event.type === "failed");
+      if (!eventMatchesActive && !canAdoptEvent) {
+        return;
+      }
+      if (canAdoptEvent) {
+        activeFolderRequestIdRef.current = event.requestId;
+      }
 
       if (event.type === "started") {
+        scheduleWatchdogForRequest(event.requestId, event.folderPath);
         setFolderLoadProgress({ loaded: event.loaded, total: event.total });
         if (DEBUG_PHOTO_AI) {
           console.log(
@@ -109,6 +163,7 @@ export function useFolderImagesStream(
         return;
       }
       if (event.type === "completed") {
+        clearWatchdogForRequest(event.requestId);
         lastCompletedFolderRequestIdRef.current = event.requestId;
         flushPendingForRequest(event.requestId);
         setFolderLoadProgress({ loaded: event.loaded, total: event.total });
@@ -139,6 +194,7 @@ export function useFolderImagesStream(
         return;
       }
       if (event.type === "failed") {
+        clearWatchdogForRequest(event.requestId);
         lastCompletedFolderRequestIdRef.current = event.requestId;
         flushPendingForRequest(event.requestId);
         activeFolderRequestIdRef.current = null;
@@ -157,6 +213,10 @@ export function useFolderImagesStream(
         clearTimeout(timer);
       }
       flushTimersByRequest.clear();
+      for (const timer of watchdogTimersByRequest.values()) {
+        clearTimeout(timer);
+      }
+      watchdogTimersByRequest.clear();
     };
   }, [mergeMetadataForPaths, store, lastCompletedFolderRequestIdRef, setMainPaneViewMode]);
 

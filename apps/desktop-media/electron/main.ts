@@ -42,6 +42,7 @@ import {
   applyAiInferenceGpuPreference,
   detectAiInferenceGpuOptions,
 } from "./ai-inference-gpu";
+import { setSemanticIndexDebugLogPath } from "./semantic-index-debug-log";
 
 const configuredUserDataPath = resolveInstalledUserDataPath();
 if (configuredUserDataPath) {
@@ -119,6 +120,7 @@ function emitFaceModelDownloadProgress(event: FaceModelDownloadProgressEvent): v
 
 app.whenReady().then(async () => {
   initDesktopDatabase(app.getPath("userData"));
+  setSemanticIndexDebugLogPath(app.getPath("userData"));
   setDatabaseProvider(() => getDesktopDatabase());
   clearAllInProgressFlags();
 

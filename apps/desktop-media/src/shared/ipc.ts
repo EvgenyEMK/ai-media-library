@@ -80,6 +80,7 @@ export const IPC_CHANNELS = {
   semanticSearchPhotos: "media:semantic-search-photos",
   cancelSemanticEmbeddingIndex: "media:cancel-semantic-embedding-index",
   getSemanticEmbeddingStatus: "media:get-semantic-embedding-status",
+  getSemanticIndexDebugLogTail: "media:get-semantic-index-debug-log-tail",
   semanticIndexProgress: "media:semantic-index-progress",
   scanFolderMetadata: "media:scan-folder-metadata",
   cancelMetadataScan: "media:cancel-metadata-scan",
@@ -194,6 +195,9 @@ export interface DatabaseLocationInfo {
   dbPath: string;
   modelsPath: string;
   cachePath: string;
+  /** Temporary troubleshooting signal for packaged legacy DB compatibility checks. */
+  mediaEmbeddingsCompatStatus?: string;
+  semanticDebugLogPath?: string | null;
 }
 
 export interface PathExtractionSettings {
@@ -1398,6 +1402,7 @@ export type SemanticIndexProgressEvent =
       failed: number;
       cancelled: number;
       averageSecondsPerFile: number;
+      topFailureReasons?: Array<{ reason: string; count: number }>;
     };
 
 export type SemanticIndexProgressListener = (event: SemanticIndexProgressEvent) => void;
@@ -1632,6 +1637,7 @@ export interface DesktopApi {
     currentJobId: string | null;
     currentFolderPath: string | null;
   }>;
+  getSemanticIndexDebugLogTail: () => Promise<{ path: string | null; content: string }>;
   semanticSearchPhotos: (request: {
     query: string;
     limit?: number;

@@ -28,6 +28,8 @@ import { runMetadataScanJob } from "./metadata-scan-handlers";
 import { runningMetadataScanJobs } from "./state";
 import { getModelsDirectory } from "../native-face/model-manager";
 import { resolveCacheRoot } from "../app-paths";
+import { getMediaEmbeddingsCompatStatus } from "../db/client";
+import { getSemanticIndexDebugLogPath } from "../semantic-index-debug-log";
 import { releasePowerSave } from "./power-save-manager";
 import {
   resetAgeGenderEstimator,
@@ -195,13 +197,27 @@ export function registerFsHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.getDatabaseLocation, async () => {
     const userDataPath = app.getPath("userData");
     const appDataPath = app.getPath("appData");
+    let modelsPath: string | null = null;
+    try {
+      modelsPath = getModelsDirectory();
+    } catch {
+      modelsPath = null;
+    }
+    let cachePath: string | null = null;
+    try {
+      cachePath = resolveCacheRoot(app);
+    } catch {
+      cachePath = null;
+    }
     return {
       appDataPath,
       userDataPath,
       dbFileName: "desktop-media.db",
       dbPath: path.join(userDataPath, "desktop-media.db"),
-      modelsPath: getModelsDirectory(),
-      cachePath: resolveCacheRoot(app),
+      modelsPath: modelsPath ?? path.join(appDataPath, "EMK Desktop Media", "ai-models"),
+      cachePath: cachePath ?? path.join(appDataPath, "EMK Desktop Media", "cache"),
+      mediaEmbeddingsCompatStatus: getMediaEmbeddingsCompatStatus(),
+      semanticDebugLogPath: getSemanticIndexDebugLogPath(),
     };
   });
 
