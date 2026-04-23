@@ -16,6 +16,10 @@ import {
 } from "../fs-media";
 import { readSettings, writeSettings } from "../storage";
 import {
+  applyAiInferenceGpuPreference,
+  detectAiInferenceGpuOptions,
+} from "../ai-inference-gpu";
+import {
   getFolderAnalysisStatuses,
   pruneFolderAnalysisStatusesForMissingChildren,
 } from "../db/folder-analysis-status";
@@ -24,7 +28,17 @@ import { runMetadataScanJob } from "./metadata-scan-handlers";
 import { runningMetadataScanJobs } from "./state";
 import { getModelsDirectory } from "../native-face/model-manager";
 import { resolveCacheRoot } from "../app-paths";
+import { getMediaEmbeddingsCompatStatus } from "../db/client";
+import { getSemanticIndexDebugLogPath } from "../semantic-index-debug-log";
 import { releasePowerSave } from "./power-save-manager";
+import {
+  resetAgeGenderEstimator,
+  resetLandmarkRefiner,
+  resetNativeDetector,
+  resetNativeEmbedder,
+  resetOrientationClassifier,
+  resetYoloDetector,
+} from "../native-face";
 
 function ts(): string {
   return new Date().toISOString();
@@ -183,17 +197,47 @@ export function registerFsHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.getDatabaseLocation, async () => {
     const userDataPath = app.getPath("userData");
     const appDataPath = app.getPath("appData");
+    let modelsPath: string | null = null;
+    try {
+      modelsPath = getModelsDirectory();
+    } catch {
+      modelsPath = null;
+    }
+    let cachePath: string | null = null;
+    try {
+      cachePath = resolveCacheRoot(app);
+    } catch {
+      cachePath = null;
+    }
     return {
       appDataPath,
       userDataPath,
       dbFileName: "desktop-media.db",
       dbPath: path.join(userDataPath, "desktop-media.db"),
-      modelsPath: getModelsDirectory(),
-      cachePath: resolveCacheRoot(app),
+      modelsPath: modelsPath ?? path.join(appDataPath, "EMK Desktop Media", "ai-models"),
+      cachePath: cachePath ?? path.join(appDataPath, "EMK Desktop Media", "cache"),
+      mediaEmbeddingsCompatStatus: getMediaEmbeddingsCompatStatus(),
+      semanticDebugLogPath: getSemanticIndexDebugLogPath(),
     };
   });
 
+  ipcMain.handle(IPC_CHANNELS.getAiInferenceGpuOptions, async () => {
+    return detectAiInferenceGpuOptions();
+  });
+
   ipcMain.handle(IPC_CHANNELS.saveSettings, async (_event, settings: AppSettings) => {
+    const gpuOptions = await detectAiInferenceGpuOptions();
+    applyAiInferenceGpuPreference(settings.aiInferencePreferredGpuId, gpuOptions);
+    // Recreate ONNX sessions lazily with the newly selected GPU preference.
+    resetNativeDetector();
+    resetYoloDetector("yolov12n-face");
+    resetYoloDetector("yolov12s-face");
+    resetYoloDetector("yolov12m-face");
+    resetYoloDetector("yolov12l-face");
+    resetNativeEmbedder();
+    resetOrientationClassifier("deep-image-orientation-v1");
+    resetLandmarkRefiner("pfld-ghostone");
+    resetAgeGenderEstimator("onnx-age-gender-v1");
     await writeSettings(app.getPath("userData"), settings);
   });
 

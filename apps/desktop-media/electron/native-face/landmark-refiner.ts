@@ -22,6 +22,7 @@ import * as ort from "onnxruntime-node";
 import { cropRgb, resizeRgb, type RawImage } from "./image-utils";
 import { getAuxModelFilename, getAuxModelPath, isAuxModelDownloaded } from "./model-manager";
 import type { FaceLandmarkModelId } from "../../src/shared/ipc";
+import { createOrtSessionWithFallback } from "./onnx-provider-policy";
 
 const INPUT_SIZE = 112;
 
@@ -46,10 +47,10 @@ async function getSession(
 ): Promise<ort.InferenceSession> {
   const state = stateFor(id);
   if (!state.promise) {
-    state.promise = ort.InferenceSession.create(
-      getAuxModelPath("landmarks", id),
-      { executionProviders: ["cpu"] },
-    );
+    state.promise = createOrtSessionWithFallback({
+      modelPath: getAuxModelPath("landmarks", id),
+      sessionName: `landmark-refiner:${id}`,
+    }).then((result) => result.session);
   }
   try {
     return await state.promise;

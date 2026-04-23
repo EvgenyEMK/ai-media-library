@@ -38,6 +38,11 @@ import {
 import { exiftool } from "exiftool-vendored";
 import { resolveInstalledUserDataPath } from "./install-config";
 import { resolveModelsPath, resolveSessionDataPath } from "./app-paths";
+import {
+  applyAiInferenceGpuPreference,
+  detectAiInferenceGpuOptions,
+} from "./ai-inference-gpu";
+import { setSemanticIndexDebugLogPath } from "./semantic-index-debug-log";
 
 const configuredUserDataPath = resolveInstalledUserDataPath();
 if (configuredUserDataPath) {
@@ -115,6 +120,7 @@ function emitFaceModelDownloadProgress(event: FaceModelDownloadProgressEvent): v
 
 app.whenReady().then(async () => {
   initDesktopDatabase(app.getPath("userData"));
+  setSemanticIndexDebugLogPath(app.getPath("userData"));
   setDatabaseProvider(() => getDesktopDatabase());
   clearAllInProgressFlags();
 
@@ -134,6 +140,8 @@ app.whenReady().then(async () => {
   const activeDetectorId = await (async () => {
     try {
       const s = await readSettings(app.getPath("userData"));
+      const gpuOptions = await detectAiInferenceGpuOptions();
+      applyAiInferenceGpuPreference(s.aiInferencePreferredGpuId, gpuOptions);
       return s.faceDetection.detectorModel;
     } catch {
       return DEFAULT_FACE_DETECTION_SETTINGS.detectorModel;

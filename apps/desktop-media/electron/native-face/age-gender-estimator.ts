@@ -14,6 +14,7 @@ import * as ort from "onnxruntime-node";
 import { cropRgb, resizeRgb, type RawImage } from "./image-utils";
 import { getAuxModelFilename, getAuxModelPath, isAuxModelDownloaded } from "./model-manager";
 import type { FaceAgeGenderModelId } from "../../src/shared/ipc";
+import { createOrtSessionWithFallback } from "./onnx-provider-policy";
 
 const INPUT_SIZE = 224;
 const IMAGENET_MEAN: [number, number, number] = [0.485, 0.456, 0.406];
@@ -40,10 +41,13 @@ async function getSession(
 ): Promise<ort.InferenceSession> {
   const state = stateFor(id);
   if (!state.promise) {
-    state.promise = ort.InferenceSession.create(
-      getAuxModelPath("age-gender", id),
-      { executionProviders: ["cpu"] },
-    );
+    const preferredProviders =
+      process.platform === "win32" ? (["cpu", "dml"] as const) : undefined;
+    state.promise = createOrtSessionWithFallback({
+      modelPath: getAuxModelPath("age-gender", id),
+      sessionName: `age-gender-estimator:${id}`,
+      preferredProviders: preferredProviders ? [...preferredProviders] : undefined,
+    }).then((result) => result.session);
   }
   try {
     return await state.promise;

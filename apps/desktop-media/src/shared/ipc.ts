@@ -63,6 +63,7 @@ export const IPC_CHANNELS = {
   getSettings: "media:get-settings",
   getDatabaseLocation: "media:get-database-location",
   saveSettings: "media:save-settings",
+  getAiInferenceGpuOptions: "media:get-ai-inference-gpu-options",
   getFolderAnalysisStatuses: "media:get-folder-analysis-statuses",
   analyzeFolderPhotos: "media:analyze-folder-photos",
   cancelPhotoAnalysis: "media:cancel-photo-analysis",
@@ -79,6 +80,7 @@ export const IPC_CHANNELS = {
   semanticSearchPhotos: "media:semantic-search-photos",
   cancelSemanticEmbeddingIndex: "media:cancel-semantic-embedding-index",
   getSemanticEmbeddingStatus: "media:get-semantic-embedding-status",
+  getSemanticIndexDebugLogTail: "media:get-semantic-index-debug-log-tail",
   semanticIndexProgress: "media:semantic-index-progress",
   scanFolderMetadata: "media:scan-folder-metadata",
   cancelMetadataScan: "media:cancel-metadata-scan",
@@ -158,6 +160,13 @@ export const IPC_CHANNELS = {
   geocoderInitProgress: "media:geocoder-init-progress",
 } as const;
 
+export interface AiInferenceGpuOption {
+  id: string;
+  label: string;
+  dmlDeviceId: number | null;
+  source: "auto" | "detected";
+}
+
 export interface AppSettings {
   libraryRoots: string[];
   sidebarCollapsed: boolean;
@@ -168,6 +177,7 @@ export interface AppSettings {
   aiImageSearch: AiImageSearchSettings;
   mediaViewer: MediaViewerSettings;
   pathExtraction: PathExtractionSettings;
+  aiInferencePreferredGpuId: string | null;
   clientId: string;
 }
 
@@ -185,6 +195,9 @@ export interface DatabaseLocationInfo {
   dbPath: string;
   modelsPath: string;
   cachePath: string;
+  /** Temporary troubleshooting signal for packaged legacy DB compatibility checks. */
+  mediaEmbeddingsCompatStatus?: string;
+  semanticDebugLogPath?: string | null;
 }
 
 export interface PathExtractionSettings {
@@ -536,6 +549,7 @@ export const DEFAULT_APP_SETTINGS: Omit<AppSettings, "clientId"> = {
   aiImageSearch: DEFAULT_AI_IMAGE_SEARCH_SETTINGS,
   mediaViewer: DEFAULT_MEDIA_VIEWER_SETTINGS,
   pathExtraction: DEFAULT_PATH_EXTRACTION_SETTINGS,
+  aiInferencePreferredGpuId: null,
 };
 
 export interface FolderNode {
@@ -1388,6 +1402,7 @@ export type SemanticIndexProgressEvent =
       failed: number;
       cancelled: number;
       averageSecondsPerFile: number;
+      topFailureReasons?: Array<{ reason: string; count: number }>;
     };
 
 export type SemanticIndexProgressListener = (event: SemanticIndexProgressEvent) => void;
@@ -1555,6 +1570,7 @@ export interface DesktopApi {
   onFolderMediaProgress: (listener: FolderMediaProgressListener) => () => void;
   getSettings: () => Promise<AppSettings>;
   getDatabaseLocation: () => Promise<DatabaseLocationInfo>;
+  getAiInferenceGpuOptions: () => Promise<AiInferenceGpuOption[]>;
   saveSettings: (settings: AppSettings) => Promise<void>;
   getFolderAnalysisStatuses: () => Promise<Record<string, FolderAnalysisStatus>>;
   getFolderAiSummaryReport: (folderPath: string) => Promise<FolderAiSummaryReport>;
@@ -1621,6 +1637,7 @@ export interface DesktopApi {
     currentJobId: string | null;
     currentFolderPath: string | null;
   }>;
+  getSemanticIndexDebugLogTail: () => Promise<{ path: string | null; content: string }>;
   semanticSearchPhotos: (request: {
     query: string;
     limit?: number;

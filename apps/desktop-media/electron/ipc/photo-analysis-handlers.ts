@@ -30,7 +30,12 @@ import { ensureFaceDetectionServiceRunning } from "../face-service";
 import { emitPhotoProgress } from "./progress-emitters";
 import { runningJobs, analyzedPhotosByFolder, vectorStore } from "./state";
 import type { RunningAnalysisJob } from "./types";
-import { collectFoldersRecursively, clampConcurrency, ensureCatalogForImages, ensureMetadataForImage } from "./folder-utils";
+import {
+  collectFoldersRecursivelyWithProgress,
+  clampConcurrency,
+  ensureCatalogForImagesWithProgress,
+  ensureMetadataForImage,
+} from "./folder-utils";
 import { acquirePowerSave, releasePowerSave } from "./power-save-manager";
 import { orderPendingPipelineItems, type PipelineImageItem } from "./pipeline-item-order";
 import { runWrongImageRotationPrecheck } from "../orientation-preprocess";
@@ -57,7 +62,7 @@ export function registerPhotoAnalysisHandlers(): void {
       }
 
       const folders = request.recursive
-        ? await collectFoldersRecursively(folderPath)
+        ? await collectFoldersRecursivelyWithProgress(folderPath)
         : [folderPath];
 
       const mode = request.mode === "missing" ? "missing" : "all";
@@ -119,7 +124,7 @@ export function registerPhotoAnalysisHandlers(): void {
         selectedImages.push(item);
       }
 
-      ensureCatalogForImages(initialItems.map((item) => item.path));
+      await ensureCatalogForImagesWithProgress(initialItems.map((item) => item.path));
 
       const jobId = randomUUID();
       const job: RunningAnalysisJob = {

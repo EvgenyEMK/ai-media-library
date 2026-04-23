@@ -1,3 +1,7 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import { app } from "electron";
+import { resolveCacheRoot } from "./app-paths";
 import { embedImageWithDecodeFallback } from "./nomic-vision-image-decode";
 
 let visionPipelineInstance: ReturnType<typeof createVisionPipeline> | null = null;
@@ -7,10 +11,27 @@ let loadError: string | null = null;
 
 let transformersEnvConfigured: Promise<void> | null = null;
 
+function getTransformersCacheDirs(): { cacheDir: string; localModelPath: string } {
+  const runtimeCacheRoot = resolveCacheRoot(app);
+  const hfRoot = path.join(runtimeCacheRoot, "huggingface");
+  return {
+    cacheDir: path.join(hfRoot, "cache"),
+    localModelPath: path.join(hfRoot, "models"),
+  };
+}
+
 function ensureTransformersEnvConfigured(): Promise<void> {
   if (!transformersEnvConfigured) {
     transformersEnvConfigured = (async () => {
       const { env } = await import("@huggingface/transformers");
+      const dirs = getTransformersCacheDirs();
+      await fs.mkdir(dirs.cacheDir, { recursive: true });
+      await fs.mkdir(dirs.localModelPath, { recursive: true });
+      // Packaged Electron reads app code from app.asar; explicit filesystem cache/model
+      // roots avoid ENOTDIR path resolution failures in transformers warmup.
+      env.cacheDir = dirs.cacheDir;
+      env.localModelPath = dirs.localModelPath;
+      env.allowRemoteModels = true;
       env.allowLocalModels = true;
       // Types mark `wasm` read-only; runtime allows configuring ORT wasm memory cap.
       const onnx = env.backends.onnx as unknown as {

@@ -47,6 +47,7 @@ const api: DesktopApi = {
   },
   getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.getSettings),
   getDatabaseLocation: () => ipcRenderer.invoke(IPC_CHANNELS.getDatabaseLocation),
+  getAiInferenceGpuOptions: () => ipcRenderer.invoke(IPC_CHANNELS.getAiInferenceGpuOptions),
   saveSettings: (settings) => ipcRenderer.invoke(IPC_CHANNELS.saveSettings, settings),
   getFolderAnalysisStatuses: () =>
     ipcRenderer.invoke(IPC_CHANNELS.getFolderAnalysisStatuses),
@@ -124,6 +125,8 @@ const api: DesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.ensureAuxModel, kind, modelId),
   getSemanticEmbeddingStatus: () =>
     ipcRenderer.invoke(IPC_CHANNELS.getSemanticEmbeddingStatus),
+  getSemanticIndexDebugLogTail: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.getSemanticIndexDebugLogTail),
   semanticSearchPhotos: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.semanticSearchPhotos, request),
   scanFolderMetadata: (request) =>

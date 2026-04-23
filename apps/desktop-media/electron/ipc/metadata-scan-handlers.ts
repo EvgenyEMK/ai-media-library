@@ -28,7 +28,10 @@ import { readSettings } from "../storage";
 import { emitMetadataScanProgress } from "./progress-emitters";
 import { runningMetadataScanJobs } from "./state";
 import type { RunningMetadataScanJob } from "./types";
-import { collectFoldersRecursively, collectLibraryFileEntriesForFolders } from "./folder-utils";
+import {
+  collectFoldersRecursivelyWithProgress,
+  collectLibraryFileEntriesForFoldersWithProgress,
+} from "./folder-utils";
 import { acquirePowerSave, releasePowerSave } from "./power-save-manager";
 import { isGeocoderReady, initGeocoder, reverseGeocodeBatch } from "../geocoder/reverse-geocoder";
 import { getMediaItemsNeedingGpsGeocoding, updateMediaItemLocationFromGps } from "../db/media-item-geocoding";
@@ -104,9 +107,9 @@ export async function runMetadataScanJob(params: {
     scanEntries = params.knownCatalogEntries;
   } else {
     const folders = params.recursive
-      ? await collectFoldersRecursively(params.folderPath)
+      ? await collectFoldersRecursivelyWithProgress(params.folderPath)
       : [params.folderPath];
-    scanEntries = await collectLibraryFileEntriesForFolders(folders);
+    scanEntries = await collectLibraryFileEntriesForFoldersWithProgress(folders);
   }
 
   const items: MetadataScanItemState[] = scanEntries.map((entry) => ({
