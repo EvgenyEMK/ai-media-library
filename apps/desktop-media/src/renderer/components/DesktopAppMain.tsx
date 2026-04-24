@@ -38,6 +38,7 @@ interface DesktopAppMainProps {
   photoAnalysisSettings: DesktopStoreState["photoAnalysisSettings"];
   folderScanningSettings: DesktopStoreState["folderScanningSettings"];
   aiImageSearchSettings: DesktopStoreState["aiImageSearchSettings"];
+  hideAdvancedSettings: boolean;
   mediaViewerSettings: DesktopStoreState["mediaViewerSettings"];
   pathExtractionSettings: PathExtractionSettings;
   aiInferencePreferredGpuId: string | null;
@@ -96,9 +97,10 @@ export function DesktopAppMain({
   wrongImageRotationDetectionSettings,
   photoAnalysisSettings,
   folderScanningSettings,
-    aiImageSearchSettings,
+  aiImageSearchSettings,
+  hideAdvancedSettings,
   mediaViewerSettings,
-    pathExtractionSettings,
+  pathExtractionSettings,
   aiInferencePreferredGpuId,
   aiInferenceGpuOptions,
   selectedFolderLabel,
@@ -159,6 +161,7 @@ export function DesktopAppMain({
             photoAnalysisSettings={photoAnalysisSettings}
             folderScanningSettings={folderScanningSettings}
             aiImageSearchSettings={aiImageSearchSettings}
+            hideAdvancedSettings={hideAdvancedSettings}
             mediaViewerSettings={mediaViewerSettings}
             onFaceDetectionSettingChange={(key, value) => store.getState().updateFaceDetectionSetting(key, value)}
             onResetFaceDetectionOnlySettings={() => store.getState().resetFaceDetectionOnlySettings()}
@@ -179,6 +182,9 @@ export function DesktopAppMain({
               store.getState().updateAiImageSearchSetting(key, value)
             }
             onResetAiImageSearchSettings={() => store.getState().resetAiImageSearchSettings()}
+            onHideAdvancedSettingsChange={(next) =>
+              store.getState().setHideAdvancedSettings(next)
+            }
             onMediaViewerSettingChange={(key, value) =>
               store.getState().updateMediaViewerSetting(key, value)
             }

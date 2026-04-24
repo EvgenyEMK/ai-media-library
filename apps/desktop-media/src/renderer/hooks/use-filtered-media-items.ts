@@ -86,10 +86,10 @@ export function useFilteredMediaItems(quickFilters: ThumbnailQuickFilterState): 
     (s) => s.aiImageSearchSettings.hideResultsBelowDescriptionSimilarity,
   );
   const semanticSearchSignalMode = useDesktopStore((s) => s.semanticSearchSignalMode);
-  const showMatchingMethodSelector = useDesktopStore(
-    (s) => s.aiImageSearchSettings.showMatchingMethodSelector,
+  const experimentalAdvancedSearch = useDesktopStore(
+    (s) => s.aiImageSearchSettings.keywordMatchReranking,
   );
-  const effectiveSearchSignalMode = showMatchingMethodSelector
+  const effectiveSearchSignalMode = experimentalAdvancedSearch
     ? semanticSearchSignalMode
     : "hybrid";
   const viewerItemsOverride = useDesktopStore((s) => s.viewerItemsOverride);

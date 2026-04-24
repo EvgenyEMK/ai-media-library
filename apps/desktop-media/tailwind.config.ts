@@ -42,6 +42,14 @@ const config = {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
+        "ai-search": {
+          panel: "#151d2e",
+          control: "#1d2940",
+          border: "#2a3550",
+          text: "#e8eefc",
+          muted: "#9fb0d4",
+          accent: "#6e9fff",
+        },
         chart: {
           "1": "hsl(var(--chart-1))",
           "2": "hsl(var(--chart-2))",

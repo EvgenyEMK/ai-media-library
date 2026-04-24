@@ -86,7 +86,7 @@ export function SemanticSearchPersonTagsBar({
           <button
             type="button"
             onClick={() => setTagsListExpanded((expanded) => !expanded)}
-            className="inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-border px-3 text-sm hover:bg-muted"
+            className="inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-ai-search-border bg-ai-search-control px-3 text-sm text-ai-search-text hover:border-ai-search-accent/60 hover:bg-ai-search-control/80"
           >
             {tagsListExpanded ? UI_TEXT.hideAllPersonTags : UI_TEXT.showAllPersonTags}
           </button>
@@ -97,11 +97,11 @@ export function SemanticSearchPersonTagsBar({
 
   return (
     <div className="space-y-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-ai-search-muted">
         {UI_TEXT.heading}
       </h3>
       <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 [&_input]:border-ai-search-border [&_input]:bg-ai-search-control [&_input]:text-ai-search-text [&_input]:placeholder:text-ai-search-muted/75 [&_input]:focus:border-ai-search-accent [&_input]:focus:ring-ai-search-accent/45">
           {toolbar}
           {visibleTags.map((tag) => {
             const isSelected = selectedTagIds.includes(tag.id);
@@ -112,8 +112,8 @@ export function SemanticSearchPersonTagsBar({
                 onClick={() => handleChipClick(tag.id)}
                 className={`inline-flex h-8 shrink-0 items-center rounded-md border px-3 text-sm transition ${
                   isSelected
-                    ? "border-primary bg-primary/10"
-                    : "border-border hover:border-primary/50"
+                    ? "border-ai-search-accent bg-ai-search-accent/15 text-ai-search-text"
+                    : "border-ai-search-border bg-ai-search-control/60 text-ai-search-text/85 hover:border-ai-search-accent/60"
                 }`}
               >
                 {tag.label}
@@ -122,7 +122,7 @@ export function SemanticSearchPersonTagsBar({
           })}
         </div>
         {visibleTags.length === 0 && nameFilterTrimmed.length > 0 ? (
-          <p className="text-sm text-muted-foreground">{UI_TEXT.noFilterMatches}</p>
+          <p className="text-sm text-ai-search-muted">{UI_TEXT.noFilterMatches}</p>
         ) : null}
       </div>
     </div>

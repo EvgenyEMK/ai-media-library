@@ -52,6 +52,10 @@ export async function readSettings(userDataPath: string): Promise<AppSettings> {
       typeof parsed.sidebarCollapsed === "boolean"
         ? parsed.sidebarCollapsed
         : false,
+    hideAdvancedSettings:
+      typeof parsed.hideAdvancedSettings === "boolean"
+        ? parsed.hideAdvancedSettings
+        : DEFAULT_SETTINGS.hideAdvancedSettings,
     wrongImageRotationDetection: sanitizeWrongImageRotationDetectionSettings(
       parsed.wrongImageRotationDetection,
       parsed.faceDetection,
@@ -290,10 +294,11 @@ function sanitizeAiImageSearchSettings(candidate: unknown): AiImageSearchSetting
   return {
     hideResultsBelowVlmSimilarity: vlm,
     hideResultsBelowDescriptionSimilarity: desc,
-    showMatchingMethodSelector:
-      typeof value.showMatchingMethodSelector === "boolean"
-        ? value.showMatchingMethodSelector
-        : DEFAULT_AI_IMAGE_SEARCH_SETTINGS.showMatchingMethodSelector,
+    searchPromptTranslationModel:
+      typeof value.searchPromptTranslationModel === "string" &&
+      value.searchPromptTranslationModel.trim().length > 0
+        ? value.searchPromptTranslationModel.trim()
+        : DEFAULT_AI_IMAGE_SEARCH_SETTINGS.searchPromptTranslationModel,
     keywordMatchReranking:
       typeof value.keywordMatchReranking === "boolean"
         ? value.keywordMatchReranking

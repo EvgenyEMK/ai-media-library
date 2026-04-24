@@ -51,6 +51,7 @@ export function App(): ReactElement {
   const mediaItems = useDesktopStore((s) => s.mediaItems);
   const mediaMetadataByItemId = useDesktopStore((s) => s.mediaMetadataByItemId);
   const viewMode = useDesktopStore((s) => s.viewMode);
+  const hideAdvancedSettings = useDesktopStore((s) => s.hideAdvancedSettings);
   const viewerOpen = useDesktopStore((s) => s.viewerOpen);
   const viewerCurrentIndex = useDesktopStore((s) => s.viewerCurrentIndex);
   const viewerShowInfoPanel = useDesktopStore((s) => s.viewerShowInfoPanel);
@@ -291,6 +292,7 @@ export function App(): ReactElement {
         photoAnalysisSettings={photoAnalysisSettings}
         folderScanningSettings={folderScanningSettings}
         aiImageSearchSettings={aiImageSearchSettings}
+        hideAdvancedSettings={hideAdvancedSettings}
         mediaViewerSettings={mediaViewerSettings}
         pathExtractionSettings={pathExtractionSettings}
         aiInferencePreferredGpuId={aiInferencePreferredGpuId}

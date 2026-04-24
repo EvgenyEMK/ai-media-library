@@ -25,6 +25,7 @@ import {
 export interface DesktopSlice {
   clientId: string;
   libraryRoots: string[];
+  hideAdvancedSettings: boolean;
   expandedFolders: Set<string>;
   selectedFolder: string | null;
   childrenByPath: Record<string, FolderNode[]>;
@@ -86,6 +87,7 @@ export interface DesktopSlice {
   similarUntaggedCountsPanelVisible: boolean;
 
   setLibraryRoots: (roots: string[]) => void;
+  setHideAdvancedSettings: (hide: boolean) => void;
   addLibraryRoot: (root: string) => void;
   removeLibraryRoot: (root: string) => void;
   setExpandedFolders: (folders: Set<string>) => void;
@@ -157,6 +159,7 @@ export interface DesktopSlice {
 export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", never]]> = (set) => ({
   clientId: "",
   libraryRoots: [],
+  hideAdvancedSettings: true,
   expandedFolders: new Set<string>(),
   selectedFolder: null,
   childrenByPath: {},
@@ -209,6 +212,11 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   setLibraryRoots: (roots) =>
     set((state) => {
       state.libraryRoots = roots;
+    }),
+
+  setHideAdvancedSettings: (hide) =>
+    set((state) => {
+      state.hideAdvancedSettings = hide;
     }),
 
   addLibraryRoot: (root) =>

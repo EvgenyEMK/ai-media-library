@@ -19,7 +19,7 @@ export interface SemanticSearchSlice {
   semanticSearchScope: SemanticSearchScope;
   semanticPersonTagIds: string[];
   semanticIncludeUnconfirmedFaces: boolean;
-  semanticAdvancedSearch: boolean;
+  semanticTranslateToEnglish: boolean;
   semanticSearchSignalMode: SemanticSearchSignalMode;
 
   semanticIndexJobId: string | null;
@@ -47,7 +47,7 @@ export interface SemanticSearchSlice {
   setSemanticSearchScope: (scope: SemanticSearchScope) => void;
   setSemanticPersonTagIds: (ids: string[]) => void;
   setSemanticIncludeUnconfirmedFaces: (include: boolean) => void;
-  setSemanticAdvancedSearch: (on: boolean) => void;
+  setSemanticTranslateToEnglish: (on: boolean) => void;
   setSemanticSearchSignalMode: (mode: SemanticSearchSignalMode) => void;
 }
 
@@ -62,7 +62,7 @@ export const createSemanticSearchSlice: StateCreator<SemanticSearchSlice, [["zus
   semanticSearchScope: "global",
   semanticPersonTagIds: [],
   semanticIncludeUnconfirmedFaces: true,
-  semanticAdvancedSearch: false,
+  semanticTranslateToEnglish: false,
   semanticSearchSignalMode: "hybrid",
 
   semanticIndexJobId: null,
@@ -149,9 +149,9 @@ export const createSemanticSearchSlice: StateCreator<SemanticSearchSlice, [["zus
       state.semanticIncludeUnconfirmedFaces = include;
     }),
 
-  setSemanticAdvancedSearch: (on) =>
+  setSemanticTranslateToEnglish: (on) =>
     set((state) => {
-      state.semanticAdvancedSearch = on;
+      state.semanticTranslateToEnglish = on;
     }),
 
   setSemanticSearchSignalMode: (mode) =>
