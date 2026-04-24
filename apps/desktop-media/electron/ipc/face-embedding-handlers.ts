@@ -39,6 +39,7 @@ import {
 } from "../face-clustering";
 import { DEFAULT_LIBRARY_ID } from "../db/folder-analysis-status";
 import { ensureFaceDetectionServiceRunning } from "../face-service";
+import { createRotatedTempImage } from "../photo-analysis";
 import { emitFaceClusteringProgress, emitFaceEmbeddingProgress } from "./progress-emitters";
 import { runningFaceClusteringJobs, runningJobs } from "./state";
 import type { RunningAnalysisJob } from "./types";
@@ -487,6 +488,7 @@ export async function autoChainEmbeddings(
   _detectionResult: FaceDetectionOutput,
   signal?: AbortSignal,
   preferredRotationClockwise?: 0 | 90 | 180 | 270,
+  embeddingOverride?: { imagePath: string; faces: FaceDetectionOutput; cleanup?: () => Promise<void> },
 ): Promise<void> {
   const instances = listFaceInstancesByMediaItem(mediaItemId);
   if (instances.length === 0) return;
@@ -495,19 +497,50 @@ export async function autoChainEmbeddings(
     const modelInfo = await getEmbeddingModelInfo();
     if (!modelInfo?.loaded) return;
 
+    let embeddingImagePath = embeddingOverride?.imagePath ?? imagePath;
+    let cleanupRotatedImage: (() => Promise<void>) | null = null;
+    const shouldEmbedFromRotatedCopy =
+      preferredRotationClockwise === 90 ||
+      preferredRotationClockwise === 180 ||
+      preferredRotationClockwise === 270;
+    if (embeddingOverride?.cleanup) {
+      cleanupRotatedImage = embeddingOverride.cleanup;
+    } else if (shouldEmbedFromRotatedCopy) {
+      const rotated = await createRotatedTempImage(imagePath, preferredRotationClockwise);
+      embeddingImagePath = rotated.path;
+      cleanupRotatedImage = rotated.cleanup;
+    }
+
     const facesForEmbed: FaceForEmbedding[] = [];
     const embeddableInstances: typeof instances = [];
 
-    for (const inst of instances) {
+    for (let idx = 0; idx < instances.length; idx++) {
+      const inst = instances[idx];
+      const overrideFace = embeddingOverride?.faces.faces[idx];
+      const sourceBox = [
+        inst.bounding_box.x ?? 0,
+        inst.bounding_box.y ?? 0,
+        (inst.bounding_box.x ?? 0) + (inst.bounding_box.width ?? 0),
+        (inst.bounding_box.y ?? 0) + (inst.bounding_box.height ?? 0),
+      ] as [number, number, number, number];
+      const transformed =
+        overrideFace
+          ? { bbox: overrideFace.bbox_xyxy, landmarks: overrideFace.landmarks_5 }
+          :
+        shouldEmbedFromRotatedCopy && inst.ref_image_width && inst.ref_image_height
+          ? transformFaceForRotatedEmbedding({
+              bbox: sourceBox,
+              landmarks: inst.landmarks_5 ?? null,
+              angle: preferredRotationClockwise,
+              originalSize: {
+                width: inst.ref_image_width,
+                height: inst.ref_image_height,
+              },
+            })
+          : { bbox: sourceBox, landmarks: inst.landmarks_5 ?? undefined };
       facesForEmbed.push({
-        bbox_xyxy: [
-          inst.bounding_box.x ?? 0,
-          inst.bounding_box.y ?? 0,
-          (inst.bounding_box.x ?? 0) + (inst.bounding_box.width ?? 0),
-          (inst.bounding_box.y ?? 0) + (inst.bounding_box.height ?? 0),
-        ] as [number, number, number, number],
-        landmarks_5: inst.landmarks_5 ?? undefined,
-        preferredRotationClockwise,
+        bbox_xyxy: transformed.bbox,
+        landmarks_5: transformed.landmarks,
       });
       embeddableInstances.push(inst);
     }
@@ -519,10 +552,14 @@ export async function autoChainEmbeddings(
     }
 
     const embedResult = await generateFaceEmbeddings({
-      imagePath,
+      imagePath: embeddingImagePath,
       faces: facesForEmbed,
       signal,
     });
+    if (cleanupRotatedImage) {
+      await cleanupRotatedImage();
+      cleanupRotatedImage = null;
+    }
 
     for (let i = 0; i < embeddableInstances.length; i++) {
       const inst = embeddableInstances[i];
@@ -544,6 +581,47 @@ export async function autoChainEmbeddings(
       `[emk-face-debug][chain-embed] fail path=${imagePath} msg=${JSON.stringify(msg)}`,
     );
     // Embedding failure is non-fatal for the detection pipeline
+  }
+}
+
+function transformFaceForRotatedEmbedding(params: {
+  bbox: [number, number, number, number];
+  landmarks: Array<[number, number]> | null;
+  angle: 90 | 180 | 270;
+  originalSize: { width: number; height: number };
+}): { bbox: [number, number, number, number]; landmarks?: Array<[number, number]> } {
+  const { bbox, landmarks, angle, originalSize } = params;
+  const [x1, y1, x2, y2] = bbox;
+  const p1 = transformOriginalPointToRotated(x1, y1, angle, originalSize);
+  const p2 = transformOriginalPointToRotated(x2, y2, angle, originalSize);
+  const transformedLandmarks = landmarks?.map(([x, y]) => {
+    const p = transformOriginalPointToRotated(x, y, angle, originalSize);
+    return [p.x, p.y] as [number, number];
+  });
+  return {
+    bbox: [
+      Math.min(p1.x, p2.x),
+      Math.min(p1.y, p2.y),
+      Math.max(p1.x, p2.x),
+      Math.max(p1.y, p2.y),
+    ],
+    landmarks: transformedLandmarks,
+  };
+}
+
+function transformOriginalPointToRotated(
+  x: number,
+  y: number,
+  angleCw: 90 | 180 | 270,
+  originalSize: { width: number; height: number },
+): { x: number; y: number } {
+  switch (angleCw) {
+    case 90:
+      return { x: originalSize.height - 1 - y, y: x };
+    case 180:
+      return { x: originalSize.width - 1 - x, y: originalSize.height - 1 - y };
+    case 270:
+      return { x: y, y: originalSize.width - 1 - x };
   }
 }
 

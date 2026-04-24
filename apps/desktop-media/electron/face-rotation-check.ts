@@ -373,7 +373,6 @@ export function transformFacesToOriginalCoordinates(
           toRawPixelBoundingBox(face.bbox_xyxy, originalSize),
         )
       : null,
-    azureFaceAttributes: null,
     detected_features: detection.peopleBoundingBoxes[idx]?.detected_features ?? null,
   }));
 

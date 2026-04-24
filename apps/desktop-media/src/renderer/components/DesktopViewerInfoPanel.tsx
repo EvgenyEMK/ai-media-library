@@ -15,6 +15,7 @@ import { getCategoryLabel, getGenderLabel, toHeadlineLabel } from "../lib/label-
 import { DesktopInfoSection, type DesktopInfoField } from "./DesktopInfoSection";
 import { DesktopViewerInfoRatingRow } from "./DesktopViewerInfoRatingRow";
 import { DesktopFaceTagsTabContent } from "./DesktopFaceTagsTabContent";
+import { DesktopMetadataTree } from "./DesktopMetadataTree";
 import type { DesktopViewerInfoPanelProps, DesktopViewerItem } from "../types/viewer-types";
 import type { DesktopFaceInstance, DesktopMediaItemMetadata } from "../../shared/ipc";
 import { formatPhotoTakenListLabel } from "../lib/photo-date-format";
@@ -61,22 +62,23 @@ function buildInfoSections(metadata: DesktopMediaItemMetadata): {
   videoDataFields: DesktopInfoField[];
 } {
   const normalized = normalizeMetadata(metadata.aiMetadata ?? null);
-  const ai = normalized.ai;
+  const ai = normalized.image_analysis;
   const people = normalized.people;
   const extras = getAdditionalTopLevelFields(metadata.aiMetadata ?? null);
+  const vlm = people?.vlm_analysis ?? null;
   const starRating =
-    typeof extras.photo_star_rating_1_5 === "number"
-      ? extras.photo_star_rating_1_5
+    typeof ai?.photo_estetic_quality === "number" && Number.isFinite(ai.photo_estetic_quality)
+      ? Math.max(1, Math.min(5, Math.ceil(ai.photo_estetic_quality / 2)))
       : null;
   const isLowQuality =
-    typeof extras.is_low_quality === "boolean" ? extras.is_low_quality : null;
-  const qualityIssues = Array.isArray(extras.quality_issues)
-    ? extras.quality_issues.filter((issue): issue is string => typeof issue === "string")
+    typeof ai?.is_low_quality === "boolean" ? ai.is_low_quality : null;
+  const qualityIssues = Array.isArray(ai?.quality_issues)
+    ? ai.quality_issues.filter((issue): issue is string => typeof issue === "string")
     : [];
   const editSuggestions: Array<{ edit_type?: string; priority?: string; reason?: string }> = Array.isArray(
-    extras.edit_suggestions,
+    ai?.edit_suggestions,
   )
-    ? extras.edit_suggestions.filter(
+    ? ai.edit_suggestions.filter(
         (entry): entry is { edit_type?: string; priority?: string; reason?: string } =>
           typeof entry === "object" && entry !== null,
       )
@@ -180,16 +182,16 @@ function buildInfoSections(metadata: DesktopMediaItemMetadata): {
     { label: "Category", value: ai?.image_category ? toHeadlineLabel(ai.image_category) : null },
     { label: "Title", value: ai?.title ?? null },
     { label: "Description", value: ai?.description ?? null, display: "stacked" },
-    { label: "People detected", value: people?.number_of_people ?? null },
+    { label: "People detected", value: vlm?.number_of_people ?? null },
     {
       label: "Has child or children",
-      value: typeof people?.has_children === "boolean" ? (people.has_children ? "Yes" : "No") : null,
+      value: typeof vlm?.has_children === "boolean" ? (vlm.has_children ? "Yes" : "No") : null,
     },
   ];
 
   const aiQualityFields: DesktopInfoField[] = [
     { label: "Aesthetic quality (1-10)", value: ai?.photo_estetic_quality ?? null },
-    { label: "Star rating (1-5)", value: starRating },
+    { label: "AI star rating (1-5)", value: starRating },
     {
       label: "Low quality",
       value: typeof isLowQuality === "boolean" ? (isLowQuality ? "Yes" : "No") : null,
@@ -293,7 +295,6 @@ function synthesizedBoundingBoxesFromFaceInstances(instances: DesktopFaceInstanc
       image_height: inst.ref_image_height ?? undefined,
     },
     provider_raw_bounding_box: undefined,
-    azureFaceAttributes: null,
   }));
 }
 
@@ -572,9 +573,7 @@ export function DesktopViewerInfoPanel({
             <div className="grid gap-3">
               <h3 className="mb-3.5 text-lg text-foreground">Metadata</h3>
               {metadata ? (
-                <pre className="m-0 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-muted p-2.5 text-xs text-foreground">
-                  {JSON.stringify(metadata.aiMetadata ?? metadata, null, 2)}
-                </pre>
+                <DesktopMetadataTree data={metadata.aiMetadata ?? metadata} />
               ) : (
                 <p className="m-0 text-muted-foreground">No metadata available</p>
               )}

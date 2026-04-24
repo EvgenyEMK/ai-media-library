@@ -148,9 +148,15 @@ export async function upsertMediaItemFromFilePath(params: {
 
   const currentMtime = observedState?.mtimeMs ?? null;
   const currentSize = observedState?.fileSize ?? null;
+  const contentHashChanged =
+    !!existingByPath &&
+    typeof contentHash === "string" &&
+    contentHash.length > 0 &&
+    contentHash !== existingByPath.content_hash;
   const requiresRefresh =
     isDuplicateLink ||
     !existing ||
+    contentHashChanged ||
     (existingByPath &&
       existingByPath.file_mtime_ms === currentMtime &&
       existingByPath.byte_size === currentSize &&
@@ -688,42 +694,39 @@ function buildDesktopAiMetadata(
   const hasStar = typeof extracted.starRating === "number";
   const embeddedSource = hasEmbeddedText ? "mixed" : hasStar ? "file" : null;
   const isVideo = VIDEO_EXTENSIONS.has(path.extname(filePath).toLowerCase());
-  const technicalSource = isVideo ? "desktop-exiftool-video" : "desktop-exifreader-xmp";
+  const technicalSource = isVideo ? "file" : "xmp";
   const next = mergeMetadataV2(current, {
     schema_version: "2.0",
-    technical: {
-      capture: {
-        captured_at: extracted.photoTakenAt,
-        photo_taken_precision: extracted.photoTakenPrecision,
-        metadata_modified_at: extracted.metadataModifiedAt,
-        camera_make: extracted.cameraMake,
-        camera_model: extracted.cameraModel,
-        lens_model: extracted.lensModel,
-        focal_length_mm: extracted.focalLengthMm,
-        f_number: extracted.fNumber,
-        exposure_time: extracted.exposureTime,
-        iso: extracted.iso,
-      },
-      ...(isVideo
-        ? {
-            video: {
-              duration_sec: extracted.videoDurationSec,
-            },
-          }
-        : {}),
-    },
-    embedded: {
-      source: embeddedSource,
-      title: extracted.embeddedTitle,
-      description: extracted.embeddedDescription,
-      location_text: extracted.embeddedLocation,
-      star_rating: extracted.starRating,
-    },
-    provenance: {
-      metadata_version: METADATA_VERSION,
+    metadata_version: METADATA_VERSION,
+    file_data: {
       metadata_extracted_at: extractedAt,
-      sources: {
-        technical: technicalSource,
+      technical: {
+        capture: {
+          captured_at: extracted.photoTakenAt,
+          photo_taken_precision: extracted.photoTakenPrecision,
+          metadata_modified_at: extracted.metadataModifiedAt,
+          camera_make: extracted.cameraMake,
+          camera_model: extracted.cameraModel,
+          lens_model: extracted.lensModel,
+          focal_length_mm: extracted.focalLengthMm,
+          f_number: extracted.fNumber,
+          exposure_time: extracted.exposureTime,
+          iso: extracted.iso,
+        },
+        ...(isVideo
+          ? {
+              video: {
+                duration_sec: extracted.videoDurationSec,
+              },
+            }
+          : {}),
+      },
+      exif_xmp: {
+        source: embeddedSource ?? technicalSource,
+        title: extracted.embeddedTitle,
+        description: extracted.embeddedDescription,
+        location_text: extracted.embeddedLocation,
+        star_rating: extracted.starRating,
       },
     },
   });
@@ -758,18 +761,21 @@ function readEmbeddedStrings(ai: unknown): {
   if (!ai || typeof ai !== "object") {
     return { title: null, description: null, locationText: null };
   }
-  const emb = (ai as { embedded?: Record<string, unknown> }).embedded;
+  const fileData = (ai as { file_data?: Record<string, unknown> }).file_data;
+  const emb = fileData?.exif_xmp;
   if (!emb || typeof emb !== "object") {
     return { title: null, description: null, locationText: null };
   }
-  const t = typeof emb.title === "string" && emb.title.trim() ? emb.title.trim() : null;
+  const embRecord = emb as Record<string, unknown>;
+  const t =
+    typeof embRecord.title === "string" && embRecord.title.trim() ? embRecord.title.trim() : null;
   const d =
-    typeof emb.description === "string" && emb.description.trim()
-      ? emb.description.trim()
+    typeof embRecord.description === "string" && embRecord.description.trim()
+      ? embRecord.description.trim()
       : null;
   const l =
-    typeof emb.location_text === "string" && emb.location_text.trim()
-      ? emb.location_text.trim()
+    typeof embRecord.location_text === "string" && embRecord.location_text.trim()
+      ? embRecord.location_text.trim()
       : null;
   return { title: t, description: d, locationText: l };
 }

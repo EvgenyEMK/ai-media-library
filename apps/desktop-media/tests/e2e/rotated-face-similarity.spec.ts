@@ -42,14 +42,23 @@ test.describe("Rotated face similarity suggestion", () => {
         const settings = await window.desktopApi.getSettings();
         const faceDetection = {
           ...settings.faceDetection,
-          detectorModel: "yolov12s-face" as const,
+          detectorModel: "yolov12l-face" as const,
+          faceRecognitionSimilarityThreshold: 0.2,
           faceLandmarkRefinement: {
             ...settings.faceDetection.faceLandmarkRefinement,
             enabled: true,
           },
         };
-        await window.desktopApi.ensureDetectorModel("yolov12s-face");
-        await window.desktopApi.saveSettings({ ...settings, faceDetection });
+        await window.desktopApi.ensureDetectorModel("yolov12l-face");
+        await window.desktopApi.saveSettings({
+          ...settings,
+          wrongImageRotationDetection: {
+            ...settings.wrongImageRotationDetection,
+            enabled: true,
+            useFaceLandmarkFeaturesFallback: true,
+          },
+          faceDetection,
+        });
 
         const baseDetection = await window.desktopApi.detectFacesForMediaItem(
           baseFacePath,
@@ -87,6 +96,15 @@ test.describe("Rotated face similarity suggestion", () => {
           return { ok: false as const, error: "Unable to resolve media items." };
         }
 
+        const orientation = (rotatedMedia.aiMetadata as {
+          orientation_detection?: { correction_angle_clockwise?: unknown; source?: unknown };
+        } | null | undefined)?.orientation_detection;
+        const rotatedCorrectionAngle = orientation?.correction_angle_clockwise;
+        const baseOrientation = (baseMedia.aiMetadata as {
+          orientation_detection?: { correction_angle_clockwise?: unknown; source?: unknown };
+        } | null | undefined)?.orientation_detection;
+        const baseCorrectionAngle = baseOrientation?.correction_angle_clockwise;
+
         const baseFaces = await window.desktopApi.listFaceInstancesForMediaItem(baseMedia.id);
         const rotatedFaces = await window.desktopApi.listFaceInstancesForMediaItem(rotatedMedia.id);
         const extraFaces = await window.desktopApi.listFaceInstancesForMediaItem(extraMedia.id);
@@ -106,21 +124,29 @@ test.describe("Rotated face similarity suggestion", () => {
           rotatedFaces.map((face) =>
             window.desktopApi.suggestPersonTagForFace({
               faceInstanceId: face.id,
-              threshold: settings.faceDetection.faceRecognitionSimilarityThreshold,
+              threshold: faceDetection.faceRecognitionSimilarityThreshold,
             }),
           ),
         );
         const matched = suggestions.find((s) => s?.tagId === person.id) ?? null;
+        const rotatedSimilarities = await window.desktopApi.getFaceToPersonCentroidSimilarities(
+          rotatedFaces.map((face) => face.id),
+          person.id,
+        );
 
         const extraSuggestions = await Promise.all(
           extraFaces.map((face) =>
             window.desktopApi.suggestPersonTagForFace({
               faceInstanceId: face.id,
-              threshold: settings.faceDetection.faceRecognitionSimilarityThreshold,
+              threshold: faceDetection.faceRecognitionSimilarityThreshold,
             }),
           ),
         );
         const matchedExtra = extraSuggestions.find((s) => s?.tagId === person.id) ?? null;
+        const extraSimilarities = await window.desktopApi.getFaceToPersonCentroidSimilarities(
+          extraFaces.map((face) => face.id),
+          person.id,
+        );
 
         return {
           ok: true as const,
@@ -129,6 +155,10 @@ test.describe("Rotated face similarity suggestion", () => {
           matchedExtra,
           rotatedFaceCount: rotatedFaces.length,
           extraFaceCount: extraFaces.length,
+          rotatedCorrectionAngle,
+          baseCorrectionAngle,
+          rotatedSimilarities,
+          extraSimilarities,
         };
       },
       { baseFacePath, rotatedFacePath, extraFacePath, personLabel },
@@ -138,9 +168,11 @@ test.describe("Rotated face similarity suggestion", () => {
       throw new Error(result.error);
     }
 
+    expect(result.baseCorrectionAngle).toBe(0);
+    expect(result.rotatedCorrectionAngle).toBe(270);
     expect(
       result.matched,
-      "Expected at least one rotated face to get person-tag suggestion.",
+      `Expected at least one rotated face to get person-tag suggestion. Similarities: ${JSON.stringify(result.rotatedSimilarities)}`,
     ).toBeTruthy();
     expect(
       result.matchedExtra,

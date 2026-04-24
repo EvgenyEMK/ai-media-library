@@ -50,8 +50,10 @@ export function updateMediaItemStarRatingInDb(params: {
   const priorAi = parseAiMetadataJson(row.ai_metadata);
   const merged = normalizeMetadata(
     mergeMetadataV2(priorAi, {
-      embedded: {
-        star_rating: starRating,
+      file_data: {
+        exif_xmp: {
+          star_rating: starRating,
+        },
       },
     }),
   );

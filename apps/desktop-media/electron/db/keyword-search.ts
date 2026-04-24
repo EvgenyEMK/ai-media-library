@@ -41,28 +41,28 @@ export function starRatingToFtsTokens(starRating: number | null | undefined): st
 }
 
 /**
- * Merges embedded XMP/IPTC (`embedded.*`) with AI analysis (`ai.*`) for FTS rows.
- * Embedded title/description/location take precedence over AI when non-empty.
+ * Merges EXIF/XMP (`file_data.exif_xmp.*`) with VLM image analysis (`image_analysis.*`) for FTS rows.
+ * EXIF/XMP title/description/location take precedence over VLM text when non-empty.
  */
 export function getFtsFieldsFromAiMetadata(
   aiMetadataParsed: unknown,
   locationName: string | null | undefined,
 ): { title: string; description: string; location: string; category: string; ratingTokens: string } {
   const norm = normalizeMetadata(aiMetadataParsed);
-  const emb = isRecord(norm.embedded) ? norm.embedded : {};
-  const ai = norm.ai ?? {};
+  const emb = isRecord(norm.file_data?.exif_xmp) ? norm.file_data?.exif_xmp : {};
+  const imageAnalysis = norm.image_analysis ?? {};
 
   const embTitle = typeof emb.title === "string" ? emb.title.trim() : "";
   const embDesc = typeof emb.description === "string" ? emb.description.trim() : "";
   const embLoc = typeof emb.location_text === "string" ? emb.location_text.trim() : "";
-  const aiTitle = typeof ai.title === "string" ? ai.title.trim() : "";
-  const aiDesc = typeof ai.description === "string" ? ai.description.trim() : "";
+  const aiTitle = typeof imageAnalysis.title === "string" ? imageAnalysis.title.trim() : "";
+  const aiDesc = typeof imageAnalysis.description === "string" ? imageAnalysis.description.trim() : "";
 
   const title = embTitle || aiTitle;
   const description = embDesc || aiDesc;
   const locationFromName = typeof locationName === "string" ? locationName.trim() : "";
-  const location = locationFromName || embLoc || aiLocationToFtsString(ai.location);
-  const category = typeof ai.image_category === "string" ? ai.image_category : "";
+  const location = locationFromName || embLoc || aiLocationToFtsString(imageAnalysis.location);
+  const category = typeof imageAnalysis.image_category === "string" ? imageAnalysis.image_category : "";
 
   const embStar = emb.star_rating;
   const ratingTokens =

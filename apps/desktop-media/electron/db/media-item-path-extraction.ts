@@ -1,3 +1,4 @@
+import path from "node:path";
 import { getDesktopDatabase } from "./client";
 import { DEFAULT_LIBRARY_ID } from "./folder-analysis-status";
 import { extractDateFromPath } from "../path-extraction/date-extractor";
@@ -36,7 +37,12 @@ export function runPathExtractionForMediaItem(input: PathExtractionInput): void 
   const now = new Date().toISOString();
 
   const pathDate = extractDateFromPath(filePath);
-  const displayTitle = extractDisplayTitle(filePath);
+  const extractedDisplayTitle = extractDisplayTitle(filePath);
+  const filenameStem = path.parse(filePath).name.trim();
+  const displayTitle =
+    extractedDisplayTitle && extractedDisplayTitle.trim() !== filenameStem
+      ? extractedDisplayTitle
+      : null;
 
   const resolved = resolveEventDate(
     { photoTakenAt, photoTakenPrecision },

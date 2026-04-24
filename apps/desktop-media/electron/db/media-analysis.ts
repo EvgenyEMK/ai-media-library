@@ -16,7 +16,6 @@ import {
   type PersonInfo,
 } from "@emk/media-metadata-core";
 import {
-  estimateRotationFromFaceLandmarks,
   greedyMatchBoxesByIou,
   rescaleBoxToImageSize,
   type PixelXyxyBox,
@@ -169,11 +168,13 @@ export function upsertPhotoAnalysisResult(
       const merged = mergeMetadataV2(parseJson(existingAiMetadata?.ai_metadata), {
       schema_version: "2.0",
       people: {
-        number_of_people: peopleDetected,
-        has_children: result.has_children ?? null,
-        people_detected: normalizedPeople,
+        vlm_analysis: {
+          number_of_people: peopleDetected,
+          has_children: result.has_children ?? null,
+          people_detected: normalizedPeople,
+        },
       },
-      ai: {
+      image_analysis: {
         image_category: (result.image_category as MediaImageCategory) ?? null,
         title: result.title ?? null,
         description: result.description ?? null,
@@ -188,13 +189,12 @@ export function upsertPhotoAnalysisResult(
         weather: result.weather ?? null,
         photo_estetic_quality: result.photo_estetic_quality ?? null,
         photo_analysis_method: result.modelInfo?.model ?? null,
+        is_low_quality: result.is_low_quality ?? null,
+        quality_issues: normalizeQualityIssues(result.quality_issues),
       },
-      provenance: {
-        metadata_version: "2.0",
+      metadata_version: "desktop-photo-metadata-v2",
+      file_data: {
         metadata_extracted_at: now,
-        sources: {
-          analysis: "desktop-vision",
-        },
       },
     });
 
@@ -212,6 +212,10 @@ export function upsertPhotoAnalysisResult(
         "weather",
         "daytime",
         "photo_estetic_quality",
+        "is_low_quality",
+        "quality_issues",
+        "edit_suggestions",
+        "star_rating_1_5",
         "modelInfo",
       ]);
 
@@ -224,12 +228,17 @@ export function upsertPhotoAnalysisResult(
       delete merged.rotation_decision;
       delete merged.two_pass_rotation_consistency;
       delete merged.face_rotation_override;
+      sanitizeLegacyPeopleShape(merged);
+      sanitizeAiAnalysisRootLeakage(merged);
 
       merged.edit_suggestions = stripRotateEditSuggestions(merged.edit_suggestions);
 
       return merged;
     })(),
   );
+
+  const existingFaceCount = getFaceCountFromMetadata(parseJson(existingAiMetadata?.ai_metadata));
+  const peopleDetectedForSearch = existingFaceCount ?? peopleDetected;
 
   db.prepare(
     `INSERT INTO media_items (
@@ -269,7 +278,7 @@ export function upsertPhotoAnalysisResult(
     location,
     city,
     country,
-    peopleDetected,
+    peopleDetectedForSearch,
     ageMin,
     ageMax,
     aiMetadata,
@@ -471,7 +480,7 @@ export function upsertFaceDetectionResult(
   const merged = mergeMetadataV2(parseJson(existingAiMetadata?.ai_metadata), {
     schema_version: "2.0",
     people: {
-      number_of_people: result.faceCount > 0 ? result.faceCount : null,
+      face_count: result.faceCount > 0 ? result.faceCount : null,
       detections: {
         face_detection_method: faceDetectionMethod,
         image_size_for_bounding_boxes: result.imageSizeForBoundingBoxes,
@@ -479,17 +488,14 @@ export function upsertFaceDetectionResult(
           result.peopleBoundingBoxes.length > 0
             ? normalizeFaceBeingBoxes(result.peopleBoundingBoxes)
             : null,
-        face_orientation: null,
       },
     },
-    provenance: {
-      metadata_version: "2.0",
+    metadata_version: "desktop-photo-metadata-v2",
+    file_data: {
       metadata_extracted_at: now,
-      sources: {
-        face_detection: result.modelInfo.modelName,
-      },
     },
   });
+  sanitizeLegacyPeopleShape(merged as Record<string, unknown>);
 
   merged.edit_suggestions = stripRotateEditSuggestions(merged.edit_suggestions);
 
@@ -499,12 +505,14 @@ export function upsertFaceDetectionResult(
     db.prepare(
       `UPDATE media_items
        SET ai_metadata = ?, face_detection_processed_at = ?,
+           people_detected = ?,
            face_detection_failed_at = NULL, face_detection_error = NULL,
            deleted_at = NULL, updated_at = ?
        WHERE id = ?`,
     ).run(
       nextAiMetadata,
       now,
+      result.faceCount > 0 ? result.faceCount : null,
       now,
       mediaItem.id,
     );
@@ -866,7 +874,7 @@ export function upsertRotationPipelineFaces(
     const rotMerged = mergeMetadataV2(parseJson(existingAiMetadata?.ai_metadata), {
       schema_version: "2.0",
       people: {
-        number_of_people: faces.faceCount > 0 ? faces.faceCount : null,
+        face_count: faces.faceCount > 0 ? faces.faceCount : null,
         detections: {
           face_detection_method: "retinaface",
           image_size_for_bounding_boxes: faces.imageSizeForBoundingBoxes,
@@ -874,17 +882,14 @@ export function upsertRotationPipelineFaces(
             faces.peopleBoundingBoxes.length > 0
               ? normalizeFaceBeingBoxes(faces.peopleBoundingBoxes)
               : null,
-          face_orientation: null,
         },
       },
-      provenance: {
-        metadata_version: "2.0",
+      metadata_version: "desktop-photo-metadata-v2",
+      file_data: {
         metadata_extracted_at: now,
-        sources: {
-          face_detection: faces.modelInfo.modelName,
-        },
       },
     });
+    sanitizeLegacyPeopleShape(rotMerged as Record<string, unknown>);
 
     rotMerged.edit_suggestions = stripRotateEditSuggestions(rotMerged.edit_suggestions);
 
@@ -892,9 +897,9 @@ export function upsertRotationPipelineFaces(
 
     db.prepare(
       `UPDATE media_items
-       SET ai_metadata = ?, face_detection_processed_at = ?, updated_at = ?
+       SET ai_metadata = ?, face_detection_processed_at = ?, people_detected = ?, updated_at = ?
        WHERE id = ?`,
-    ).run(nextAiMetadata, now, now, mediaItem.id);
+    ).run(nextAiMetadata, now, faces.faceCount > 0 ? faces.faceCount : null, now, mediaItem.id);
 
     const insertFace = db.prepare(
       `INSERT INTO media_face_instances (
@@ -948,7 +953,6 @@ function normalizeFaceBeingBoxes(boxes: FaceDetectionOutput["peopleBoundingBoxes
     person_bounding_box: box.person_bounding_box ?? undefined,
     person_face_bounding_box: normalizeFaceBoxForMetadata(box.person_face_bounding_box ?? null),
     provider_raw_bounding_box: box.provider_raw_bounding_box ?? undefined,
-    azureFaceAttributes: box.azureFaceAttributes ?? null,
     detected_features: box.detected_features ?? null,
   }));
 }
@@ -966,32 +970,108 @@ function normalizeFaceBoxForMetadata(
   if (typeof rounded.height === "number") {
     rounded.height = Math.round(rounded.height);
   }
+  if (typeof rounded.x === "number") {
+    rounded.x = Math.round(rounded.x);
+  }
+  if (typeof rounded.y === "number") {
+    rounded.y = Math.round(rounded.y);
+  }
+  if (typeof rounded.x_min === "number") {
+    rounded.x_min = Math.round(rounded.x_min);
+  }
+  if (typeof rounded.y_min === "number") {
+    rounded.y_min = Math.round(rounded.y_min);
+  }
+  if (typeof rounded.x_max === "number") {
+    rounded.x_max = Math.round(rounded.x_max);
+  }
+  if (typeof rounded.y_max === "number") {
+    rounded.y_max = Math.round(rounded.y_max);
+  }
+  if (typeof rounded.mp_x === "number") {
+    rounded.mp_x = Math.round(rounded.mp_x);
+  }
+  if (typeof rounded.mp_y === "number") {
+    rounded.mp_y = Math.round(rounded.mp_y);
+  }
+  if (typeof rounded.mp_width === "number") {
+    rounded.mp_width = Math.round(rounded.mp_width);
+  }
+  if (typeof rounded.mp_height === "number") {
+    rounded.mp_height = Math.round(rounded.mp_height);
+  }
   return rounded as typeof box;
 }
 
-function computeFaceOrientation(result: FaceDetectionOutput): FaceOrientationMetadata | null {
-  if (result.faceCount === 0) {
+function getFaceCountFromMetadata(value: unknown): number | null {
+  if (!value || typeof value !== "object") {
     return null;
   }
-  const facesWithLandmarks = result.faces
-    .filter((f) => Array.isArray(f.landmarks_5) && f.landmarks_5.length >= 5)
-    .map((f) => ({ landmarks: f.landmarks_5, score: f.score }));
-
-  if (facesWithLandmarks.length === 0) {
+  const root = value as Record<string, unknown>;
+  const people = root.people;
+  if (!people || typeof people !== "object") {
     return null;
   }
+  const peopleRecord = people as Record<string, unknown>;
+  const faceCount = peopleRecord.face_count;
+  if (typeof faceCount === "number" && Number.isFinite(faceCount)) {
+    return Math.max(0, Math.floor(faceCount));
+  }
+  const legacyCount = peopleRecord.number_of_people;
+  if (typeof legacyCount === "number" && Number.isFinite(legacyCount)) {
+    return Math.max(0, Math.floor(legacyCount));
+  }
+  return null;
+}
 
-  const rotation = estimateRotationFromFaceLandmarks(facesWithLandmarks);
-  if (!rotation) {
-    return null;
+function sanitizeLegacyPeopleShape(metadata: Record<string, unknown>): void {
+  delete metadata.rotation_decision;
+  delete metadata.two_pass_rotation_consistency;
+  delete metadata.face_rotation_override;
+  const peopleNode = metadata.people;
+  if (!peopleNode || typeof peopleNode !== "object") {
+    return;
+  }
+  const people = peopleNode as Record<string, unknown>;
+  const legacyNumber = people.number_of_people;
+  const legacyHasChildren = people.has_children;
+  const legacyPeopleDetected = people.people_detected;
+
+  const existingVlm =
+    people.vlm_analysis && typeof people.vlm_analysis === "object"
+      ? (people.vlm_analysis as Record<string, unknown>)
+      : {};
+
+  if (
+    existingVlm.number_of_people === undefined &&
+    typeof legacyNumber === "number" &&
+    Number.isFinite(legacyNumber)
+  ) {
+    existingVlm.number_of_people = Math.max(0, Math.floor(legacyNumber));
+  }
+  if (existingVlm.has_children === undefined && typeof legacyHasChildren === "boolean") {
+    existingVlm.has_children = legacyHasChildren;
+  }
+  if (existingVlm.people_detected === undefined && Array.isArray(legacyPeopleDetected)) {
+    existingVlm.people_detected = legacyPeopleDetected;
+  }
+  if (
+    (people.face_count === undefined || people.face_count === null) &&
+    typeof legacyNumber === "number" &&
+    Number.isFinite(legacyNumber)
+  ) {
+    people.face_count = Math.max(0, Math.floor(legacyNumber));
   }
 
-  return {
-    orientation: rotation.orientation,
-    correction_angle_clockwise: rotation.correctionAngleClockwise,
-    confidence: rotation.confidence,
-    face_count: rotation.faceCount,
-  };
+  people.vlm_analysis = existingVlm;
+  delete people.number_of_people;
+  delete people.has_children;
+  delete people.people_detected;
+
+  const detections = people.detections;
+  if (detections && typeof detections === "object") {
+    delete (detections as Record<string, unknown>).face_orientation;
+  }
 }
 
 function stripRotateEditSuggestions(input: unknown): unknown {
@@ -1033,7 +1113,9 @@ function hasPhotoAnalysisSignature(aiMetadataRaw: string | null): boolean {
 
   const root = parsed as Record<string, unknown>;
   const aiNode =
-    root.ai && typeof root.ai === "object" ? (root.ai as Record<string, unknown>) : root;
+    root.image_analysis && typeof root.image_analysis === "object"
+      ? (root.image_analysis as Record<string, unknown>)
+      : root;
 
   const imageCategory = aiNode.image_category;
   const title = aiNode.title;
@@ -1047,6 +1129,59 @@ function hasPhotoAnalysisSignature(aiMetadataRaw: string | null): boolean {
     typeof description === "string" &&
     description.trim().length > 0
   );
+}
+
+function normalizeQualityIssues(value: unknown): string[] | null {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const listFromObject = Object.entries(value as Record<string, unknown>)
+      .filter(([k, v]) => /^\d+$/.test(k) && typeof v === "string")
+      .sort((a, b) => Number(a[0]) - Number(b[0]))
+      .map(([, v]) => (v as string).trim());
+    if (listFromObject.length > 0) {
+      return listFromObject.filter((entry) => entry.length > 0 && entry.toLowerCase() !== "none");
+    }
+  }
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const normalized = value
+    .filter((entry): entry is string => typeof entry === "string")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0 && entry.toLowerCase() !== "none");
+  return normalized;
+}
+
+function sanitizeAiAnalysisRootLeakage(metadata: Record<string, unknown>): void {
+  const imageAnalysis =
+    metadata.image_analysis && typeof metadata.image_analysis === "object"
+      ? (metadata.image_analysis as Record<string, unknown>)
+      : {};
+
+  if (imageAnalysis.is_low_quality === undefined && typeof metadata.is_low_quality === "boolean") {
+    imageAnalysis.is_low_quality = metadata.is_low_quality;
+  }
+  if (imageAnalysis.quality_issues === undefined && metadata.quality_issues !== undefined) {
+    imageAnalysis.quality_issues = normalizeQualityIssues(metadata.quality_issues);
+  } else if (imageAnalysis.quality_issues !== undefined) {
+    imageAnalysis.quality_issues = normalizeQualityIssues(imageAnalysis.quality_issues);
+  }
+  if (imageAnalysis.edit_suggestions === undefined && metadata.edit_suggestions !== undefined) {
+    imageAnalysis.edit_suggestions = metadata.edit_suggestions;
+  }
+  if (
+    imageAnalysis.photo_estetic_quality === undefined &&
+    typeof metadata.photo_estetic_quality === "number" &&
+    Number.isFinite(metadata.photo_estetic_quality)
+  ) {
+    imageAnalysis.photo_estetic_quality = metadata.photo_estetic_quality;
+  }
+
+  metadata.image_analysis = imageAnalysis;
+  delete metadata.is_low_quality;
+  delete metadata.quality_issues;
+  delete metadata.edit_suggestions;
+  delete metadata.photo_star_rating_1_5;
+  delete metadata.star_rating_1_5;
 }
 
 const MAX_ERROR_LENGTH = 500;

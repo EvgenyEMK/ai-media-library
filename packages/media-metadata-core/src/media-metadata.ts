@@ -83,7 +83,6 @@ export interface BeingBoundingBox {
   person_bounding_box?: BoundingBox;
   person_face_bounding_box?: BoundingBox | null;
   provider_raw_bounding_box?: ProviderBoundingBoxReference | null;
-  azureFaceAttributes?: Record<string, unknown> | null;
   detected_features?: FaceLandmarkFeature[] | null;
 }
 
@@ -190,12 +189,12 @@ export interface TechnicalCaptureMetadata {
   iso?: number | null;
 }
 
-/** Embedded XMP/IPTC from the file (does not replace AI analysis fields in `ai`). */
-export interface EmbeddedFileMetadata {
+/** EXIF/XMP/IPTC metadata embedded in the file. */
+export interface ExifXmpMetadata {
   source?: 'xmp' | 'iptc' | 'mixed' | 'file' | null;
   title?: string | null;
   description?: string | null;
-  /** Freeform place string from XMP/IPTC (not structured `LocationData`). */
+  /** Freeform place string from EXIF/XMP/IPTC (not structured `LocationData`). */
   location_text?: string | null;
   star_rating?: number | null;
 }
@@ -300,22 +299,42 @@ export interface MediaPeopleDetectionsMetadata {
   face_detection_method?: FaceDetectionMethod | null;
   image_size_for_bounding_boxes?: ImageSizeForBoundingBoxes | null;
   people_bounding_boxes?: BeingBoundingBox[] | null;
-  face_orientation?: FaceOrientationMetadata | null;
 }
 
 export interface MediaMetadataV2 {
+  /**
+   * Structural schema identifier for JSON shape compatibility.
+   * Bump when field layout/paths change.
+   */
   schema_version: '2.0';
-  technical?: {
-    capture?: TechnicalCaptureMetadata;
+  /**
+   * Producer/version stamp for the pipeline that last wrote metadata values.
+   * This tracks writer behavior and can change without changing JSON structure.
+   */
+  metadata_version?: string | null;
+  file_data?: {
+    metadata_extracted_at?: string | null;
+    /**
+     * Container for file-derived technical groups.
+     * Kept as a namespace so future technical groups (e.g. video/audio blocks)
+     * can be added without crowding `file_data` top-level keys.
+     */
+    technical?: {
+      capture?: TechnicalCaptureMetadata;
+      [key: string]: unknown;
+    };
+    exif_xmp?: ExifXmpMetadata | null;
   };
-  embedded?: EmbeddedFileMetadata | null;
   people?: {
-    number_of_people?: number | null;
-    has_children?: boolean | null;
-    people_detected?: PersonInfo[] | null;
+    face_count?: number | null;
+    vlm_analysis?: {
+      number_of_people?: number | null;
+      has_children?: boolean | null;
+      people_detected?: PersonInfo[] | null;
+    } | null;
     detections?: MediaPeopleDetectionsMetadata;
   };
-  ai?: {
+  image_analysis?: {
     photo_analysis_method?: string | null;
     image_category?: MediaImageCategory | null;
     title?: string | null;
@@ -326,11 +345,10 @@ export interface MediaMetadataV2 {
     weather?: string | null;
     lighting?: string | null;
     photo_estetic_quality?: number | null;
-  };
-  provenance?: {
-    metadata_version?: string | null;
-    metadata_extracted_at?: string | null;
-    sources?: Record<string, string>;
+    is_low_quality?: boolean | null;
+    quality_issues?: string[] | null;
+    edit_suggestions?: unknown[] | null;
+    [key: string]: unknown;
   };
   document_data?: DocumentData | null;
   path_extraction?: PathExtractionMetadata | null;

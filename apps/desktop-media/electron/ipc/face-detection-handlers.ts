@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { app, BrowserWindow, ipcMain } from "electron";
 import {
+  estimateRotationFromFaceLandmarks,
+  type FaceLandmarkRotationResult,
+} from "@emk/shared-contracts";
+import {
   IPC_CHANNELS,
   type AppSettings,
   type DetectFolderFacesRequest,
@@ -101,54 +105,204 @@ function deriveOriginalDimensions(
   return { originalImageWidth: rotatedSize.width, originalImageHeight: rotatedSize.height };
 }
 
+interface OrientedFaceDetectionResult {
+  faces: FaceDetectionOutput;
+  embeddingOverride?: {
+    imagePath: string;
+    faces: FaceDetectionOutput;
+    cleanup: () => Promise<void>;
+  };
+}
+
 async function detectFacesUsingOrientationState(params: {
   imagePath: string;
   signal?: AbortSignal;
   settings?: AppSettings["faceDetection"];
   orientationAngleClockwise?: 0 | 90 | 180 | 270;
   enableRotationFallback?: boolean;
-}): Promise<FaceDetectionOutput> {
+}): Promise<OrientedFaceDetectionResult> {
   const { imagePath, signal, settings, orientationAngleClockwise, enableRotationFallback } = params;
-  const detectOnRotatedCopy = async (angle: 90 | 180 | 270): Promise<FaceDetectionOutput> => {
+  const detectOnRotatedCopy = async (angle: 90 | 180 | 270): Promise<OrientedFaceDetectionResult> => {
     const rotated = await createRotatedTempImage(imagePath, angle);
-    try {
-      const { faces: rotatedFaces } = await detectFacesInPhotoWithOrientation({
-        imagePath: rotated.path,
-        signal,
-        settings,
-      });
-      return transformFacesToOriginalCoordinates({
+    const { faces: rotatedFaces } = await detectFacesInPhotoWithOrientation({
+      imagePath: rotated.path,
+      signal,
+      settings,
+    });
+    return {
+      faces: transformFacesToOriginalCoordinates({
         faces: rotatedFaces,
         rotationAngleUsed: angle,
         ...deriveOriginalDimensions(rotatedFaces.imageSizeForBoundingBoxes, angle),
-      });
-    } finally {
-      await rotated.cleanup();
-    }
+      }),
+      embeddingOverride: {
+        imagePath: rotated.path,
+        faces: rotatedFaces,
+        cleanup: rotated.cleanup,
+      },
+    };
   };
   const hasKnownOrientation =
     orientationAngleClockwise === 90 ||
     orientationAngleClockwise === 180 ||
     orientationAngleClockwise === 270;
-  const baseResult = hasKnownOrientation
+  const baseDetection = hasKnownOrientation
     ? await detectOnRotatedCopy(orientationAngleClockwise)
-    : (await detectFacesInPhotoWithOrientation({ imagePath, signal, settings })).faces;
+    : {
+        faces: (await detectFacesInPhotoWithOrientation({ imagePath, signal, settings })).faces,
+      };
+  const baseResult = baseDetection.faces;
+
+  // Safety net: if detected landmarks still indicate non-upright orientation,
+  // run one corrective pass to align by landmarks-based correction.
+  const landmarkCorrection = hasKnownOrientation ? null : inferLandmarkCorrection(baseResult);
+  if (landmarkCorrection !== null) {
+    const currentAppliedAngle = hasKnownOrientation ? orientationAngleClockwise : 0;
+    const combined = (currentAppliedAngle + landmarkCorrection) % 360;
+    if (combined === 0) {
+      return {
+        faces: (await detectFacesInPhotoWithOrientation({ imagePath, signal, settings })).faces,
+      };
+    }
+    if (combined === 90 || combined === 180 || combined === 270) {
+      return detectOnRotatedCopy(combined);
+    }
+  }
+
+  // If orientation is still unknown and landmarks are ambiguous, probe quarter turns
+  // and pick the most upright high-confidence candidate.
+  if (!hasKnownOrientation && baseResult.faceCount > 0) {
+    const best = await chooseBestUprightRotationByLandmarks({
+      imagePath,
+      signal,
+      settings,
+      baseResult,
+      detectOnRotatedCopy,
+    });
+    if (best) {
+      return best;
+    }
+  }
 
   // Default behavior: single pass only (rotated when orientation is known, otherwise original).
   if (!enableRotationFallback || baseResult.faceCount > 0) {
-    return baseResult;
+    return baseDetection;
   }
 
   // Optional fallback mode (kept for future settings toggle): try additional quarter turns.
-  let best = baseResult;
+  let best = baseDetection;
   for (const angle of [90, 270, 180] as const) {
     if (orientationAngleClockwise === angle) continue;
     const candidate = await detectOnRotatedCopy(angle);
-    if (candidate.faceCount > best.faceCount) {
+    if (candidate.faces.faceCount > best.faces.faceCount) {
       best = candidate;
     }
   }
   return best;
+}
+
+function inferLandmarkCorrection(
+  faces: FaceDetectionOutput,
+): 90 | 180 | 270 | null {
+  if (!Array.isArray(faces.faces) || faces.faces.length === 0) {
+    return null;
+  }
+  const landmarks = faces.faces
+    .map((face) => ({
+      landmarks: face.landmarks_5,
+      score: face.score,
+    }))
+    .filter(
+      (entry): entry is { landmarks: [number, number][]; score: number } =>
+        Array.isArray(entry.landmarks) && entry.landmarks.length >= 5,
+    );
+  if (landmarks.length === 0) {
+    return null;
+  }
+  const result = estimateLandmarkRotation(faces);
+  if (!result) {
+    return null;
+  }
+  const isStrongSignal =
+    result.confidence >= 0.4 &&
+    result.faceCount >= 1 &&
+    (result.unanimousAgreement || result.faceCount === 1);
+  if (!isStrongSignal) {
+    return null;
+  }
+  const correction = result.correctionAngleClockwise;
+  if (correction === 90 || correction === 180 || correction === 270) {
+    return correction;
+  }
+  return null;
+}
+
+function estimateLandmarkRotation(
+  faces: FaceDetectionOutput,
+): FaceLandmarkRotationResult | null {
+  if (!Array.isArray(faces.faces) || faces.faces.length === 0) {
+    return null;
+  }
+  const landmarks = faces.faces
+    .map((face) => ({
+      landmarks: face.landmarks_5,
+      score: face.score,
+    }))
+    .filter(
+      (entry): entry is { landmarks: [number, number][]; score: number } =>
+        Array.isArray(entry.landmarks) && entry.landmarks.length >= 5,
+    );
+  if (landmarks.length === 0) {
+    return null;
+  }
+  return estimateRotationFromFaceLandmarks(landmarks);
+}
+
+async function chooseBestUprightRotationByLandmarks(params: {
+  imagePath: string;
+  signal?: AbortSignal;
+  settings?: AppSettings["faceDetection"];
+  baseResult: FaceDetectionOutput;
+  detectOnRotatedCopy: (angle: 90 | 180 | 270) => Promise<OrientedFaceDetectionResult>;
+}): Promise<(OrientedFaceDetectionResult & { angle: 0 | 90 | 180 | 270 }) | null> {
+  const { baseResult, detectOnRotatedCopy } = params;
+  const candidates: Array<OrientedFaceDetectionResult & { angle: 0 | 90 | 180 | 270 }> = [
+    { angle: 0, faces: baseResult },
+  ];
+  for (const angle of [90, 180, 270] as const) {
+    candidates.push({ angle, ...(await detectOnRotatedCopy(angle)) });
+  }
+
+  const scored = candidates
+    .map((candidate) => {
+      const rotation = estimateLandmarkRotation(candidate.faces);
+      return {
+        ...candidate,
+        rotation,
+      };
+    })
+    .filter((entry) => entry.faces.faceCount > 0);
+
+  if (scored.length === 0) {
+    return null;
+  }
+
+  const upright = scored
+    .filter(
+      (entry) =>
+        entry.rotation?.orientation === "upright" &&
+        entry.rotation.confidence >= 0.35,
+    )
+    .sort((a, b) => {
+      const conf = (b.rotation?.confidence ?? 0) - (a.rotation?.confidence ?? 0);
+      if (conf !== 0) return conf;
+      return b.faces.faceCount - a.faces.faceCount;
+    })[0];
+
+  if (!upright) {
+    return null;
+  }
+  return { angle: upright.angle, faces: upright.faces };
 }
 
 export function registerFaceDetectionHandlers(): void {
@@ -352,12 +506,13 @@ export function registerFaceDetectionHandlers(): void {
       });
       const orientationState = getOrientationDetectionStateByPath(imagePath);
 
-      const result = await detectFacesUsingOrientationState({
+      const detection = await detectFacesUsingOrientationState({
         imagePath,
         settings: resolvedSettings,
         orientationAngleClockwise: orientationState?.correctionAngleClockwise,
         enableRotationFallback: false,
       });
+      const result = detection.faces;
       const mediaId = upsertFaceDetectionResult(
         imagePath,
         result,
@@ -379,6 +534,7 @@ export function registerFaceDetectionHandlers(): void {
           result,
           undefined,
           orientationState?.correctionAngleClockwise,
+          detection.embeddingOverride,
         );
       }
 
@@ -667,13 +823,14 @@ async function runFaceDetectionJob(
           signal: controller.signal,
         });
         const orientationState = getOrientationDetectionStateByPath(photo.path);
-        const result = await detectFacesUsingOrientationState({
+        const detection = await detectFacesUsingOrientationState({
           imagePath: photo.path,
           signal: controller.signal,
           settings: faceDetectionSettings,
           orientationAngleClockwise: orientationState?.correctionAngleClockwise,
           enableRotationFallback: false,
         });
+        const result = detection.faces;
         if (faceJobContext.finalized || job.cancelled) {
           return;
         }
@@ -716,6 +873,7 @@ async function runFaceDetectionJob(
               result,
               controller.signal,
               orientationState?.correctionAngleClockwise,
+              detection.embeddingOverride,
             );
           }
         }

@@ -20,6 +20,7 @@
     "test:query-understanding-ollama": "pnpm exec tsx scripts/test-query-understanding-ollama.ts",
     "test:path-llm-ollama-batch": "pnpm exec tsx scripts/test-path-llm-ollama-batch.ts",
     "test:path-llm-ollama-bulk": "pnpm exec tsx scripts/test-path-llm-ollama-bulk.ts",
+    "migrate:ai-metadata-vlm-face-count": "python scripts/migrate_ai_metadata_vlm_face_count.py",
     "test": "vitest run",
     "test:face-pipeline-gpu-machine": "pnpm exec vitest run electron/native-face/native-face-gpu.machine.integration.test.ts",
     "test:e2e": "pnpm run rebuild:native && pnpm run build && pnpm exec playwright test --config playwright.config.ts",

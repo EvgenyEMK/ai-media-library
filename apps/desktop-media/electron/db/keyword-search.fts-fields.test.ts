@@ -6,8 +6,8 @@ describe("getFtsFieldsFromAiMetadata", () => {
     const fields = getFtsFieldsFromAiMetadata(
       {
         schema_version: "2.0",
-        embedded: { title: "XMP Title", description: null, location_text: null },
-        ai: { title: "AI Title", description: "AI Desc" },
+        file_data: { exif_xmp: { title: "XMP Title", description: null, location_text: null } },
+        image_analysis: { title: "AI Title", description: "AI Desc" },
       },
       null,
     );
@@ -19,14 +19,14 @@ describe("getFtsFieldsFromAiMetadata", () => {
     const fields = getFtsFieldsFromAiMetadata(
       {
         schema_version: "2.0",
-        embedded: { location_text: "Paris" },
-        ai: {},
+        file_data: { exif_xmp: { location_text: "Paris" } },
+        image_analysis: {},
       },
       "Berlin",
     );
     expect(fields.location).toBe("Berlin");
     const fields2 = getFtsFieldsFromAiMetadata(
-      { schema_version: "2.0", embedded: { location_text: "Paris" }, ai: {} },
+      { schema_version: "2.0", file_data: { exif_xmp: { location_text: "Paris" } }, image_analysis: {} },
       "",
     );
     expect(fields2.location).toBe("Paris");
@@ -36,14 +36,14 @@ describe("getFtsFieldsFromAiMetadata", () => {
     const fields = getFtsFieldsFromAiMetadata(
       {
         schema_version: "2.0",
-        embedded: { star_rating: 5 },
-        ai: {},
+        file_data: { exif_xmp: { star_rating: 5 } },
+        image_analysis: {},
       },
       null,
     );
     expect(fields.ratingTokens).toBe("file_rating_5");
     const rej = getFtsFieldsFromAiMetadata(
-      { schema_version: "2.0", embedded: { star_rating: -1 }, ai: {} },
+      { schema_version: "2.0", file_data: { exif_xmp: { star_rating: -1 } }, image_analysis: {} },
       null,
     );
     expect(rej.ratingTokens).toBe("file_rating_rejected");

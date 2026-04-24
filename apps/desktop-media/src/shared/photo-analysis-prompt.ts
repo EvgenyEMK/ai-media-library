@@ -25,7 +25,6 @@ Respond in JSON format with the following structure:
   "weather": "weather conditions (if identifiable). Null if not identifiable.",
   "daytime": "morning, day, evening, night, or null if not identifiable",
   "photo_estetic_quality": "from professional photographer perspective. 10 - best, 1 - worst",
-  "photo_star_rating_1_5": "overall user-facing score. 5 - best, 1 - worst, null if uncertain",
   "is_low_quality": "true if clearly low quality, false if acceptable, null if uncertain",
   "quality_issues": ["blur, out_of_focus, motion_blur, overexposed, underexposed, high_noise, compression_artifacts, poor_framing, tilted_horizon, none"],
   "edit_suggestions": [

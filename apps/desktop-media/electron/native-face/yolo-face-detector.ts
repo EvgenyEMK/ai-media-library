@@ -489,7 +489,6 @@ async function detectFacesYolo(
             toRawPixelBoundingBox(face.bbox_xyxy, imageSize),
           )
         : null,
-      azureFaceAttributes: null,
       detected_features: detectLandmarkFeatures(face.landmarks_5),
     })),
     imageSizeForBoundingBoxes: imageSize,

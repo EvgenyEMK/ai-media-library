@@ -8,7 +8,7 @@
 import { DEFAULT_FACE_DETECTION_SETTINGS } from "../../src/shared/ipc";
 import { getDesktopDatabase } from "./client";
 import { DEFAULT_LIBRARY_ID } from "./folder-analysis-status";
-import { findMatchesForPerson } from "./face-embeddings";
+import { computePersonCentroid, findMatchesForPerson } from "./face-embeddings";
 
 /**
  * Maximum number of untagged face embeddings to evaluate per person centroid
@@ -54,15 +54,16 @@ export function refreshSuggestionsForTag(
     )
     .get(tagId, libraryId) as { centroid_json: string } | undefined;
 
-  if (!centroidRow) {
+  let centroid =
+    centroidRow && centroidRow.centroid_json ? parseVector(centroidRow.centroid_json) : null;
+  if (!centroid) {
+    const computed = computePersonCentroid(tagId, libraryId);
+    centroid = computed?.centroid ?? null;
+  }
+  if (!centroid) {
     db.prepare(
       `DELETE FROM media_item_person_suggestions WHERE library_id = ? AND tag_id = ?`,
     ).run(libraryId, tagId);
-    return 0;
-  }
-
-  const centroid = parseVector(centroidRow.centroid_json);
-  if (!centroid) {
     return 0;
   }
 
@@ -156,7 +157,12 @@ export function refreshAllSuggestionsWithProgress(
   const db = getDesktopDatabase();
 
   const tags = db
-    .prepare(`SELECT tag_id FROM person_centroids WHERE library_id = ?`)
+    .prepare(
+      `SELECT id AS tag_id
+       FROM media_tags
+       WHERE library_id = ?
+         AND tag_type = 'person'`,
+    )
     .all(libraryId) as Array<{ tag_id: string }>;
 
   const totalTags = tags.length;

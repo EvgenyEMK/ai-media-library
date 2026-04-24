@@ -1,6 +1,29 @@
 {
   "version": 1,
   "notes": "Test expectations for e2e-photos. Update manually when test assets change.",
+  "assetMetadata": {
+    "notes": "Keep EXIF-vs-visual orientation context close to fixtures. Some files are visually upright even when EXIF tags are missing or misleading.",
+    "files": [
+      {
+        "name": "face-detect-sample-01.jpg",
+        "exifOrientation": "top-left",
+        "visualOrientationNote": "Visually upright; EXIF can be misleading for rotation assumptions.",
+        "expectedFaceCountApprox": 1
+      },
+      {
+        "name": "20230810_141737.jpg",
+        "exifOrientation": "Horizontal (normal)",
+        "visualOrientationNote": "Used in rotation/similarity scenarios; verify visually instead of trusting EXIF only.",
+        "expectedFaceCountApprox": 2
+      },
+      {
+        "name": "IMG-20220802-WA0016.jpg",
+        "exifOrientation": null,
+        "visualOrientationNote": "No EXIF orientation tag.",
+        "expectedFaceCountApprox": 3
+      }
+    ]
+  },
   "semanticSearch": {
     "notes": "Prompt cases for semantic search ranking validation.",
     "requiredFiles": [
@@ -32,13 +55,13 @@
     ]
   },
   "unconfirmedFaceSearch": {
-    "notes": "Expectations for the 'include unconfirmed similar faces' toggle in semantic search. The person in face-detect-sample-01.jpg also appears in the unconfirmedImage. Tagging one face in the confirmed image and enabling the unconfirmed toggle should surface the unconfirmed image.",
+    "notes": "Expectations for the 'include unconfirmed similar faces' toggle in semantic search. This scenario uses two non-rotated images for cleaner validation independent from rotation handling.",
     "personLabel": "TestPerson",
     "confirmedImage": "face-detect-sample-01.jpg",
-    "unconfirmedImage": "20230810_141737.jpg",
+    "unconfirmedImage": "IMG-20220802-WA0016.jpg",
     "searchPrompt": "person photo",
     "requiredFiles": [
-      "20230810_141737.jpg",
+      "IMG-20220802-WA0016.jpg",
       "face-detect-sample-01.jpg"
     ]
   },

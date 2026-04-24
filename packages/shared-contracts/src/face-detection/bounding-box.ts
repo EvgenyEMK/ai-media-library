@@ -38,7 +38,6 @@ export interface FaceBeingBoundingBox {
   person_bounding_box?: CanonicalBoundingBox | null;
   person_face_bounding_box?: CanonicalBoundingBox | null;
   provider_raw_bounding_box?: ProviderRawBoundingBoxReference | null;
-  azureFaceAttributes?: Record<string, unknown> | null;
   detected_features?: FaceLandmarkFeature[] | null;
 }
 

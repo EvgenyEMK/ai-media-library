@@ -93,11 +93,7 @@ export async function embedFacesNative(params: {
       : alignFaceFromBoundingBox(image, face.bbox_xyxy, ARCFACE_INPUT_SIZE);
 
     const embedding = hasLandmarks
-      ? await inferEmbeddingWithPreferredRotation(
-          session,
-          aligned,
-          face.preferredRotationClockwise,
-        )
+      ? await inferSingleEmbedding(session, aligned)
       : await inferEmbeddingWithoutLandmarks(
           session,
           aligned,
@@ -163,24 +159,6 @@ async function inferRotationAwareEmbedding(
 
 const ENABLE_ROTATION_SWEEP_FALLBACK =
   process.env.EMK_DESKTOP_FACE_EMBED_ROTATION_SWEEP === "1";
-
-async function inferEmbeddingWithPreferredRotation(
-  session: ort.InferenceSession,
-  aligned: { data: Uint8Array; width: number; height: number; channels: 3 },
-  preferredRotationClockwise?: 0 | 90 | 180 | 270,
-): Promise<number[]> {
-  if (
-    preferredRotationClockwise === 90 ||
-    preferredRotationClockwise === 180 ||
-    preferredRotationClockwise === 270
-  ) {
-    return inferSingleEmbedding(
-      session,
-      rotateRgb(aligned, preferredRotationClockwise),
-    );
-  }
-  return inferSingleEmbedding(session, aligned);
-}
 
 async function inferEmbeddingWithoutLandmarks(
   session: ort.InferenceSession,

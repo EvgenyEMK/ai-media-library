@@ -1,3 +1,4 @@
+import path from "node:path";
 import type {
   PathDateExtraction,
   PathLocationExtraction,
@@ -581,6 +582,7 @@ function emptyResults(
 export function llmResultToPathExtraction(
   result: LlmPathResult,
   model: string,
+  filePath?: string,
 ): PathExtractionMetadata {
   const now = new Date().toISOString();
   const meta: PathExtractionMetadata = {
@@ -610,7 +612,11 @@ export function llmResultToPathExtraction(
   }
 
   if (result.display_title) {
-    meta.display_title = result.display_title;
+    const title = result.display_title.trim();
+    const filenameStem = filePath ? path.parse(filePath).name.trim() : null;
+    if (title && (!filenameStem || title !== filenameStem)) {
+      meta.display_title = title;
+    }
   }
 
   return meta;
