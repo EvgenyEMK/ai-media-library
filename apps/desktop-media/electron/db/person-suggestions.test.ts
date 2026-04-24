@@ -61,9 +61,11 @@ vi.mock("./folder-analysis-status", () => ({
 }));
 
 const findMatchesForPersonMock = vi.hoisted(() => vi.fn());
+const computePersonCentroidMock = vi.hoisted(() => vi.fn());
 
 vi.mock("./face-embeddings", () => ({
   findMatchesForPerson: findMatchesForPersonMock,
+  computePersonCentroid: computePersonCentroidMock,
 }));
 
 import {
@@ -78,6 +80,8 @@ beforeEach(() => {
   transactionFn = null;
   findMatchesForPersonMock.mockReset();
   findMatchesForPersonMock.mockReturnValue([]);
+  computePersonCentroidMock.mockReset();
+  computePersonCentroidMock.mockReturnValue(null);
 });
 
 afterEach(() => {
@@ -212,8 +216,8 @@ describe("refreshSuggestionsForTag", () => {
 });
 
 describe("refreshAllSuggestions", () => {
-  it("iterates all person tags with centroids", () => {
-    mockPrepareResults.set("SELECT tag_id FROM person_centroids", {
+  it("iterates all person tags", () => {
+    mockPrepareResults.set("FROM media_tags", {
       all: [{ tag_id: "t1" }, { tag_id: "t2" }],
     });
     mockPrepareResults.set("person_centroids WHERE tag_id", {

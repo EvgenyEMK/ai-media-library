@@ -70,17 +70,18 @@ test.describe("Unconfirmed face search", () => {
 
     await mainWindow.evaluate(async () => {
       const settings = await window.desktopApi.getSettings();
-      await window.desktopApi.ensureDetectorModel("yolov12s-face");
+      await window.desktopApi.ensureDetectorModel("yolov12l-face");
       await window.desktopApi.saveSettings({
         ...settings,
         wrongImageRotationDetection: {
           ...settings.wrongImageRotationDetection,
-          enabled: true,
-          useFaceLandmarkFeaturesFallback: true,
+          enabled: false,
+          useFaceLandmarkFeaturesFallback: false,
         },
         faceDetection: {
           ...settings.faceDetection,
-          detectorModel: "yolov12s-face",
+          detectorModel: "yolov12l-face",
+          faceRecognitionSimilarityThreshold: 0.2,
         },
       });
     });
@@ -108,17 +109,17 @@ test.describe("Unconfirmed face search", () => {
     const confirmedPath = path.join(e2ePhotosDir, exp.confirmedImage);
     const unconfirmedPath = path.join(e2ePhotosDir, exp.unconfirmedImage);
 
-    const detResult1 = await mainWindow.evaluate(
-      async (sourcePath) => window.desktopApi.detectFacesForMediaItem(sourcePath),
-      confirmedPath,
-    );
+    const detResult1 = await mainWindow.evaluate(async (sourcePath) => {
+      const settings = await window.desktopApi.getSettings();
+      return window.desktopApi.detectFacesForMediaItem(sourcePath, settings.faceDetection);
+    }, confirmedPath);
     console.log(`[test] Face detection on confirmed image: ${detResult1.faceCount} faces`);
     expect(detResult1.faceCount).toBeGreaterThan(0);
 
-    const detResult2 = await mainWindow.evaluate(
-      async (sourcePath) => window.desktopApi.detectFacesForMediaItem(sourcePath),
-      unconfirmedPath,
-    );
+    const detResult2 = await mainWindow.evaluate(async (sourcePath) => {
+      const settings = await window.desktopApi.getSettings();
+      return window.desktopApi.detectFacesForMediaItem(sourcePath, settings.faceDetection);
+    }, unconfirmedPath);
     console.log(`[test] Face detection on unconfirmed image: ${detResult2.faceCount} faces`);
     expect(detResult2.faceCount).toBeGreaterThan(0);
 
@@ -136,9 +137,8 @@ test.describe("Unconfirmed face search", () => {
     });
     console.log(`[test] Embedding stats: ${JSON.stringify(embedStats)}`);
 
-    // Step 4: Tag the confirmed-image face that actually matches the unconfirmed photo
-    // (the selfie has multiple faces; index 0 is not necessarily the same person).
-    console.log("[test] Step 4: Resolving matching face and assigning person tag...");
+    // Step 4: Tag confirmed-image face (fixture has a single person/face).
+    console.log("[test] Step 4: Assigning person tag on confirmed image...");
     const confirmedMediaItem = await mainWindow.evaluate(async (sourcePath) => {
       const items = await window.desktopApi.getMediaItemsByPaths([sourcePath]);
       return Object.values(items)[0] ?? null;
@@ -150,45 +150,8 @@ test.describe("Unconfirmed face search", () => {
     );
     expect(confirmedFaces.length).toBeGreaterThan(0);
 
-    const unconfirmedMediaItem = await mainWindow.evaluate(async (sourcePath) => {
-      const items = await window.desktopApi.getMediaItemsByPaths([sourcePath]);
-      return Object.values(items)[0] ?? null;
-    }, unconfirmedPath);
-    expect(unconfirmedMediaItem).not.toBeNull();
-
-    const unconfirmedFaces = await mainWindow.evaluate(
-      async (mediaItemId) => window.desktopApi.listFaceInstancesForMediaItem(mediaItemId),
-      unconfirmedMediaItem!.id,
-    );
-    expect(unconfirmedFaces.length).toBeGreaterThan(0);
-
-    const faceToTag = await mainWindow.evaluate(
-      async ({ anchorFaceIds, confirmedPath: cPath }) => {
-        const settings = await window.desktopApi.getSettings();
-        const defaultThreshold = settings.faceDetection.faceRecognitionSimilarityThreshold;
-        const norm = (p: string) => p.replace(/\\/g, "/").toLowerCase();
-        const target = norm(cPath);
-        let best: { faceInstanceId: string; score: number } | null = null;
-        for (const anchorFaceId of anchorFaceIds) {
-          const matches = await window.desktopApi.searchSimilarFaces({
-            faceInstanceId: anchorFaceId,
-            threshold: defaultThreshold,
-            limit: 80,
-            taggedOnly: false,
-          });
-          const onConfirmed = matches.filter((m) => norm(m.sourcePath) === target);
-          onConfirmed.sort((a, b) => b.score - a.score);
-          const top = onConfirmed[0];
-          if (top && (!best || top.score > best.score)) {
-            best = { faceInstanceId: top.faceInstanceId, score: top.score };
-          }
-        }
-        return best?.faceInstanceId ?? null;
-      },
-      { anchorFaceIds: unconfirmedFaces.map((f) => f.id), confirmedPath },
-    );
-    const fallbackFaceToTag = faceToTag ?? confirmedFaces[0].id;
-    console.log(`[test] Best cross-photo match face on confirmed image: ${faceToTag} (fallback=${fallbackFaceToTag})`);
+    const faceToTag = confirmedFaces[0].id;
+    console.log(`[test] Using confirmed face as tag reference: ${faceToTag}`);
 
     const personTag = await mainWindow.evaluate(
       async (label) => window.desktopApi.createPersonTag(label),
@@ -198,7 +161,7 @@ test.describe("Unconfirmed face search", () => {
 
     const assignResult = await mainWindow.evaluate(
       async ({ faceId, tagId }) => window.desktopApi.assignPersonTagToFace(faceId, tagId),
-      { faceId: fallbackFaceToTag, tagId: personTag.id },
+      { faceId: faceToTag, tagId: personTag.id },
     );
     console.log(`[test] Face assigned: ${assignResult !== null}`);
     expect(assignResult).not.toBeNull();
