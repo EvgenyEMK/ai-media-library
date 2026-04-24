@@ -331,8 +331,9 @@ describe.skipIf(!HAS_SQLITE)("upsertMediaItemFromFilePath — duplicate content 
     const parsed = JSON.parse(refreshed.ai_metadata ?? "{}") as Record<string, unknown>;
     expect(parsed.orientation_detection).toBeUndefined();
     expect(parsed.ai).toBeUndefined();
-    const embedded = parsed.embedded as Record<string, unknown> | undefined;
-    expect(embedded?.title).toBeNull();
+    const fileData = parsed.file_data as Record<string, unknown> | undefined;
+    const exifXmp = fileData?.exif_xmp as Record<string, unknown> | undefined;
+    expect(exifXmp?.title).toBeNull();
 
     const faceRows = db
       .prepare(

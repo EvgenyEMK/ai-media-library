@@ -189,12 +189,12 @@ export interface TechnicalCaptureMetadata {
   iso?: number | null;
 }
 
-/** Embedded XMP/IPTC from the file (does not replace AI analysis fields in `ai`). */
-export interface EmbeddedFileMetadata {
+/** EXIF/XMP/IPTC metadata embedded in the file. */
+export interface ExifXmpMetadata {
   source?: 'xmp' | 'iptc' | 'mixed' | 'file' | null;
   title?: string | null;
   description?: string | null;
-  /** Freeform place string from XMP/IPTC (not structured `LocationData`). */
+  /** Freeform place string from EXIF/XMP/IPTC (not structured `LocationData`). */
   location_text?: string | null;
   star_rating?: number | null;
 }
@@ -303,10 +303,21 @@ export interface MediaPeopleDetectionsMetadata {
 
 export interface MediaMetadataV2 {
   schema_version: '2.0';
+  metadata_version?: string | null;
+  file_data?: {
+    metadata_extracted_at?: string | null;
+    technical?: {
+      capture?: TechnicalCaptureMetadata;
+      [key: string]: unknown;
+    };
+    exif_xmp?: ExifXmpMetadata | null;
+  };
+  /** @deprecated Use `file_data.technical`. */
   technical?: {
     capture?: TechnicalCaptureMetadata;
   };
-  embedded?: EmbeddedFileMetadata | null;
+  /** @deprecated Use `file_data.exif_xmp`. */
+  embedded?: ExifXmpMetadata | null;
   people?: {
     face_count?: number | null;
     number_of_people?: number | null;
@@ -319,6 +330,24 @@ export interface MediaMetadataV2 {
     } | null;
     detections?: MediaPeopleDetectionsMetadata;
   };
+  image_analysis?: {
+    photo_analysis_method?: string | null;
+    image_category?: MediaImageCategory | null;
+    title?: string | null;
+    description?: string | null;
+    location?: LocationData | null;
+    date?: string | null;
+    time?: string | null;
+    weather?: string | null;
+    lighting?: string | null;
+    photo_estetic_quality?: number | null;
+    photo_star_rating_1_5?: number | null;
+    is_low_quality?: boolean | null;
+    quality_issues?: string[] | null;
+    edit_suggestions?: unknown[] | null;
+    [key: string]: unknown;
+  };
+  /** @deprecated Use `image_analysis`. */
   ai?: {
     photo_analysis_method?: string | null;
     image_category?: MediaImageCategory | null;
@@ -330,11 +359,11 @@ export interface MediaMetadataV2 {
     weather?: string | null;
     lighting?: string | null;
     photo_estetic_quality?: number | null;
-  };
-  provenance?: {
-    metadata_version?: string | null;
-    metadata_extracted_at?: string | null;
-    sources?: Record<string, string>;
+    photo_star_rating_1_5?: number | null;
+    is_low_quality?: boolean | null;
+    quality_issues?: string[] | null;
+    edit_suggestions?: unknown[] | null;
+    [key: string]: unknown;
   };
   document_data?: DocumentData | null;
   path_extraction?: PathExtractionMetadata | null;

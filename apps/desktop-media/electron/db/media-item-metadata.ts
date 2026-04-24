@@ -697,39 +697,36 @@ function buildDesktopAiMetadata(
   const technicalSource = isVideo ? "desktop-exiftool-video" : "desktop-exifreader-xmp";
   const next = mergeMetadataV2(current, {
     schema_version: "2.0",
-    technical: {
-      capture: {
-        captured_at: extracted.photoTakenAt,
-        photo_taken_precision: extracted.photoTakenPrecision,
-        metadata_modified_at: extracted.metadataModifiedAt,
-        camera_make: extracted.cameraMake,
-        camera_model: extracted.cameraModel,
-        lens_model: extracted.lensModel,
-        focal_length_mm: extracted.focalLengthMm,
-        f_number: extracted.fNumber,
-        exposure_time: extracted.exposureTime,
-        iso: extracted.iso,
-      },
-      ...(isVideo
-        ? {
-            video: {
-              duration_sec: extracted.videoDurationSec,
-            },
-          }
-        : {}),
-    },
-    embedded: {
-      source: embeddedSource,
-      title: extracted.embeddedTitle,
-      description: extracted.embeddedDescription,
-      location_text: extracted.embeddedLocation,
-      star_rating: extracted.starRating,
-    },
-    provenance: {
-      metadata_version: METADATA_VERSION,
+    metadata_version: METADATA_VERSION,
+    file_data: {
       metadata_extracted_at: extractedAt,
-      sources: {
-        technical: technicalSource,
+      technical: {
+        capture: {
+          captured_at: extracted.photoTakenAt,
+          photo_taken_precision: extracted.photoTakenPrecision,
+          metadata_modified_at: extracted.metadataModifiedAt,
+          camera_make: extracted.cameraMake,
+          camera_model: extracted.cameraModel,
+          lens_model: extracted.lensModel,
+          focal_length_mm: extracted.focalLengthMm,
+          f_number: extracted.fNumber,
+          exposure_time: extracted.exposureTime,
+          iso: extracted.iso,
+        },
+        ...(isVideo
+          ? {
+              video: {
+                duration_sec: extracted.videoDurationSec,
+              },
+            }
+          : {}),
+      },
+      exif_xmp: {
+        source: embeddedSource ?? technicalSource,
+        title: extracted.embeddedTitle,
+        description: extracted.embeddedDescription,
+        location_text: extracted.embeddedLocation,
+        star_rating: extracted.starRating,
       },
     },
   });
@@ -764,7 +761,10 @@ function readEmbeddedStrings(ai: unknown): {
   if (!ai || typeof ai !== "object") {
     return { title: null, description: null, locationText: null };
   }
-  const emb = (ai as { embedded?: Record<string, unknown> }).embedded;
+  const fileData = (ai as { file_data?: Record<string, unknown> }).file_data;
+  const emb =
+    fileData?.exif_xmp ??
+    (ai as { embedded?: Record<string, unknown> }).embedded;
   if (!emb || typeof emb !== "object") {
     return { title: null, description: null, locationText: null };
   }

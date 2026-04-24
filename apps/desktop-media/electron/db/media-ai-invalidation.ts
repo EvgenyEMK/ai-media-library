@@ -68,14 +68,10 @@ function sanitizeAiMetadataAfterContentRefresh(
   const normalized = normalizeMetadata(parseJson(aiMetadataRaw));
   const next = normalizeMetadata({
     schema_version: "2.0",
-    technical: normalized.technical ?? undefined,
-    embedded: normalized.embedded ?? undefined,
-    provenance: {
-      ...(normalized.provenance ?? {}),
+    metadata_version: normalized.metadata_version ?? null,
+    file_data: {
+      ...(normalized.file_data ?? {}),
       metadata_extracted_at: metadataExtractedAt,
-      sources: {
-        ...(normalized.provenance?.sources ?? {}),
-      },
     },
   });
   return JSON.stringify(next);

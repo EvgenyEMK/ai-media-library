@@ -62,22 +62,23 @@ function buildInfoSections(metadata: DesktopMediaItemMetadata): {
   videoDataFields: DesktopInfoField[];
 } {
   const normalized = normalizeMetadata(metadata.aiMetadata ?? null);
-  const ai = normalized.ai;
+  const ai = normalized.image_analysis;
   const people = normalized.people;
   const extras = getAdditionalTopLevelFields(metadata.aiMetadata ?? null);
+  const vlm = people?.vlm_analysis ?? null;
   const starRating =
-    typeof extras.photo_star_rating_1_5 === "number"
-      ? extras.photo_star_rating_1_5
+    typeof ai?.photo_star_rating_1_5 === "number"
+      ? ai.photo_star_rating_1_5
       : null;
   const isLowQuality =
-    typeof extras.is_low_quality === "boolean" ? extras.is_low_quality : null;
-  const qualityIssues = Array.isArray(extras.quality_issues)
-    ? extras.quality_issues.filter((issue): issue is string => typeof issue === "string")
+    typeof ai?.is_low_quality === "boolean" ? ai.is_low_quality : null;
+  const qualityIssues = Array.isArray(ai?.quality_issues)
+    ? ai.quality_issues.filter((issue): issue is string => typeof issue === "string")
     : [];
   const editSuggestions: Array<{ edit_type?: string; priority?: string; reason?: string }> = Array.isArray(
-    extras.edit_suggestions,
+    ai?.edit_suggestions,
   )
-    ? extras.edit_suggestions.filter(
+    ? ai.edit_suggestions.filter(
         (entry): entry is { edit_type?: string; priority?: string; reason?: string } =>
           typeof entry === "object" && entry !== null,
       )
@@ -181,10 +182,10 @@ function buildInfoSections(metadata: DesktopMediaItemMetadata): {
     { label: "Category", value: ai?.image_category ? toHeadlineLabel(ai.image_category) : null },
     { label: "Title", value: ai?.title ?? null },
     { label: "Description", value: ai?.description ?? null, display: "stacked" },
-    { label: "People detected", value: people?.number_of_people ?? null },
+    { label: "People detected", value: vlm?.number_of_people ?? null },
     {
       label: "Has child or children",
-      value: typeof people?.has_children === "boolean" ? (people.has_children ? "Yes" : "No") : null,
+      value: typeof vlm?.has_children === "boolean" ? (vlm.has_children ? "Yes" : "No") : null,
     },
   ];
 

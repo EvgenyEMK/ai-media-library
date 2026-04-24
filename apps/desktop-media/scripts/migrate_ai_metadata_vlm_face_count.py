@@ -20,6 +20,53 @@ def _as_int_count(value: Any) -> int | None:
 
 def _sanitize_metadata_in_place(metadata: dict[str, Any]) -> bool:
     changed = False
+    provenance = metadata.get("provenance")
+    if isinstance(provenance, dict):
+        if metadata.get("metadata_version") is None and provenance.get("metadata_version") is not None:
+            metadata["metadata_version"] = provenance.get("metadata_version")
+            changed = True
+        file_data = metadata.get("file_data")
+        if not isinstance(file_data, dict):
+            file_data = {}
+            metadata["file_data"] = file_data
+            changed = True
+        if (
+            file_data.get("metadata_extracted_at") is None
+            and provenance.get("metadata_extracted_at") is not None
+        ):
+            file_data["metadata_extracted_at"] = provenance.get("metadata_extracted_at")
+            changed = True
+        del metadata["provenance"]
+        changed = True
+
+    if metadata.get("ai") is not None and metadata.get("image_analysis") is None:
+        metadata["image_analysis"] = metadata.get("ai")
+        changed = True
+    if "ai" in metadata:
+        del metadata["ai"]
+        changed = True
+
+    technical = metadata.get("technical")
+    embedded = metadata.get("embedded")
+    if technical is not None or embedded is not None:
+        file_data = metadata.get("file_data")
+        if not isinstance(file_data, dict):
+            file_data = {}
+            metadata["file_data"] = file_data
+            changed = True
+        if technical is not None and file_data.get("technical") is None:
+            file_data["technical"] = technical
+            changed = True
+        if embedded is not None and file_data.get("exif_xmp") is None:
+            file_data["exif_xmp"] = embedded
+            changed = True
+    if "technical" in metadata:
+        del metadata["technical"]
+        changed = True
+    if "embedded" in metadata:
+        del metadata["embedded"]
+        changed = True
+
     for key in ("rotation_decision", "two_pass_rotation_consistency", "face_rotation_override"):
         if key in metadata:
             del metadata[key]

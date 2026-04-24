@@ -174,7 +174,7 @@ export function upsertPhotoAnalysisResult(
           people_detected: normalizedPeople,
         },
       },
-      ai: {
+      image_analysis: {
         image_category: (result.image_category as MediaImageCategory) ?? null,
         title: result.title ?? null,
         description: result.description ?? null,
@@ -189,13 +189,13 @@ export function upsertPhotoAnalysisResult(
         weather: result.weather ?? null,
         photo_estetic_quality: result.photo_estetic_quality ?? null,
         photo_analysis_method: result.modelInfo?.model ?? null,
+        photo_star_rating_1_5: result.photo_star_rating_1_5 ?? null,
+        is_low_quality: result.is_low_quality ?? null,
+        quality_issues: result.quality_issues ?? null,
       },
-      provenance: {
-        metadata_version: "2.0",
+      metadata_version: "desktop-photo-metadata-v2",
+      file_data: {
         metadata_extracted_at: now,
-        sources: {
-          analysis: "desktop-vision",
-        },
       },
     });
 
@@ -486,12 +486,9 @@ export function upsertFaceDetectionResult(
             : null,
       },
     },
-    provenance: {
-      metadata_version: "2.0",
+    metadata_version: "desktop-photo-metadata-v2",
+    file_data: {
       metadata_extracted_at: now,
-      sources: {
-        face_detection: result.modelInfo.modelName,
-      },
     },
   });
   sanitizeLegacyPeopleShape(merged as Record<string, unknown>);
@@ -883,12 +880,9 @@ export function upsertRotationPipelineFaces(
               : null,
         },
       },
-      provenance: {
-        metadata_version: "2.0",
+      metadata_version: "desktop-photo-metadata-v2",
+      file_data: {
         metadata_extracted_at: now,
-        sources: {
-          face_detection: faces.modelInfo.modelName,
-        },
       },
     });
     sanitizeLegacyPeopleShape(rotMerged as Record<string, unknown>);
@@ -1027,6 +1021,29 @@ function getFaceCountFromMetadata(value: unknown): number | null {
 }
 
 function sanitizeLegacyPeopleShape(metadata: Record<string, unknown>): void {
+  delete metadata.rotation_decision;
+  delete metadata.two_pass_rotation_consistency;
+  delete metadata.face_rotation_override;
+  delete metadata.provenance;
+  if (metadata.ai && !metadata.image_analysis) {
+    metadata.image_analysis = metadata.ai;
+  }
+  delete metadata.ai;
+  if (metadata.technical || metadata.embedded) {
+    const fileData =
+      metadata.file_data && typeof metadata.file_data === "object"
+        ? (metadata.file_data as Record<string, unknown>)
+        : {};
+    if (metadata.technical && fileData.technical === undefined) {
+      fileData.technical = metadata.technical;
+    }
+    if (metadata.embedded && fileData.exif_xmp === undefined) {
+      fileData.exif_xmp = metadata.embedded;
+    }
+    metadata.file_data = fileData;
+  }
+  delete metadata.technical;
+  delete metadata.embedded;
   const peopleNode = metadata.people;
   if (!peopleNode || typeof peopleNode !== "object") {
     return;
@@ -1112,7 +1129,11 @@ function hasPhotoAnalysisSignature(aiMetadataRaw: string | null): boolean {
 
   const root = parsed as Record<string, unknown>;
   const aiNode =
-    root.ai && typeof root.ai === "object" ? (root.ai as Record<string, unknown>) : root;
+    root.image_analysis && typeof root.image_analysis === "object"
+      ? (root.image_analysis as Record<string, unknown>)
+      : root.ai && typeof root.ai === "object"
+        ? (root.ai as Record<string, unknown>)
+        : root;
 
   const imageCategory = aiNode.image_category;
   const title = aiNode.title;

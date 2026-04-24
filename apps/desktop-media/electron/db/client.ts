@@ -605,18 +605,18 @@ function backfillFts5FromAiMetadata(database: SQLiteDatabase): void {
       .prepare(
         `SELECT mi.id, mi.library_id,
             COALESCE(
-              NULLIF(TRIM(json_extract(mi.ai_metadata, '$.embedded.title')), ''),
-              json_extract(mi.ai_metadata, '$.ai.title')
+              NULLIF(TRIM(json_extract(mi.ai_metadata, '$.file_data.exif_xmp.title')), ''),
+              json_extract(mi.ai_metadata, '$.image_analysis.title')
             ) AS title,
             COALESCE(
-              NULLIF(TRIM(json_extract(mi.ai_metadata, '$.embedded.description')), ''),
-              json_extract(mi.ai_metadata, '$.ai.description')
+              NULLIF(TRIM(json_extract(mi.ai_metadata, '$.file_data.exif_xmp.description')), ''),
+              json_extract(mi.ai_metadata, '$.image_analysis.description')
             ) AS description,
             COALESCE(
               NULLIF(TRIM(mi.location_name), ''),
-              NULLIF(TRIM(json_extract(mi.ai_metadata, '$.embedded.location_text')), '')
+              NULLIF(TRIM(json_extract(mi.ai_metadata, '$.file_data.exif_xmp.location_text')), '')
             ) AS location,
-            json_extract(mi.ai_metadata, '$.ai.image_category') AS category,
+            json_extract(mi.ai_metadata, '$.image_analysis.image_category') AS category,
             CASE
               WHEN mi.star_rating IS NULL THEN ''
               WHEN mi.star_rating = -1 THEN 'file_rating_rejected'

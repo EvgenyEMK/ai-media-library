@@ -495,7 +495,7 @@ function matchesDocumentsFilter(
 
 function normalizeQuality(metadata: unknown): number | null {
   const normalized = normalizeMetadata(metadata);
-  const aiQuality = normalized.ai?.photo_estetic_quality;
+  const aiQuality = normalized.image_analysis?.photo_estetic_quality;
   if (typeof aiQuality === "number" && Number.isFinite(aiQuality)) {
     return Math.max(1, Math.min(10, aiQuality));
   }

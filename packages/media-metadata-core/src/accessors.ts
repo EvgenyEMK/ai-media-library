@@ -58,13 +58,65 @@ export function normalizeMetadata(raw: unknown): MediaMetadataV2 {
   }
 
   if (isV2Metadata(raw)) {
-    return raw as MediaMetadataV2;
+    const v2 = { ...(raw as MediaMetadataV2) };
+    if (!v2.image_analysis && isRecord(v2.ai)) {
+      v2.image_analysis = { ...v2.ai };
+    }
+    if (!v2.file_data) {
+      v2.file_data = {};
+    }
+    if (!v2.file_data.technical && isRecord(v2.technical)) {
+      v2.file_data.technical = { ...v2.technical };
+    }
+    if (!v2.file_data.exif_xmp && isRecord(v2.embedded)) {
+      v2.file_data.exif_xmp = { ...v2.embedded };
+    }
+    if (
+      (v2.file_data.metadata_extracted_at === undefined || v2.file_data.metadata_extracted_at === null) &&
+      isRecord((v2 as { provenance?: unknown }).provenance)
+    ) {
+      v2.file_data.metadata_extracted_at = asNullableString(
+        ((v2 as { provenance?: Record<string, unknown> }).provenance ?? {}).metadata_extracted_at,
+      ) ?? null;
+    }
+    if (
+      (v2.metadata_version === undefined || v2.metadata_version === null) &&
+      isRecord((v2 as { provenance?: unknown }).provenance)
+    ) {
+      v2.metadata_version = asNullableString(
+        ((v2 as { provenance?: Record<string, unknown> }).provenance ?? {}).metadata_version,
+      ) ?? null;
+    }
+    delete (v2 as Record<string, unknown>).provenance;
+    delete (v2 as Record<string, unknown>).technical;
+    delete (v2 as Record<string, unknown>).embedded;
+    delete (v2 as Record<string, unknown>).ai;
+    return v2;
   }
 
   const legacy = raw as MediaMetadataV1;
 
   const normalized: MediaMetadataV2 = {
     schema_version: '2.0',
+    metadata_version: null,
+    file_data: {
+      metadata_extracted_at: null,
+      technical: {
+        capture: {
+          captured_at: null,
+          photo_taken_precision: null,
+          metadata_modified_at: null,
+          camera_make: null,
+          camera_model: null,
+          lens_model: null,
+          focal_length_mm: null,
+          f_number: null,
+          exposure_time: null,
+          iso: null,
+        },
+      },
+      exif_xmp: null,
+    },
     people: {
       face_count: legacy.number_of_people ?? null,
       vlm_analysis: {
@@ -81,7 +133,7 @@ export function normalizeMetadata(raw: unknown): MediaMetadataV2 {
         people_bounding_boxes: legacy.people_bounding_boxes ?? null,
       },
     },
-    ai: {
+    image_analysis: {
       photo_analysis_method: legacy.photo_analysis_method ?? null,
       image_category: (legacy.image_category as MediaImageCategory | null | undefined) ?? null,
       title: legacy.title ?? null,
@@ -130,26 +182,30 @@ export function mergeMetadataV2(
   patch: Partial<MediaMetadataV2>,
 ): MediaMetadataV2 {
   const normalizedBase = normalizeMetadata(base);
-  const mergedEmbedded =
-    patch.embedded !== undefined
+  const mergedExifXmp =
+    patch.file_data?.exif_xmp !== undefined
       ? {
-          ...(isRecord(normalizedBase.embedded) ? normalizedBase.embedded : {}),
-          ...(isRecord(patch.embedded) ? patch.embedded : {}),
+          ...(isRecord(normalizedBase.file_data?.exif_xmp) ? normalizedBase.file_data?.exif_xmp : {}),
+          ...(isRecord(patch.file_data?.exif_xmp) ? patch.file_data?.exif_xmp : {}),
         }
-      : normalizedBase.embedded;
+      : normalizedBase.file_data?.exif_xmp;
   return {
     ...normalizedBase,
     ...patch,
     schema_version: '2.0',
-    technical: {
-      ...(normalizedBase.technical ?? {}),
-      ...(patch.technical ?? {}),
-      capture: {
-        ...(normalizedBase.technical?.capture ?? {}),
-        ...(patch.technical?.capture ?? {}),
+    file_data: {
+      ...(normalizedBase.file_data ?? {}),
+      ...(patch.file_data ?? {}),
+      technical: {
+        ...(normalizedBase.file_data?.technical ?? {}),
+        ...(patch.file_data?.technical ?? {}),
+        capture: {
+          ...(normalizedBase.file_data?.technical?.capture ?? {}),
+          ...(patch.file_data?.technical?.capture ?? {}),
+        },
       },
+      ...(mergedExifXmp !== undefined ? { exif_xmp: mergedExifXmp } : {}),
     },
-    ...(mergedEmbedded !== undefined ? { embedded: mergedEmbedded } : {}),
     people: {
       ...(normalizedBase.people ?? {}),
       ...(patch.people ?? {}),
@@ -166,17 +222,9 @@ export function mergeMetadataV2(
         ...(patch.people?.detections ?? {}),
       },
     },
-    ai: {
-      ...(normalizedBase.ai ?? {}),
-      ...(patch.ai ?? {}),
-    },
-    provenance: {
-      ...(normalizedBase.provenance ?? {}),
-      ...(patch.provenance ?? {}),
-      sources: {
-        ...(normalizedBase.provenance?.sources ?? {}),
-        ...(patch.provenance?.sources ?? {}),
-      },
+    image_analysis: {
+      ...(normalizedBase.image_analysis ?? {}),
+      ...(patch.image_analysis ?? {}),
     },
   };
 }
@@ -226,28 +274,28 @@ export function getPeopleDetected(metadata: unknown): PersonInfo[] {
 }
 
 export function getAiTitle(metadata: unknown): string | null {
-  return normalizeMetadata(metadata).ai?.title ?? null;
+  return normalizeMetadata(metadata).image_analysis?.title ?? null;
 }
 
 export function getAiDescription(metadata: unknown): string | null {
-  return normalizeMetadata(metadata).ai?.description ?? null;
+  return normalizeMetadata(metadata).image_analysis?.description ?? null;
 }
 
 export function getAiCategory(metadata: unknown): MediaImageCategory | null {
-  return normalizeMetadata(metadata).ai?.image_category ?? null;
+  return normalizeMetadata(metadata).image_analysis?.image_category ?? null;
 }
 
 export function getAiLocation(metadata: unknown): LocationData | null {
-  return normalizeMetadata(metadata).ai?.location ?? null;
+  return normalizeMetadata(metadata).image_analysis?.location ?? null;
 }
 
 export function getAiPhotoAnalysisMethod(metadata: unknown): string | null {
-  return normalizeMetadata(metadata).ai?.photo_analysis_method ?? null;
+  return normalizeMetadata(metadata).image_analysis?.photo_analysis_method ?? null;
 }
 
 export function getTechnicalCapture(metadata: unknown): TechnicalCaptureMetadata | null {
   const normalized = normalizeMetadata(metadata);
-  return normalized.technical?.capture ?? null;
+  return normalized.file_data?.technical?.capture ?? null;
 }
 
 export function extractTechnicalCaptureFromUnknown(
@@ -272,11 +320,11 @@ export function extractTechnicalCaptureFromUnknown(
 }
 
 export function getMetadataVersion(metadata: unknown): string | null {
-  return normalizeMetadata(metadata).provenance?.metadata_version ?? null;
+  return normalizeMetadata(metadata).metadata_version ?? null;
 }
 
 export function getMetadataExtractedAt(metadata: unknown): string | null {
-  return normalizeMetadata(metadata).provenance?.metadata_extracted_at ?? null;
+  return normalizeMetadata(metadata).file_data?.metadata_extracted_at ?? null;
 }
 
 export function getAdditionalTopLevelFields(
@@ -285,12 +333,13 @@ export function getAdditionalTopLevelFields(
   const normalized = normalizeMetadata(metadata);
   const knownKeys = new Set([
     'schema_version',
-    'technical',
-    'embedded',
+    'metadata_version',
+    'file_data',
     'people',
-    'ai',
-    'provenance',
+    'image_analysis',
     'document_data',
+    'path_extraction',
+    'locations_by_source',
   ]);
   const extras: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(normalized)) {
@@ -331,7 +380,7 @@ export function metadataFromFaceDetectionUpdate(
 }
 
 export function metadataFromAiAnalysisUpdate(
-  input: Partial<MediaMetadataV2['ai']> & {
+  input: Partial<MediaMetadataV2['image_analysis']> & {
     numberOfPeople?: number | null;
     hasChildren?: boolean | null;
     peopleDetected?: PersonInfo[] | null;
@@ -345,7 +394,7 @@ export function metadataFromAiAnalysisUpdate(
     ...aiFields
   } = input;
   return mergeMetadataV2(base, {
-    ai: {
+    image_analysis: {
       ...aiFields,
     },
     people: {
