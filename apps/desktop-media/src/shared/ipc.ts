@@ -855,7 +855,6 @@ export interface PhotoAnalysisOutput {
   weather?: string | null;
   daytime?: string | null;
   photo_estetic_quality?: number | null;
-  photo_star_rating_1_5?: number | null;
   is_low_quality?: boolean | null;
   quality_issues?: string[] | null;
   edit_suggestions?: PhotoEditSuggestion[] | null;

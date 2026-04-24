@@ -479,7 +479,7 @@ function persistLlmPathResult(filePath: string, result: LlmPathResult, model: st
     );
   }
 
-  const pathExtraction = llmResultToPathExtraction(result, model);
+  const pathExtraction = llmResultToPathExtraction(result, model, filePath);
 
   // Re-resolve event date with LLM data if present
   let eventDateUpdate: {

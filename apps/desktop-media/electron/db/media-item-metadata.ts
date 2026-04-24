@@ -694,7 +694,7 @@ function buildDesktopAiMetadata(
   const hasStar = typeof extracted.starRating === "number";
   const embeddedSource = hasEmbeddedText ? "mixed" : hasStar ? "file" : null;
   const isVideo = VIDEO_EXTENSIONS.has(path.extname(filePath).toLowerCase());
-  const technicalSource = isVideo ? "desktop-exiftool-video" : "desktop-exifreader-xmp";
+  const technicalSource = isVideo ? "file" : "xmp";
   const next = mergeMetadataV2(current, {
     schema_version: "2.0",
     metadata_version: METADATA_VERSION,
@@ -762,20 +762,20 @@ function readEmbeddedStrings(ai: unknown): {
     return { title: null, description: null, locationText: null };
   }
   const fileData = (ai as { file_data?: Record<string, unknown> }).file_data;
-  const emb =
-    fileData?.exif_xmp ??
-    (ai as { embedded?: Record<string, unknown> }).embedded;
+  const emb = fileData?.exif_xmp;
   if (!emb || typeof emb !== "object") {
     return { title: null, description: null, locationText: null };
   }
-  const t = typeof emb.title === "string" && emb.title.trim() ? emb.title.trim() : null;
+  const embRecord = emb as Record<string, unknown>;
+  const t =
+    typeof embRecord.title === "string" && embRecord.title.trim() ? embRecord.title.trim() : null;
   const d =
-    typeof emb.description === "string" && emb.description.trim()
-      ? emb.description.trim()
+    typeof embRecord.description === "string" && embRecord.description.trim()
+      ? embRecord.description.trim()
       : null;
   const l =
-    typeof emb.location_text === "string" && emb.location_text.trim()
-      ? emb.location_text.trim()
+    typeof embRecord.location_text === "string" && embRecord.location_text.trim()
+      ? embRecord.location_text.trim()
       : null;
   return { title: t, description: d, locationText: l };
 }

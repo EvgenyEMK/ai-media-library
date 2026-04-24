@@ -302,27 +302,31 @@ export interface MediaPeopleDetectionsMetadata {
 }
 
 export interface MediaMetadataV2 {
+  /**
+   * Structural schema identifier for JSON shape compatibility.
+   * Bump when field layout/paths change.
+   */
   schema_version: '2.0';
+  /**
+   * Producer/version stamp for the pipeline that last wrote metadata values.
+   * This tracks writer behavior and can change without changing JSON structure.
+   */
   metadata_version?: string | null;
   file_data?: {
     metadata_extracted_at?: string | null;
+    /**
+     * Container for file-derived technical groups.
+     * Kept as a namespace so future technical groups (e.g. video/audio blocks)
+     * can be added without crowding `file_data` top-level keys.
+     */
     technical?: {
       capture?: TechnicalCaptureMetadata;
       [key: string]: unknown;
     };
     exif_xmp?: ExifXmpMetadata | null;
   };
-  /** @deprecated Use `file_data.technical`. */
-  technical?: {
-    capture?: TechnicalCaptureMetadata;
-  };
-  /** @deprecated Use `file_data.exif_xmp`. */
-  embedded?: ExifXmpMetadata | null;
   people?: {
     face_count?: number | null;
-    number_of_people?: number | null;
-    has_children?: boolean | null;
-    people_detected?: PersonInfo[] | null;
     vlm_analysis?: {
       number_of_people?: number | null;
       has_children?: boolean | null;
@@ -341,25 +345,6 @@ export interface MediaMetadataV2 {
     weather?: string | null;
     lighting?: string | null;
     photo_estetic_quality?: number | null;
-    photo_star_rating_1_5?: number | null;
-    is_low_quality?: boolean | null;
-    quality_issues?: string[] | null;
-    edit_suggestions?: unknown[] | null;
-    [key: string]: unknown;
-  };
-  /** @deprecated Use `image_analysis`. */
-  ai?: {
-    photo_analysis_method?: string | null;
-    image_category?: MediaImageCategory | null;
-    title?: string | null;
-    description?: string | null;
-    location?: LocationData | null;
-    date?: string | null;
-    time?: string | null;
-    weather?: string | null;
-    lighting?: string | null;
-    photo_estetic_quality?: number | null;
-    photo_star_rating_1_5?: number | null;
     is_low_quality?: boolean | null;
     quality_issues?: string[] | null;
     edit_suggestions?: unknown[] | null;

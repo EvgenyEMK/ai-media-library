@@ -72,6 +72,70 @@ def _sanitize_metadata_in_place(metadata: dict[str, Any]) -> bool:
             del metadata[key]
             changed = True
 
+    image_analysis = metadata.get("image_analysis")
+    if not isinstance(image_analysis, dict):
+        image_analysis = {}
+        metadata["image_analysis"] = image_analysis
+        changed = True
+
+    # Move historically leaked top-level AI-analysis fields into image_analysis.
+    if image_analysis.get("is_low_quality") is None and isinstance(metadata.get("is_low_quality"), bool):
+        image_analysis["is_low_quality"] = metadata.get("is_low_quality")
+        changed = True
+    if image_analysis.get("edit_suggestions") is None and metadata.get("edit_suggestions") is not None:
+        image_analysis["edit_suggestions"] = metadata.get("edit_suggestions")
+        changed = True
+    if image_analysis.get("photo_estetic_quality") is None and isinstance(
+        metadata.get("photo_estetic_quality"), (int, float)
+    ):
+        image_analysis["photo_estetic_quality"] = metadata.get("photo_estetic_quality")
+        changed = True
+    if "quality_issues" in metadata and image_analysis.get("quality_issues") is None:
+        image_analysis["quality_issues"] = metadata.get("quality_issues")
+        changed = True
+
+    for key in (
+        "is_low_quality",
+        "quality_issues",
+        "edit_suggestions",
+        "photo_estetic_quality",
+        "photo_star_rating_1_5",
+        "star_rating_1_5",
+    ):
+        if key in metadata:
+            del metadata[key]
+            changed = True
+
+    if isinstance(image_analysis, dict):
+        if "photo_star_rating_1_5" in image_analysis:
+            del image_analysis["photo_star_rating_1_5"]
+            changed = True
+        if "star_rating_1_5" in image_analysis:
+            del image_analysis["star_rating_1_5"]
+            changed = True
+
+        quality_issues = image_analysis.get("quality_issues")
+        if isinstance(quality_issues, list):
+            normalized_quality_issues = [
+                entry.strip()
+                for entry in quality_issues
+                if isinstance(entry, str) and entry.strip() and entry.strip().lower() != "none"
+            ]
+            if normalized_quality_issues != quality_issues:
+                image_analysis["quality_issues"] = normalized_quality_issues
+                changed = True
+        elif isinstance(quality_issues, dict):
+            normalized_quality_issues = [
+                quality_issues[k].strip()
+                for k in sorted(quality_issues.keys(), key=lambda x: int(x) if str(x).isdigit() else 10**9)
+                if str(k).isdigit()
+                and isinstance(quality_issues[k], str)
+                and quality_issues[k].strip()
+                and quality_issues[k].strip().lower() != "none"
+            ]
+            image_analysis["quality_issues"] = normalized_quality_issues
+            changed = True
+
     people = metadata.get("people")
     if not isinstance(people, dict):
         return changed
@@ -130,12 +194,31 @@ def _derive_people_detected(metadata: dict[str, Any]) -> int | None:
     return _as_int_count(vlm.get("number_of_people"))
 
 
+def _normalize_display_title(metadata: dict[str, Any], filename: str | None) -> bool:
+    if not filename:
+        return False
+    path_extraction = metadata.get("path_extraction")
+    if not isinstance(path_extraction, dict):
+        return False
+    display_title = path_extraction.get("display_title")
+    if not isinstance(display_title, str):
+        return False
+    filename_stem = Path(filename).stem.strip()
+    if not filename_stem:
+        return False
+    if display_title.strip() != filename_stem:
+        return False
+    del path_extraction["display_title"]
+    return True
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "One-off rewrite for ai_metadata people shape: move legacy people fields under "
-            "people.vlm_analysis, populate people.face_count from legacy number_of_people, "
-            "remove face_orientation + rotation debug keys, and sync media_items.people_detected."
+            "One-off rewrite for ai_metadata schema normalization: move legacy ai/technical/embedded "
+            "keys to image_analysis/file_data, normalize people.vlm_analysis + face_count, "
+            "drop AI star_rating fields, normalize quality_issues, "
+            "drop display_title when it equals filename stem, and sync media_items.people_detected."
         )
     )
     parser.add_argument("--db", required=True, help="Absolute path to desktop-media.db")
@@ -152,7 +235,7 @@ def main() -> None:
     cur = conn.cursor()
 
     rows = cur.execute(
-        "SELECT id, ai_metadata FROM media_items WHERE ai_metadata IS NOT NULL"
+        "SELECT id, filename, ai_metadata FROM media_items WHERE ai_metadata IS NOT NULL"
     ).fetchall()
     now = dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -172,6 +255,7 @@ def main() -> None:
                 continue
 
             changed = _sanitize_metadata_in_place(parsed)
+            changed = _normalize_display_title(parsed, row["filename"]) or changed
             if not changed:
                 skipped += 1
                 continue

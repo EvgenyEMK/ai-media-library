@@ -38,6 +38,50 @@ function asNullableString(value: unknown): string | null | undefined {
   return undefined;
 }
 
+function normalizeQualityIssuesNode(value: unknown): string[] | null {
+  if (Array.isArray(value)) {
+    return value
+      .filter((entry): entry is string => typeof entry === 'string')
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0 && entry.toLowerCase() !== 'none');
+  }
+  if (isRecord(value)) {
+    return Object.entries(value)
+      .filter(([k, v]) => /^\d+$/.test(k) && typeof v === 'string')
+      .sort((a, b) => Number(a[0]) - Number(b[0]))
+      .map(([, v]) => (v as string).trim())
+      .filter((entry) => entry.length > 0 && entry.toLowerCase() !== 'none');
+  }
+  return null;
+}
+
+function sanitizeImageAnalysisInPlace(metadata: MediaMetadataV2): void {
+  const rawRec = metadata as Record<string, unknown>;
+  const sourceNode = isRecord(metadata.image_analysis) ? metadata.image_analysis : {};
+  const nextNode = { ...(sourceNode as Record<string, unknown>) };
+  if (nextNode.photo_estetic_quality === undefined && asNullableNumber(rawRec.photo_estetic_quality) !== undefined) {
+    nextNode.photo_estetic_quality = asNullableNumber(rawRec.photo_estetic_quality) ?? null;
+  }
+  if (nextNode.is_low_quality === undefined && asNullableBoolean(rawRec.is_low_quality) !== undefined) {
+    nextNode.is_low_quality = asNullableBoolean(rawRec.is_low_quality) ?? null;
+  }
+  if (nextNode.edit_suggestions === undefined && rawRec.edit_suggestions !== undefined) {
+    nextNode.edit_suggestions = rawRec.edit_suggestions;
+  }
+  if (nextNode.quality_issues === undefined && rawRec.quality_issues !== undefined) {
+    nextNode.quality_issues = rawRec.quality_issues;
+  }
+  delete nextNode.star_rating_1_5;
+  nextNode.quality_issues = normalizeQualityIssuesNode(nextNode.quality_issues);
+  metadata.image_analysis = nextNode as MediaMetadataV2["image_analysis"];
+  delete rawRec.photo_star_rating_1_5;
+  delete rawRec.star_rating_1_5;
+  delete rawRec.photo_estetic_quality;
+  delete rawRec.is_low_quality;
+  delete rawRec.quality_issues;
+  delete rawRec.edit_suggestions;
+}
+
 function readVlmAnalysisPeopleNode(
   metadata: MediaMetadataV2,
 ): { number_of_people: number | null; has_children: boolean | null; people_detected: PersonInfo[] | null } | null {
@@ -59,17 +103,11 @@ export function normalizeMetadata(raw: unknown): MediaMetadataV2 {
 
   if (isV2Metadata(raw)) {
     const v2 = { ...(raw as MediaMetadataV2) };
-    if (!v2.image_analysis && isRecord(v2.ai)) {
-      v2.image_analysis = { ...v2.ai };
+    if (isRecord(v2.image_analysis)) {
+      v2.image_analysis = { ...(v2.image_analysis as Record<string, unknown>) };
     }
     if (!v2.file_data) {
       v2.file_data = {};
-    }
-    if (!v2.file_data.technical && isRecord(v2.technical)) {
-      v2.file_data.technical = { ...v2.technical };
-    }
-    if (!v2.file_data.exif_xmp && isRecord(v2.embedded)) {
-      v2.file_data.exif_xmp = { ...v2.embedded };
     }
     if (
       (v2.file_data.metadata_extracted_at === undefined || v2.file_data.metadata_extracted_at === null) &&
@@ -88,9 +126,7 @@ export function normalizeMetadata(raw: unknown): MediaMetadataV2 {
       ) ?? null;
     }
     delete (v2 as Record<string, unknown>).provenance;
-    delete (v2 as Record<string, unknown>).technical;
-    delete (v2 as Record<string, unknown>).embedded;
-    delete (v2 as Record<string, unknown>).ai;
+    sanitizeImageAnalysisInPlace(v2);
     return v2;
   }
 
@@ -124,9 +160,6 @@ export function normalizeMetadata(raw: unknown): MediaMetadataV2 {
         has_children: legacy.has_children ?? null,
         people_detected: legacy.people_detected ?? null,
       },
-      number_of_people: legacy.number_of_people ?? null,
-      has_children: legacy.has_children ?? null,
-      people_detected: legacy.people_detected ?? null,
       detections: {
         face_detection_method: legacy.face_detection_method ?? null,
         image_size_for_bounding_boxes: legacy.image_size_for_bounding_boxes ?? null,
@@ -173,6 +206,8 @@ export function normalizeMetadata(raw: unknown): MediaMetadataV2 {
       normalized[key] = value;
     }
   }
+
+  sanitizeImageAnalysisInPlace(normalized);
 
   return normalized;
 }
@@ -249,28 +284,19 @@ export function getImageSizeForBoundingBoxes(
 export function getNumberOfPeople(metadata: unknown): number | null {
   const normalized = normalizeMetadata(metadata);
   const vlm = readVlmAnalysisPeopleNode(normalized);
-  if (vlm?.number_of_people != null) {
-    return vlm.number_of_people;
-  }
-  return normalized.people?.number_of_people ?? null;
+  return vlm?.number_of_people ?? null;
 }
 
 export function getHasChildren(metadata: unknown): boolean | null {
   const normalized = normalizeMetadata(metadata);
   const vlm = readVlmAnalysisPeopleNode(normalized);
-  if (vlm?.has_children != null) {
-    return vlm.has_children;
-  }
-  return normalized.people?.has_children ?? null;
+  return vlm?.has_children ?? null;
 }
 
 export function getPeopleDetected(metadata: unknown): PersonInfo[] {
   const normalized = normalizeMetadata(metadata);
   const vlm = readVlmAnalysisPeopleNode(normalized);
-  if (Array.isArray(vlm?.people_detected)) {
-    return vlm.people_detected;
-  }
-  return normalized.people?.people_detected ?? [];
+  return Array.isArray(vlm?.people_detected) ? vlm.people_detected : [];
 }
 
 export function getAiTitle(metadata: unknown): string | null {

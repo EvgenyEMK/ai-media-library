@@ -46,7 +46,8 @@ export function parseAnalysisJson(content: string): Omit<PhotoAnalysisOutput, "m
     "weather",
     "daytime",
     "photo_estetic_quality",
-    "photo_star_rating_1_5",
+    // Keep as known legacy key so it is dropped from extras if model still emits it.
+    "star_rating_1_5",
     "is_low_quality",
     "quality_issues",
     "edit_suggestions",
@@ -71,7 +72,6 @@ export function parseAnalysisJson(content: string): Omit<PhotoAnalysisOutput, "m
     weather: ensureNullableString(parsedValue.weather),
     daytime: ensureNullableString(parsedValue.daytime),
     photo_estetic_quality: ensureNullableNumber(parsedValue.photo_estetic_quality),
-    photo_star_rating_1_5: ensureNullableNumber(parsedValue.photo_star_rating_1_5),
     is_low_quality: ensureNullableBoolean(parsedValue.is_low_quality),
     quality_issues: ensureNullableStringArray(parsedValue.quality_issues),
     edit_suggestions: ensureEditSuggestions(parsedValue.edit_suggestions),

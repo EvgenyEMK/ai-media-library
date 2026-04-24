@@ -67,8 +67,8 @@ function buildInfoSections(metadata: DesktopMediaItemMetadata): {
   const extras = getAdditionalTopLevelFields(metadata.aiMetadata ?? null);
   const vlm = people?.vlm_analysis ?? null;
   const starRating =
-    typeof ai?.photo_star_rating_1_5 === "number"
-      ? ai.photo_star_rating_1_5
+    typeof ai?.photo_estetic_quality === "number" && Number.isFinite(ai.photo_estetic_quality)
+      ? Math.max(1, Math.min(5, Math.ceil(ai.photo_estetic_quality / 2)))
       : null;
   const isLowQuality =
     typeof ai?.is_low_quality === "boolean" ? ai.is_low_quality : null;
@@ -191,7 +191,7 @@ function buildInfoSections(metadata: DesktopMediaItemMetadata): {
 
   const aiQualityFields: DesktopInfoField[] = [
     { label: "Aesthetic quality (1-10)", value: ai?.photo_estetic_quality ?? null },
-    { label: "Star rating (1-5)", value: starRating },
+    { label: "AI star rating (1-5)", value: starRating },
     {
       label: "Low quality",
       value: typeof isLowQuality === "boolean" ? (isLowQuality ? "Yes" : "No") : null,

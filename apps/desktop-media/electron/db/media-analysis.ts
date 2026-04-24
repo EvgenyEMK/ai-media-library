@@ -189,9 +189,8 @@ export function upsertPhotoAnalysisResult(
         weather: result.weather ?? null,
         photo_estetic_quality: result.photo_estetic_quality ?? null,
         photo_analysis_method: result.modelInfo?.model ?? null,
-        photo_star_rating_1_5: result.photo_star_rating_1_5 ?? null,
         is_low_quality: result.is_low_quality ?? null,
-        quality_issues: result.quality_issues ?? null,
+        quality_issues: normalizeQualityIssues(result.quality_issues),
       },
       metadata_version: "desktop-photo-metadata-v2",
       file_data: {
@@ -213,6 +212,10 @@ export function upsertPhotoAnalysisResult(
         "weather",
         "daytime",
         "photo_estetic_quality",
+        "is_low_quality",
+        "quality_issues",
+        "edit_suggestions",
+        "star_rating_1_5",
         "modelInfo",
       ]);
 
@@ -226,6 +229,7 @@ export function upsertPhotoAnalysisResult(
       delete merged.two_pass_rotation_consistency;
       delete merged.face_rotation_override;
       sanitizeLegacyPeopleShape(merged);
+      sanitizeAiAnalysisRootLeakage(merged);
 
       merged.edit_suggestions = stripRotateEditSuggestions(merged.edit_suggestions);
 
@@ -1024,26 +1028,6 @@ function sanitizeLegacyPeopleShape(metadata: Record<string, unknown>): void {
   delete metadata.rotation_decision;
   delete metadata.two_pass_rotation_consistency;
   delete metadata.face_rotation_override;
-  delete metadata.provenance;
-  if (metadata.ai && !metadata.image_analysis) {
-    metadata.image_analysis = metadata.ai;
-  }
-  delete metadata.ai;
-  if (metadata.technical || metadata.embedded) {
-    const fileData =
-      metadata.file_data && typeof metadata.file_data === "object"
-        ? (metadata.file_data as Record<string, unknown>)
-        : {};
-    if (metadata.technical && fileData.technical === undefined) {
-      fileData.technical = metadata.technical;
-    }
-    if (metadata.embedded && fileData.exif_xmp === undefined) {
-      fileData.exif_xmp = metadata.embedded;
-    }
-    metadata.file_data = fileData;
-  }
-  delete metadata.technical;
-  delete metadata.embedded;
   const peopleNode = metadata.people;
   if (!peopleNode || typeof peopleNode !== "object") {
     return;
@@ -1131,9 +1115,7 @@ function hasPhotoAnalysisSignature(aiMetadataRaw: string | null): boolean {
   const aiNode =
     root.image_analysis && typeof root.image_analysis === "object"
       ? (root.image_analysis as Record<string, unknown>)
-      : root.ai && typeof root.ai === "object"
-        ? (root.ai as Record<string, unknown>)
-        : root;
+      : root;
 
   const imageCategory = aiNode.image_category;
   const title = aiNode.title;
@@ -1147,6 +1129,59 @@ function hasPhotoAnalysisSignature(aiMetadataRaw: string | null): boolean {
     typeof description === "string" &&
     description.trim().length > 0
   );
+}
+
+function normalizeQualityIssues(value: unknown): string[] | null {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const listFromObject = Object.entries(value as Record<string, unknown>)
+      .filter(([k, v]) => /^\d+$/.test(k) && typeof v === "string")
+      .sort((a, b) => Number(a[0]) - Number(b[0]))
+      .map(([, v]) => (v as string).trim());
+    if (listFromObject.length > 0) {
+      return listFromObject.filter((entry) => entry.length > 0 && entry.toLowerCase() !== "none");
+    }
+  }
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const normalized = value
+    .filter((entry): entry is string => typeof entry === "string")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0 && entry.toLowerCase() !== "none");
+  return normalized;
+}
+
+function sanitizeAiAnalysisRootLeakage(metadata: Record<string, unknown>): void {
+  const imageAnalysis =
+    metadata.image_analysis && typeof metadata.image_analysis === "object"
+      ? (metadata.image_analysis as Record<string, unknown>)
+      : {};
+
+  if (imageAnalysis.is_low_quality === undefined && typeof metadata.is_low_quality === "boolean") {
+    imageAnalysis.is_low_quality = metadata.is_low_quality;
+  }
+  if (imageAnalysis.quality_issues === undefined && metadata.quality_issues !== undefined) {
+    imageAnalysis.quality_issues = normalizeQualityIssues(metadata.quality_issues);
+  } else if (imageAnalysis.quality_issues !== undefined) {
+    imageAnalysis.quality_issues = normalizeQualityIssues(imageAnalysis.quality_issues);
+  }
+  if (imageAnalysis.edit_suggestions === undefined && metadata.edit_suggestions !== undefined) {
+    imageAnalysis.edit_suggestions = metadata.edit_suggestions;
+  }
+  if (
+    imageAnalysis.photo_estetic_quality === undefined &&
+    typeof metadata.photo_estetic_quality === "number" &&
+    Number.isFinite(metadata.photo_estetic_quality)
+  ) {
+    imageAnalysis.photo_estetic_quality = metadata.photo_estetic_quality;
+  }
+
+  metadata.image_analysis = imageAnalysis;
+  delete metadata.is_low_quality;
+  delete metadata.quality_issues;
+  delete metadata.edit_suggestions;
+  delete metadata.photo_star_rating_1_5;
+  delete metadata.star_rating_1_5;
 }
 
 const MAX_ERROR_LENGTH = 500;
