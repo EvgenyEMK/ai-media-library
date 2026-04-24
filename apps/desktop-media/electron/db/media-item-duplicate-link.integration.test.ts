@@ -330,7 +330,10 @@ describe.skipIf(!HAS_SQLITE)("upsertMediaItemFromFilePath — duplicate content 
     expect(refreshed.face_detection_processed_at).toBeNull();
     expect(refreshed.ai_metadata).toBeTruthy();
     const parsed = JSON.parse(refreshed.ai_metadata ?? "{}") as Record<string, unknown>;
-    expect(parsed.orientation_detection).toBeUndefined();
+    expect(parsed.orientation_detection).toEqual({
+      source: "image-orientation-classifier",
+      correction_angle_clockwise: 90,
+    });
     expect(parsed.ai).toBeUndefined();
     const fileData = parsed.file_data as Record<string, unknown> | undefined;
     const exifXmp = fileData?.exif_xmp as Record<string, unknown> | undefined;
