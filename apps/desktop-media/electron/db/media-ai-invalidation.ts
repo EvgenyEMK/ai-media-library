@@ -67,8 +67,7 @@ function sanitizeAiMetadataAfterContentRefresh(
 ): string {
   const normalized = normalizeMetadata(parseJson(aiMetadataRaw));
   const next = normalizeMetadata({
-    schema_version: "2.0",
-    metadata_version: normalized.metadata_version ?? null,
+    ...normalized,
     file_data: {
       ...(normalized.file_data ?? {}),
       metadata_extracted_at: metadataExtractedAt,
