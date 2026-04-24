@@ -66,8 +66,13 @@ function sanitizeAiMetadataAfterContentRefresh(
   metadataExtractedAt: string,
 ): string {
   const normalized = normalizeMetadata(parseJson(aiMetadataRaw));
+  const preservedOrientation = normalized.orientation_detection;
   const next = normalizeMetadata({
     ...normalized,
+    ai: undefined,
+    image_analysis: undefined,
+    people: undefined,
+    orientation_detection: preservedOrientation,
     file_data: {
       ...(normalized.file_data ?? {}),
       metadata_extracted_at: metadataExtractedAt,
