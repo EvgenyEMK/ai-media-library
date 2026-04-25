@@ -105,6 +105,11 @@ export function DesktopAlbumsWorkspace({
     setAlbumItems(result.rows);
     setAlbumItemsTotal(result.totalCount);
   }, [actions, albumItemsPage, selectedAlbumId]);
+  const refreshAlbumDetailState = useCallback((): void => {
+    void Promise.all([loadAlbumItems(), loadAlbums()]).catch((error) => {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to load album items.");
+    });
+  }, [loadAlbumItems, loadAlbums]);
 
   useEffect(() => {
     void window.desktopApi.listPersonTagsWithFaceCounts().then((tags: DesktopPersonTagWithFaceCount[]) => {
@@ -331,12 +336,14 @@ export function DesktopAlbumsWorkspace({
         <div className="min-h-0 flex-1 overflow-auto">
           <DesktopAlbumContentGrid
             store={store}
+            albumId={selectedAlbum.id}
             albumItems={albumItems}
             albumItemsPage={albumItemsPage}
             albumItemsTotal={albumItemsTotal}
             quickFilters={albumQuickFilters}
             viewMode={viewMode}
             onAlbumItemsPageChange={setAlbumItemsPage}
+            onAlbumContentChanged={refreshAlbumDetailState}
           />
         </div>
       ) : (

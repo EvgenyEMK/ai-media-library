@@ -42,6 +42,7 @@ function installDesktopApiMock(): Record<string, ReturnType<typeof vi.fn>> {
       .mockResolvedValue([{ albumId: "member", title: "Member Album" }, { albumId: "alpha", title: "Alpha Album" }]),
     addMediaItemsToAlbum: vi.fn().mockResolvedValue(undefined),
     removeMediaItemFromAlbum: vi.fn().mockResolvedValue(undefined),
+    setAlbumCover: vi.fn().mockResolvedValue(undefined),
     revealItemInFolder: vi.fn().mockResolvedValue({ success: true }),
     _logToMain: vi.fn(),
   };
@@ -65,6 +66,22 @@ function renderMenu(): void {
       }}
     >
       <DesktopMediaItemActionsMenu filePath="C:/photos/item.jpg" />
+    </DesktopStoreProvider>,
+  );
+}
+
+function renderMenuInAlbumContext(): void {
+  render(
+    <DesktopStoreProvider
+      initialState={{
+        albums,
+        recentAlbumIds: ["recent"],
+      }}
+    >
+      <DesktopMediaItemActionsMenu
+        filePath="C:/photos/item.jpg"
+        albumContext={{ albumId: "member" }}
+      />
     </DesktopStoreProvider>,
   );
 }
@@ -136,5 +153,29 @@ describe("DesktopMediaItemActionsMenu", () => {
 
     fireEvent.click(screen.getByTitle("Open media item actions"));
     expect(await screen.findByRole("menuitem", { name: "Reveal in File Explorer" })).toBeVisible();
+  });
+
+  it("shows album-only actions first in album context", async () => {
+    installDesktopApiMock();
+    renderMenuInAlbumContext();
+
+    fireEvent.click(screen.getByTitle("Open media item actions"));
+    const menu = await screen.findByRole("menu");
+    const labels = within(menu)
+      .getAllByRole("menuitem")
+      .map((item) => item.textContent?.trim())
+      .filter((label): label is string => Boolean(label));
+
+    expect(labels[0]).toBe("Set as album cover");
+    expect(labels[1]).toBe("Remove from album");
+  });
+
+  it("does not show album-only actions in folder context", async () => {
+    installDesktopApiMock();
+    renderMenu();
+
+    fireEvent.click(screen.getByTitle("Open media item actions"));
+    expect(screen.queryByRole("menuitem", { name: "Set as album cover" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "Remove from album" })).toBeNull();
   });
 });
