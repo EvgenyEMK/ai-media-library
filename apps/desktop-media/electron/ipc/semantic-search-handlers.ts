@@ -237,6 +237,8 @@ export function registerSemanticSearchHandlers(): void {
         eventDateEnd?: string;
         locationQuery?: string;
         advancedSearch?: boolean;
+        translateToEnglish?: boolean;
+        queryAnalysisModel?: string;
         vlmSimilarityThreshold?: number;
         descriptionSimilarityThreshold?: number;
         keywordMatchReranking?: boolean;
@@ -252,7 +254,10 @@ export function registerSemanticSearchHandlers(): void {
 
       const searchT0 = Date.now();
       const signalMode: SemanticSearchSignalMode = request.signalMode ?? "hybrid";
+      const translateToEnglish = request.translateToEnglish === true;
       const keywordMatchReranking = request.keywordMatchReranking === true;
+      const shouldAnalyzeQuery =
+        request.advancedSearch === true || translateToEnglish || keywordMatchReranking;
       const keywordMatchThresholdVlm =
         typeof request.keywordMatchThresholdVlm === "number" &&
         Number.isFinite(request.keywordMatchThresholdVlm)
@@ -264,7 +269,7 @@ export function registerSemanticSearchHandlers(): void {
           ? Math.max(0, Math.min(1, request.keywordMatchThresholdDescription))
           : DEFAULT_AI_IMAGE_SEARCH_SETTINGS.keywordMatchThresholdDescription;
       logVerbose(
-        `[semantic-search][main][${new Date().toISOString()}] search START query="${query}" advanced=${!!request.advancedSearch} signalMode=${signalMode} kwRerank=${keywordMatchReranking} kwVlmTh=${keywordMatchThresholdVlm} kwDescTh=${keywordMatchThresholdDescription}`,
+        `[semantic-search][main][${new Date().toISOString()}] search START query="${query}" analyze=${shouldAnalyzeQuery} translate=${translateToEnglish} signalMode=${signalMode} kwRerank=${keywordMatchReranking} kwVlmTh=${keywordMatchThresholdVlm} kwDescTh=${keywordMatchThresholdDescription}`,
       );
 
       // ── Advanced search: LLM query preprocessing ─────────────
@@ -273,16 +278,13 @@ export function registerSemanticSearchHandlers(): void {
       const searchQuery = query;
       let embeddingQuery = query;
 
-      if (request.advancedSearch) {
-        const result = await analyzeSearchQuery(query);
+      if (shouldAnalyzeQuery) {
+        const result = await analyzeSearchQuery(query, request.queryAnalysisModel);
         if (result) {
           queryAnalysis = result.analysis;
           analysisModel = result.model;
-          // Always embed the English query when LLM analysis succeeds — models often
-          // omit `translated: true` while still returning english_query; Cyrillic/raw
-          // text in Nomic search_query: space hurts retrieval.
           const eq = queryAnalysis.englishQuery?.trim();
-          if (eq.length > 0) {
+          if (translateToEnglish && eq.length > 0) {
             embeddingQuery = eq;
           }
           logVerbose(
@@ -308,9 +310,9 @@ export function registerSemanticSearchHandlers(): void {
         }
       }
 
-      if (request.advancedSearch) {
+      if (shouldAnalyzeQuery) {
         logVerbose(
-          `[semantic-search][main][advanced] text passed to embedTextDirect: ${JSON.stringify(embeddingQuery)} (user query was: ${JSON.stringify(query)})`,
+          `[semantic-search][main][query-analysis] text passed to embedTextDirect: ${JSON.stringify(embeddingQuery)} (user query was: ${JSON.stringify(query)})`,
         );
       }
       const queryVector = await embedTextDirect(embeddingQuery);
@@ -411,12 +413,12 @@ export function registerSemanticSearchHandlers(): void {
 
       // ── Advanced search: keyword re-ranking ──────────────────
       const canKeywordRerank =
-        Boolean(request.advancedSearch) &&
+        shouldAnalyzeQuery &&
         keywordMatchReranking &&
         Boolean(queryAnalysis?.keywords?.length) &&
         (keywordMatchThresholdVlm > 0 || keywordMatchThresholdDescription > 0);
 
-      if (request.advancedSearch) {
+      if (shouldAnalyzeQuery) {
         if (!queryAnalysis) {
           logVerbose(
             "[semantic-search][main][advanced] keyword re-rank skipped: no queryAnalysis (LLM failed or Ollama unavailable)",

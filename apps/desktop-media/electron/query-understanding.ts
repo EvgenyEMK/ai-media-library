@@ -39,25 +39,29 @@ function getOllamaChatUrl(): string {
 }
 
 // ── Model availability cache (reset each app launch) ───────────────
-let cachedModel: string | null = null;
-let modelResolvePromise: Promise<string | null> | null = null;
+const cachedModelsByPreference = new Map<string, string>();
+const modelResolvePromisesByPreference = new Map<string, Promise<string | null>>();
 
-async function resolveModel(): Promise<string | null> {
+async function resolveModel(preferred?: string | null): Promise<string | null> {
+  const cacheKey = preferred?.trim() ?? "";
+  const cachedModel = cachedModelsByPreference.get(cacheKey);
   if (cachedModel) return cachedModel;
 
-  if (modelResolvePromise) return modelResolvePromise;
+  const existingPromise = modelResolvePromisesByPreference.get(cacheKey);
+  if (existingPromise) return existingPromise;
 
-  modelResolvePromise = (async () => {
-    const picked = await resolveOllamaTextChatModel({});
+  const modelResolvePromise = (async () => {
+    const picked = await resolveOllamaTextChatModel({ preferred });
     if (picked) {
-      cachedModel = picked;
-      console.log(`[query-understanding] using Ollama model: ${cachedModel} (from /api/tags)`);
+      cachedModelsByPreference.set(cacheKey, picked);
+      console.log(`[query-understanding] using Ollama model: ${picked} (from /api/tags)`);
     }
-    return cachedModel;
+    return picked;
   })();
+  modelResolvePromisesByPreference.set(cacheKey, modelResolvePromise);
 
   const result = await modelResolvePromise;
-  modelResolvePromise = null;
+  modelResolvePromisesByPreference.delete(cacheKey);
   return result;
 }
 
@@ -206,11 +210,12 @@ function isPlaceholderEnglishQuery(s: string): boolean {
  */
 export async function analyzeSearchQuery(
   query: string,
+  preferredModel?: string | null,
   signal?: AbortSignal,
 ): Promise<{ analysis: QueryAnalysis; model: string } | null> {
   const logPrefix = "[query-understanding]";
   try {
-    const model = await resolveModel();
+    const model = await resolveModel(preferredModel);
     if (!model) {
       console.log(
         `${logPrefix} no Ollama model resolved (tried ${OLLAMA_TEXT_PRIMARY_MODEL}, ${OLLAMA_TEXT_FALLBACK_MODEL})`,

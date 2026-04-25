@@ -65,8 +65,10 @@ export function useSemanticHandlers(opts: {
         const recursive = scope === "recursive";
 
         const includeUnconfirmedFaces = currentState.semanticIncludeUnconfirmedFaces;
-        const advancedSearch = currentState.semanticAdvancedSearch;
-        const signalMode = currentState.aiImageSearchSettings.showMatchingMethodSelector
+        const translateToEnglish = currentState.semanticTranslateToEnglish;
+        const experimentalAdvancedSearch = currentState.aiImageSearchSettings.keywordMatchReranking;
+        const shouldAnalyzeQuery = translateToEnglish || experimentalAdvancedSearch;
+        const signalMode = experimentalAdvancedSearch
           ? currentState.semanticSearchSignalMode
           : "hybrid";
         const eventLoc = quickFiltersToSearchEventLocationExtras(quickFilters);
@@ -80,7 +82,9 @@ export function useSemanticHandlers(opts: {
           eventDateStart: eventLoc.eventDateStart,
           eventDateEnd: eventLoc.eventDateEnd,
           locationQuery: eventLoc.locationQuery,
-          advancedSearch,
+          advancedSearch: shouldAnalyzeQuery,
+          translateToEnglish,
+          queryAnalysisModel: currentState.aiImageSearchSettings.searchPromptTranslationModel,
           signalMode,
           vlmSimilarityThreshold: currentState.aiImageSearchSettings.hideResultsBelowVlmSimilarity,
           descriptionSimilarityThreshold:
@@ -97,7 +101,7 @@ export function useSemanticHandlers(opts: {
         if (version !== semanticSearchVersionRef.current) return;
         const tVlm = currentState.aiImageSearchSettings.hideResultsBelowVlmSimilarity;
         const tDesc = currentState.aiImageSearchSettings.hideResultsBelowDescriptionSimilarity;
-        const gateMode = currentState.aiImageSearchSettings.showMatchingMethodSelector
+        const gateMode = currentState.aiImageSearchSettings.keywordMatchReranking
           ? currentState.semanticSearchSignalMode
           : "hybrid";
         const shownCount = results.filter((r) =>

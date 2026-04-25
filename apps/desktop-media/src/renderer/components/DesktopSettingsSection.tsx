@@ -1,6 +1,11 @@
 import { useEffect, useId, useState, type ReactElement } from "react";
-import { ChevronDown, Square } from "lucide-react";
-import { SettingsCheckboxField, SettingsNumberField, SettingsSectionCard } from "@emk/media-viewer";
+import { ChevronDown, Square, Star } from "lucide-react";
+import {
+  SettingsCheckboxField,
+  SettingsNumberField,
+  SettingsSectionCard,
+  type SettingsOptionSurfaceVariant,
+} from "@emk/media-viewer";
 import {
   AUX_MODEL_OPTIONS,
   DEFAULT_AI_IMAGE_SEARCH_SETTINGS,
@@ -15,6 +20,7 @@ import {
   type AiInferenceGpuOption,
   type AuxModelId,
   type AuxModelKind,
+  type AuxModelOption,
   type FaceAgeGenderModelId,
   type FaceDetectionSettings,
   type FaceDetectorModelId,
@@ -42,6 +48,7 @@ interface DesktopSettingsSectionProps {
   photoAnalysisSettings: PhotoAnalysisSettings;
   folderScanningSettings: FolderScanningSettings;
   aiImageSearchSettings: AiImageSearchSettings;
+  hideAdvancedSettings: boolean;
   mediaViewerSettings: MediaViewerSettings;
   onFaceDetectionSettingChange: <K extends keyof FaceDetectionSettings>(
     key: K,
@@ -70,6 +77,7 @@ interface DesktopSettingsSectionProps {
     value: AiImageSearchSettings[K],
   ) => void;
   onResetAiImageSearchSettings: () => void;
+  onHideAdvancedSettingsChange: (hide: boolean) => void;
   onMediaViewerSettingChange: <K extends keyof MediaViewerSettings>(
     key: K,
     value: MediaViewerSettings[K],
@@ -87,6 +95,7 @@ interface DesktopSettingsSectionProps {
 
 const UI_TEXT = {
   title: "Settings",
+  hideAdvancedSettingsTitle: "Hide advanced settings",
   scanForFileChanges: "Scan for file changes",
   /** Shorter than “folder change scanning and file metadata management”; covers scan policy + embedded writes + path helpers. */
   fileMetadataManagement: "Folder scanning & file metadata",
@@ -110,6 +119,9 @@ const UI_TEXT = {
   photoAnalysis: "AI image analysis",
   wrongImageRotationDetection: "Wrong image rotation detection",
   aiImageSearch: "AI image search",
+  aiImageSearchTranslationModelTitle: "AI model to translate search prompt to English",
+  aiImageSearchTranslationModelDescription:
+    "Use the exact Ollama model name from ollama list. The current built-in default is qwen2.5vl:3b.",
   mediaViewer: "Image / Video viewer",
   aiInferenceGpu: "Graphic card usage (GPU)",
   photoAnalysisPromptTitle: "Prompt used",
@@ -136,13 +148,11 @@ const UI_TEXT = {
   faceLandmarkFallbackDescription:
     "Fallback only: if the primary image-orientation classifier is unavailable or inconclusive, use detected face landmarks (eyes/nose geometry) to infer rotation.",
   extractInvoiceDataTitle: "Extract invoice data",
-  extractInvoiceDataDescription: `Why: Structured fields are easier to search and reuse than text buried in a long description.
-
-How: If image category is invoice_or_receipt, run a second prompt to extract issuer, invoice number/date, client number, totals, currency, and VAT fields into top-level metadata.document_data.`,
+  extractInvoiceDataDescription:
+    "When an image is an invoice or receipt, run a second prompt to store issuer, invoice number/date, totals, currency, and VAT as structured fields.",
   gpsLocationDetectionTitle: "Detect Country / City from GPS coordinates",
-  gpsLocationDetectionDescription: `Why: Images with GPS coordinates can be automatically tagged with Country, State/Province, and City for use in search filters, folder/album views, and smart albums.
-
-How: During metadata scan, reverse-geocode GPS lat/lon using offline GeoNames data (cities with population >= 1000). First-time setup downloads ~2 GB of geographic data (cached locally).`,
+  gpsLocationDetectionDescription:
+    "During metadata scan, GPS coordinates are matched against offline GeoNames data to fill Country, State/Province, and City for search filters and folder views. First-time setup downloads about 2 GB of cached geographic data.",
   gpsLocationDetectionConfirmTitle: "Download location data?",
   gpsLocationDetectionConfirmMessage: "This will download approximately 2 GB of geographic data from GeoNames. The download happens in the background and data is cached locally for future use.",
   gpsLocationDetectionConfirmOk: "Download",
@@ -161,12 +171,24 @@ How: During metadata scan, reverse-geocode GPS lat/lon using offline GeoNames da
 const SETTINGS_OPTION_CHECKBOX_CLASS =
   "mt-1 h-[calc(26px/1.2)] w-[calc(26px/1.2)] shrink-0 cursor-pointer rounded-sm [accent-color:hsl(var(--primary))]";
 
+const SETTINGS_CUSTOM_OPTION_SURFACE_CLASSES: Record<SettingsOptionSurfaceVariant, string> = {
+  default: "rounded-md border border-border/70 border-l-4 border-l-border bg-background/40 p-3",
+  "soft-selected": "rounded-md border border-border/70 border-l-4 border-l-border bg-background/40 p-3",
+  "accent-stripe": "rounded-md border border-border/70 border-l-4 border-l-border bg-background/40 p-3",
+  muted: "rounded-md border border-border/70 border-l-4 border-l-border bg-background/40 p-3",
+};
+
+function settingsCustomOptionSurfaceClass(variant: SettingsOptionSurfaceVariant): string {
+  return SETTINGS_CUSTOM_OPTION_SURFACE_CLASSES[variant];
+}
+
 export function DesktopSettingsSection({
   faceDetectionSettings,
   wrongImageRotationDetectionSettings,
   photoAnalysisSettings,
   folderScanningSettings,
   aiImageSearchSettings,
+  hideAdvancedSettings,
   mediaViewerSettings,
   onFaceDetectionSettingChange,
   onResetFaceDetectionOnlySettings,
@@ -178,6 +200,7 @@ export function DesktopSettingsSection({
   onResetFolderScanningSectionSettings,
   onAiImageSearchSettingChange,
   onResetAiImageSearchSettings,
+  onHideAdvancedSettingsChange,
   onMediaViewerSettingChange,
   onResetMediaViewerSettings,
   pathExtractionSettings,
@@ -190,11 +213,14 @@ export function DesktopSettingsSection({
   const [showWindowsGpuGuide, setShowWindowsGpuGuide] = useState(false);
   const [showAiModelHelp, setShowAiModelHelp] = useState(false);
   const [showPhotoDownscaleDescription, setShowPhotoDownscaleDescription] = useState(false);
+  const [showAdvancedSearchDescription, setShowAdvancedSearchDescription] = useState(false);
   const [downscaleLongestSideDraft, setDownscaleLongestSideDraft] = useState(() =>
     String(photoAnalysisSettings.downscaleLongestSidePx),
   );
   const photoDownscaleCheckboxId = useId();
   const photoDownscaleLongestSideId = useId();
+  const advancedSearchCheckboxId = useId();
+  const showAdvancedSettings = !hideAdvancedSettings;
 
   useEffect(() => {
     setDownscaleLongestSideDraft(String(photoAnalysisSettings.downscaleLongestSidePx));
@@ -248,6 +274,16 @@ export function DesktopSettingsSection({
   return (
     <div className="mx-auto w-full max-w-7xl space-y-3 px-4 py-6 md:px-8">
       <h1 className="m-0 text-3xl font-bold text-foreground md:text-4xl">{UI_TEXT.title}</h1>
+      <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border/70 bg-card/40 px-3 py-2 text-sm text-foreground">
+        <input
+          type="checkbox"
+          className="h-4 w-4 cursor-pointer [accent-color:hsl(var(--primary))]"
+          checked={hideAdvancedSettings}
+          onChange={(event) => onHideAdvancedSettingsChange(event.target.checked)}
+        />
+        <span>{UI_TEXT.hideAdvancedSettingsTitle}</span>
+        <Star className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+      </label>
 
       <SettingsSectionCard title={UI_TEXT.mediaViewer}>
         <div className="space-y-3">
@@ -290,29 +326,35 @@ export function DesktopSettingsSection({
             description={UI_TEXT.emptyFolderAiSummaryDescription}
             checked={folderScanningSettings.showFolderAiSummaryWhenSelectingEmptyFolder}
             checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+            surfaceVariant="accent-stripe"
             onChange={(next) =>
               onFolderScanningSettingChange("showFolderAiSummaryWhenSelectingEmptyFolder", next)
             }
           />
-          <SettingsNumberField
-            title="Automatically scan folder for changes on selection if number of files less than"
-            description={`When you open a folder, the app can automatically scan the files in that folder (not sub-folders) to refresh the database and detect new or moved images. On large folders this scan may take more than 10 seconds. If the number of images here is greater than or equal to this value, the automatic scan is skipped (thumbnails still load). To refresh the database yourself, use “${UI_TEXT.scanForFileChanges}” on the folder—use “Include sub-folders” to scan the whole tree, or turn it off to scan only this folder’s files.`}
-            value={folderScanningSettings.autoMetadataScanOnSelectMaxFiles}
-            min={0}
-            max={1_000_000}
-            step={1}
-            onChange={(nextValue) =>
-              onFolderScanningSettingChange(
-                "autoMetadataScanOnSelectMaxFiles",
-                Math.round(nextValue),
-              )
-            }
-          />
+          {showAdvancedSettings ? (
+            <SettingsNumberField
+              title="Automatically scan folder for changes on selection if number of files less than"
+              description={`When you open a folder, the app can automatically scan the files in that folder (not sub-folders) to refresh the database and detect new or moved images. On large folders this scan may take more than 10 seconds. If the number of images here is greater than or equal to this value, the automatic scan is skipped (thumbnails still load). To refresh the database yourself, use “${UI_TEXT.scanForFileChanges}” on the folder—use “Include sub-folders” to scan the whole tree, or turn it off to scan only this folder’s files.`}
+              value={folderScanningSettings.autoMetadataScanOnSelectMaxFiles}
+              min={0}
+              max={1_000_000}
+              step={1}
+              advanced
+              surfaceVariant="accent-stripe"
+              onChange={(nextValue) =>
+                onFolderScanningSettingChange(
+                  "autoMetadataScanOnSelectMaxFiles",
+                  Math.round(nextValue),
+                )
+              }
+            />
+          ) : null}
           <SettingsCheckboxField
             title="Update file metadata on change of Rating, Title, Description"
             description={`XMP and EXIF are standard metadata blocks inside many image and video files; other apps (Lightroom, Windows) read them for star ratings and titles. When this option is on, after your change is saved in the database the app runs ExifTool to mirror rating into the file. When off, edits stay in the database only—original files on disk are not modified (recommended).`}
             checked={folderScanningSettings.writeEmbeddedMetadataOnUserEdit}
             checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+            surfaceVariant="accent-stripe"
             onChange={(next) => onFolderScanningSettingChange("writeEmbeddedMetadataOnUserEdit", next)}
           />
           <SettingsCheckboxField
@@ -320,10 +362,11 @@ export function DesktopSettingsSection({
             description={UI_TEXT.gpsLocationDetectionDescription}
             checked={folderScanningSettings.detectLocationFromGps}
             checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+            surfaceVariant="accent-stripe"
             onChange={handleGpsToggle}
           />
           {showGpsConfirm ? (
-            <div className="rounded-md border border-amber-700/60 bg-amber-950/40 p-3">
+            <div className="rounded-md border border-amber-700/60 border-l-4 border-l-primary/70 bg-amber-950/40 p-3">
               <p className="m-0 text-sm font-medium text-amber-200">
                 {UI_TEXT.gpsLocationDetectionConfirmTitle}
               </p>
@@ -353,17 +396,27 @@ export function DesktopSettingsSection({
             description={UI_TEXT.pathExtractDatesDescription}
             checked={pathExtractionSettings.extractDates}
             checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+            surfaceVariant="accent-stripe"
             onChange={(next) => onPathExtractionSettingChange("extractDates", next)}
           />
-          <SettingsCheckboxField
-            title={UI_TEXT.pathUseLlmTitle}
-            description={UI_TEXT.pathUseLlmDescription}
-            checked={pathExtractionSettings.useLlm}
-            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
-            onChange={(next) => onPathExtractionSettingChange("useLlm", next)}
-          />
-          {pathExtractionSettings.useLlm ? (
-            <div className="rounded-md border border-border/70 bg-background/40 p-3">
+          {showAdvancedSettings ? (
+            <SettingsCheckboxField
+              title={UI_TEXT.pathUseLlmTitle}
+              description={UI_TEXT.pathUseLlmDescription}
+              checked={pathExtractionSettings.useLlm}
+              checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+              advanced
+              surfaceVariant="accent-stripe"
+              onChange={(next) => onPathExtractionSettingChange("useLlm", next)}
+            />
+          ) : null}
+          {showAdvancedSettings && pathExtractionSettings.useLlm ? (
+            <div
+              className={cn(
+                settingsCustomOptionSurfaceClass("accent-stripe"),
+                "border-l-primary/70",
+              )}
+            >
               <div className="flex flex-col gap-3">
                 <p className="m-0 text-sm text-muted-foreground">{UI_TEXT.pathLlmModelDescription}</p>
                 <label className="flex flex-col gap-1">
@@ -415,9 +468,18 @@ export function DesktopSettingsSection({
         </div>
       </SettingsSectionCard>
 
-      <SettingsSectionCard title={UI_TEXT.aiInferenceGpu}>
+      <SettingsSectionCard
+        title={UI_TEXT.aiInferenceGpu}
+        advanced
+        className={hideAdvancedSettings ? "hidden" : undefined}
+      >
         <div className="space-y-3">
-          <div className="rounded-md border border-border/70 bg-background/40 p-3">
+          <div
+            className={cn(
+              settingsCustomOptionSurfaceClass("accent-stripe"),
+              "border-l-primary/70",
+            )}
+          >
             <h4 className="m-0 text-base font-medium text-foreground">GPU usage for AI inference</h4>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               Select GPU adapter.
@@ -445,7 +507,12 @@ export function DesktopSettingsSection({
               Important: see Windows configuration settings below.
             </p>
           </div>
-          <div className="rounded-md border border-border/70 bg-background/40 p-3">
+          <div
+            className={cn(
+              settingsCustomOptionSurfaceClass("accent-stripe"),
+              showWindowsGpuGuide && "border-l-primary/70",
+            )}
+          >
             <button
               type="button"
               className="flex w-full items-center gap-2 text-left"
@@ -484,7 +551,11 @@ export function DesktopSettingsSection({
         </div>
       </SettingsSectionCard>
 
-      <SettingsSectionCard title={UI_TEXT.wrongImageRotationDetection}>
+      <SettingsSectionCard
+        title={UI_TEXT.wrongImageRotationDetection}
+        advanced
+        className={hideAdvancedSettings ? "hidden" : undefined}
+      >
         <div className="space-y-3">
           <SettingsCheckboxField
             title={UI_TEXT.detectWrongImageRotationBeforePipelinesTitle}
@@ -537,89 +608,155 @@ export function DesktopSettingsSection({
             combined using RRF (Reciprocal Rank Fusion). The search prompt must be in English, but can be automatically
             translated.
           </p>
-          <SettingsNumberField
-            title="VLM (visual) similarity threshold"
-            description={`Why: Too low hides almost nothing; too high hides images that still look relevant.
-
-How: Cosine similarity between the query and the image embedding. Typical visual matches sit lower than text-to-text scores; adjust if too many or too few images are hidden.`}
-            value={aiImageSearchSettings.hideResultsBelowVlmSimilarity}
-            min={0}
-            max={1}
-            step={0.01}
-            onChange={(nextValue) =>
-              onAiImageSearchSettingChange("hideResultsBelowVlmSimilarity", nextValue)
-            }
-          />
-          <SettingsNumberField
-            title="AI description similarity threshold"
-            description={`Why: Captions can match your words even when the picture embedding does not.
-
-How: Cosine similarity between the query and the embedding built from AI title + description. Works when the written caption matches, even if the scene embedding is weak.`}
-            value={aiImageSearchSettings.hideResultsBelowDescriptionSimilarity}
-            min={0}
-            max={1}
-            step={0.01}
-            onChange={(nextValue) =>
-              onAiImageSearchSettingChange("hideResultsBelowDescriptionSimilarity", nextValue)
-            }
-          />
-          <SettingsCheckboxField
-            title="Advanced search — Translate search prompt to English if needed"
-            description={`Why: Non-English prompts hurt retrieval with the current text embedding pipeline.
-
-How: With **Advanced search** enabled (in the search panel), the app asks the local model for structured analysis and uses the returned English query for embedding when available. This does not depend on keyword re-ranking below. Shown as always on (display only).`}
-            checked={true}
-            disabled
-            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
-            onChange={() => {}}
-          />
-          <SettingsCheckboxField
-            title="Advanced search — Keyword match reranking"
-            description={`Experimental: When enabled, the AI search results are obtained in two steps:
-(1) Search prompt similarity comparison to visual [VLM] and/or text [AI description] embeddings
-(2) Results re-ranking based on semantic match of the search prompt and key words extracted by LLM from the prompt
-The re-ranking prioritizes showing first results that match all or most of keywords`}
-            checked={aiImageSearchSettings.keywordMatchReranking}
-            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
-            onChange={(next) => onAiImageSearchSettingChange("keywordMatchReranking", next)}
-          />
-          <SettingsNumberField
-            title="Advanced search — Keyword match threshold - VLM"
-            description={`Why: Visual keyword matches use a different similarity scale than text-to-text.
-
-How: Used only when **Keyword match reranking** is on. Minimum cosine between each keyword embedding and the image’s VLM embedding for a hit. Range 0–1. At **0**, the VLM limb does not count toward keyword hits (the AI description limb may still apply in hybrid).`}
-            value={aiImageSearchSettings.keywordMatchThresholdVlm}
-            min={0}
-            max={1}
-            step={0.01}
-            disabled={!aiImageSearchSettings.keywordMatchReranking}
-            onChange={(nextValue) =>
-              onAiImageSearchSettingChange("keywordMatchThresholdVlm", nextValue)
-            }
-          />
-          <SettingsNumberField
-            title="Advanced search — Keyword match threshold - AI Description"
-            description={`Why: Caption-to-keyword similarity behaves differently from VLM.
-
-How: Used only when **Keyword match reranking** is on. Minimum cosine between each keyword embedding and the AI title+description embedding for a hit. Range 0–1. At **0**, the description limb does not contribute. If **both** this and the VLM keyword threshold are **0**, keyword re-ranking is skipped (set at least one above 0).`}
-            value={aiImageSearchSettings.keywordMatchThresholdDescription}
-            min={0}
-            max={1}
-            step={0.01}
-            disabled={!aiImageSearchSettings.keywordMatchReranking}
-            onChange={(nextValue) =>
-              onAiImageSearchSettingChange("keywordMatchThresholdDescription", nextValue)
-            }
-          />
-          <SettingsCheckboxField
-            title="Show matching method selector in search filters"
-            description={`Why: The AI search uses a mix of visual similarity (VLM) and similarity to image description. This allows to control which of the two methods are used to compare results.
-
-How: When enabled, the AI image search panel shows a "Matching method" control next to Advanced search (hybrid vs VLM only vs description only). When off, search always uses the default combined ranking and visibility rules.`}
-            checked={aiImageSearchSettings.showMatchingMethodSelector}
-            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
-            onChange={(next) => onAiImageSearchSettingChange("showMatchingMethodSelector", next)}
-          />
+          <div
+            className={cn(
+              settingsCustomOptionSurfaceClass("accent-stripe"),
+              "border-l-primary/70",
+            )}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="m-0 text-base font-medium text-foreground">
+                    {UI_TEXT.aiImageSearchTranslationModelTitle}
+                  </h4>
+                </div>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                  {UI_TEXT.aiImageSearchTranslationModelDescription}
+                </p>
+              </div>
+              <input
+                type="text"
+                className="h-10 min-w-[260px] rounded-md border border-border bg-background px-2 text-sm text-foreground"
+                value={aiImageSearchSettings.searchPromptTranslationModel}
+                onChange={(event) =>
+                  onAiImageSearchSettingChange("searchPromptTranslationModel", event.target.value)
+                }
+                autoComplete="off"
+              />
+            </div>
+          </div>
+          {showAdvancedSettings ? (
+            <>
+              <SettingsNumberField
+                title="VLM (visual) similarity threshold"
+                description="Controls how strict visual-image matching is; raise it to hide weak visual matches or lower it when relevant images disappear."
+                value={aiImageSearchSettings.hideResultsBelowVlmSimilarity}
+                min={0}
+                max={1}
+                step={0.01}
+                advanced
+                onChange={(nextValue) =>
+                  onAiImageSearchSettingChange("hideResultsBelowVlmSimilarity", nextValue)
+                }
+              />
+              <SettingsNumberField
+                title="AI description similarity threshold"
+                description="Controls how strict title-and-description matching is; raise it to hide weak caption matches or lower it when caption wording is close but not exact."
+                value={aiImageSearchSettings.hideResultsBelowDescriptionSimilarity}
+                min={0}
+                max={1}
+                step={0.01}
+                advanced
+                onChange={(nextValue) =>
+                  onAiImageSearchSettingChange("hideResultsBelowDescriptionSimilarity", nextValue)
+                }
+              />
+              <div
+                className={cn(
+                  settingsCustomOptionSurfaceClass("accent-stripe"),
+                  aiImageSearchSettings.keywordMatchReranking && "border-l-primary/70",
+                )}
+              >
+                <div className="flex items-start gap-3">
+                  <input
+                    id={advancedSearchCheckboxId}
+                    type="checkbox"
+                    className={SETTINGS_OPTION_CHECKBOX_CLASS}
+                    checked={aiImageSearchSettings.keywordMatchReranking}
+                    onChange={(event) =>
+                      onAiImageSearchSettingChange("keywordMatchReranking", event.target.checked)
+                    }
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <label
+                        htmlFor={advancedSearchCheckboxId}
+                        className="m-0 cursor-pointer text-base font-medium text-foreground"
+                      >
+                        Experimental - Advanced search
+                      </label>
+                      <Star className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                      <button
+                        type="button"
+                        aria-label="Toggle description for Experimental - Advanced search"
+                        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border text-sm text-muted-foreground"
+                        onClick={() => setShowAdvancedSearchDescription((current) => !current)}
+                      >
+                        ?
+                      </button>
+                    </div>
+                    {showAdvancedSearchDescription ? (
+                      <div className="mt-1 whitespace-pre-line text-sm leading-6 text-muted-foreground">
+                        Uses the local LLM to extract important search concepts and can re-rank results that match more of those concepts.
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+                {aiImageSearchSettings.keywordMatchReranking ? (
+                  <div className="mt-3 space-y-3 border-t border-border/60 pt-3">
+                    <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="text-sm font-medium text-foreground">
+                        Keyword match threshold - VLM
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        className="h-9 w-32 rounded-md border border-border bg-background px-2 text-base"
+                        value={aiImageSearchSettings.keywordMatchThresholdVlm}
+                        onChange={(event) => {
+                          const next = Number(event.target.value);
+                          if (Number.isFinite(next)) {
+                            onAiImageSearchSettingChange("keywordMatchThresholdVlm", next);
+                          }
+                        }}
+                      />
+                    </label>
+                    <p className="m-0 text-xs text-muted-foreground">
+                      Minimum keyword-to-image-embedding cosine score for counting a visual keyword hit; set to 0 to ignore VLM keyword hits.
+                    </p>
+                    <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="text-sm font-medium text-foreground">
+                        Keyword match threshold - AI Description
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        className="h-9 w-32 rounded-md border border-border bg-background px-2 text-base"
+                        value={aiImageSearchSettings.keywordMatchThresholdDescription}
+                        onChange={(event) => {
+                          const next = Number(event.target.value);
+                          if (Number.isFinite(next)) {
+                            onAiImageSearchSettingChange(
+                              "keywordMatchThresholdDescription",
+                              next,
+                            );
+                          }
+                        }}
+                      />
+                    </label>
+                    <p className="m-0 text-xs text-muted-foreground">
+                      Minimum keyword-to-caption-embedding cosine score for counting a description keyword hit; set to 0 to ignore description keyword hits.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            </>
+          ) : null}
           <div className="pt-1">
             <button
               type="button"
@@ -630,8 +767,8 @@ How: When enabled, the AI image search panel shows a "Matching method" control n
                   DEFAULT_AI_IMAGE_SEARCH_SETTINGS.hideResultsBelowVlmSimilarity &&
                 aiImageSearchSettings.hideResultsBelowDescriptionSimilarity ===
                   DEFAULT_AI_IMAGE_SEARCH_SETTINGS.hideResultsBelowDescriptionSimilarity &&
-                aiImageSearchSettings.showMatchingMethodSelector ===
-                  DEFAULT_AI_IMAGE_SEARCH_SETTINGS.showMatchingMethodSelector &&
+                aiImageSearchSettings.searchPromptTranslationModel ===
+                  DEFAULT_AI_IMAGE_SEARCH_SETTINGS.searchPromptTranslationModel &&
                 aiImageSearchSettings.keywordMatchReranking ===
                   DEFAULT_AI_IMAGE_SEARCH_SETTINGS.keywordMatchReranking &&
                 aiImageSearchSettings.keywordMatchThresholdVlm ===
@@ -646,9 +783,18 @@ How: When enabled, the AI image search panel shows a "Matching method" control n
         </div>
       </SettingsSectionCard>
 
-      <SettingsSectionCard title={UI_TEXT.faceDetection}>
+      <SettingsSectionCard
+        title={UI_TEXT.faceDetection}
+        advanced
+        className={hideAdvancedSettings ? "hidden" : undefined}
+      >
         <div className="space-y-3">
-          <div className="rounded-md border border-border/70 bg-background/40 p-3">
+          <div
+            className={cn(
+              settingsCustomOptionSurfaceClass("accent-stripe"),
+              "border-l-primary/70",
+            )}
+          >
             <h4 className="m-0 text-base font-medium text-foreground">
               Face detection model
             </h4>
@@ -682,9 +828,7 @@ How: When enabled, the AI image search panel shows a "Matching method" control n
           </div>
           <SettingsNumberField
             title="Minimum confidence threshold"
-            description={`Why: Removes weak detections that are often false positives (patterns that look like faces).
-
-How: Each detected face gets a confidence score from 0 to 1; any score below this value is filtered out before saving results.`}
+            description="Filters out detected faces below this confidence score, which reduces false positives from patterns that only look like faces."
             value={faceDetectionSettings.minConfidenceThreshold}
             min={0}
             max={1}
@@ -695,9 +839,7 @@ How: Each detected face gets a confidence score from 0 to 1; any score below thi
           />
           <SettingsNumberField
             title="Minimum face box short-side ratio"
-            description={`Why: Ignores tiny face boxes that are usually too small for reliable tagging and matching.
-
-How: The detector compares the face box short side to the image short side; if that ratio is below this threshold, the face is discarded.`}
+            description="Discards face boxes whose short side is too small compared with the image, because very small faces are usually unreliable for tagging and matching."
             value={faceDetectionSettings.minFaceBoxShortSideRatio}
             min={0}
             max={1}
@@ -708,9 +850,7 @@ How: The detector compares the face box short side to the image short side; if t
           />
           <SettingsNumberField
             title="Face box overlap merge ratio"
-            description={`Why: Prevents one real face from being counted twice when two boxes overlap heavily.
-
-How: If overlap area is higher than this ratio (relative to either box), boxes are merged into one larger box and the best confidence/landmarks are kept.`}
+            description="Merges heavily overlapping face boxes so one real face is not counted twice; the best confidence and landmarks are kept."
             value={faceDetectionSettings.faceBoxOverlapMergeRatio}
             min={0}
             max={1}
@@ -722,9 +862,7 @@ How: If overlap area is higher than this ratio (relative to either box), boxes a
 
           <SettingsNumberField
             title="Main subject: min face size ratio vs. largest face"
-            description={`Why: In group shots the main subjects are usually larger than background faces. Filters like "images with two people" can then include photos where only two are main subjects and others are in the background.
-
-How: A face is classified as a "main subject" only if its short side is at least this fraction of the largest detected face's short side. Example: 0.5 means half as tall as the biggest face still counts as main; 1.0 means only the single largest face is main.`}
+            description='Classifies a face as a main subject only when its short side is at least this fraction of the largest face, helping filters like "images with two people" ignore small background faces.'
             value={faceDetectionSettings.mainSubjectMinSizeRatioToLargest}
             min={0}
             max={1}
@@ -738,9 +876,7 @@ How: A face is classified as a "main subject" only if its short side is at least
           />
           <SettingsNumberField
             title="Main subject: min area fraction of the image"
-            description={`Why: A secondary safeguard: when all detected faces are tiny (e.g. a crowd photo), none of them should be called "main".
-
-How: A face is classified as a main subject only if its bounding-box area is at least this fraction of the whole image area. 0.01 ≈ 1% of the image. Lower values make the rule more permissive.`}
+            description="Classifies a face as a main subject only if its box covers at least this fraction of the image, so crowd photos with only tiny faces do not get misleading main-subject counts."
             value={faceDetectionSettings.mainSubjectMinImageAreaRatio}
             min={0}
             max={1}
@@ -754,9 +890,7 @@ How: A face is classified as a main subject only if its bounding-box area is at 
           />
           <SettingsNumberField
             title="Preserve person tags on re-detection: min IoU"
-            description={`Why: When you re-run face detection on an image that already has tagged faces, the app matches each newly-detected face to the existing tagged faces so the tag is kept.
-
-How: Matching uses IoU (Intersection over Union). A pair matches only if IoU ≥ this value. 0 disables tag preservation (every run replaces all auto-detected faces).`}
+            description="When re-running face detection, existing tagged faces are kept only if a new face box overlaps them by at least this IoU value; 0 replaces all auto-detected faces."
             value={faceDetectionSettings.preserveTaggedFacesMinIoU}
             min={0}
             max={1}
@@ -770,9 +904,7 @@ How: Matching uses IoU (Intersection over Union). A pair matches only if IoU ≥
           />
           <SettingsCheckboxField
             title="Keep tagged faces even when the new detector misses them"
-            description={`Why: Models disagree. Switching to a less sensitive detector should not silently drop a face you already named.
-
-How: When on, previously-tagged face boxes with no newly-detected match are kept in the database. When off, re-running face detection replaces all auto-detected faces (any tag on an unmatched box is lost).`}
+            description="Keeps previously tagged face boxes even if a newly selected detector no longer finds them, preventing named people from disappearing after a re-run."
             checked={faceDetectionSettings.keepUnmatchedTaggedFaces}
             checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
             onChange={(next) =>
@@ -783,9 +915,7 @@ How: When on, previously-tagged face boxes with no newly-detected match are kept
           <AuxModelToggleRow
             title="Face landmark refinement"
             kind="landmarks"
-            description={`Why: Adds precise 5-point facial landmarks (eyes, nose, mouth corners) on top of YOLO detections. Landmarks enable more accurate face alignment, similarity matching and rotation estimation from faces.
-
-How: Runs a tiny PFLD-GhostOne model on each detected face crop and reduces its 98 landmarks to 5 canonical points.`}
+            description="Adds precise eye, nose, and mouth landmarks on top of YOLO detections for better face alignment, similarity matching, and rotation estimation."
             enabled={faceDetectionSettings.faceLandmarkRefinement.enabled}
             modelId={faceDetectionSettings.faceLandmarkRefinement.model}
             onEnabledChange={(enabled) =>
@@ -804,9 +934,7 @@ How: Runs a tiny PFLD-GhostOne model on each detected face crop and reduces its 
           <AuxModelToggleRow
             title="Face age & gender estimation"
             kind="age-gender"
-            description={`Why: Populates estimated age and gender for each detected face to power search and filter features.
-
-How: Runs a lightweight ONNX classifier on each detected face crop. Estimates are approximate and stored alongside the face record.`}
+            description="Stores approximate age and gender estimates for each detected face using a lightweight local ONNX classifier."
             enabled={faceDetectionSettings.faceAgeGenderDetection.enabled}
             modelId={faceDetectionSettings.faceAgeGenderDetection.model}
             onEnabledChange={(enabled) =>
@@ -863,13 +991,15 @@ How: Runs a lightweight ONNX classifier on each detected face crop. Estimates ar
         </div>
       </SettingsSectionCard>
 
-      <SettingsSectionCard title={UI_TEXT.faceRecognition}>
+      <SettingsSectionCard
+        title={UI_TEXT.faceRecognition}
+        advanced
+        className={hideAdvancedSettings ? "hidden" : undefined}
+      >
         <div className="space-y-3">
           <SettingsNumberField
             title="Similarity threshold for suggesting a person"
-            description={`Why: Controls how close an untagged face must be to someone you already named before the app suggests that person (for example in “similar faces” hints).
-
-How: Uses a similarity score from 0 to 1. Lower values show more suggestions (including more mistakes); higher values are stricter and may miss real matches.`}
+            description="Controls how similar an untagged face must be to a named person before the app suggests that person; lower values show more suggestions, higher values are stricter."
             value={faceDetectionSettings.faceRecognitionSimilarityThreshold}
             min={0}
             max={1}
@@ -880,9 +1010,7 @@ How: Uses a similarity score from 0 to 1. Lower values show more suggestions (in
           />
           <SettingsNumberField
             title="How similar two faces must look to join the same group"
-            description={`Why: The app can bundle untagged faces into draft groups so you can name many at once. This controls how “alike” two faces must be to end up in the same draft group. Lower values create larger, broader groups (more mixing of different people); higher values keep groups smaller and tighter.
-
-How: Uses a similarity score from 0 to 1 between two face signatures. Only used when you run grouping—not when detecting faces in a single photo.`}
+            description="Controls how alike two untagged faces must be to enter the same draft group; lower values create larger broader groups, higher values keep groups smaller and tighter."
             value={faceDetectionSettings.faceGroupPairwiseSimilarityThreshold}
             min={0}
             max={1}
@@ -893,9 +1021,7 @@ How: Uses a similarity score from 0 to 1 between two face signatures. Only used 
           />
           <SettingsNumberField
             title="Minimum faces in a suggested group"
-            description={`Why: Very small groups are often noise or one-off detections; requiring a few faces together keeps the Untagged list easier to work through.
-
-How: After you click “Find groups” under People → Untagged faces, any draft group with fewer than this many faces is dropped and those faces stay ungrouped until the next time you run Find groups.`}
+            description="Drops draft face groups smaller than this after “Find groups”, keeping one-off detections out of the grouped Untagged list."
             value={faceDetectionSettings.faceGroupMinSize}
             min={2}
             max={500}
@@ -930,7 +1056,12 @@ How: After you click “Find groups” under People → Untagged faces, any draf
 
       <SettingsSectionCard title={UI_TEXT.photoAnalysis}>
         <div className="space-y-3">
-          <div className="rounded-md border border-border/70 bg-background/40 p-3">
+          <div
+            className={cn(
+              settingsCustomOptionSurfaceClass("accent-stripe"),
+              "border-l-primary/70",
+            )}
+          >
             <h4 className="m-0 text-base font-medium text-foreground">{UI_TEXT.folderIconWhenPhotoPendingTitle}</h4>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               {UI_TEXT.folderIconWhenPhotoPendingDescription}
@@ -981,11 +1112,18 @@ How: After you click “Find groups” under People → Untagged faces, any draf
               ))}
             </div>
           </div>
-          <div className="rounded-md border border-border/70 bg-background/40 p-3">
+          {showAdvancedSettings ? (
+          <div
+            className={cn(
+              settingsCustomOptionSurfaceClass("accent-stripe"),
+              "border-l-primary/70",
+            )}
+          >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <h4 className="m-0 text-base font-medium text-foreground">{UI_TEXT.photoAnalysisModelTitle}</h4>
+                  <Star className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
                   <button
                     type="button"
                     aria-label={`Toggle description for ${UI_TEXT.photoAnalysisModelTitle}`}
@@ -1012,15 +1150,16 @@ How: After you click “Find groups” under People → Untagged faces, any draf
               />
             </div>
           </div>
+          ) : null}
+          {showAdvancedSettings ? (
           <SettingsNumberField
             title="Analysis timed out per image (seconds)"
-            description={`Why: Stops one stuck image from blocking the rest of a batch indefinitely.
-
-How: If analysis of a single image exceeds this many seconds, it is marked failed (timeout).`}
+            description="Marks a single image as failed if the local AI model spends longer than this many seconds analyzing it."
             value={photoAnalysisSettings.analysisTimeoutPerImageSec}
             min={10}
             max={1800}
             step={1}
+            advanced
             onChange={(nextValue) =>
               onPhotoAnalysisSettingChange(
                 "analysisTimeoutPerImageSec",
@@ -1028,7 +1167,14 @@ How: If analysis of a single image exceeds this many seconds, it is marked faile
               )
             }
           />
-          <div className="rounded-md border border-border/70 bg-background/40 p-3">
+          ) : null}
+          {showAdvancedSettings ? (
+          <div
+            className={cn(
+              settingsCustomOptionSurfaceClass("accent-stripe"),
+              photoAnalysisSettings.downscaleBeforeLlm && "border-l-primary/70",
+            )}
+          >
             <div className="flex items-start gap-3">
               <input
                 id={photoDownscaleCheckboxId}
@@ -1047,6 +1193,7 @@ How: If analysis of a single image exceeds this many seconds, it is marked faile
                   >
                     {UI_TEXT.photoAnalysisDownscaleTitle}
                   </label>
+                  <Star className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
                   <button
                     type="button"
                     aria-label={`Toggle description for ${UI_TEXT.photoAnalysisDownscaleTitle}`}
@@ -1102,6 +1249,7 @@ How: If analysis of a single image exceeds this many seconds, it is marked faile
               </div>
             ) : null}
           </div>
+          ) : null}
           <SettingsCheckboxField
             title={UI_TEXT.extractInvoiceDataTitle}
             description={UI_TEXT.extractInvoiceDataDescription}
@@ -1135,6 +1283,7 @@ How: If analysis of a single image exceeds this many seconds, it is marked faile
             </button>
           </div>
         </div>
+        {showAdvancedSettings ? (
         <details className="mt-2.5 border-t border-border pt-2">
           <summary className="cursor-pointer select-none text-sm text-muted-foreground">
             {UI_TEXT.photoAnalysisPromptTitle} (version {PHOTO_ANALYSIS_PROMPT_VERSION}) - matches
@@ -1144,6 +1293,8 @@ How: If analysis of a single image exceeds this many seconds, it is marked faile
             {PHOTO_ANALYSIS_PROMPT}
           </pre>
         </details>
+        ) : null}
+        {showAdvancedSettings ? (
         <details className="mt-2.5 border-t border-border pt-2">
           <summary className="cursor-pointer select-none text-sm text-muted-foreground">
             {UI_TEXT.invoicePromptTitle} (version {INVOICE_DATA_EXTRACTION_PROMPT_VERSION})
@@ -1152,29 +1303,54 @@ How: If analysis of a single image exceeds this many seconds, it is marked faile
             {INVOICE_DATA_EXTRACTION_PROMPT}
           </pre>
         </details>
+        ) : null}
       </SettingsSectionCard>
 
-      <SettingsSectionCard title={UI_TEXT.databaseLocation}>
+      <SettingsSectionCard
+        title={UI_TEXT.databaseLocation}
+        advanced
+        className={hideAdvancedSettings ? "hidden" : undefined}
+      >
         <div className="space-y-2">
-          <div className="rounded-md border border-border/70 bg-background/40 p-3">
+          <div
+            className={cn(
+              settingsCustomOptionSurfaceClass("accent-stripe"),
+              "border-l-primary/70",
+            )}
+          >
             <p className="m-0 text-sm text-muted-foreground">{UI_TEXT.databaseFolder}</p>
             <p className="mt-1 break-all font-mono text-sm text-foreground">
               {databaseLocation?.userDataPath ?? UI_TEXT.notAvailable}
             </p>
           </div>
-          <div className="rounded-md border border-border/70 bg-background/40 p-3">
+          <div
+            className={cn(
+              settingsCustomOptionSurfaceClass("accent-stripe"),
+              "border-l-primary/70",
+            )}
+          >
             <p className="m-0 text-sm text-muted-foreground">{UI_TEXT.databaseFile}</p>
             <p className="mt-1 break-all font-mono text-sm text-foreground">
               {databaseLocation?.dbPath ?? UI_TEXT.notAvailable}
             </p>
           </div>
-          <div className="rounded-md border border-border/70 bg-background/40 p-3">
+          <div
+            className={cn(
+              settingsCustomOptionSurfaceClass("accent-stripe"),
+              "border-l-primary/70",
+            )}
+          >
             <p className="m-0 text-sm text-muted-foreground">{UI_TEXT.modelsPath}</p>
             <p className="mt-1 break-all font-mono text-sm text-foreground">
               {databaseLocation?.modelsPath ?? UI_TEXT.notAvailable}
             </p>
           </div>
-          <div className="rounded-md border border-border/70 bg-background/40 p-3">
+          <div
+            className={cn(
+              settingsCustomOptionSurfaceClass("accent-stripe"),
+              "border-l-primary/70",
+            )}
+          >
             <p className="m-0 text-sm text-muted-foreground">{UI_TEXT.cachePath}</p>
             <p className="mt-1 break-all font-mono text-sm text-foreground">
               {databaseLocation?.cachePath ?? UI_TEXT.notAvailable}
@@ -1196,6 +1372,19 @@ interface AuxModelToggleRowProps {
   onModelChange: (next: AuxModelId) => void;
 }
 
+function auxModelCheckboxDescription(
+  conceptual: string,
+  option: AuxModelOption | undefined,
+): string {
+  const trimmed = conceptual.trim();
+  if (!option) {
+    return trimmed;
+  }
+  const modelLine =
+    `Model: ${option.label} (~${option.approxSizeMb} MB). ${option.description} ${option.licenseNote}`.trim();
+  return `${trimmed}\n\n${modelLine}`;
+}
+
 function AuxModelToggleRow({
   title,
   kind,
@@ -1211,60 +1400,52 @@ function AuxModelToggleRow({
   const activeOption = optionsForKind.find((o) => o.id === modelId);
 
   return (
-    <div className="rounded-md border border-border/70 bg-background/40 p-3">
-      <div className="flex flex-col gap-2">
-        <SettingsCheckboxField
-          title={title}
-          description={description}
-          checked={enabled}
-          checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
-          onChange={(next) => {
-            onEnabledChange(next);
-            if (next) {
-              void window.desktopApi
-                .ensureAuxModel(kind, modelId)
-                .catch(() => {
+    <>
+      <SettingsCheckboxField
+        title={title}
+        description={auxModelCheckboxDescription(description, activeOption)}
+        checked={enabled}
+        checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+        onChange={(next) => {
+          onEnabledChange(next);
+          if (next) {
+            void window.desktopApi
+              .ensureAuxModel(kind, modelId)
+              .catch(() => {
+                // Errors surface via the face-model-download-progress channel
+              });
+          }
+        }}
+      />
+      {optionsForKind.length > 1 ? (
+        <div
+          className={cn(
+            settingsCustomOptionSurfaceClass("accent-stripe"),
+            enabled && "border-l-primary/70",
+          )}
+        >
+          <select
+            className="h-9 min-w-[260px] rounded-md border border-border bg-background px-2 text-sm text-foreground"
+            value={modelId}
+            disabled={!enabled}
+            onChange={(event) => {
+              const nextId = event.target.value as AuxModelId;
+              onModelChange(nextId);
+              if (enabled) {
+                void window.desktopApi.ensureAuxModel(kind, nextId).catch(() => {
                   // Errors surface via the face-model-download-progress channel
                 });
-            }
-          }}
-        />
-        {optionsForKind.length > 1 ? (
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <select
-              className="h-9 min-w-[260px] rounded-md border border-border bg-background px-2 text-sm text-foreground"
-              value={modelId}
-              disabled={!enabled}
-              onChange={(event) => {
-                const nextId = event.target.value as AuxModelId;
-                onModelChange(nextId);
-                if (enabled) {
-                  void window.desktopApi.ensureAuxModel(kind, nextId).catch(() => {
-                    // Errors surface via the face-model-download-progress channel
-                  });
-                }
-              }}
-            >
-              {optionsForKind.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label} (~{option.approxSizeMb} MB)
-                </option>
-              ))}
-            </select>
-            {activeOption ? (
-              <p className="m-0 text-xs text-muted-foreground">
-                {activeOption.description} {activeOption.licenseNote}
-              </p>
-            ) : null}
-          </div>
-        ) : activeOption ? (
-          <p className="m-0 text-xs text-muted-foreground">
-            Model: <span className="font-medium">{activeOption.label}</span> (~
-            {activeOption.approxSizeMb} MB). {activeOption.description}{" "}
-            {activeOption.licenseNote}
-          </p>
-        ) : null}
-      </div>
-    </div>
+              }
+            }}
+          >
+            {optionsForKind.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label} (~{option.approxSizeMb} MB)
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
+    </>
   );
 }

@@ -11,6 +11,7 @@ interface SettingsSectionCardProps {
   children?: ReactNode;
   defaultOpen?: boolean;
   className?: string;
+  advanced?: boolean;
 }
 
 const SETTINGS_SECTION_CARD_CLASS =
@@ -20,11 +21,53 @@ const SETTINGS_SECTION_HEADER_CLASS =
 const SETTINGS_SECTION_BODY_CLASS = "mt-3 px-4 pb-4";
 const SETTINGS_FIELD_SURFACE_CLASS = "rounded-md border border-border/70 bg-background/40 p-3";
 
+export type SettingsOptionSurfaceVariant = "default" | "soft-selected" | "accent-stripe" | "muted";
+
+function settingsOptionSurfaceClass(
+  variant: SettingsOptionSurfaceVariant,
+  selected = false,
+): string {
+  if (variant === "soft-selected") {
+    return "rounded-md border border-primary/45 bg-primary/10 p-3";
+  }
+  if (variant === "accent-stripe") {
+    return joinClasses(
+      "rounded-md border border-border/70 border-l-4 bg-background/40 p-3",
+      selected ? "border-l-primary/70" : "border-l-border",
+    );
+  }
+  if (variant === "muted") {
+    return "rounded-md border border-border/70 bg-muted/20 p-3";
+  }
+  return SETTINGS_FIELD_SURFACE_CLASS;
+}
+
+function AdvancedSettingsStar(): ReactElement {
+  return (
+    <svg
+      aria-label="Advanced setting"
+      role="img"
+      viewBox="0 0 16 16"
+      className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M8 1.7L9.75 5.5L13.9 6L10.82 8.83L11.64 12.95L8 10.9L4.36 12.95L5.18 8.83L2.1 6L6.25 5.5L8 1.7Z"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function SettingsSectionCard({
   title,
   children,
   defaultOpen = false,
   className,
+  advanced = false,
 }: SettingsSectionCardProps): ReactElement {
   return (
     <details
@@ -46,6 +89,7 @@ export function SettingsSectionCard({
           </svg>
         </span>
         <span>{title}</span>
+        {advanced ? <AdvancedSettingsStar /> : null}
       </summary>
       <div className={SETTINGS_SECTION_BODY_CLASS}>{children}</div>
     </details>
@@ -61,6 +105,8 @@ interface SettingsNumberFieldProps {
   step?: number;
   onChange: (nextValue: number) => void;
   disabled?: boolean;
+  advanced?: boolean;
+  surfaceVariant?: SettingsOptionSurfaceVariant;
 }
 
 export function SettingsNumberField({
@@ -72,6 +118,8 @@ export function SettingsNumberField({
   step = 0.01,
   onChange,
   disabled = false,
+  advanced = false,
+  surfaceVariant = "accent-stripe",
 }: SettingsNumberFieldProps): ReactElement {
   const [inputValue, setInputValue] = useState(() => String(value));
   const [showDescription, setShowDescription] = useState(false);
@@ -98,7 +146,7 @@ export function SettingsNumberField({
   return (
     <div
       className={joinClasses(
-        SETTINGS_FIELD_SURFACE_CLASS,
+        settingsOptionSurfaceClass(surfaceVariant, !disabled),
         disabled && "opacity-50",
       )}
     >
@@ -106,6 +154,7 @@ export function SettingsNumberField({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h4 className="m-0 text-base font-medium text-foreground">{title}</h4>
+            {advanced ? <AdvancedSettingsStar /> : null}
             <button
               type="button"
               aria-label={`Toggle description for ${title}`}
@@ -155,6 +204,8 @@ interface SettingsCheckboxFieldProps {
   checkboxClassName: string;
   /** When set, the control is non-interactive (e.g. informational fixed policy). */
   disabled?: boolean;
+  advanced?: boolean;
+  surfaceVariant?: SettingsOptionSurfaceVariant;
 }
 
 export function SettingsCheckboxField({
@@ -164,12 +215,14 @@ export function SettingsCheckboxField({
   onChange,
   checkboxClassName,
   disabled = false,
+  advanced = false,
+  surfaceVariant = "accent-stripe",
 }: SettingsCheckboxFieldProps): ReactElement {
   const [showDescription, setShowDescription] = useState(false);
   const fieldId = useId();
 
   return (
-    <div className={SETTINGS_FIELD_SURFACE_CLASS}>
+    <div className={settingsOptionSurfaceClass(surfaceVariant, checked)}>
       <div className="flex items-start gap-3">
         <input
           id={fieldId}
@@ -191,6 +244,7 @@ export function SettingsCheckboxField({
             >
               {title}
             </label>
+            {advanced ? <AdvancedSettingsStar /> : null}
             <button
               type="button"
               aria-label={`Toggle description for ${title}`}

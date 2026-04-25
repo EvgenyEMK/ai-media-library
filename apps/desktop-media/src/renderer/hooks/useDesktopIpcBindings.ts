@@ -105,6 +105,7 @@ export function useDesktopInitialization(): void {
           s.clientId = settings.clientId;
           s.libraryRoots = settings.libraryRoots;
           s.sidebarCollapsed = settings.sidebarCollapsed;
+          s.hideAdvancedSettings = settings.hideAdvancedSettings;
           s.wrongImageRotationDetectionSettings = settings.wrongImageRotationDetection;
           s.faceDetectionSettings = settings.faceDetection;
           s.photoAnalysisSettings = {
@@ -297,6 +298,7 @@ export function useDesktopSettingsPersistence(): void {
             prev.photoAnalysisSettings.extractInvoiceData ||
           state.photoAnalysisSettings.folderIconWhenPhotoAnalysisPending !==
             prev.photoAnalysisSettings.folderIconWhenPhotoAnalysisPending ||
+          state.hideAdvancedSettings !== prev.hideAdvancedSettings ||
           state.folderScanningSettings.showFolderAiSummaryWhenSelectingEmptyFolder !==
             prev.folderScanningSettings.showFolderAiSummaryWhenSelectingEmptyFolder ||
           state.folderScanningSettings.autoMetadataScanOnSelectMaxFiles !==
@@ -309,8 +311,8 @@ export function useDesktopSettingsPersistence(): void {
             prev.aiImageSearchSettings.hideResultsBelowVlmSimilarity ||
           state.aiImageSearchSettings.hideResultsBelowDescriptionSimilarity !==
             prev.aiImageSearchSettings.hideResultsBelowDescriptionSimilarity ||
-          state.aiImageSearchSettings.showMatchingMethodSelector !==
-            prev.aiImageSearchSettings.showMatchingMethodSelector ||
+          state.aiImageSearchSettings.searchPromptTranslationModel !==
+            prev.aiImageSearchSettings.searchPromptTranslationModel ||
           state.aiImageSearchSettings.keywordMatchReranking !==
             prev.aiImageSearchSettings.keywordMatchReranking ||
           state.aiImageSearchSettings.keywordMatchThresholdVlm !==
@@ -335,6 +337,7 @@ export function useDesktopSettingsPersistence(): void {
             clientId: state.clientId,
             libraryRoots: state.libraryRoots,
             sidebarCollapsed: state.sidebarCollapsed,
+            hideAdvancedSettings: state.hideAdvancedSettings,
             wrongImageRotationDetection: state.wrongImageRotationDetectionSettings,
             faceDetection: state.faceDetectionSettings,
             photoAnalysis: state.photoAnalysisSettings,

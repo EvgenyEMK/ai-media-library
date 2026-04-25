@@ -85,7 +85,7 @@ export const UI_TEXT = {
   onlyIfMissing: "Only if missing",
   allPhotos: "All images",
   semanticPanelTitle: "AI image search",
-  semanticSearchPlaceholder: "e.g. Bald man with a woman on a beach...",
+  semanticSearchPlaceholder: "e.g. Lady in white dress near piano",
   semanticSearch: "Search",
   semanticSearchSignalModeLabel: "Matching method",
   semanticSearchSignalHybrid: "VLM + Description",

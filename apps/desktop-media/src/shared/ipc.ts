@@ -170,6 +170,7 @@ export interface AiInferenceGpuOption {
 export interface AppSettings {
   libraryRoots: string[];
   sidebarCollapsed: boolean;
+  hideAdvancedSettings: boolean;
   wrongImageRotationDetection: WrongImageRotationDetectionSettings;
   faceDetection: FaceDetectionSettings;
   photoAnalysis: PhotoAnalysisSettings;
@@ -449,11 +450,8 @@ export interface AiImageSearchSettings {
   hideResultsBelowVlmSimilarity: number;
   /** Cosine similarity vs AI title+description text embedding; paired with VLM threshold for display filter. */
   hideResultsBelowDescriptionSimilarity: number;
-  /**
-   * When true, the AI image search panel shows the VLM / description matching-method selector.
-   * Default off (comparison testing only).
-   */
-  showMatchingMethodSelector: boolean;
+  /** Exact Ollama model id used for search-prompt translation / query understanding. */
+  searchPromptTranslationModel: string;
   /**
    * When true, Advanced search re-orders results using LLM keyword hits (after RRF).
    * When false, keyword thresholds below are ignored and re-ranking is skipped.
@@ -521,7 +519,7 @@ export const DEFAULT_FOLDER_SCANNING_SETTINGS: FolderScanningSettings = {
 export const DEFAULT_AI_IMAGE_SEARCH_SETTINGS: AiImageSearchSettings = {
   hideResultsBelowVlmSimilarity: 0.04,
   hideResultsBelowDescriptionSimilarity: 0.6,
-  showMatchingMethodSelector: false,
+  searchPromptTranslationModel: "qwen2.5vl:3b",
   keywordMatchReranking: false,
   keywordMatchThresholdVlm: 0.05,
   keywordMatchThresholdDescription: 0.5,
@@ -542,6 +540,7 @@ export const DEFAULT_MEDIA_VIEWER_SETTINGS: MediaViewerSettings = {
 export const DEFAULT_APP_SETTINGS: Omit<AppSettings, "clientId"> = {
   libraryRoots: [],
   sidebarCollapsed: false,
+  hideAdvancedSettings: true,
   wrongImageRotationDetection: DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS,
   faceDetection: DEFAULT_FACE_DETECTION_SETTINGS,
   photoAnalysis: DEFAULT_PHOTO_ANALYSIS_SETTINGS,
@@ -1651,6 +1650,8 @@ export interface DesktopApi {
     /** Case-insensitive substring match across country, city, area, place, location name. */
     locationQuery?: string;
     advancedSearch?: boolean;
+    translateToEnglish?: boolean;
+    queryAnalysisModel?: string;
     /** Grid visibility: min VLM cosine (`hideResultsBelowVlmSimilarity`). */
     vlmSimilarityThreshold?: number;
     /** Grid visibility: min AI-description cosine (`hideResultsBelowDescriptionSimilarity`). */

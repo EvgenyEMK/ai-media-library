@@ -21,9 +21,12 @@ interface SemanticSearchPanelProps {
 
 const scopeLabelClass = (active: boolean): string =>
   cn(
-    "flex cursor-pointer select-none items-center gap-1 text-xs text-[#c8d6f0] has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-40",
-    active && "font-medium text-white",
+    "flex cursor-pointer select-none items-center gap-1 text-xs text-ai-search-text/80 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-40",
+    active && "font-medium text-ai-search-text",
   );
+
+const panelButtonClass =
+  "inline-flex h-9 items-center justify-center rounded-md border border-ai-search-border bg-ai-search-control px-3 text-sm text-ai-search-text shadow-none transition-colors hover:border-ai-search-accent/60 hover:bg-ai-search-control/80 disabled:cursor-not-allowed disabled:opacity-45";
 
 export function SemanticSearchPanel({
   onSearch,
@@ -37,13 +40,13 @@ export function SemanticSearchPanel({
   const hideDesc = useDesktopStore(
     (s) => s.aiImageSearchSettings.hideResultsBelowDescriptionSimilarity,
   );
-  const showMatchingMethodSelector = useDesktopStore(
-    (s) => s.aiImageSearchSettings.showMatchingMethodSelector,
+  const experimentalAdvancedSearch = useDesktopStore(
+    (s) => s.aiImageSearchSettings.keywordMatchReranking,
   );
   const semanticSearchScope = useDesktopStore((s) => s.semanticSearchScope);
   const semanticPersonTagIds = useDesktopStore((s) => s.semanticPersonTagIds);
   const semanticIncludeUnconfirmedFaces = useDesktopStore((s) => s.semanticIncludeUnconfirmedFaces);
-  const semanticAdvancedSearch = useDesktopStore((s) => s.semanticAdvancedSearch);
+  const semanticTranslateToEnglish = useDesktopStore((s) => s.semanticTranslateToEnglish);
   const semanticSearchSignalMode = useDesktopStore((s) => s.semanticSearchSignalMode);
   const selectedFolder = useDesktopStore((s) => s.selectedFolder);
   const semanticPanelOpen = useDesktopStore((s) => s.semanticPanelOpen);
@@ -89,7 +92,7 @@ export function SemanticSearchPanel({
 
   const hasFolderScope = semanticSearchScope !== "global";
 
-  const effectiveSearchSignalMode = showMatchingMethodSelector
+  const effectiveSearchSignalMode = experimentalAdvancedSearch
     ? semanticSearchSignalMode
     : "hybrid";
 
@@ -109,14 +112,14 @@ export function SemanticSearchPanel({
         : semanticStatus;
 
   return (
-    <section className="shrink-0 border-b border-border px-4 py-2.5">
+    <section className="shrink-0 border-b border-ai-search-border bg-ai-search-panel px-4 py-2.5 text-ai-search-text">
       <div className="flex items-center justify-between gap-3">
         <h2 className="m-0 text-sm font-semibold">{UI_TEXT.semanticPanelTitle}</h2>
         <div className="analysis-header-actions flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">{statusLabel}</span>
+          <span className="text-sm text-ai-search-muted">{statusLabel}</span>
           <button
             type="button"
-            className="border-0 bg-transparent p-1 shadow-none"
+            className="border-0 bg-transparent p-1 text-ai-search-text shadow-none hover:bg-ai-search-control/70"
             title={UI_TEXT.semanticClose}
             aria-label={UI_TEXT.semanticClose}
             onClick={() => store.getState().setSemanticPanelOpen(false)}
@@ -133,14 +136,20 @@ export function SemanticSearchPanel({
             onChange={(event) => store.getState().setSemanticQuery(event.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={UI_TEXT.semanticSearchPlaceholder}
-            className="min-w-0 flex-1 rounded-md border border-input bg-secondary px-3 py-1.5 text-left text-[15px] shadow-none"
+            className="min-w-0 flex-1 rounded-md border border-ai-search-border bg-ai-search-control px-3 py-1.5 text-left text-[15px] text-ai-search-text shadow-none placeholder:text-ai-search-muted/75 focus:border-ai-search-accent focus:outline-none focus:ring-1 focus:ring-ai-search-accent/45"
           />
           <div className="relative flex shrink-0 gap-2">
-            <button type="button" onClick={onSearch} disabled={semanticSearching || !semanticQuery.trim()}>
+            <button
+              type="button"
+              className={panelButtonClass}
+              onClick={onSearch}
+              disabled={semanticSearching || !semanticQuery.trim()}
+            >
               {UI_TEXT.semanticSearch}
             </button>
             <button
               type="button"
+              className={panelButtonClass}
               onClick={() => {
                 store.setState((s) => {
                   s.semanticResults = [];
@@ -156,11 +165,11 @@ export function SemanticSearchPanel({
 
         <div className="flex flex-wrap items-center justify-start gap-x-2 gap-y-1">
           <div
-            className="m-0 flex min-w-0 flex-[0_1_auto] flex-wrap items-center gap-x-3 gap-y-1.5 border-0 p-0 text-xs text-muted-foreground"
+            className="m-0 flex min-w-0 flex-[0_1_auto] flex-wrap items-center gap-x-3 gap-y-1.5 border-0 p-0 text-xs text-ai-search-muted"
             role="radiogroup"
             aria-labelledby="semantic-search-scope-label"
           >
-            <span id="semantic-search-scope-label" className="m-0 mr-2 shrink-0 p-0 text-xs leading-relaxed text-muted-foreground">
+            <span id="semantic-search-scope-label" className="m-0 mr-2 shrink-0 p-0 text-xs leading-relaxed text-ai-search-muted">
               Scope
             </span>
             <label className={scopeLabelClass(semanticSearchScope === "global")}>
@@ -206,29 +215,36 @@ export function SemanticSearchPanel({
             </label>
           </div>
 
-          <span className="mx-2.5 ml-3.5 h-5 w-px shrink-0 self-center bg-[#3a4a6a]" aria-hidden="true" />
+          <span className="mx-2.5 ml-3.5 h-5 w-px shrink-0 self-center bg-ai-search-border" aria-hidden="true" />
 
-          <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+          <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-ai-search-text/80">
             <input
               type="checkbox"
-              className="cursor-pointer accent-[#6e9fff]"
-              checked={semanticAdvancedSearch}
-              onChange={(e) => store.getState().setSemanticAdvancedSearch(e.target.checked)}
+              className="cursor-pointer accent-ai-search-accent"
+              checked={semanticTranslateToEnglish}
+              onChange={(e) => store.getState().setSemanticTranslateToEnglish(e.target.checked)}
             />
-            <span>Advanced search</span>
+            <span>Translate to English</span>
+            <span
+              className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-ai-search-border text-[11px] text-ai-search-muted"
+              title="Search prompts work best in English; when enabled, Ollama translates other languages before searching."
+              aria-label="Search prompts work best in English; when enabled, Ollama translates other languages before searching."
+            >
+              ?
+            </span>
           </label>
 
-          {showMatchingMethodSelector ? (
+          {experimentalAdvancedSearch ? (
             <>
               <span
-                className="mx-2.5 ml-3.5 h-5 w-px shrink-0 self-center bg-[#3a4a6a]"
+                className="mx-2.5 ml-3.5 h-5 w-px shrink-0 self-center bg-ai-search-border"
                 aria-hidden="true"
               />
 
-              <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+              <label className="flex shrink-0 items-center gap-1.5 text-xs text-ai-search-text/80">
                 <span className="shrink-0">{UI_TEXT.semanticSearchSignalModeLabel}</span>
                 <select
-                  className="max-w-[11.5rem] cursor-pointer rounded border border-input bg-secondary px-1.5 py-0.5 text-xs shadow-none"
+                  className="max-w-[11.5rem] cursor-pointer rounded border border-ai-search-border bg-ai-search-control px-1.5 py-0.5 text-xs text-ai-search-text shadow-none focus:border-ai-search-accent focus:outline-none focus:ring-1 focus:ring-ai-search-accent/45"
                   aria-label={UI_TEXT.semanticSearchSignalModeLabel}
                   value={semanticSearchSignalMode}
                   onChange={(e) =>
@@ -251,10 +267,10 @@ export function SemanticSearchPanel({
         />
 
         {semanticPersonTagIds.length > 0 ? (
-          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-ai-search-text/80">
             <input
               type="checkbox"
-              className="cursor-pointer accent-[#6e9fff]"
+              className="cursor-pointer accent-ai-search-accent"
               checked={semanticIncludeUnconfirmedFaces}
               onChange={(e) =>
                 store.getState().setSemanticIncludeUnconfirmedFaces(e.target.checked)
