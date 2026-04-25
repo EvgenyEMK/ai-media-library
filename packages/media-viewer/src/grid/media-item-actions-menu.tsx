@@ -1,19 +1,31 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactElement } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactElement,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
 
 interface ActionItem {
   id: string;
   label: string;
-  icon?: string;
+  icon?: ReactNode;
+  trailingIcon?: ReactNode;
   disabled?: boolean;
   onSelect?: () => void;
+  closeOnSelect?: boolean;
 }
 
 interface MediaItemActionsMenuProps {
   actions: ActionItem[];
   buttonTitle?: string;
   onOpenChange?: (open: boolean) => void;
+  renderContent?: (context: { closeMenu: () => void }) => ReactNode;
 }
 
 const styles: Record<string, CSSProperties> = {
@@ -45,7 +57,7 @@ const styles: Record<string, CSSProperties> = {
     border: "1px solid #334155",
     background: "#0f172a",
     boxShadow: "0 10px 24px rgba(2, 6, 23, 0.5)",
-    zIndex: 40,
+    zIndex: 1000,
   },
   item: {
     width: "100%",
@@ -53,10 +65,29 @@ const styles: Record<string, CSSProperties> = {
     background: "transparent",
     color: "#e2e8f0",
     textAlign: "left",
-    padding: "8px 10px",
+    padding: "10px 12px",
     borderRadius: 6,
     cursor: "pointer",
-    fontSize: 13,
+    fontSize: 15,
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+  },
+  itemLabel: {
+    flex: "1 1 auto",
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  itemTrailingIcon: {
+    flex: "0 0 auto",
+    display: "inline-flex",
+    alignItems: "center",
+    color: "#cbd5e1",
+  },
+  itemHover: {
+    background: "#1e293b",
   },
   itemDisabled: {
     opacity: 0.5,
@@ -64,18 +95,56 @@ const styles: Record<string, CSSProperties> = {
   },
 };
 
+function ArrowRightIcon(): ReactElement {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <path
+        d="M6 3.5L10.5 8L6 12.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function MediaItemActionsMenu({
   actions,
   buttonTitle = "Open media item actions",
   onOpenChange,
+  renderContent,
 }: MediaItemActionsMenuProps): ReactElement | null {
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPosition, setMenuPosition] = useState<CSSProperties | null>(null);
 
   const setOpenAndNotify = (next: boolean): void => {
     setOpen(next);
     onOpenChange?.(next);
   };
+
+  const updateMenuPosition = (): void => {
+    const root = rootRef.current;
+    if (!root) {
+      return;
+    }
+    const rect = root.getBoundingClientRect();
+    setMenuPosition({
+      position: "fixed",
+      top: rect.bottom + 4,
+      right: Math.max(8, window.innerWidth - rect.right),
+    });
+  };
+
+  useLayoutEffect(() => {
+    if (!open) {
+      return;
+    }
+    updateMenuPosition();
+  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -83,7 +152,14 @@ export function MediaItemActionsMenu({
     }
 
     const handleOutsideClick = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        rootRef.current?.contains(target) ||
+        menuRef.current?.contains(target)
+      ) {
+        return;
+      }
+      if (menuRef.current || rootRef.current) {
         setOpenAndNotify(false);
       }
     };
@@ -94,21 +170,27 @@ export function MediaItemActionsMenu({
       }
     };
 
+    const handleReposition = () => updateMenuPosition();
+
     window.addEventListener("mousedown", handleOutsideClick);
     window.addEventListener("keydown", handleEscape);
+    window.addEventListener("resize", handleReposition);
+    window.addEventListener("scroll", handleReposition, true);
     return () => {
       window.removeEventListener("mousedown", handleOutsideClick);
       window.removeEventListener("keydown", handleEscape);
+      window.removeEventListener("resize", handleReposition);
+      window.removeEventListener("scroll", handleReposition, true);
     };
   }, [open]);
 
-  if (actions.length === 0) {
+  if (actions.length === 0 && !renderContent) {
     return null;
   }
 
   return (
     <div
-      ref={menuRef}
+      ref={rootRef}
       style={styles.wrap}
       onClick={(event) => {
         event.stopPropagation();
@@ -124,31 +206,57 @@ export function MediaItemActionsMenu({
       >
         ⋮
       </button>
-      {open ? (
-        <div style={styles.menu} role="menu">
-          {actions.map((action) => (
-            <button
-              key={action.id}
-              type="button"
-              role="menuitem"
-              style={{
-                ...styles.item,
-                ...(action.disabled ? styles.itemDisabled : {}),
-              }}
-              disabled={action.disabled}
-              onClick={() => {
-                if (!action.disabled) {
-                  action.onSelect?.();
-                }
-                setOpenAndNotify(false);
+      {open && menuPosition
+        ? createPortal(
+            <div
+              ref={menuRef}
+              style={{ ...styles.menu, ...menuPosition }}
+              role="menu"
+              onClick={(event) => {
+                event.stopPropagation();
               }}
             >
-              {action.icon ? `${action.icon} ` : ""}
-              {action.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
+              {actions.map((action) => (
+                <button
+                  key={action.id}
+                  type="button"
+                  role="menuitem"
+                  style={{
+                    ...styles.item,
+                    ...(action.disabled ? styles.itemDisabled : {}),
+                  }}
+                  disabled={action.disabled}
+                  onMouseEnter={(event) => {
+                    if (!action.disabled) {
+                      Object.assign(event.currentTarget.style, styles.itemHover);
+                    }
+                  }}
+                  onMouseLeave={(event) => {
+                    event.currentTarget.style.background = styles.item.background as string;
+                  }}
+                  onClick={() => {
+                    if (!action.disabled) {
+                      action.onSelect?.();
+                    }
+                    if (action.closeOnSelect !== false) {
+                      setOpenAndNotify(false);
+                    }
+                  }}
+                >
+                  {action.icon ? <span aria-hidden="true">{action.icon}</span> : null}
+                  <span style={styles.itemLabel}>{action.label}</span>
+                  {action.trailingIcon ? (
+                    <span style={styles.itemTrailingIcon}>{action.trailingIcon}</span>
+                  ) : null}
+                </button>
+              ))}
+              {renderContent?.({ closeMenu: () => setOpenAndNotify(false) })}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
+
+export { ArrowRightIcon as MediaItemActionsMenuArrowRightIcon };

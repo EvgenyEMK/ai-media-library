@@ -23,6 +23,7 @@ import { registerPathAnalysisHandlers } from "./ipc/path-analysis-handlers";
 import { registerFolderAiSummaryHandlers } from "./ipc/folder-ai-summary-handlers";
 import { registerMediaItemMutationHandlers } from "./ipc/media-item-mutation-handlers";
 import { registerGeocoderHandlers } from "./ipc/geocoder-handlers";
+import { registerAlbumHandlers } from "./ipc/album-handlers";
 import { releaseAllPowerSave } from "./ipc/power-save-manager";
 import {
   ensureActiveModels,
@@ -62,6 +63,7 @@ function registerAllIpcHandlers(): void {
   registerFolderAiSummaryHandlers();
   registerMediaItemMutationHandlers();
   registerGeocoderHandlers();
+  registerAlbumHandlers();
 
   ipcMain.handle(IPC_CHANNELS.getActiveJobStatuses, (): ActiveJobStatuses => {
     let photoAnalysis: ActiveJobStatuses["photoAnalysis"] = null;

@@ -32,13 +32,7 @@ export interface MediaStoreItem {
 
 // ── Album (platform-agnostic minimal shape) ─────────────────────
 
-export interface MediaStoreAlbum {
-  id: string;
-  name: string;
-  description?: string | null;
-  coverImageUrl?: string | null;
-  mediaCount?: number;
-}
+export type { AlbumPersonTagSummary, MediaAlbumSummary as MediaStoreAlbum } from "@emk/shared-contracts";
 
 // ── Person tag ──────────────────────────────────────────────────
 

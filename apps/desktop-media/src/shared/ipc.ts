@@ -1,6 +1,12 @@
 import type {
+  AlbumItemsRequest,
+  AlbumItemsResult,
+  AlbumListRequest,
+  AlbumListResult,
+  AlbumMembership,
   CanonicalBoundingBox,
   FaceBeingBoundingBox,
+  MediaAlbumSummary,
   ProviderRawBoundingBoxReference,
 } from "@emk/shared-contracts";
 import type { SemanticSearchSignalMode } from "@emk/media-store";
@@ -87,6 +93,15 @@ export const IPC_CHANNELS = {
   metadataScanProgress: "media:metadata-scan-progress",
   getMediaItemsByPaths: "media:get-media-items-by-paths",
   setMediaItemStarRating: "media:set-media-item-star-rating",
+  listAlbums: "media:list-albums",
+  createAlbum: "media:create-album",
+  updateAlbumTitle: "media:update-album-title",
+  deleteAlbum: "media:delete-album",
+  listAlbumItems: "media:list-album-items",
+  listAlbumsForMediaItem: "media:list-albums-for-media-item",
+  addMediaItemsToAlbum: "media:add-media-items-to-album",
+  removeMediaItemFromAlbum: "media:remove-media-item-from-album",
+  setAlbumCover: "media:set-album-cover",
   /** Pushed from main → renderer after a background file-metadata write refreshes the catalog row. */
   mediaItemMetadataRefreshed: "media:media-item-metadata-refreshed",
   listPersonTags: "media:list-person-tags",
@@ -1698,6 +1713,15 @@ export interface DesktopApi {
   setMediaItemStarRating: (
     request: SetMediaItemStarRatingRequest,
   ) => Promise<SetMediaItemStarRatingResult>;
+  listAlbums: (request?: AlbumListRequest) => Promise<AlbumListResult>;
+  createAlbum: (title: string) => Promise<MediaAlbumSummary>;
+  updateAlbumTitle: (albumId: string, title: string) => Promise<MediaAlbumSummary>;
+  deleteAlbum: (albumId: string) => Promise<void>;
+  listAlbumItems: (request: AlbumItemsRequest) => Promise<AlbumItemsResult>;
+  listAlbumsForMediaItem: (mediaItemIdOrPath: string) => Promise<AlbumMembership[]>;
+  addMediaItemsToAlbum: (albumId: string, mediaItemIds: string[]) => Promise<void>;
+  removeMediaItemFromAlbum: (albumId: string, mediaItemId: string) => Promise<void>;
+  setAlbumCover: (albumId: string, mediaItemId: string | null) => Promise<void>;
   onMediaItemMetadataRefreshed: (
     listener: (byPath: Record<string, DesktopMediaItemMetadata>) => void,
   ) => () => void;

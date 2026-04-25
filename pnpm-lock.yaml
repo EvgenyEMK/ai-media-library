@@ -150,6 +150,9 @@ importers:
 
   packages/media-store:
     dependencies:
+      '@emk/shared-contracts':
+        specifier: workspace:*
+        version: link:../shared-contracts
       immer:
         specifier: ^10.2.0
         version: 10.2.0

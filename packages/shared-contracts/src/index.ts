@@ -1,4 +1,5 @@
 export * from "./ai/provider";
+export * from "./domain/albums";
 export * from "./domain/media";
 export * from "./embedding";
 export * from "./face-detection";

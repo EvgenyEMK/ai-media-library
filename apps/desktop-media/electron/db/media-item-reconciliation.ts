@@ -161,6 +161,12 @@ function runHardPurgeForMediaRows(
         )
         .run(libraryId, ...batchIds).changes;
 
+      db.prepare(
+        `UPDATE media_albums
+         SET cover_media_item_id = NULL
+         WHERE library_id = ? AND cover_media_item_id IN (${idPlaceholders})`,
+      ).run(libraryId, ...batchIds);
+
       result.purgedItemTags += db
         .prepare(
           `DELETE FROM media_item_tags

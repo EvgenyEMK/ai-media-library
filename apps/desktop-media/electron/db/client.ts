@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS media_albums (
   library_id TEXT NOT NULL,
   name TEXT NOT NULL,
   description TEXT,
+  cover_media_item_id TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -80,10 +81,43 @@ CREATE TABLE IF NOT EXISTS media_album_items (
   library_id TEXT NOT NULL,
   media_album_id TEXT NOT NULL,
   media_item_id TEXT NOT NULL,
+  position INTEGER,
   created_at TEXT NOT NULL,
   UNIQUE(media_album_id, media_item_id)
 );
 CREATE INDEX IF NOT EXISTS idx_media_album_items_library_id ON media_album_items (library_id);
+
+CREATE TABLE IF NOT EXISTS album_categories (
+  id TEXT PRIMARY KEY,
+  library_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  parent_id TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(library_id, parent_id, name)
+);
+CREATE INDEX IF NOT EXISTS idx_album_categories_library_parent
+  ON album_categories (library_id, parent_id);
+
+CREATE TABLE IF NOT EXISTS media_album_categories (
+  album_id TEXT NOT NULL,
+  category_id TEXT NOT NULL,
+  library_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (album_id, category_id)
+);
+CREATE INDEX IF NOT EXISTS idx_media_album_categories_library
+  ON media_album_categories (library_id, category_id);
+
+CREATE TABLE IF NOT EXISTS media_album_person_tags (
+  album_id TEXT NOT NULL,
+  tag_id TEXT NOT NULL,
+  library_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (album_id, tag_id)
+);
+CREATE INDEX IF NOT EXISTS idx_media_album_person_tags_library
+  ON media_album_person_tags (library_id, tag_id);
 
 CREATE TABLE IF NOT EXISTS media_tags (
   id TEXT PRIMARY KEY,
@@ -569,6 +603,42 @@ const MIGRATIONS: Array<{ id: string; sql: string }> = [
       ALTER TABLE media_face_instances ADD COLUMN estimated_gender TEXT;
       ALTER TABLE media_face_instances ADD COLUMN age_gender_confidence REAL;
       ALTER TABLE media_face_instances ADD COLUMN age_gender_model TEXT;
+    `,
+  },
+  {
+    id: "022_album_desktop_capabilities",
+    sql: `
+      ALTER TABLE media_albums ADD COLUMN cover_media_item_id TEXT;
+      ALTER TABLE media_album_items ADD COLUMN position INTEGER;
+      CREATE TABLE IF NOT EXISTS album_categories (
+        id TEXT PRIMARY KEY,
+        library_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        parent_id TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(library_id, parent_id, name)
+      );
+      CREATE INDEX IF NOT EXISTS idx_album_categories_library_parent
+        ON album_categories (library_id, parent_id);
+      CREATE TABLE IF NOT EXISTS media_album_categories (
+        album_id TEXT NOT NULL,
+        category_id TEXT NOT NULL,
+        library_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (album_id, category_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_media_album_categories_library
+        ON media_album_categories (library_id, category_id);
+      CREATE TABLE IF NOT EXISTS media_album_person_tags (
+        album_id TEXT NOT NULL,
+        tag_id TEXT NOT NULL,
+        library_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (album_id, tag_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_media_album_person_tags_library
+        ON media_album_person_tags (library_id, tag_id);
     `,
   },
 ];
