@@ -1,7 +1,7 @@
 import type { StateCreator } from "zustand";
 import type { MetadataScanItem, ProcessingItemStatus, MetadataScanItemAction, TaskStatus } from "../types";
 
-export type MetadataScanPhase = "preparing" | "scanning";
+export type MetadataScanPhase = "preparing" | "scanning" | "geocoding";
 
 export interface MetadataScanSummary {
   created: number;
@@ -10,6 +10,8 @@ export interface MetadataScanSummary {
   failed: number;
   cancelled: number;
   total: number;
+  gpsGeocodingEnabled: boolean;
+  geoDataUpdated: number;
 }
 
 export interface MetadataScanSlice {
@@ -24,6 +26,8 @@ export interface MetadataScanSlice {
   metadataPhase: MetadataScanPhase | null;
   metadataPhaseProcessed: number;
   metadataPhaseTotal: number;
+  metadataGpsGeocodingEnabled: boolean;
+  metadataGeoDataUpdated: number;
 
   startMetadataJob: (jobId: string, items: MetadataScanItem[]) => void;
   updateMetadataItem: (key: string, updates: { status?: ProcessingItemStatus; action?: MetadataScanItemAction; mediaItemId?: string | null; error?: string }) => void;
@@ -47,6 +51,8 @@ export const createMetadataScanSlice: StateCreator<MetadataScanSlice, [["zustand
   metadataPhase: null,
   metadataPhaseProcessed: 0,
   metadataPhaseTotal: 0,
+  metadataGpsGeocodingEnabled: false,
+  metadataGeoDataUpdated: 0,
 
   startMetadataJob: (jobId, items) =>
     set((state) => {
@@ -59,6 +65,8 @@ export const createMetadataScanSlice: StateCreator<MetadataScanSlice, [["zustand
       state.metadataPhase = "scanning";
       state.metadataPhaseProcessed = 0;
       state.metadataPhaseTotal = items.length;
+      state.metadataGpsGeocodingEnabled = false;
+      state.metadataGeoDataUpdated = 0;
       for (const item of items) {
         state.metadataItemsByKey[item.path] = item;
       }
@@ -120,5 +128,7 @@ export const createMetadataScanSlice: StateCreator<MetadataScanSlice, [["zustand
       state.metadataPhase = null;
       state.metadataPhaseProcessed = 0;
       state.metadataPhaseTotal = 0;
+      state.metadataGpsGeocodingEnabled = false;
+      state.metadataGeoDataUpdated = 0;
     }),
 });

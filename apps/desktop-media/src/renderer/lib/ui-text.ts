@@ -120,12 +120,16 @@ export const UI_TEXT = {
   metadataScanPreparing: "Checking files on disk",
   /** Second phase: read sidecar/embedded metadata and upsert database rows. */
   metadataScanScanning: "Reading metadata and updating database",
+  /** Optional phase: reverse-geocode GPS coordinates into country/city fields. */
+  metadataScanGeocoding: "Updating location data from GPS",
   /** Card heading when the scan is idle, completed, or the phase is not shown separately. */
   metadataScanCardTitle: "Media metadata scan",
   /** Card heading during the file-identity / observe phase (folder name is appended by the UI). */
   metadataPreparingCardTitle: "Media metadata scan - Indexing file identity",
   /** Card heading while processing each file’s metadata against the database. */
   metadataScanScanningCardTitle: "Media metadata scan - updating database",
+  /** Card heading while reverse-geocoding GPS metadata. */
+  metadataScanGeocodingCardTitle: "Media metadata scan - updating locations",
   loadingFolder: "Loading folder images...",
   progressPanelTitle: "Background operations",
   progressPathAnalysisTitle: "Path metadata (LLM)",
@@ -157,6 +161,7 @@ First-time setup downloads ~2 GB of GeoNames geographic data (cached locally for
   gpsLocationDetectionConfirmCancel: "Cancel",
   geocoderInitPanelTitle: "GPS location database",
   geocoderInitDownloading: "Downloading GeoNames data (~2 GB)…",
+  geocoderInitLoadingCache: "Loading cached GeoNames data…",
   geocoderInitParsing: "Building location index…",
   geocoderInitReady: "Location database ready.",
   geocoderInitError: "Location database initialization failed.",

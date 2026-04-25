@@ -1,5 +1,9 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
+  hasCachedGeocoderData,
   initGeocoder,
   isGeocoderReady,
   resetGeocoderForTests,
@@ -74,6 +78,46 @@ describe("reverseGeocode", () => {
   it("returns null when geocoder is not ready", async () => {
     const result = await reverseGeocode(48.466667, 9.133333);
     expect(result).toBeNull();
+  });
+});
+
+describe("geocoder cache detection", () => {
+  beforeEach(() => {
+    resetGeocoderForTests(() => createMockGeocoder());
+  });
+
+  it("detects and stabilizes previously downloaded dated GeoNames files", async () => {
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "emk-geocoder-"));
+    const dumpDir = path.join(tmpRoot, "geonames");
+    const citiesDir = path.join(dumpDir, "cities1000");
+    const admin1Dir = path.join(dumpDir, "admin1_codes");
+    fs.mkdirSync(citiesDir, { recursive: true });
+    fs.mkdirSync(admin1Dir, { recursive: true });
+    fs.writeFileSync(path.join(citiesDir, "cities1000_2026-04-24.txt"), "cities");
+    fs.writeFileSync(path.join(admin1Dir, "admin1CodesASCII_2026-04-24.txt"), "admin1");
+
+    expect(hasCachedGeocoderData(tmpRoot)).toBe(true);
+    await initGeocoder(tmpRoot);
+
+    expect(fs.existsSync(path.join(citiesDir, "cities1000.txt"))).toBe(true);
+    expect(fs.existsSync(path.join(admin1Dir, "admin1CodesASCII.txt"))).toBe(true);
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  it("clears cached GeoNames files when forcing a refresh", async () => {
+    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "emk-geocoder-"));
+    const citiesDir = path.join(tmpRoot, "geonames", "cities1000");
+    const admin1Dir = path.join(tmpRoot, "geonames", "admin1_codes");
+    fs.mkdirSync(citiesDir, { recursive: true });
+    fs.mkdirSync(admin1Dir, { recursive: true });
+    fs.writeFileSync(path.join(citiesDir, "cities1000.txt"), "cities");
+    fs.writeFileSync(path.join(admin1Dir, "admin1CodesASCII.txt"), "admin1");
+
+    await initGeocoder(tmpRoot, { forceRefresh: true });
+
+    expect(fs.existsSync(path.join(citiesDir, "cities1000.txt"))).toBe(false);
+    expect(fs.existsSync(path.join(admin1Dir, "admin1CodesASCII.txt"))).toBe(false);
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
   });
 });
 

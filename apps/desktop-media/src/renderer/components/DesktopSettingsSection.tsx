@@ -155,7 +155,11 @@ const UI_TEXT = {
     "During metadata scan, GPS coordinates are matched against offline GeoNames data to fill Country, State/Province, and City for search filters and folder views. First-time setup downloads about 2 GB of cached geographic data.",
   gpsLocationDetectionConfirmTitle: "Download location data?",
   gpsLocationDetectionConfirmMessage: "This will download approximately 2 GB of geographic data from GeoNames. The download happens in the background and data is cached locally for future use.",
+  gpsLocationDetectionLocalCopyTitle: "Use local location data?",
+  gpsLocationDetectionLocalCopyMessage: "GeoNames data is already present on this device. You can use the local copy now, or download it again if you want the latest GeoNames data.",
   gpsLocationDetectionConfirmOk: "Download",
+  gpsLocationDetectionUseLocalCopy: "Use local copy",
+  gpsLocationDetectionDownloadAgain: "Download again",
   gpsLocationDetectionConfirmCancel: "Cancel",
   /** Single label for all section reset buttons (one i18n key). */
   resetToDefaults: "Reset to defaults",
@@ -210,6 +214,7 @@ export function DesktopSettingsSection({
   onAiInferencePreferredGpuIdChange,
 }: DesktopSettingsSectionProps): ReactElement {
   const [showGpsConfirm, setShowGpsConfirm] = useState(false);
+  const [gpsConfirmHasLocalCopy, setGpsConfirmHasLocalCopy] = useState(false);
   const [showWindowsGpuGuide, setShowWindowsGpuGuide] = useState(false);
   const [showAiModelHelp, setShowAiModelHelp] = useState(false);
   const [showPhotoDownscaleDescription, setShowPhotoDownscaleDescription] = useState(false);
@@ -255,16 +260,25 @@ export function DesktopSettingsSection({
 
   const handleGpsToggle = (next: boolean): void => {
     if (next && !folderScanningSettings.detectLocationFromGps) {
+      setGpsConfirmHasLocalCopy(false);
       setShowGpsConfirm(true);
+      void window.desktopApi
+        .getGeocoderCacheStatus()
+        .then((status) => {
+          setGpsConfirmHasLocalCopy(status.hasLocalCopy);
+        })
+        .catch(() => {
+          setGpsConfirmHasLocalCopy(false);
+        });
       return;
     }
     onFolderScanningSettingChange("detectLocationFromGps", next);
   };
 
-  const confirmGpsEnable = (): void => {
+  const enableGpsLocationDetection = (options?: { forceRefresh?: boolean }): void => {
     setShowGpsConfirm(false);
     onFolderScanningSettingChange("detectLocationFromGps", true);
-    void window.desktopApi.initGeocoder();
+    void window.desktopApi.initGeocoder(options);
   };
 
   const cancelGpsEnable = (): void => {
@@ -368,19 +382,35 @@ export function DesktopSettingsSection({
           {showGpsConfirm ? (
             <div className="rounded-md border border-amber-700/60 border-l-4 border-l-primary/70 bg-amber-950/40 p-3">
               <p className="m-0 text-sm font-medium text-amber-200">
-                {UI_TEXT.gpsLocationDetectionConfirmTitle}
+                {gpsConfirmHasLocalCopy
+                  ? UI_TEXT.gpsLocationDetectionLocalCopyTitle
+                  : UI_TEXT.gpsLocationDetectionConfirmTitle}
               </p>
               <p className="m-0 mt-1 text-sm text-amber-200/80">
-                {UI_TEXT.gpsLocationDetectionConfirmMessage}
+                {gpsConfirmHasLocalCopy
+                  ? UI_TEXT.gpsLocationDetectionLocalCopyMessage
+                  : UI_TEXT.gpsLocationDetectionConfirmMessage}
               </p>
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   type="button"
                   className="inline-flex h-8 items-center rounded-md bg-amber-700 px-3 text-sm text-white hover:bg-amber-600"
-                  onClick={confirmGpsEnable}
+                  onClick={() => enableGpsLocationDetection({ forceRefresh: false })}
+                  autoFocus={gpsConfirmHasLocalCopy}
                 >
-                  {UI_TEXT.gpsLocationDetectionConfirmOk}
+                  {gpsConfirmHasLocalCopy
+                    ? UI_TEXT.gpsLocationDetectionUseLocalCopy
+                    : UI_TEXT.gpsLocationDetectionConfirmOk}
                 </button>
+                {gpsConfirmHasLocalCopy ? (
+                  <button
+                    type="button"
+                    className="inline-flex h-8 items-center rounded-md border border-amber-700/70 px-3 text-sm text-amber-100 hover:bg-amber-900/40"
+                    onClick={() => enableGpsLocationDetection({ forceRefresh: true })}
+                  >
+                    {UI_TEXT.gpsLocationDetectionDownloadAgain}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm"

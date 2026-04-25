@@ -136,7 +136,10 @@ export function useDesktopProgressDockState({
       descEmbedBackfill.status === "cancelled" ||
       Boolean(descEmbedBackfill.error));
 
-  const isGeocoderInitRunning = geocoderInitStatus === "downloading" || geocoderInitStatus === "parsing";
+  const isGeocoderInitRunning =
+    geocoderInitStatus === "downloading" ||
+    geocoderInitStatus === "loading-cache" ||
+    geocoderInitStatus === "parsing";
   const geocoderQualifies =
     geocoderInitPanelVisible &&
     (isGeocoderInitRunning ||

@@ -326,7 +326,8 @@ const api: DesktopApi = {
       ipcRenderer.removeListener(IPC_CHANNELS.pathAnalysisProgress, wrapped);
     };
   },
-  initGeocoder: () => ipcRenderer.invoke(IPC_CHANNELS.initGeocoder),
+  getGeocoderCacheStatus: () => ipcRenderer.invoke(IPC_CHANNELS.getGeocoderCacheStatus),
+  initGeocoder: (options) => ipcRenderer.invoke(IPC_CHANNELS.initGeocoder, options),
   onGeocoderInitProgress: (listener) => {
     const wrapped = (
       _event: Electron.IpcRendererEvent,

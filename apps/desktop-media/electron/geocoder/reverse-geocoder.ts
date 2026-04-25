@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import fs from "node:fs";
 import path from "node:path";
 import type {
   GeoNameRecord,
@@ -56,6 +57,11 @@ let geocoderInitializing = false;
 let geocoderError: string | null = null;
 let statusListener: ((status: GeocoderStatus, error?: string) => void) | null = null;
 
+const GEOCODER_CACHE_DATASETS = [
+  { dirName: "cities1000", baseName: "cities1000" },
+  { dirName: "admin1_codes", baseName: "admin1CodesASCII" },
+];
+
 function emitStatus(status: GeocoderStatus, error?: string): void {
   if (statusListener) {
     statusListener(status, error);
@@ -79,6 +85,62 @@ export function getGeocoderError(): string | null {
   return geocoderError;
 }
 
+function getGeocoderDumpDir(userDataPath: string): string {
+  return path.join(userDataPath, "geonames");
+}
+
+function getCachedDatasetPath(datasetDir: string, baseName: string): string | null {
+  const barePath = path.join(datasetDir, `${baseName}.txt`);
+  if (fs.existsSync(barePath)) {
+    return barePath;
+  }
+  if (!fs.existsSync(datasetDir)) {
+    return null;
+  }
+  const datedPattern = new RegExp(`^${baseName}_\\d{4}-\\d{2}-\\d{2}\\.txt$`);
+  const datedFiles = fs
+    .readdirSync(datasetDir)
+    .filter((fileName) => datedPattern.test(fileName))
+    .sort()
+    .reverse();
+  return datedFiles.length > 0 ? path.join(datasetDir, datedFiles[0]) : null;
+}
+
+/**
+ * local-reverse-geocoder refreshes dated cache files daily. For the desktop app,
+ * keep an already-downloaded GeoNames cache stable so later scans do not pull
+ * the same large files again.
+ */
+function stabilizeCachedGeocoderData(dumpDir: string): boolean {
+  let allRequiredDataCached = true;
+  for (const { dirName, baseName } of GEOCODER_CACHE_DATASETS) {
+    const datasetDir = path.join(dumpDir, dirName);
+    const barePath = path.join(datasetDir, `${baseName}.txt`);
+    if (fs.existsSync(barePath)) {
+      continue;
+    }
+    const cachedPath = getCachedDatasetPath(datasetDir, baseName);
+    if (!cachedPath) {
+      allRequiredDataCached = false;
+      continue;
+    }
+    fs.renameSync(cachedPath, barePath);
+  }
+  return allRequiredDataCached;
+}
+
+export function hasCachedGeocoderData(userDataPath: string): boolean {
+  return GEOCODER_CACHE_DATASETS.every(({ dirName, baseName }) =>
+    getCachedDatasetPath(path.join(getGeocoderDumpDir(userDataPath), dirName), baseName) !== null,
+  );
+}
+
+function clearCachedGeocoderData(dumpDir: string): void {
+  for (const { dirName } of GEOCODER_CACHE_DATASETS) {
+    fs.rmSync(path.join(dumpDir, dirName), { recursive: true, force: true });
+  }
+}
+
 /**
  * Playwright sets `EMK_E2E_GEOCODER_STUB=1` (see `app-fixture.ts`).
  * Do not combine with `process.env.NODE_ENV === "test"` — Vite production builds
@@ -95,15 +157,18 @@ function shouldUseE2eGeocoderStub(): boolean {
  * We only load cities1000 + admin1 codes (no admin2/3/4, no alternate names)
  * to keep memory and download size reasonable.
  */
-export async function initGeocoder(userDataPath: string): Promise<void> {
-  if (geocoderReady || geocoderInitializing) return;
+export async function initGeocoder(
+  userDataPath: string,
+  options: { forceRefresh?: boolean } = {},
+): Promise<void> {
+  if ((geocoderReady && options.forceRefresh !== true) || geocoderInitializing) return;
   geocoderInitializing = true;
   geocoderError = null;
-  emitStatus("downloading");
 
   /** Playwright E2E only: same IPC/progress events without fetching GeoNames. */
   if (shouldUseE2eGeocoderStub()) {
     try {
+      emitStatus(hasCachedGeocoderData(userDataPath) ? "loading-cache" : "downloading");
       emitStatus("parsing");
       await new Promise<void>((resolve) => {
         setTimeout(resolve, 50);
@@ -124,9 +189,13 @@ export async function initGeocoder(userDataPath: string): Promise<void> {
     }
   }
 
-  const dumpDir = path.join(userDataPath, "geonames");
-
   try {
+    const dumpDir = getGeocoderDumpDir(userDataPath);
+    if (options.forceRefresh === true) {
+      clearCachedGeocoderData(dumpDir);
+    }
+    const usingCachedData = options.forceRefresh === true ? false : stabilizeCachedGeocoderData(dumpDir);
+    emitStatus(usingCachedData ? "loading-cache" : "downloading");
     const geocoder = getGeocoder();
 
     const initOptions: InitOptions = {
@@ -142,7 +211,7 @@ export async function initGeocoder(userDataPath: string): Promise<void> {
 
     await new Promise<void>((resolve, reject) => {
       try {
-        emitStatus("downloading");
+        emitStatus(usingCachedData ? "loading-cache" : "downloading");
         geocoder.init(initOptions, () => {
           resolve();
         });
@@ -154,7 +223,9 @@ export async function initGeocoder(userDataPath: string): Promise<void> {
     geocoderReady = true;
     geocoderInitializing = false;
     emitStatus("ready");
-    console.log("[geocoder] initialization complete");
+    console.log(
+      `[geocoder] initialization complete source=${usingCachedData ? "cache" : "download-or-refresh"}`,
+    );
   } catch (err) {
     geocoderInitializing = false;
     geocoderReady = false;

@@ -20,6 +20,8 @@ interface AppOptions {
    * Use for Playwright tests of the settings/download UX without multi‑GB downloads.
    */
   e2eGeocoderStub?: boolean;
+  /** Pre-seed minimal GeoNames cache files so settings can exercise the local-copy branch. */
+  e2eGeocoderCachedData?: boolean;
   /** Force model download failure path for ensureDetectorModel in test mode. */
   e2eFailFaceModelDownload?: boolean;
 }
@@ -35,13 +37,28 @@ export const test = base.extend<AppFixtures & AppOptions>({
   ollamaMock: [{ failFirstChatRequests: 0 }, { option: true }],
   e2eFilenameInAnalysisPrompt: [false, { option: true }],
   e2eGeocoderStub: [false, { option: true }],
+  e2eGeocoderCachedData: [false, { option: true }],
   e2eFailFaceModelDownload: [false, { option: true }],
 
   electronApp: async (
-    { ollamaMock, e2eFilenameInAnalysisPrompt, e2eGeocoderStub, e2eFailFaceModelDownload },
+    {
+      ollamaMock,
+      e2eFilenameInAnalysisPrompt,
+      e2eGeocoderStub,
+      e2eGeocoderCachedData,
+      e2eFailFaceModelDownload,
+    },
     use,
   ) => {
     const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), "emk-e2e-userdata-"));
+    if (e2eGeocoderCachedData) {
+      const citiesDir = path.join(userDataPath, "geonames", "cities1000");
+      const admin1Dir = path.join(userDataPath, "geonames", "admin1_codes");
+      fs.mkdirSync(citiesDir, { recursive: true });
+      fs.mkdirSync(admin1Dir, { recursive: true });
+      fs.writeFileSync(path.join(citiesDir, "cities1000_2026-04-24.txt"), "cities");
+      fs.writeFileSync(path.join(admin1Dir, "admin1CodesASCII_2026-04-24.txt"), "admin1");
+    }
     const ollama = await startMockOllamaServer(ollamaMock);
     const app = await electron.launch({
       args: [MAIN_JS],

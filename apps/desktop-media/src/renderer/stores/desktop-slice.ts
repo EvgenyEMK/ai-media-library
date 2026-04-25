@@ -445,7 +445,7 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
     set((state) => {
       state.geocoderInitStatus = status;
       state.geocoderInitError = error ?? null;
-      if (status === "downloading" || status === "parsing") {
+      if (status === "downloading" || status === "loading-cache" || status === "parsing") {
         state.geocoderInitPanelVisible = true;
       }
     }),

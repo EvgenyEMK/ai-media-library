@@ -171,6 +171,7 @@ export const IPC_CHANNELS = {
   analyzeFolderPathMetadata: "media:analyze-folder-path-metadata",
   cancelPathAnalysis: "media:cancel-path-analysis",
   pathAnalysisProgress: "media:path-analysis-progress",
+  getGeocoderCacheStatus: "media:get-geocoder-cache-status",
   initGeocoder: "media:init-geocoder",
   geocoderInitProgress: "media:geocoder-init-progress",
 } as const;
@@ -1084,7 +1085,7 @@ export interface ScanFolderMetadataResult {
   total: number;
 }
 
-export type MetadataScanPhase = "preparing" | "scanning";
+export type MetadataScanPhase = "preparing" | "scanning" | "geocoding";
 
 export type MetadataScanTriggerSource = "manual" | "auto";
 
@@ -1136,6 +1137,7 @@ export type MetadataScanProgressEvent =
       phase: MetadataScanPhase;
       processed: number;
       total: number;
+      geoDataUpdated?: number;
     }
   | {
       type: "item-updated";
@@ -1155,6 +1157,8 @@ export type MetadataScanProgressEvent =
       unchanged: number;
       failed: number;
       cancelled: number;
+      gpsGeocodingEnabled: boolean;
+      geoDataUpdated: number;
       /** True when the user cancelled after some work; reconciliation may still have run if prepare finished. */
       scanCancelled: boolean;
       filesCreated: MetadataScanFilePathRef[];
@@ -1207,12 +1211,16 @@ export type PathAnalysisProgressEvent =
 
 export type PathAnalysisProgressListener = (event: PathAnalysisProgressEvent) => void;
 
-export type GeocoderInitStatus = "idle" | "downloading" | "parsing" | "ready" | "error";
+export type GeocoderInitStatus = "idle" | "downloading" | "loading-cache" | "parsing" | "ready" | "error";
 
 export type GeocoderInitProgressEvent = {
   status: GeocoderInitStatus;
   error?: string;
 };
+
+export interface GeocoderCacheStatus {
+  hasLocalCopy: boolean;
+}
 
 export interface DesktopPersonTag {
   id: string;
@@ -1870,7 +1878,8 @@ export interface DesktopApi {
   }) => Promise<{ jobId: string; total: number }>;
   cancelPathAnalysis: (jobId: string) => Promise<boolean>;
   onPathAnalysisProgress: (listener: PathAnalysisProgressListener) => () => void;
-  initGeocoder: () => Promise<void>;
+  getGeocoderCacheStatus: () => Promise<GeocoderCacheStatus>;
+  initGeocoder: (options?: { forceRefresh?: boolean }) => Promise<void>;
   onGeocoderInitProgress: (listener: (event: GeocoderInitProgressEvent) => void) => () => void;
   // TEMPORARY: description embedding backfill — remove after migration
   indexDescriptionEmbeddings: (request: {

@@ -4,13 +4,14 @@ import type { MetadataProgressState } from "../../../hooks/use-eta-tracking";
 import { UI_TEXT } from "../../../lib/ui-text";
 import { formatCount, formatCountRatio } from "../../../lib/progress-stats-format";
 import type { DesktopStore } from "../../../stores/desktop-store";
+import type { MetadataScanPhase } from "../../../../shared/ipc";
 import { ProgressDockCloseButton } from "../ProgressDockCloseButton";
 import { useProgressEta } from "./use-progress-eta";
 
 interface MetadataScanCardProps {
   store: DesktopStore;
   metadataProgress: MetadataProgressState;
-  metadataPhase: "preparing" | "scanning" | null;
+  metadataPhase: MetadataScanPhase | null;
   metadataPhaseProcessed: number;
   metadataPhaseTotal: number;
   isMetadataScanning: boolean;
@@ -28,15 +29,21 @@ export function MetadataScanCard({
   metadataJobId,
   onCancelMetadataScan,
 }: MetadataScanCardProps): ReactElement {
+  const metadataBarPercent =
+    metadataPhase === "geocoding" ? 100 : metadataProgress.metadataDisplayProgressPercent;
+  const geocodingProgressPercent =
+    metadataPhase === "geocoding" && metadataPhaseTotal > 0
+      ? Math.min(100, Math.round((metadataPhaseProcessed / metadataPhaseTotal) * 100))
+      : 0;
   const metadataTimeLeftText = useProgressEta({
     running: isMetadataScanning,
     jobId: metadataJobId,
     processed:
-      metadataPhase === "preparing" || metadataPhase === "scanning"
+      metadataPhase === "preparing" || metadataPhase === "scanning" || metadataPhase === "geocoding"
         ? metadataPhaseProcessed
         : metadataProgress.metadataProcessed,
     total:
-      metadataPhase === "preparing" || metadataPhase === "scanning"
+      metadataPhase === "preparing" || metadataPhase === "scanning" || metadataPhase === "geocoding"
         ? metadataPhaseTotal
         : metadataProgress.metadataTotal,
   });
@@ -80,14 +87,27 @@ export function MetadataScanCard({
                 ? UI_TEXT.metadataScanPreparing
                 : metadataPhase === "scanning"
                   ? UI_TEXT.metadataScanScanning
-                  : "Metadata scan progress"
+                  : metadataPhase === "geocoding"
+                    ? "Metadata scan progress"
+                    : "Metadata scan progress"
             }
           >
             <div
               className="h-full bg-[#79d7a4] transition-[width] duration-100 ease-linear"
-              style={{ width: `${metadataProgress.metadataDisplayProgressPercent}%` }}
+              style={{ width: `${metadataBarPercent}%` }}
             />
           </div>
+          {metadataPhase === "geocoding" ? (
+            <div
+              className="h-2 w-full overflow-hidden rounded-full bg-[#20293d]"
+              aria-label={UI_TEXT.metadataScanGeocoding}
+            >
+              <div
+                className="h-full bg-sky-400 transition-[width] duration-100 ease-linear"
+                style={{ width: `${geocodingProgressPercent}%` }}
+              />
+            </div>
+          ) : null}
           <div className="text-xs text-muted-foreground">
             <div className="flex items-center justify-between gap-2">
               <span>
@@ -95,9 +115,14 @@ export function MetadataScanCard({
                   ? metadataProgress.metadataProgressLabel +
                     " " +
                     formatCountRatio(metadataPhaseProcessed, metadataPhaseTotal)
+                  : isMetadataScanning && metadataPhase === "geocoding"
+                    ? `${metadataProgress.metadataProgressLabel} ${formatCountRatio(metadataPhaseProcessed, metadataPhaseTotal)} | Geo data updated: ${formatCount(metadataProgress.metadataGeoDataUpdated)}`
                   : `${metadataProgress.metadataProgressLabel ? `${metadataProgress.metadataProgressLabel} ` : ""}Processed: ${formatCountRatio(metadataProgress.metadataProcessed, metadataProgress.metadataTotal)} | New: ${formatCount(metadataProgress.metadataCounts.created)} | Updated: ${formatCount(metadataProgress.metadataCounts.updated)}`}
                 {metadataProgress.metadataCounts.failed > 0
                   ? ` | Failed: ${formatCount(metadataProgress.metadataCounts.failed)}`
+                  : ""}
+                {metadataProgress.metadataGpsGeocodingEnabled && metadataPhase !== "geocoding"
+                  ? ` | Geo data updated: ${formatCount(metadataProgress.metadataGeoDataUpdated)}`
                   : ""}
               </span>
               {metadataTimeLeftText ? (

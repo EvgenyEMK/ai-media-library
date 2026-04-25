@@ -33,7 +33,12 @@ import {
   collectLibraryFileEntriesForFoldersWithProgress,
 } from "./folder-utils";
 import { acquirePowerSave, releasePowerSave } from "./power-save-manager";
-import { isGeocoderReady, initGeocoder, reverseGeocodeBatch } from "../geocoder/reverse-geocoder";
+import {
+  hasCachedGeocoderData,
+  isGeocoderReady,
+  initGeocoder,
+  reverseGeocodeBatch,
+} from "../geocoder/reverse-geocoder";
 import { getMediaItemsNeedingGpsGeocoding, updateMediaItemLocationFromGps } from "../db/media-item-geocoding";
 
 export function registerMetadataScanHandlers(): void {
@@ -209,6 +214,7 @@ export async function runMetadataScanJob(params: {
   let cancelled = 0;
   let scanningProcessed = 0;
   let filesNeedingAiPipelineFollowUp = 0;
+  let geoDataUpdated = 0;
   const observedFolders = new Set<string>([params.folderPath]);
   const folderTouchMap = new Map<
     string,
@@ -343,9 +349,19 @@ export async function runMetadataScanJob(params: {
     // so turning on "detect location from GPS" after an earlier scan still backfills country/city.
     if (!job.cancelled && gpsGeocodingEnabled && scanEntries.length > 0) {
       try {
+        emitMetadataScanProgress({
+          type: "phase-updated",
+          jobId,
+          phase: "geocoding",
+          processed: 0,
+          total: scanEntries.length,
+          geoDataUpdated,
+        });
         if (!isGeocoderReady()) {
-          console.log(`[metadata-scan][${scanTs()}] geocoder not ready, initializing…`);
-          await initGeocoder(app.getPath("userData"));
+          const userDataPath = app.getPath("userData");
+          const cacheState = hasCachedGeocoderData(userDataPath) ? "cache" : "download-or-refresh";
+          console.log(`[metadata-scan][${scanTs()}] geocoder not ready, initializing source=${cacheState}`);
+          await initGeocoder(userDataPath);
         }
         if (isGeocoderReady()) {
           const GPS_BATCH_SIZE = 500;
@@ -358,9 +374,10 @@ export async function runMetadataScanJob(params: {
             emitMetadataScanProgress({
               type: "phase-updated",
               jobId,
-              phase: "scanning",
-              processed: scanningProcessed,
-              total: scanEntries.length,
+              phase: "geocoding",
+              processed: 0,
+              total: itemsToGeocode.length,
+              geoDataUpdated,
             });
 
             for (let i = 0; i < itemsToGeocode.length; i += GPS_BATCH_SIZE) {
@@ -371,7 +388,7 @@ export async function runMetadataScanJob(params: {
               for (let j = 0; j < batch.length; j++) {
                 const loc = results[j];
                 if (loc) {
-                  updateMediaItemLocationFromGps(batch[j].id, loc);
+                  geoDataUpdated += updateMediaItemLocationFromGps(batch[j].id, loc);
                   // Per-file geocode debug (re-enable when needed) — use return value (>0 rows updated):
                   // const changed = updateMediaItemLocationFromGps(batch[j].id, loc);
                   // if (changed > 0) {
@@ -384,8 +401,26 @@ export async function runMetadataScanJob(params: {
                   // }
                 }
               }
+              emitMetadataScanProgress({
+                type: "phase-updated",
+                jobId,
+                phase: "geocoding",
+                processed: Math.min(i + batch.length, itemsToGeocode.length),
+                total: itemsToGeocode.length,
+                geoDataUpdated,
+              });
             }
-            console.log(`[metadata-scan][${scanTs()}] geocoding complete`);
+            console.log(`[metadata-scan][${scanTs()}] geocoding complete geoDataUpdated=${geoDataUpdated}`);
+          } else {
+            console.log(`[metadata-scan][${scanTs()}] geocoding skipped no items needing GPS location update`);
+            emitMetadataScanProgress({
+              type: "phase-updated",
+              jobId,
+              phase: "geocoding",
+              processed: 0,
+              total: 0,
+              geoDataUpdated,
+            });
           }
         }
       } catch (geocodeErr) {
@@ -432,7 +467,7 @@ export async function runMetadataScanJob(params: {
       job.powerSaveToken = undefined;
     }
     console.log(
-      `[metadata-scan][${scanTs()}] job-completed jobId=${jobId} created=${created} updated=${updated} unchanged=${unchanged} failed=${failed} cancelled=${cancelled} needsAiFollowUp=${filesNeedingAiPipelineFollowUp}`,
+      `[metadata-scan][${scanTs()}] job-completed jobId=${jobId} created=${created} updated=${updated} unchanged=${unchanged} failed=${failed} cancelled=${cancelled} geoDataUpdated=${geoDataUpdated} needsAiFollowUp=${filesNeedingAiPipelineFollowUp}`,
     );
     const foldersTouched = Array.from(folderTouchMap.entries())
       .map(([folderPath, counts]) => ({
@@ -455,6 +490,8 @@ export async function runMetadataScanJob(params: {
       unchanged,
       failed,
       cancelled,
+      gpsGeocodingEnabled,
+      geoDataUpdated,
       scanCancelled: cancelled > 0,
       filesCreated,
       filesUpdated,
