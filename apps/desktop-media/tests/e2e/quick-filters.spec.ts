@@ -193,7 +193,7 @@ test.describe("Quick filters (e2e-photos)", () => {
 
     await mainWindow.locator(`button[title="Open AI image search"]`).click();
     await mainWindow.waitForTimeout(500);
-    const searchInput = mainWindow.locator('input[placeholder*="Bald man"]');
+    const searchInput = mainWindow.locator('input[placeholder*="Lady in white dress near piano"]');
     await searchInput.fill("Mountains with cloudy sky");
     await searchInput.press("Enter");
 

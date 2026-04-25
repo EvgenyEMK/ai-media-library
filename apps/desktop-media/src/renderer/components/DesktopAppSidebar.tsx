@@ -22,6 +22,9 @@ interface DesktopAppSidebarProps {
   folderAnalysisByPath: DesktopStoreState["folderAnalysisByPath"];
   folderRollupByPath: DesktopStoreState["folderRollupByPath"];
   pipeline: DesktopPipelineHandlers;
+  onCreateAlbum: () => void;
+  onAlbumSelected: () => void;
+  onShowAlbumList: () => void;
   folderTree: {
     handleAddLibrary: () => Promise<void>;
     handleToggleExpand: (folderPath: string) => Promise<void>;
@@ -44,6 +47,9 @@ export function DesktopAppSidebar({
   folderAnalysisByPath,
   folderRollupByPath,
   pipeline,
+  onCreateAlbum,
+  onAlbumSelected,
+  onShowAlbumList,
   folderTree,
 }: DesktopAppSidebarProps): ReactElement {
   return (
@@ -65,20 +71,22 @@ export function DesktopAppSidebar({
             id: "folders",
             label: UI_TEXT.sectionFolders,
             icon: <FolderOpen size={20} aria-hidden="true" />,
-            headerTrailing: (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  void folderTree.handleAddLibrary();
-                }}
-                className="inline-flex h-10 w-10 shrink-0 items-center justify-center border-0 bg-transparent px-0 text-foreground shadow-none outline-none hover:bg-primary/15"
-                aria-label={UI_TEXT.addLibrary}
-                title={UI_TEXT.addLibrary}
-              >
-                <Plus size={20} aria-hidden="true" />
-              </button>
-            ),
+            headerTrailing: activeSidebarSection === "folders"
+              ? (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void folderTree.handleAddLibrary();
+                    }}
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center border-0 bg-transparent px-0 text-inherit shadow-none outline-none hover:bg-muted/70"
+                    aria-label={UI_TEXT.addLibrary}
+                    title={UI_TEXT.addLibrary}
+                  >
+                    <Plus size={20} aria-hidden="true" />
+                  </button>
+                )
+              : undefined,
             contentClassName: "pr-0",
             content: (
               <DesktopFoldersSidebarPanel
@@ -101,7 +109,31 @@ export function DesktopAppSidebar({
             id: "albums",
             label: UI_TEXT.sectionAlbums,
             icon: <Images size={20} aria-hidden="true" />,
-            content: <DesktopSidebarAlbumsSection collapsed={false} />,
+            headerTrailing: activeSidebarSection === "albums"
+              ? (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onCreateAlbum();
+                    }}
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center border-0 bg-transparent px-0 text-inherit shadow-none outline-none hover:bg-muted/70"
+                    aria-label="Create album"
+                    title="Create album"
+                  >
+                    <Plus size={20} aria-hidden="true" />
+                  </button>
+                )
+              : undefined,
+            contentChrome: "plain",
+            contentClassName: "pr-0",
+            content: (
+              <DesktopSidebarAlbumsSection
+                collapsed={false}
+                onAlbumSelected={onAlbumSelected}
+                onShowAlbumList={onShowAlbumList}
+              />
+            ),
           },
           {
             id: "people",

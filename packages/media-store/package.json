@@ -10,6 +10,7 @@
     "zustand": "^5.0.11"
   },
   "dependencies": {
+    "@emk/shared-contracts": "workspace:*",
     "immer": "^10.2.0"
   },
   "scripts": {

@@ -4,6 +4,7 @@ import type { SemanticSearchResult } from "@emk/media-store";
 import type { ThumbnailQuickFilterState } from "@emk/media-metadata-core";
 import { DesktopMainToolbar } from "./DesktopMainToolbar";
 import { DesktopMediaWorkspace } from "./DesktopMediaWorkspace";
+import { DesktopAlbumsWorkspace } from "./DesktopAlbumsWorkspace";
 import { DesktopPeopleSection } from "./DesktopPeopleSection";
 import { DesktopProgressDock } from "./DesktopProgressDock";
 import { DesktopSettingsSection } from "./DesktopSettingsSection";
@@ -21,11 +22,16 @@ import type {
 } from "../hooks/use-eta-tracking";
 import type { DescEmbedBackfillState } from "./DesktopProgressDock";
 import type { DesktopStore, DesktopStoreState } from "../stores/desktop-store";
-import type { MainPaneViewMode } from "../types/app-types";
+import type { AlbumWorkspaceMode, MainPaneViewMode } from "../types/app-types";
 
 interface DesktopAppMainProps {
   store: DesktopStore;
   isPeopleSectionOpen: boolean;
+  isAlbumsSectionOpen: boolean;
+  albumWorkspaceMode: AlbumWorkspaceMode;
+  setAlbumWorkspaceMode: Dispatch<SetStateAction<AlbumWorkspaceMode>>;
+  albumSearchControlsOpen: boolean;
+  setAlbumSearchControlsOpen: Dispatch<SetStateAction<boolean>>;
   isSettingsSectionOpen: boolean;
   openFacePhotoInViewer: (args: {
     sourcePath: string;
@@ -91,6 +97,11 @@ interface DesktopAppMainProps {
 export function DesktopAppMain({
   store,
   isPeopleSectionOpen,
+  isAlbumsSectionOpen,
+  albumWorkspaceMode,
+  setAlbumWorkspaceMode,
+  albumSearchControlsOpen,
+  setAlbumSearchControlsOpen,
   isSettingsSectionOpen,
   openFacePhotoInViewer,
   faceDetectionSettings,
@@ -149,7 +160,16 @@ export function DesktopAppMain({
 }: DesktopAppMainProps): ReactElement {
   return (
     <main className="main-panel relative flex min-h-0 min-w-0 flex-col overflow-hidden">
-      {isPeopleSectionOpen ? (
+      {isAlbumsSectionOpen ? (
+        <div className="min-h-0 flex-1 overflow-auto">
+          <DesktopAlbumsWorkspace
+            mode={albumWorkspaceMode}
+            onModeChange={setAlbumWorkspaceMode}
+            searchControlsOpen={albumSearchControlsOpen}
+            onSearchControlsOpenChange={setAlbumSearchControlsOpen}
+          />
+        </div>
+      ) : isPeopleSectionOpen ? (
         <div className="min-h-0 flex-1 overflow-auto">
           <DesktopPeopleSection onOpenFacePhoto={openFacePhotoInViewer} />
         </div>

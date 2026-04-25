@@ -192,12 +192,14 @@ interface QuickFiltersMenuProps {
   isOpen: boolean;
   filters: ThumbnailQuickFilterState;
   onFiltersChange: Dispatch<SetStateAction<ThumbnailQuickFilterState>>;
+  placementClassName?: string;
 }
 
 export const QuickFiltersMenu = memo(function QuickFiltersMenu({
   isOpen,
   filters,
   onFiltersChange,
+  placementClassName = "absolute -right-11 top-9",
 }: QuickFiltersMenuProps) {
   const activeCount = useMemo(() => countActiveQuickFilters(filters), [filters]);
 
@@ -341,7 +343,10 @@ export const QuickFiltersMenu = memo(function QuickFiltersMenu({
   return (
     <div
       data-testid="desktop-quick-filters-menu"
-      className="absolute -right-11 top-9 z-40 grid min-w-[300px] gap-1 rounded-lg border border-border bg-card p-2"
+      className={cn(
+        placementClassName,
+        "z-40 grid min-w-[300px] gap-1 rounded-lg border border-border bg-card p-2",
+      )}
     >
       <div className="px-1 pb-1.5 pt-1 text-[13px] font-semibold text-[#d3def6]">{FILTER_TEXT.title}</div>
 

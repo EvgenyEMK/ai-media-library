@@ -29,8 +29,10 @@ import { useAnalysisEta, useFaceDetectionEta, useMetadataProgress, useSemanticIn
 import { UI_TEXT } from "./lib/ui-text";
 import { cn } from "./lib/cn";
 import { useDesktopStore, useDesktopStoreApi } from "./stores/desktop-store";
-import type { MainPaneViewMode, SidebarSectionId } from "./types/app-types";
+import type { AlbumWorkspaceMode, MainPaneViewMode, SidebarSectionId } from "./types/app-types";
 import type { DesktopViewerItem } from "./types/viewer-types";
+
+const RECENT_ALBUM_IDS_STORAGE_KEY = "desktop-media.recentAlbumIds.v1";
 
 export function App(): ReactElement {
   const store = useDesktopStoreApi();
@@ -84,6 +86,7 @@ export function App(): ReactElement {
   const pathAnalysisStatus = useDesktopStore((s) => s.pathAnalysisStatus);
   const pathAnalysisJobId = useDesktopStore((s) => s.pathAnalysisJobId);
   const faceModelDownload = useDesktopStore((s) => s.faceModelDownload);
+  const recentAlbumIds = useDesktopStore((s) => s.recentAlbumIds);
 
   const [quickFilters, setQuickFilters] = useState<ThumbnailQuickFilterState>(DEFAULT_THUMBNAIL_QUICK_FILTERS);
   const {
@@ -104,6 +107,9 @@ export function App(): ReactElement {
   const [activeSidebarSection, setActiveSidebarSection] = useState<SidebarSectionId>("folders");
   const [expandedSidebarSection, setExpandedSidebarSection] = useState<SidebarSectionId | null>("folders");
   const [mainPaneViewMode, setMainPaneViewMode] = useState<MainPaneViewMode>("media");
+  const [albumWorkspaceMode, setAlbumWorkspaceMode] = useState<AlbumWorkspaceMode>("list");
+  const [albumSearchControlsOpen, setAlbumSearchControlsOpen] = useState(false);
+  const [recentAlbumsHydrated, setRecentAlbumsHydrated] = useState(false);
 
   const {
     actionsMenuOpen,
@@ -233,6 +239,26 @@ export function App(): ReactElement {
     setExpandedSidebarSection,
   });
 
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(RECENT_ALBUM_IDS_STORAGE_KEY);
+      if (!raw) return;
+      const parsed: unknown = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        store.getState().setRecentAlbumIds(parsed.filter((id): id is string => typeof id === "string"));
+      }
+    } catch {
+      // Ignore corrupt local UI preference state.
+    } finally {
+      setRecentAlbumsHydrated(true);
+    }
+  }, [store]);
+
+  useEffect(() => {
+    if (!recentAlbumsHydrated) return;
+    window.localStorage.setItem(RECENT_ALBUM_IDS_STORAGE_KEY, JSON.stringify(recentAlbumIds));
+  }, [recentAlbumIds, recentAlbumsHydrated]);
+
   const renderViewerInfoPanel = (item: DesktopViewerItem): ReactElement => {
     const metadata = lookupMediaMetadataByItemId<DesktopMediaItemMetadata>(item.sourcePath, mediaMetadataByItemId);
     return (
@@ -242,6 +268,9 @@ export function App(): ReactElement {
 
   const handleSidebarSectionToggle = (sectionId: string): void => {
     if (sectionId === "folders" || sectionId === "albums" || sectionId === "people" || sectionId === "settings") {
+      if (sectionId === "albums" && activeSidebarSection !== "albums") {
+        setAlbumSearchControlsOpen(false);
+      }
       setActiveSidebarSection(sectionId);
       if (sidebarCollapsed) {
         if (sectionId === "folders" || sectionId === "albums") {
@@ -256,7 +285,34 @@ export function App(): ReactElement {
     }
   };
 
+  const openAlbumsSection = (): void => {
+    setActiveSidebarSection("albums");
+    setExpandedSidebarSection("albums");
+    if (sidebarCollapsed) {
+      store.getState().setSidebarCollapsed(false);
+    }
+  };
+
+  const handleCreateAlbumFromSidebar = (): void => {
+    openAlbumsSection();
+    store.getState().selectAlbum(null);
+    setAlbumWorkspaceMode("create");
+  };
+
+  const handleAlbumSelectedFromSidebar = (): void => {
+    openAlbumsSection();
+    setAlbumWorkspaceMode("detail");
+  };
+
+  const handleShowAlbumListFromSidebar = (): void => {
+    openAlbumsSection();
+    store.getState().selectAlbum(null);
+    setAlbumWorkspaceMode("list");
+    setAlbumSearchControlsOpen(true);
+  };
+
   const isPeopleSectionOpen = activeSidebarSection === "people";
+  const isAlbumsSectionOpen = activeSidebarSection === "albums";
   const isSettingsSectionOpen = activeSidebarSection === "settings";
 
   return (
@@ -279,12 +335,20 @@ export function App(): ReactElement {
         folderAnalysisByPath={folderAnalysisByPath}
         folderRollupByPath={folderRollupByPath}
         pipeline={pipeline}
+        onCreateAlbum={handleCreateAlbumFromSidebar}
+        onAlbumSelected={handleAlbumSelectedFromSidebar}
+        onShowAlbumList={handleShowAlbumListFromSidebar}
         folderTree={folderTree}
       />
 
       <DesktopAppMain
         store={store}
         isPeopleSectionOpen={isPeopleSectionOpen}
+        isAlbumsSectionOpen={isAlbumsSectionOpen}
+        albumWorkspaceMode={albumWorkspaceMode}
+        setAlbumWorkspaceMode={setAlbumWorkspaceMode}
+        albumSearchControlsOpen={albumSearchControlsOpen}
+        setAlbumSearchControlsOpen={setAlbumSearchControlsOpen}
         isSettingsSectionOpen={isSettingsSectionOpen}
         openFacePhotoInViewer={openFacePhotoInViewer}
         faceDetectionSettings={faceDetectionSettings}

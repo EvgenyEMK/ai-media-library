@@ -16,11 +16,15 @@
   },
   "scripts": {
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "build": "echo Media viewer package is source-only"
+    "build": "echo Media viewer package is source-only",
+    "test": "vitest run"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
+    "jsdom": "^29.0.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "typescript": "^5",

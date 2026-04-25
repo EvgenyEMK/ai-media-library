@@ -101,7 +101,7 @@ test.describe("Search UI timing measurement", () => {
     await mainWindow.waitForTimeout(500);
 
     // Fill query and search via UI interaction (not evaluate)
-    const searchInput = mainWindow.locator('input[placeholder*="Bald man"]');
+    const searchInput = mainWindow.locator('input[placeholder*="Lady in white dress near piano"]');
     await searchInput.fill("Mountains with cloudy sky");
 
     // Clear any logs from before the search

@@ -15,6 +15,7 @@ export interface MainAppSidebarSection {
   content?: ReactNode;
   /** Extra classes for the expanded section scroll container (after default `p-2`, etc.). */
   contentClassName?: string;
+  contentChrome?: "default" | "plain";
 }
 
 interface MainAppSidebarProps {
@@ -51,7 +52,7 @@ export function MainAppSidebar({
     const splitHeader = !collapsed && section.headerTrailing;
 
     return (
-      <div key={section.id} className="space-y-1">
+      <div key={section.id} className={joinClasses("space-y-1", isExpanded && !collapsed && "mb-4")}>
         {splitHeader ? (
           <div
             className={joinClasses(
@@ -106,7 +107,9 @@ export function MainAppSidebar({
         {isExpanded && section.content ? (
           <div
             className={joinClasses(
-              "min-h-0 max-h-[60vh] overflow-auto rounded-md border border-border/70 p-2",
+              section.contentChrome === "plain"
+                ? "min-h-0 max-h-[60vh] overflow-auto"
+                : "min-h-0 max-h-[60vh] overflow-auto rounded-md border border-border/70 p-2",
               section.contentClassName,
             )}
           >

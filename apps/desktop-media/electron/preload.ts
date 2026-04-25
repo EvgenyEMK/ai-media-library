@@ -149,6 +149,20 @@ const api: DesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.getMediaItemsByPaths, paths),
   setMediaItemStarRating: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.setMediaItemStarRating, request),
+  listAlbums: (request) => ipcRenderer.invoke(IPC_CHANNELS.listAlbums, request),
+  createAlbum: (title) => ipcRenderer.invoke(IPC_CHANNELS.createAlbum, title),
+  updateAlbumTitle: (albumId, title) =>
+    ipcRenderer.invoke(IPC_CHANNELS.updateAlbumTitle, albumId, title),
+  deleteAlbum: (albumId) => ipcRenderer.invoke(IPC_CHANNELS.deleteAlbum, albumId),
+  listAlbumItems: (request) => ipcRenderer.invoke(IPC_CHANNELS.listAlbumItems, request),
+  listAlbumsForMediaItem: (mediaItemIdOrPath) =>
+    ipcRenderer.invoke(IPC_CHANNELS.listAlbumsForMediaItem, mediaItemIdOrPath),
+  addMediaItemsToAlbum: (albumId, mediaItemIds) =>
+    ipcRenderer.invoke(IPC_CHANNELS.addMediaItemsToAlbum, albumId, mediaItemIds),
+  removeMediaItemFromAlbum: (albumId, mediaItemId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.removeMediaItemFromAlbum, albumId, mediaItemId),
+  setAlbumCover: (albumId, mediaItemId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.setAlbumCover, albumId, mediaItemId),
   onMediaItemMetadataRefreshed: (listener) => {
     const wrapped = (
       _event: Electron.IpcRendererEvent,
