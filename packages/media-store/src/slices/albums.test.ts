@@ -23,6 +23,16 @@ const album = {
 };
 
 describe("AlbumsSlice", () => {
+  it("replaces albums with setAlbums", () => {
+    const store = createTestStore();
+    const skiAlbum = { ...album, id: "album-2", title: "Ski" };
+
+    store.getState().upsertAlbum(album);
+    store.getState().setAlbums([skiAlbum]);
+
+    expect(store.getState().albums).toEqual([skiAlbum]);
+  });
+
   it("upserts new albums", () => {
     const store = createTestStore();
     store.getState().upsertAlbum(album);
@@ -35,6 +45,61 @@ describe("AlbumsSlice", () => {
     store.getState().upsertAlbum({ ...album, title: "Ski" });
     expect(store.getState().albums).toHaveLength(1);
     expect(store.getState().albums[0]?.title).toBe("Ski");
+  });
+
+  it("updates an existing album by id", () => {
+    const store = createTestStore();
+    store.getState().upsertAlbum(album);
+
+    store.getState().updateAlbum(album.id, { title: "Renamed", mediaCount: 3 });
+
+    expect(store.getState().albums[0]).toMatchObject({
+      id: album.id,
+      title: "Renamed",
+      mediaCount: 3,
+    });
+  });
+
+  it("selects albums and moves them to the top of recents", () => {
+    const store = createTestStore();
+    store.getState().setRecentAlbumIds(["album-2", album.id]);
+
+    store.getState().selectAlbum(album.id);
+
+    expect(store.getState().selectedAlbumId).toBe(album.id);
+    expect(store.getState().recentAlbumIds).toEqual([album.id, "album-2"]);
+  });
+
+  it("deduplicates and caps setRecentAlbumIds", () => {
+    const store = createTestStore();
+
+    store.getState().setRecentAlbumIds([
+      "album-1",
+      "album-2",
+      "album-1",
+      "album-3",
+      "album-4",
+      "album-5",
+      "album-6",
+      "album-7",
+      "album-8",
+      "album-9",
+      "album-10",
+      "album-11",
+    ]);
+
+    expect(store.getState().recentAlbumIds).toEqual([
+      "album-1",
+      "album-2",
+      "album-3",
+      "album-4",
+      "album-5",
+      "album-6",
+      "album-7",
+      "album-8",
+      "album-9",
+      "album-10",
+    ]);
   });
 
   it("tracks the latest 10 used albums", () => {
@@ -54,5 +119,19 @@ describe("AlbumsSlice", () => {
       "album-3",
       "album-2",
     ]);
+  });
+
+  it("removes albums from list, recent ids, and selection", () => {
+    const store = createTestStore();
+    const skiAlbum = { ...album, id: "album-2", title: "Ski" };
+    store.getState().setAlbums([album, skiAlbum]);
+    store.getState().setRecentAlbumIds([skiAlbum.id, album.id]);
+    store.getState().selectAlbum(album.id);
+
+    store.getState().removeAlbum(album.id);
+
+    expect(store.getState().albums).toEqual([skiAlbum]);
+    expect(store.getState().recentAlbumIds).toEqual([skiAlbum.id]);
+    expect(store.getState().selectedAlbumId).toBeNull();
   });
 });

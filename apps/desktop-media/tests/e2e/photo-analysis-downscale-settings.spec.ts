@@ -109,6 +109,12 @@ test.describe("AI image analysis LLM downscale settings", () => {
     expect(requests[0]!.downscaleLongestSidePx).toBe(1024);
 
     await mainWindow.getByText("Settings").click();
+    const hideAdvancedSettingsCheckbox = mainWindow.getByRole("checkbox", {
+      name: /Hide advanced settings/i,
+    });
+    if (await hideAdvancedSettingsCheckbox.isChecked()) {
+      await hideAdvancedSettingsCheckbox.uncheck();
+    }
     const photoAnalysisSection = mainWindow
       .locator("details")
       .filter({ has: mainWindow.getByText("AI image analysis", { exact: true }) });

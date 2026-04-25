@@ -242,7 +242,7 @@ test.describe("Semantic image search", () => {
     await mainWindow.waitForTimeout(500);
 
     // Type a query and press Enter
-    const searchInput = mainWindow.locator('input[placeholder*="Bald man"]');
+    const searchInput = mainWindow.locator('input[placeholder*="Lady in white dress near piano"]');
     await searchInput.fill("Mountains with cloudy sky");
     await searchInput.press("Enter");
 
@@ -288,7 +288,7 @@ test.describe("Semantic image search", () => {
     await expect(semanticButton).toHaveAttribute("aria-pressed", "false");
 
     await semanticButton.click();
-    const searchInput = mainWindow.locator('input[placeholder*="Bald man"]');
+    const searchInput = mainWindow.locator('input[placeholder*="Lady in white dress near piano"]');
     await expect(searchInput).toBeVisible();
     await searchInput.fill("Mountains with cloudy sky");
     await searchInput.press("Enter");
@@ -341,12 +341,18 @@ test.describe("Semantic image search", () => {
     const semanticButton = mainWindow.locator('button[title="Open AI image search"]');
     await semanticButton.click();
 
-    const searchInput = mainWindow.locator('input[placeholder*="Bald man"]');
+    const searchInput = mainWindow.locator('input[placeholder*="Lady in white dress near piano"]');
     await searchInput.fill("Mountains with cloudy sky");
     await searchInput.press("Enter");
     await expect(mainWindow.getByTestId("desktop-search-results-grid")).toBeVisible({ timeout: 60_000 });
 
     await mainWindow.getByRole("navigation").getByText("Settings", { exact: true }).click();
+    const hideAdvancedSettingsCheckbox = mainWindow.getByRole("checkbox", {
+      name: /Hide advanced settings/i,
+    });
+    if (await hideAdvancedSettingsCheckbox.isChecked()) {
+      await hideAdvancedSettingsCheckbox.uncheck();
+    }
     const aiSearchCard = mainWindow.locator("details").filter({
       has: mainWindow.getByText("AI image search", { exact: true }),
     });
