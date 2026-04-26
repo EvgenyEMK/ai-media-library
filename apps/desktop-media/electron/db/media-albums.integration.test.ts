@@ -34,6 +34,8 @@ function insertMediaItem(args: {
   aiQuality: number | null;
   city?: string | null;
   country?: string | null;
+  locationArea?: string | null;
+  locationSource?: "gps" | "ai_vision" | "path_script" | null;
   photoTakenAt?: string | null;
 }): void {
   const now = "2026-01-01T00:00:00.000Z";
@@ -42,8 +44,8 @@ function insertMediaItem(args: {
     .prepare(
       `INSERT INTO media_items (
         id, library_id, source_path, filename, star_rating, ai_metadata,
-        city, country, photo_taken_at, media_kind, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'image', ?, ?)`,
+        city, country, location_area, location_source, photo_taken_at, media_kind, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'image', ?, ?)`,
     )
     .run(
       args.id,
@@ -56,6 +58,8 @@ function insertMediaItem(args: {
         : JSON.stringify({ image_analysis: { photo_estetic_quality: args.aiQuality } }),
       args.city ?? null,
       args.country ?? null,
+      args.locationArea ?? null,
+      args.locationSource ?? "gps",
       args.photoTakenAt ?? null,
       now,
       now,
@@ -238,5 +242,125 @@ describe.skipIf(!HAS_SQLITE)("media albums DB", () => {
     expect(db.prepare(`SELECT cover_media_item_id FROM media_albums WHERE id = ?`).get(album.id)).toEqual({
       cover_media_item_id: null,
     });
+  });
+
+  it("generates country smart album entries with single-year and multi-year city labels", () => {
+    insertMediaItem({
+      id: "rome-2024",
+      sourcePath: "C:/photos/rome-2024.jpg",
+      starRating: null,
+      aiQuality: null,
+      city: "Rome",
+      country: "Italy",
+      photoTakenAt: "2024-05-01",
+    });
+    insertMediaItem({
+      id: "rome-2025",
+      sourcePath: "C:/photos/rome-2025.jpg",
+      starRating: null,
+      aiQuality: null,
+      city: "Rome",
+      country: "Italy",
+      photoTakenAt: "2025-05-01",
+    });
+    insertMediaItem({
+      id: "venice-2024",
+      sourcePath: "C:/photos/venice-2024.jpg",
+      starRating: null,
+      aiQuality: null,
+      city: "Venice",
+      country: "Italy",
+      photoTakenAt: "2024-06-01",
+    });
+
+    const result = albums.listSmartAlbumPlaces({ grouping: "year-city", source: "gps" });
+    const italy = result.countries.find((country) => country.country === "Italy");
+    const year2024 = italy?.groups.find((year) => year.group === "2024");
+    const year2025 = italy?.groups.find((year) => year.group === "2025");
+
+    expect(year2024?.entries.map((entry) => entry.label)).toEqual(["Rome", "Venice"]);
+    expect(year2025?.entries.map((entry) => entry.label)).toEqual(["Rome"]);
+    expect(
+      albums.listSmartAlbumItems({
+        kind: "place",
+        country: "Italy",
+        city: "Rome",
+        group: "2024",
+        grouping: "year-city",
+        source: "gps",
+      }).rows.map((item) => item.id),
+    ).toEqual(["rome-2024"]);
+  });
+
+  it("generates GPS area and temporary non-GPS country smart album variants", () => {
+    insertMediaItem({
+      id: "provence",
+      sourcePath: "C:/photos/provence.jpg",
+      starRating: null,
+      aiQuality: null,
+      city: "Aix-en-Provence",
+      country: "France",
+      locationArea: "Provence-Alpes-Cote d'Azur",
+      photoTakenAt: "2024-06-01",
+    });
+    insertMediaItem({
+      id: "ai-location",
+      sourcePath: "C:/photos/ai-location.jpg",
+      starRating: null,
+      aiQuality: null,
+      city: "Barcelona",
+      country: "Spain",
+      locationArea: "Catalonia",
+      locationSource: "ai_vision",
+      photoTakenAt: "2024-06-01",
+    });
+
+    const gpsArea = albums.listSmartAlbumPlaces({ grouping: "area-city", source: "gps" });
+    expect(gpsArea.countries.find((country) => country.country === "France")?.groups[0]?.group).toBe(
+      "Provence-Alpes-Cote d'Azur",
+    );
+
+    const aiCountries = albums.listSmartAlbumPlaces({ grouping: "year-city", source: "non-gps" });
+    expect(aiCountries.countries.map((country) => country.country)).toEqual(["Spain"]);
+  });
+
+  it("generates best-of-year smart albums ordered by rating and AI quality", () => {
+    insertMediaItem({
+      id: "best-rated",
+      sourcePath: "C:/photos/best-rated.jpg",
+      starRating: 5,
+      aiQuality: 20,
+      photoTakenAt: "2024-01-01",
+    });
+    insertMediaItem({
+      id: "best-ai",
+      sourcePath: "C:/photos/best-ai.jpg",
+      starRating: null,
+      aiQuality: 8,
+      photoTakenAt: "2024-02-01",
+    });
+    insertMediaItem({
+      id: "excluded-ai",
+      sourcePath: "C:/photos/excluded-ai.jpg",
+      starRating: null,
+      aiQuality: 6,
+      photoTakenAt: "2024-03-01",
+    });
+    insertMediaItem({
+      id: "other-year",
+      sourcePath: "C:/photos/other-year.jpg",
+      starRating: 5,
+      aiQuality: 100,
+      photoTakenAt: "2023-01-01",
+    });
+
+    const years = albums.listSmartAlbumYears();
+    const year2024 = years.years.find((year) => year.year === "2024");
+
+    expect(year2024?.mediaCount).toBe(2);
+    expect(year2024?.coverSourcePath).toBeNull();
+    expect(
+      albums.listSmartAlbumItems({ kind: "best-of-year", year: "2024" }).rows.map((item) => item.id),
+    ).toEqual(["best-rated", "best-ai"]);
   });
 });

@@ -37,6 +37,7 @@ function renderSection(options: {
   albums: MediaAlbumSummary[];
   recentAlbumIds?: string[];
   onAlbumSelected?: () => void;
+  onSmartAlbumSelected?: (kind: "country-year-city" | "country-area-city" | "ai-countries" | "best-of-year") => void;
   onShowAlbumList?: () => void;
 }) {
   render(
@@ -49,6 +50,7 @@ function renderSection(options: {
       <DesktopSidebarAlbumsSection
         collapsed={false}
         onAlbumSelected={options.onAlbumSelected}
+        onSmartAlbumSelected={options.onSmartAlbumSelected}
         onShowAlbumList={options.onShowAlbumList}
       />
     </DesktopStoreProvider>,
@@ -120,5 +122,25 @@ describe("DesktopSidebarAlbumsSection", () => {
     fireEvent.click(screen.getByRole("button", { name: "Alpha" }));
 
     expect(onAlbumSelected).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows smart album shortcuts below the existing album sections", async () => {
+    const onSmartAlbumSelected = vi.fn();
+    renderSection({
+      albums: [album("album-a", "Alpha")],
+      recentAlbumIds: ["album-a"],
+      onSmartAlbumSelected,
+    });
+
+    fireEvent.click(await screen.findByRole("button", { name: "SMART ALBUMS" }));
+    fireEvent.click(screen.getByRole("button", { name: "County > Year > City" }));
+    fireEvent.click(screen.getByRole("button", { name: "Country > Area > City" }));
+    fireEvent.click(screen.getByRole("button", { name: "AI countries" }));
+    fireEvent.click(screen.getByRole("button", { name: "Best of Year" }));
+
+    expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(1, "country-year-city");
+    expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(2, "country-area-city");
+    expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(3, "ai-countries");
+    expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(4, "best-of-year");
   });
 });

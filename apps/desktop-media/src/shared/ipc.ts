@@ -8,6 +8,10 @@ import type {
   FaceBeingBoundingBox,
   MediaAlbumSummary,
   ProviderRawBoundingBoxReference,
+  SmartAlbumItemsRequest,
+  SmartAlbumPlacesRequest,
+  SmartAlbumPlacesResult,
+  SmartAlbumYearsResult,
 } from "@emk/shared-contracts";
 import type { SemanticSearchSignalMode } from "@emk/media-store";
 
@@ -102,6 +106,9 @@ export const IPC_CHANNELS = {
   addMediaItemsToAlbum: "media:add-media-items-to-album",
   removeMediaItemFromAlbum: "media:remove-media-item-from-album",
   setAlbumCover: "media:set-album-cover",
+  listSmartAlbumPlaces: "media:list-smart-album-places",
+  listSmartAlbumYears: "media:list-smart-album-years",
+  listSmartAlbumItems: "media:list-smart-album-items",
   /** Pushed from main → renderer after a background file-metadata write refreshes the catalog row. */
   mediaItemMetadataRefreshed: "media:media-item-metadata-refreshed",
   listPersonTags: "media:list-person-tags",
@@ -1730,6 +1737,9 @@ export interface DesktopApi {
   addMediaItemsToAlbum: (albumId: string, mediaItemIds: string[]) => Promise<void>;
   removeMediaItemFromAlbum: (albumId: string, mediaItemId: string) => Promise<void>;
   setAlbumCover: (albumId: string, mediaItemId: string | null) => Promise<void>;
+  listSmartAlbumPlaces: (request: SmartAlbumPlacesRequest) => Promise<SmartAlbumPlacesResult>;
+  listSmartAlbumYears: () => Promise<SmartAlbumYearsResult>;
+  listSmartAlbumItems: (request: SmartAlbumItemsRequest) => Promise<AlbumItemsResult>;
   onMediaItemMetadataRefreshed: (
     listener: (byPath: Record<string, DesktopMediaItemMetadata>) => void,
   ) => () => void;

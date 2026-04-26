@@ -7,6 +7,10 @@ import type {
   AlbumMembership,
   AlbumPersonTagSummary,
   MediaAlbumSummary,
+  SmartAlbumItemsRequest,
+  SmartAlbumPlacesRequest,
+  SmartAlbumPlacesResult,
+  SmartAlbumYearsResult,
 } from "@emk/shared-contracts";
 import { normalizeAlbumDateBounds } from "@emk/shared-contracts";
 import { DEFAULT_LIBRARY_ID } from "./folder-analysis-status";
@@ -14,6 +18,8 @@ import { getDesktopDatabase } from "./client";
 
 const DEFAULT_PAGE_SIZE = 48;
 const MAX_PAGE_SIZE = 200;
+const BEST_OF_YEAR_MIN_STAR_RATING = 4;
+const BEST_OF_YEAR_MIN_AESTHETIC_SCORE = 7;
 
 interface AlbumRow {
   id: string;
@@ -46,6 +52,27 @@ interface AlbumItemRow {
   width: number | null;
   height: number | null;
 }
+
+interface SmartAlbumPlaceRow {
+  country: string;
+  city: string;
+  group_label: string;
+  media_count: number;
+}
+
+interface SmartAlbumYearRow {
+  year: string;
+  media_count: number;
+  top_star_rating: number | null;
+  top_aesthetic_score: number | null;
+  cover_source_path: string | null;
+  cover_media_kind: "image" | "video" | null;
+}
+
+const AI_AESTHETIC_SCORE_SQL = `COALESCE(
+  CAST(json_extract(ai_metadata, '$.image_analysis.photo_estetic_quality') AS REAL),
+  CAST(json_extract(ai_metadata, '$.photo_estetic_quality') AS REAL)
+)`;
 
 function resolveMediaItemId(mediaItemIdOrPath: string, libraryId: string): string | null {
   const id = mediaItemIdOrPath.trim();
@@ -175,6 +202,19 @@ function mapPersonTags(rows: PersonTagRow[]): Record<string, AlbumPersonTagSumma
     result[albumId] = Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
   }
   return result;
+}
+
+function mapAlbumItemRows(rows: AlbumItemRow[]): AlbumItemsResult["rows"] {
+  return rows.map((row) => ({
+    id: row.id,
+    sourcePath: row.source_path,
+    title: row.display_title ?? row.filename,
+    imageUrl: row.source_path,
+    mediaKind: row.media_kind ?? "image",
+    starRating: row.star_rating,
+    width: row.width,
+    height: row.height,
+  }));
 }
 
 function listPersonTagsForAlbums(albumIds: string[], libraryId: string): Record<string, AlbumPersonTagSummary[]> {
@@ -443,18 +483,234 @@ export function listAlbumItems(
     )
     .all(request.albumId, libraryId, limit, offset) as AlbumItemRow[];
   return {
-    rows: rows.map((row) => ({
-      id: row.id,
-      sourcePath: row.source_path,
-      title: row.display_title ?? row.filename,
-      imageUrl: row.source_path,
-      mediaKind: row.media_kind ?? "image",
-      starRating: row.star_rating,
-      width: row.width,
-      height: row.height,
-    })),
+    rows: mapAlbumItemRows(rows),
     totalCount: total?.cnt ?? 0,
   };
+}
+
+function normalizeSmartAlbumPlacesRequest(request?: SmartAlbumPlacesRequest): SmartAlbumPlacesRequest {
+  return {
+    grouping: request?.grouping === "area-city" ? "area-city" : "year-city",
+    source: request?.source === "non-gps" ? "non-gps" : "gps",
+  };
+}
+
+export function listSmartAlbumPlaces(
+  request?: SmartAlbumPlacesRequest,
+  libraryId = DEFAULT_LIBRARY_ID,
+): SmartAlbumPlacesResult {
+  const normalizedRequest = normalizeSmartAlbumPlacesRequest(request);
+  const groupExpression = normalizedRequest.grouping === "area-city"
+    ? "COALESCE(NULLIF(TRIM(location_area), ''), 'Unknown area')"
+    : "SUBSTR(COALESCE(photo_taken_at, file_created_at), 1, 4)";
+  const groupPredicate = normalizedRequest.grouping === "area-city"
+    ? "1 = 1"
+    : "group_label GLOB '[0-9][0-9][0-9][0-9]'";
+  const sourcePredicate = normalizedRequest.source === "gps"
+    ? "location_source = 'gps'"
+    : "(location_source IS NULL OR location_source <> 'gps')";
+  const rows = getDesktopDatabase()
+    .prepare(
+      `WITH place_items AS (
+         SELECT
+           TRIM(country) AS country,
+           TRIM(city) AS city,
+           ${groupExpression} AS group_label
+         FROM media_items
+         WHERE library_id = ?
+           AND deleted_at IS NULL
+           AND ${sourcePredicate}
+           AND NULLIF(TRIM(country), '') IS NOT NULL
+           AND NULLIF(TRIM(city), '') IS NOT NULL
+           AND TRIM(country) <> TRIM(city)
+       ),
+       place_counts AS (
+         SELECT country, city, group_label, COUNT(*) AS media_count
+         FROM place_items
+         WHERE ${groupPredicate}
+         GROUP BY country, city, group_label
+       )
+       SELECT pc.country, pc.city, pc.group_label, pc.media_count
+       FROM place_counts pc
+       ORDER BY pc.country COLLATE NOCASE ASC, pc.group_label DESC, pc.city COLLATE NOCASE ASC`,
+    )
+    .all(libraryId) as SmartAlbumPlaceRow[];
+
+  const countries = new Map<string, SmartAlbumPlacesResult["countries"][number]>();
+  for (const row of rows) {
+    const existing = countries.get(row.country) ?? {
+      country: row.country,
+      mediaCount: 0,
+      groups: [],
+    };
+    existing.mediaCount += row.media_count;
+    let group = existing.groups.find((item) => item.group === row.group_label);
+    if (!group) {
+      group = {
+        group: row.group_label,
+        mediaCount: 0,
+        entries: [],
+      };
+      existing.groups.push(group);
+    }
+    group.mediaCount += row.media_count;
+    group.entries.push({
+      id: `place:${normalizedRequest.source}:${normalizedRequest.grouping}:${row.country}:${row.group_label}:${row.city}`,
+      country: row.country,
+      city: row.city,
+      group: row.group_label,
+      label: row.city,
+      mediaCount: row.media_count,
+    });
+    countries.set(row.country, existing);
+  }
+  return { countries: Array.from(countries.values()) };
+}
+
+export function listSmartAlbumYears(libraryId = DEFAULT_LIBRARY_ID): SmartAlbumYearsResult {
+  const rows = getDesktopDatabase()
+    .prepare(
+      `WITH valid_items AS (
+         SELECT
+           star_rating,
+           ${AI_AESTHETIC_SCORE_SQL} AS aesthetic_score,
+           SUBSTR(COALESCE(photo_taken_at, file_created_at), 1, 4) AS year
+         FROM media_items
+         WHERE library_id = ?
+           AND deleted_at IS NULL
+           AND COALESCE(photo_taken_at, file_created_at) IS NOT NULL
+           AND SUBSTR(COALESCE(photo_taken_at, file_created_at), 1, 4) GLOB '[0-9][0-9][0-9][0-9]'
+           AND (
+             COALESCE(star_rating, 0) >= ${BEST_OF_YEAR_MIN_STAR_RATING}
+             OR COALESCE(${AI_AESTHETIC_SCORE_SQL}, 0) >= ${BEST_OF_YEAR_MIN_AESTHETIC_SCORE}
+           )
+       )
+       SELECT
+         year,
+         COUNT(*) AS media_count,
+         MAX(star_rating) AS top_star_rating,
+         MAX(aesthetic_score) AS top_aesthetic_score,
+         NULL AS cover_source_path,
+         NULL AS cover_media_kind
+       FROM valid_items
+       GROUP BY year
+       ORDER BY year DESC`,
+    )
+    .all(libraryId) as SmartAlbumYearRow[];
+
+  return {
+    years: rows.map((row) => ({
+      year: row.year,
+      mediaCount: row.media_count,
+      topStarRating: row.top_star_rating,
+      topAestheticScore: row.top_aesthetic_score,
+      coverSourcePath: row.cover_source_path,
+      coverMediaKind: row.cover_media_kind ?? "image",
+    })),
+  };
+}
+
+export function listSmartAlbumItems(
+  request: SmartAlbumItemsRequest,
+  libraryId = DEFAULT_LIBRARY_ID,
+): AlbumItemsResult {
+  const limit = clampPage(request.limit, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+  const offset = clampPage(request.offset, 0, Number.MAX_SAFE_INTEGER);
+  const db = getDesktopDatabase();
+
+  if (request.kind === "place") {
+    const sourcePredicate = request.source === "gps"
+      ? "mi.location_source = 'gps'"
+      : "(mi.location_source IS NULL OR mi.location_source <> 'gps')";
+    const groupPredicate = request.grouping === "area-city"
+      ? "COALESCE(NULLIF(TRIM(mi.location_area), ''), 'Unknown area') = ?"
+      : "SUBSTR(COALESCE(mi.photo_taken_at, mi.file_created_at), 1, 4) = ?";
+    const total = db
+      .prepare(
+        `SELECT COUNT(*) AS cnt
+         FROM media_items mi
+         WHERE mi.library_id = ?
+           AND mi.deleted_at IS NULL
+           AND ${sourcePredicate}
+           AND TRIM(mi.country) = ?
+           AND TRIM(mi.city) = ?
+           AND ${groupPredicate}`,
+      )
+      .get(libraryId, request.country.trim(), request.city.trim(), request.group.trim()) as
+      | { cnt: number }
+      | undefined;
+    const rows = db
+      .prepare(
+        `SELECT mi.id, mi.source_path, mi.filename, mi.display_title, mi.media_kind, mi.star_rating, mi.width, mi.height
+         FROM media_items mi
+         WHERE mi.library_id = ?
+           AND mi.deleted_at IS NULL
+           AND ${sourcePredicate}
+           AND TRIM(mi.country) = ?
+           AND TRIM(mi.city) = ?
+           AND ${groupPredicate}
+         ORDER BY COALESCE(mi.photo_taken_at, mi.file_created_at) DESC, mi.source_path COLLATE NOCASE ASC
+         LIMIT ? OFFSET ?`,
+      )
+      .all(
+        libraryId,
+        request.country.trim(),
+        request.city.trim(),
+        request.group.trim(),
+        limit,
+        offset,
+      ) as AlbumItemRow[];
+    return { rows: mapAlbumItemRows(rows), totalCount: total?.cnt ?? 0 };
+  }
+
+  const year = request.year.trim();
+  const orderBy = request.randomize
+    ? "RANDOM()"
+    : `COALESCE(mi.star_rating, -1) DESC,
+       COALESCE(
+         CAST(json_extract(mi.ai_metadata, '$.image_analysis.photo_estetic_quality') AS REAL),
+         CAST(json_extract(mi.ai_metadata, '$.photo_estetic_quality') AS REAL),
+         -1
+       ) DESC,
+       COALESCE(mi.photo_taken_at, mi.file_created_at) DESC,
+       mi.source_path COLLATE NOCASE ASC`;
+  const total = db
+    .prepare(
+      `SELECT COUNT(*) AS cnt
+       FROM media_items mi
+       WHERE mi.library_id = ?
+         AND mi.deleted_at IS NULL
+         AND SUBSTR(COALESCE(mi.photo_taken_at, mi.file_created_at), 1, 4) = ?
+         AND (
+           COALESCE(mi.star_rating, 0) >= ${BEST_OF_YEAR_MIN_STAR_RATING}
+           OR COALESCE(
+             CAST(json_extract(mi.ai_metadata, '$.image_analysis.photo_estetic_quality') AS REAL),
+             CAST(json_extract(mi.ai_metadata, '$.photo_estetic_quality') AS REAL),
+             0
+           ) >= ${BEST_OF_YEAR_MIN_AESTHETIC_SCORE}
+         )`,
+    )
+    .get(libraryId, year) as { cnt: number } | undefined;
+  const rows = db
+    .prepare(
+      `SELECT mi.id, mi.source_path, mi.filename, mi.display_title, mi.media_kind, mi.star_rating, mi.width, mi.height
+       FROM media_items mi
+       WHERE mi.library_id = ?
+         AND mi.deleted_at IS NULL
+         AND SUBSTR(COALESCE(mi.photo_taken_at, mi.file_created_at), 1, 4) = ?
+         AND (
+           COALESCE(mi.star_rating, 0) >= ${BEST_OF_YEAR_MIN_STAR_RATING}
+           OR COALESCE(
+             CAST(json_extract(mi.ai_metadata, '$.image_analysis.photo_estetic_quality') AS REAL),
+             CAST(json_extract(mi.ai_metadata, '$.photo_estetic_quality') AS REAL),
+             0
+           ) >= ${BEST_OF_YEAR_MIN_AESTHETIC_SCORE}
+         )
+       ORDER BY ${orderBy}
+       LIMIT ? OFFSET ?`,
+    )
+    .all(libraryId, year, limit, offset) as AlbumItemRow[];
+  return { rows: mapAlbumItemRows(rows), totalCount: total?.cnt ?? 0 };
 }
 
 export function listAlbumsForMediaItem(

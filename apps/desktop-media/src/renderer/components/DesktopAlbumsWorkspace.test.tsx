@@ -6,6 +6,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { useState } from "react";
 import type { AlbumMediaItem, MediaAlbumSummary } from "@emk/shared-contracts";
 import { DesktopStoreProvider } from "../stores/desktop-store";
+import type { AlbumWorkspaceMode } from "../types/app-types";
 import { DesktopAlbumsWorkspace } from "./DesktopAlbumsWorkspace";
 
 function album(overrides: Partial<MediaAlbumSummary> = {}): MediaAlbumSummary {
@@ -71,7 +72,7 @@ function installDesktopApiMock(): Record<string, ReturnType<typeof vi.fn>> {
 
 function renderWorkspace(): void {
   function WorkspaceHarness() {
-    const [mode, setMode] = useState<"list" | "detail" | "create">("detail");
+    const [mode, setMode] = useState<AlbumWorkspaceMode>("detail");
     const [searchControlsOpen, setSearchControlsOpen] = useState(false);
     return (
       <DesktopStoreProvider
@@ -84,6 +85,7 @@ function renderWorkspace(): void {
         <DesktopAlbumsWorkspace
           mode={mode}
           onModeChange={setMode}
+          smartAlbumRootKind="country-year-city"
           searchControlsOpen={searchControlsOpen}
           onSearchControlsOpenChange={setSearchControlsOpen}
         />

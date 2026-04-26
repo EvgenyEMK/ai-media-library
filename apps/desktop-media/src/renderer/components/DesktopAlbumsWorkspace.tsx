@@ -1,11 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
-import { ArrowLeft, Filter, Grid3X3, List, Plus, Search, Undo2 } from "lucide-react";
+import { ArrowLeft, Filter, Grid3X3, List, Plus, Search, Shuffle, Undo2 } from "lucide-react";
 import {
   DEFAULT_THUMBNAIL_QUICK_FILTERS,
   countActiveQuickFilters,
   type ThumbnailQuickFilterState,
 } from "@emk/media-metadata-core";
-import type { AlbumMediaItem } from "@emk/shared-contracts";
+import type {
+  AlbumMediaItem,
+  SmartAlbumPlaceCountry,
+  SmartAlbumPlaceEntry,
+  SmartAlbumPlacesRequest,
+  SmartAlbumRootKind,
+  SmartAlbumYearSummary,
+} from "@emk/shared-contracts";
 import type { DesktopPersonTagWithFaceCount } from "../../shared/ipc";
 import { createDesktopAlbumActions } from "../actions/album-actions";
 import { PeoplePaginationBar } from "./people-pagination-bar";
@@ -19,19 +26,35 @@ import { DesktopAlbumContentGrid } from "./DesktopAlbumContentGrid";
 import { ALBUM_ITEMS_PAGE_SIZE } from "./DesktopAlbumDetailPanel";
 import { QuickFiltersMenu } from "./QuickFiltersMenu";
 import { ToolbarIconButton } from "./ToolbarIconButton";
+import { toFileUrl } from "./face-cluster-utils";
 
 const ALBUM_PAGE_SIZE = 24;
 
 interface DesktopAlbumsWorkspaceProps {
   mode: AlbumWorkspaceMode;
   onModeChange: (mode: AlbumWorkspaceMode) => void;
+  smartAlbumRootKind: SmartAlbumRootKind;
   searchControlsOpen: boolean;
   onSearchControlsOpenChange: (open: boolean) => void;
 }
 
+type ActiveSmartAlbum =
+  | {
+      kind: "place";
+      entry: SmartAlbumPlaceEntry;
+    }
+  | {
+      kind: "best-of-year";
+      year: string;
+      randomize: boolean;
+      refreshKey: number;
+    }
+  | null;
+
 export function DesktopAlbumsWorkspace({
   mode,
   onModeChange,
+  smartAlbumRootKind,
   searchControlsOpen,
   onSearchControlsOpenChange,
 }: DesktopAlbumsWorkspaceProps): ReactElement {
@@ -53,6 +76,14 @@ export function DesktopAlbumsWorkspace({
   const [albumItemsPage, setAlbumItemsPage] = useState(0);
   const [albumItems, setAlbumItems] = useState<AlbumMediaItem[]>([]);
   const [albumItemsTotal, setAlbumItemsTotal] = useState(0);
+  const [smartPlaceCountries, setSmartPlaceCountries] = useState<SmartAlbumPlaceCountry[]>([]);
+  const [smartYears, setSmartYears] = useState<SmartAlbumYearSummary[]>([]);
+  const [selectedSmartCountry, setSelectedSmartCountry] = useState<string | null>(null);
+  const [selectedSmartYear, setSelectedSmartYear] = useState<string | null>(null);
+  const [activeSmartAlbum, setActiveSmartAlbum] = useState<ActiveSmartAlbum>(null);
+  const [smartItemsPage, setSmartItemsPage] = useState(0);
+  const [smartItems, setSmartItems] = useState<AlbumMediaItem[]>([]);
+  const [smartItemsTotal, setSmartItemsTotal] = useState(0);
   const [newTitle, setNewTitle] = useState("");
   const [albumQuickFilters, setAlbumQuickFilters] = useState<ThumbnailQuickFilterState>(
     DEFAULT_THUMBNAIL_QUICK_FILTERS,
@@ -62,9 +93,33 @@ export function DesktopAlbumsWorkspace({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const selectedAlbum = albums.find((album) => album.id === selectedAlbumId) ?? null;
+  const smartPlaceRequest = useMemo<SmartAlbumPlacesRequest | null>(
+    () =>
+      smartAlbumRootKind === "best-of-year"
+        ? null
+        : {
+            grouping: smartAlbumRootKind === "country-area-city" ? "area-city" : "year-city",
+            source: smartAlbumRootKind === "ai-countries" ? "non-gps" : "gps",
+          },
+    [smartAlbumRootKind],
+  );
+  const smartPlaceRootTitle =
+    smartAlbumRootKind === "country-area-city"
+      ? "Country > Area > City"
+      : smartAlbumRootKind === "ai-countries"
+        ? "AI countries"
+        : "County > Year > City";
+  const smartPlaceGroupLabel = smartPlaceRequest?.grouping === "area-city" ? "areas" : "years";
+  const selectedSmartCountryGroup = selectedSmartCountry
+    ? smartPlaceCountries.find((country) => country.country === selectedSmartCountry) ?? null
+    : null;
+  const selectedSmartYearGroup = selectedSmartCountryGroup && selectedSmartYear
+    ? selectedSmartCountryGroup.groups.find((group) => group.group === selectedSmartYear) ?? null
+    : null;
   const personTagKey = personTagIds.join("|");
   const showingCreate = mode === "create";
   const showingDetail = mode === "detail" && selectedAlbum !== null;
+  const showingSmart = mode === "smart";
   const albumQuickFiltersActiveCount = useMemo(
     () => countActiveQuickFilters(albumQuickFilters),
     [albumQuickFilters],
@@ -105,6 +160,64 @@ export function DesktopAlbumsWorkspace({
     setAlbumItems(result.rows);
     setAlbumItemsTotal(result.totalCount);
   }, [actions, albumItemsPage, selectedAlbumId]);
+
+  const loadSmartRoots = useCallback(async () => {
+    if (!showingSmart) {
+      return;
+    }
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      if (smartPlaceRequest) {
+        const result = await actions.loadSmartAlbumPlaces(smartPlaceRequest);
+        setSmartPlaceCountries(result.countries);
+      } else {
+        const result = await actions.loadSmartAlbumYears();
+        setSmartYears(result.years);
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to load smart albums.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [actions, showingSmart, smartAlbumRootKind, smartPlaceRequest]);
+
+  const loadSmartAlbumItems = useCallback(async () => {
+    if (!activeSmartAlbum) {
+      setSmartItems([]);
+      setSmartItemsTotal(0);
+      return;
+    }
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      const result = activeSmartAlbum.kind === "place"
+        ? await actions.loadSmartAlbumItems({
+            kind: "place",
+            country: activeSmartAlbum.entry.country,
+            city: activeSmartAlbum.entry.city,
+            group: activeSmartAlbum.entry.group,
+            grouping: smartPlaceRequest?.grouping ?? "year-city",
+            source: smartPlaceRequest?.source ?? "gps",
+            offset: smartItemsPage * ALBUM_ITEMS_PAGE_SIZE,
+            limit: ALBUM_ITEMS_PAGE_SIZE,
+          })
+        : await actions.loadSmartAlbumItems({
+            kind: "best-of-year",
+            year: activeSmartAlbum.year,
+            randomize: activeSmartAlbum.randomize,
+            offset: smartItemsPage * ALBUM_ITEMS_PAGE_SIZE,
+            limit: ALBUM_ITEMS_PAGE_SIZE,
+          });
+      setSmartItems(result.rows);
+      setSmartItemsTotal(result.totalCount);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to load smart album items.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [actions, activeSmartAlbum, smartItemsPage, smartPlaceRequest]);
+
   const refreshAlbumDetailState = useCallback((): void => {
     void Promise.all([loadAlbumItems(), loadAlbums()]).catch((error) => {
       setErrorMessage(error instanceof Error ? error.message : "Failed to load album items.");
@@ -135,12 +248,34 @@ export function DesktopAlbumsWorkspace({
   }, [loadAlbumItems]);
 
   useEffect(() => {
+    if (!showingSmart) {
+      return;
+    }
+    setActiveSmartAlbum(null);
+    setSelectedSmartCountry(null);
+    setSelectedSmartYear(null);
+    setSmartItemsPage(0);
+    void loadSmartRoots();
+  }, [loadSmartRoots, showingSmart, smartAlbumRootKind]);
+
+  useEffect(() => {
+    if (!showingSmart) {
+      return;
+    }
+    void loadSmartAlbumItems();
+  }, [loadSmartAlbumItems, showingSmart]);
+
+  useEffect(() => {
     setAlbumPage(0);
   }, [titleQuery, locationQuery, yearMonthFrom, yearMonthTo, personTagKey]);
 
   useEffect(() => {
     setAlbumItemsPage(0);
   }, [selectedAlbum?.id]);
+
+  useEffect(() => {
+    setSmartItemsPage(0);
+  }, [activeSmartAlbum]);
 
   useEffect(() => {
     if (!albumQuickFiltersOpen) {
@@ -182,10 +317,77 @@ export function DesktopAlbumsWorkspace({
     onModeChange("list");
   };
 
+  const smartRootTitle = smartAlbumRootKind === "best-of-year" ? "Best of Year" : smartPlaceRootTitle;
+  const activeSmartTitle = activeSmartAlbum?.kind === "place"
+    ? `${activeSmartAlbum.entry.country} > ${activeSmartAlbum.entry.group} > ${activeSmartAlbum.entry.city}`
+    : activeSmartAlbum?.kind === "best-of-year"
+      ? `Best of ${activeSmartAlbum.year}`
+      : selectedSmartCountry && selectedSmartYear
+        ? `${smartPlaceRootTitle} > ${selectedSmartCountry} > ${selectedSmartYear}`
+        : selectedSmartCountry
+          ? `${smartPlaceRootTitle} > ${selectedSmartCountry}`
+      : smartRootTitle;
+
+  const handleBackToSmartRoot = (): void => {
+    if (activeSmartAlbum) {
+      setActiveSmartAlbum(null);
+    } else if (selectedSmartYear) {
+      setSelectedSmartYear(null);
+    } else {
+      setSelectedSmartCountry(null);
+    }
+    setSmartItemsPage(0);
+  };
+
+  const handleShuffleBestOfYear = (): void => {
+    setActiveSmartAlbum((current) => {
+      if (!current || current.kind !== "best-of-year") {
+        return current;
+      }
+      return {
+        ...current,
+        randomize: true,
+        refreshKey: Date.now(),
+      };
+    });
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="border-b border-border bg-card/60 p-4">
-        {showingDetail ? (
+        {showingSmart ? (
+          <div className="flex min-w-0 items-center gap-2">
+            {activeSmartAlbum || selectedSmartCountry ? (
+              <button
+                type="button"
+                onClick={handleBackToSmartRoot}
+                className="inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-border hover:bg-muted"
+                aria-label="Back to smart albums"
+                title="Back to smart albums"
+              >
+                <ArrowLeft size={18} aria-hidden="true" />
+              </button>
+            ) : null}
+            <div className="mr-auto min-w-0">
+              <h1 className="truncate text-xl font-semibold">{activeSmartTitle}</h1>
+              <p className="text-sm text-muted-foreground">
+                {activeSmartAlbum
+                  ? "Dynamic album generated from library metadata."
+                  : "Smart albums generated from dates, places, ratings, and AI metadata."}
+              </p>
+            </div>
+            {activeSmartAlbum?.kind === "best-of-year" ? (
+              <button
+                type="button"
+                onClick={handleShuffleBestOfYear}
+                className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
+              >
+                <Shuffle size={16} aria-hidden="true" />
+                Shuffle
+              </button>
+            ) : null}
+          </div>
+        ) : showingDetail ? (
           <div className="flex min-w-0 items-center gap-2">
             <button
               type="button"
@@ -332,7 +534,126 @@ export function DesktopAlbumsWorkspace({
           {errorMessage}
         </div>
       ) : null}
-      {showingCreate ? null : showingDetail ? (
+      {showingSmart ? (
+        <div className="min-h-0 flex-1 overflow-auto p-4">
+          {isLoading ? <div className="text-sm text-muted-foreground">Loading smart albums...</div> : null}
+          {!activeSmartAlbum ? (
+            smartPlaceRequest ? (
+              smartPlaceCountries.length === 0 && !isLoading ? (
+                <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">
+                  {smartPlaceRequest.source === "gps"
+                    ? "No GPS countries found yet. Run metadata scan with GPS location detection to generate country smart albums."
+                    : "No non-GPS country-like locations found yet."}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {!selectedSmartCountryGroup ? (
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                      {smartPlaceCountries.map((country) => (
+                        <button
+                          key={country.country}
+                          type="button"
+                          onClick={() => {
+                            setSelectedSmartCountry(country.country);
+                            setSelectedSmartYear(null);
+                          }}
+                          className="rounded-lg border border-border bg-card/60 px-4 py-3 text-left hover:bg-muted"
+                        >
+                          <div className="font-semibold text-foreground">{country.country}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {country.groups.length} {smartPlaceGroupLabel} · {country.mediaCount} items
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : !selectedSmartYearGroup ? (
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                      {selectedSmartCountryGroup.groups.map((year) => (
+                        <button
+                          key={`${selectedSmartCountryGroup.country}-${year.group}`}
+                          type="button"
+                          onClick={() => setSelectedSmartYear(year.group)}
+                          className="rounded-lg border border-border bg-card/60 px-4 py-3 text-left hover:bg-muted"
+                        >
+                          <div className="font-semibold text-foreground">{year.group}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {year.entries.length} cities · {year.mediaCount} items
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                      {selectedSmartYearGroup.entries.map((entry) => (
+                        <button
+                          key={entry.id}
+                          type="button"
+                          onClick={() => setActiveSmartAlbum({ kind: "place", entry })}
+                          className="rounded-lg border border-border bg-card/60 px-4 py-3 text-left hover:bg-muted"
+                        >
+                          <div className="font-semibold text-foreground">{entry.label}</div>
+                          <div className="text-sm text-muted-foreground">{entry.mediaCount} items</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            ) : smartYears.length === 0 && !isLoading ? (
+              <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">
+                No dated media found yet. Run metadata scan to generate Best of Year smart albums.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                {smartYears.map((year) => (
+                  <button
+                    key={year.year}
+                    type="button"
+                    onClick={() =>
+                      setActiveSmartAlbum({
+                        kind: "best-of-year",
+                        year: year.year,
+                        randomize: true,
+                        refreshKey: Date.now(),
+                      })
+                    }
+                    className="overflow-hidden rounded-lg border border-border bg-card text-left shadow-sm hover:bg-muted/50"
+                  >
+                    {year.coverSourcePath ? (
+                      <img
+                        src={toFileUrl(year.coverSourcePath)}
+                        alt={`Best of ${year.year}`}
+                        className="aspect-video w-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <div className="aspect-video w-full bg-muted" />
+                    )}
+                    <div className="space-y-1 p-3">
+                      <h2 className="font-semibold text-foreground">Best of {year.year}</h2>
+                      <p className="text-sm text-muted-foreground">{year.mediaCount} items</p>
+                      <p className="text-xs text-muted-foreground">
+                        Top rating {year.topStarRating ?? "n/a"} · AI quality {year.topAestheticScore?.toFixed(1) ?? "n/a"}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )
+          ) : (
+            <DesktopAlbumContentGrid
+              store={store}
+              albumItems={smartItems}
+              albumItemsPage={smartItemsPage}
+              albumItemsTotal={smartItemsTotal}
+              quickFilters={albumQuickFilters}
+              viewMode={viewMode}
+              onAlbumItemsPageChange={setSmartItemsPage}
+            />
+          )}
+        </div>
+      ) : showingCreate ? null : showingDetail ? (
         <div className="min-h-0 flex-1 overflow-auto">
           <DesktopAlbumContentGrid
             store={store}

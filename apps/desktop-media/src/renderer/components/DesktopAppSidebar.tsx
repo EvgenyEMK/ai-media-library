@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { MainAppSidebar } from "@emk/media-viewer";
+import type { SmartAlbumRootKind } from "@emk/shared-contracts";
 import { FolderOpen, Images, PanelLeftClose, PanelLeftOpen, Plus, Settings, Users } from "lucide-react";
 import { DesktopFoldersSidebarPanel } from "./DesktopFoldersSidebarPanel";
 import { DesktopSidebarAlbumsSection } from "./DesktopSidebarAlbumsSection";
@@ -24,6 +25,7 @@ interface DesktopAppSidebarProps {
   pipeline: DesktopPipelineHandlers;
   onCreateAlbum: () => void;
   onAlbumSelected: () => void;
+  onSmartAlbumSelected: (kind: SmartAlbumRootKind) => void;
   onShowAlbumList: () => void;
   folderTree: {
     handleAddLibrary: () => Promise<void>;
@@ -49,6 +51,7 @@ export function DesktopAppSidebar({
   pipeline,
   onCreateAlbum,
   onAlbumSelected,
+  onSmartAlbumSelected,
   onShowAlbumList,
   folderTree,
 }: DesktopAppSidebarProps): ReactElement {
@@ -131,6 +134,7 @@ export function DesktopAppSidebar({
               <DesktopSidebarAlbumsSection
                 collapsed={false}
                 onAlbumSelected={onAlbumSelected}
+                onSmartAlbumSelected={onSmartAlbumSelected}
                 onShowAlbumList={onShowAlbumList}
               />
             ),

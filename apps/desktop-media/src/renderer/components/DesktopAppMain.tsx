@@ -1,6 +1,7 @@
 import type { Dispatch, ReactElement, RefObject, SetStateAction } from "react";
 import type { ImageEditSuggestionsItem } from "@emk/media-viewer";
 import type { SemanticSearchResult } from "@emk/media-store";
+import type { SmartAlbumRootKind } from "@emk/shared-contracts";
 import type { ThumbnailQuickFilterState } from "@emk/media-metadata-core";
 import { DesktopMainToolbar } from "./DesktopMainToolbar";
 import { DesktopMediaWorkspace } from "./DesktopMediaWorkspace";
@@ -30,6 +31,7 @@ interface DesktopAppMainProps {
   isAlbumsSectionOpen: boolean;
   albumWorkspaceMode: AlbumWorkspaceMode;
   setAlbumWorkspaceMode: Dispatch<SetStateAction<AlbumWorkspaceMode>>;
+  smartAlbumRootKind: SmartAlbumRootKind;
   albumSearchControlsOpen: boolean;
   setAlbumSearchControlsOpen: Dispatch<SetStateAction<boolean>>;
   isSettingsSectionOpen: boolean;
@@ -100,6 +102,7 @@ export function DesktopAppMain({
   isAlbumsSectionOpen,
   albumWorkspaceMode,
   setAlbumWorkspaceMode,
+  smartAlbumRootKind,
   albumSearchControlsOpen,
   setAlbumSearchControlsOpen,
   isSettingsSectionOpen,
@@ -165,6 +168,7 @@ export function DesktopAppMain({
           <DesktopAlbumsWorkspace
             mode={albumWorkspaceMode}
             onModeChange={setAlbumWorkspaceMode}
+            smartAlbumRootKind={smartAlbumRootKind}
             searchControlsOpen={albumSearchControlsOpen}
             onSearchControlsOpenChange={setAlbumSearchControlsOpen}
           />

@@ -1,5 +1,10 @@
 import { ipcMain } from "electron";
-import type { AlbumItemsRequest, AlbumListRequest } from "@emk/shared-contracts";
+import type {
+  AlbumItemsRequest,
+  AlbumListRequest,
+  SmartAlbumItemsRequest,
+  SmartAlbumPlacesRequest,
+} from "@emk/shared-contracts";
 import { IPC_CHANNELS } from "../../src/shared/ipc";
 import {
   addMediaItemsToAlbum,
@@ -8,6 +13,9 @@ import {
   listAlbumItems,
   listAlbumsForMediaItem,
   listAlbums,
+  listSmartAlbumItems,
+  listSmartAlbumPlaces,
+  listSmartAlbumYears,
   removeMediaItemFromAlbum,
   setAlbumCover,
   updateAlbumTitle,
@@ -61,4 +69,16 @@ export function registerAlbumHandlers(): void {
       setAlbumCover(albumId, typeof mediaItemId === "string" ? mediaItemId : null);
     },
   );
+
+  ipcMain.handle(IPC_CHANNELS.listSmartAlbumPlaces, async (_event, request: SmartAlbumPlacesRequest) => {
+    return listSmartAlbumPlaces(request);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.listSmartAlbumYears, async () => {
+    return listSmartAlbumYears();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.listSmartAlbumItems, async (_event, request: SmartAlbumItemsRequest) => {
+    return listSmartAlbumItems(request);
+  });
 }

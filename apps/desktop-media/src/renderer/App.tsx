@@ -4,6 +4,7 @@ import {
   DEFAULT_THUMBNAIL_QUICK_FILTERS,
   type ThumbnailQuickFilterState,
 } from "@emk/media-metadata-core";
+import type { SmartAlbumRootKind } from "@emk/shared-contracts";
 import type { DesktopMediaItemMetadata } from "../shared/ipc";
 import { supportsThinkingMode } from "../shared/photo-analysis-prompt";
 import { DesktopAppMain } from "./components/DesktopAppMain";
@@ -109,6 +110,7 @@ export function App(): ReactElement {
   const [mainPaneViewMode, setMainPaneViewMode] = useState<MainPaneViewMode>("media");
   const [albumWorkspaceMode, setAlbumWorkspaceMode] = useState<AlbumWorkspaceMode>("list");
   const [albumSearchControlsOpen, setAlbumSearchControlsOpen] = useState(false);
+  const [smartAlbumRootKind, setSmartAlbumRootKind] = useState<SmartAlbumRootKind>("country-year-city");
   const [recentAlbumsHydrated, setRecentAlbumsHydrated] = useState(false);
 
   const {
@@ -311,6 +313,14 @@ export function App(): ReactElement {
     setAlbumSearchControlsOpen(true);
   };
 
+  const handleSmartAlbumSelectedFromSidebar = (kind: SmartAlbumRootKind): void => {
+    openAlbumsSection();
+    store.getState().selectAlbum(null);
+    setSmartAlbumRootKind(kind);
+    setAlbumWorkspaceMode("smart");
+    setAlbumSearchControlsOpen(false);
+  };
+
   const isPeopleSectionOpen = activeSidebarSection === "people";
   const isAlbumsSectionOpen = activeSidebarSection === "albums";
   const isSettingsSectionOpen = activeSidebarSection === "settings";
@@ -337,6 +347,7 @@ export function App(): ReactElement {
         pipeline={pipeline}
         onCreateAlbum={handleCreateAlbumFromSidebar}
         onAlbumSelected={handleAlbumSelectedFromSidebar}
+        onSmartAlbumSelected={handleSmartAlbumSelectedFromSidebar}
         onShowAlbumList={handleShowAlbumListFromSidebar}
         folderTree={folderTree}
       />
@@ -347,6 +358,7 @@ export function App(): ReactElement {
         isAlbumsSectionOpen={isAlbumsSectionOpen}
         albumWorkspaceMode={albumWorkspaceMode}
         setAlbumWorkspaceMode={setAlbumWorkspaceMode}
+        smartAlbumRootKind={smartAlbumRootKind}
         albumSearchControlsOpen={albumSearchControlsOpen}
         setAlbumSearchControlsOpen={setAlbumSearchControlsOpen}
         isSettingsSectionOpen={isSettingsSectionOpen}
