@@ -692,6 +692,8 @@ export interface DesktopMediaItemMetadata {
   locationArea: string | null;
   locationPlace: string | null;
   locationName: string | null;
+  /** Catalog location provenance (`gps`, `path_llm`, `path_script`, `ai_vision`, ...). */
+  locationSource: string | null;
   displayTitle: string | null;
   checksumSha256: string | null;
   contentHash: string | null;

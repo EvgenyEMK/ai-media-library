@@ -378,6 +378,7 @@ type MediaItemMetadataRow = {
   location_area: string | null;
   location_place: string | null;
   location_name: string | null;
+  location_source: string | null;
   display_title: string | null;
   checksum_sha256: string | null;
   content_hash: string | null;
@@ -430,6 +431,7 @@ export function getMediaItemMetadataByPaths(
            mi.location_area,
            mi.location_place,
            mi.location_name,
+           mi.location_source,
            mi.display_title,
            mi.checksum_sha256,
            mi.content_hash,
@@ -524,6 +526,7 @@ export function getMediaItemMetadataByPaths(
       locationArea: row.location_area,
       locationPlace: row.location_place,
       locationName: row.location_name,
+      locationSource: row.location_source,
       displayTitle: row.display_title,
       checksumSha256: row.checksum_sha256,
       contentHash: row.content_hash,

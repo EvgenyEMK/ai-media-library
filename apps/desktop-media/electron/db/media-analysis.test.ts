@@ -1,6 +1,50 @@
-import { describe, expect, it } from "vitest";
-import { mergeRotationEditSuggestion } from "./media-analysis";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  mergeRotationEditSuggestion,
+  parseAiVisionLocation,
+  upsertPhotoAnalysisResult,
+} from "./media-analysis";
+import { __closeDesktopDatabaseForTesting, getDesktopDatabase, initDesktopDatabase } from "./client";
 import type { FaceOrientationMetadata } from "@emk/media-metadata-core";
+import type { PhotoAnalysisOutput } from "../../src/shared/ipc";
+
+function canOpenSqlite(): boolean {
+  let probeDir: string | null = null;
+  try {
+    probeDir = fs.mkdtempSync(path.join(os.tmpdir(), "emk-sqlite-probe-"));
+    initDesktopDatabase(probeDir);
+    __closeDesktopDatabaseForTesting();
+    return true;
+  } catch {
+    return false;
+  } finally {
+    __closeDesktopDatabaseForTesting();
+    if (probeDir) {
+      fs.rmSync(probeDir, { recursive: true, force: true });
+    }
+  }
+}
+
+const HAS_SQLITE = canOpenSqlite();
+
+function photoAnalysisFixture(input: {
+  image_category: string;
+  title: string;
+  description: string;
+  location?: string | null;
+}): PhotoAnalysisOutput {
+  return {
+    ...input,
+    modelInfo: {
+      model: "test-model",
+      promptVersion: "test-prompt",
+      timestamp: "2026-01-01T00:00:00.000Z",
+    },
+  };
+}
 
 describe("mergeRotationEditSuggestion", () => {
   it("returns null when there is nothing to add and no existing entries", () => {
@@ -91,5 +135,158 @@ describe("mergeRotationEditSuggestion", () => {
     const result = mergeRotationEditSuggestion(existing, upright, "face_landmarks");
     expect(result).toHaveLength(1);
     expect(((result as Record<string, unknown>[])[0]).source).toBe("photo-analysis");
+  });
+});
+
+describe("parseAiVisionLocation", () => {
+  it("parses the current VLM prompt format as country, then city", () => {
+    expect(parseAiVisionLocation("United States, New York City")).toEqual({
+      country: "United States",
+      city: "New York City",
+      placeName: null,
+      raw: "United States, New York City",
+    });
+  });
+
+  it("keeps extra location parts as a place name", () => {
+    expect(parseAiVisionLocation("United States, New York City, Times Square")).toEqual({
+      country: "United States",
+      city: "New York City",
+      placeName: "Times Square",
+      raw: "United States, New York City, Times Square",
+    });
+  });
+
+  it("strips model-emitted labels and null placeholders", () => {
+    expect(parseAiVisionLocation("Country: Switzerland, City: Zurich")).toEqual({
+      country: "Switzerland",
+      city: "Zurich",
+      placeName: null,
+      raw: "Country: Switzerland, City: Zurich",
+    });
+    expect(parseAiVisionLocation("Switzerland, null")).toEqual({
+      country: "Switzerland",
+      city: null,
+      placeName: null,
+      raw: "Switzerland, null",
+    });
+  });
+
+  it("repairs reversed city-country output when the country is recognizable", () => {
+    expect(parseAiVisionLocation("Milan, Italy")).toEqual({
+      country: "Italy",
+      city: "Milan",
+      placeName: null,
+      raw: "Milan, Italy",
+    });
+  });
+
+  it("does not guess country or city from a single ambiguous value", () => {
+    expect(parseAiVisionLocation("Times Square")).toEqual({
+      country: null,
+      city: null,
+      placeName: null,
+      raw: "Times Square",
+    });
+  });
+});
+
+describe.skipIf(!HAS_SQLITE)("upsertPhotoAnalysisResult location persistence", () => {
+  let tmpDir = "";
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "emk-media-analysis-"));
+    initDesktopDatabase(tmpDir);
+  });
+
+  afterEach(() => {
+    __closeDesktopDatabaseForTesting();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("stores current VLM location output in separate country and city fields", () => {
+    const id = upsertPhotoAnalysisResult("C:/photos/times-square.jpg", photoAnalysisFixture({
+      image_category: "architecture",
+      title: "Times Square",
+      description: "A busy city square with billboards.",
+      location: "United States, New York City",
+    }));
+
+    const row = getDesktopDatabase()
+      .prepare(
+        `SELECT country, city, location_source, ai_metadata
+         FROM media_items
+         WHERE id = ?`,
+      )
+      .get(id) as {
+      country: string | null;
+      city: string | null;
+      location_source: string | null;
+      ai_metadata: string;
+    };
+    const metadata = JSON.parse(row.ai_metadata) as {
+      image_analysis?: {
+        location?: {
+          country?: string | null;
+          city?: string | null;
+          source?: string;
+        };
+      };
+    };
+
+    expect(row.country).toBe("United States");
+    expect(row.city).toBe("New York City");
+    expect(row.location_source).toBe("ai_vision");
+    expect(metadata.image_analysis?.location).toMatchObject({
+      country: "United States",
+      city: "New York City",
+      source: "ai",
+    });
+  });
+
+  it("does not overwrite GPS catalog location fields with AI location", () => {
+    const now = "2026-01-01T00:00:00.000Z";
+    const db = getDesktopDatabase();
+    db.prepare(
+      `INSERT INTO media_items (
+        id, library_id, source_path, filename, country, city, location_area, location_source,
+        created_at, updated_at
+      ) VALUES ('gps-item', 'local-default', ?, 'gps.jpg', 'Germany', 'Berlin', 'Berlin', 'gps', ?, ?)`,
+    ).run("C:/photos/gps.jpg", now, now);
+
+    upsertPhotoAnalysisResult("C:/photos/gps.jpg", photoAnalysisFixture({
+      image_category: "architecture",
+      title: "Times Square",
+      description: "A busy city square with billboards.",
+      location: "United States, New York City",
+    }));
+
+    const row = db
+      .prepare(
+        `SELECT country, city, location_area, location_source, ai_metadata
+         FROM media_items
+         WHERE id = 'gps-item'`,
+      )
+      .get() as {
+      country: string | null;
+      city: string | null;
+      location_area: string | null;
+      location_source: string | null;
+      ai_metadata: string;
+    };
+
+    expect(row.country).toBe("Germany");
+    expect(row.city).toBe("Berlin");
+    expect(row.location_area).toBe("Berlin");
+    expect(row.location_source).toBe("gps");
+    expect(JSON.parse(row.ai_metadata)).toMatchObject({
+      image_analysis: {
+        location: {
+          country: "United States",
+          city: "New York City",
+          source: "ai",
+        },
+      },
+    });
   });
 });

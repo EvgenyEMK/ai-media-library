@@ -23,6 +23,7 @@ import {
 import { getDesktopDatabase } from "./client";
 import { DEFAULT_LIBRARY_ID } from "./folder-analysis-status";
 import { getFtsFieldsFromAiMetadata, starRatingToFtsTokens, upsertFtsEntry } from "./keyword-search";
+import { ISO_COUNTRY_NAMES } from "../geocoder/country-codes";
 
 /** Keep IN-list size well under SQLite's default 999-variable limit (leaving room for fixed params). */
 const IN_CHUNK_SIZE = 900;
@@ -148,7 +149,12 @@ export function upsertPhotoAnalysisResult(
   const now = new Date().toISOString();
   const filename = path.basename(photoPath);
   const location = result.location?.trim() ?? null;
-  const { city, country } = splitLocation(result.location);
+  const aiVisionLocation = parseAiVisionLocation(result.location);
+  const hasAiVisionCatalogLocation =
+    aiVisionLocation !== null &&
+    (aiVisionLocation.country !== null ||
+      aiVisionLocation.city !== null ||
+      aiVisionLocation.placeName !== null);
   const peopleDetected =
     typeof result.number_of_people === "number" ? Math.max(0, Math.floor(result.number_of_people)) : null;
   const { ageMin, ageMax } = inferAgeRange(result);
@@ -178,9 +184,11 @@ export function upsertPhotoAnalysisResult(
         image_category: (result.image_category as MediaImageCategory) ?? null,
         title: result.title ?? null,
         description: result.description ?? null,
-        location: result.location
+        location: aiVisionLocation
           ? {
-              country: result.location,
+              country: aiVisionLocation.country,
+              city: aiVisionLocation.city,
+              place_name: aiVisionLocation.placeName,
               source: "ai",
             }
           : null,
@@ -249,6 +257,8 @@ export function upsertPhotoAnalysisResult(
       location_name,
       city,
       country,
+      location_place,
+      location_source,
       people_detected,
       age_min,
       age_max,
@@ -256,12 +266,30 @@ export function upsertPhotoAnalysisResult(
       photo_analysis_processed_at,
       created_at,
       updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(library_id, source_path) DO UPDATE SET
       filename = excluded.filename,
-      location_name = excluded.location_name,
-      city = excluded.city,
-      country = excluded.country,
+      location_name = COALESCE(excluded.location_name, media_items.location_name),
+      city = CASE
+        WHEN media_items.location_source IN ('gps', 'embedded_xmp', 'path_llm', 'path_script')
+          THEN media_items.city
+        ELSE COALESCE(excluded.city, media_items.city)
+      END,
+      country = CASE
+        WHEN media_items.location_source IN ('gps', 'embedded_xmp', 'path_llm', 'path_script')
+          THEN media_items.country
+        ELSE COALESCE(excluded.country, media_items.country)
+      END,
+      location_place = CASE
+        WHEN media_items.location_source IN ('gps', 'embedded_xmp', 'path_llm', 'path_script')
+          THEN media_items.location_place
+        ELSE COALESCE(excluded.location_place, media_items.location_place)
+      END,
+      location_source = CASE
+        WHEN media_items.location_source IN ('gps', 'embedded_xmp', 'path_llm', 'path_script')
+          THEN media_items.location_source
+        ELSE COALESCE(excluded.location_source, media_items.location_source)
+      END,
       people_detected = excluded.people_detected,
       age_min = excluded.age_min,
       age_max = excluded.age_max,
@@ -276,8 +304,10 @@ export function upsertPhotoAnalysisResult(
     photoPath,
     filename,
     location,
-    city,
-    country,
+    aiVisionLocation?.city ?? null,
+    aiVisionLocation?.country ?? null,
+    aiVisionLocation?.placeName ?? null,
+    hasAiVisionCatalogLocation ? "ai_vision" : null,
     peopleDetectedForSearch,
     ageMin,
     ageMax,
@@ -336,21 +366,68 @@ export function buildCaptionText(result: PhotoAnalysisOutput): string {
   return chunks.join(". ");
 }
 
-function splitLocation(location: string | null | undefined): { city: string | null; country: string | null } {
+export interface AiVisionLocation {
+  country: string | null;
+  city: string | null;
+  placeName: string | null;
+  raw: string;
+}
+
+const KNOWN_COUNTRY_NAMES = new Set(
+  Object.values(ISO_COUNTRY_NAMES).map((name) => name.trim().toLowerCase()),
+);
+for (const alias of ["usa", "u.s.a.", "us", "u.s.", "uk", "u.k."]) {
+  KNOWN_COUNTRY_NAMES.add(alias);
+}
+
+export function parseAiVisionLocation(location: string | null | undefined): AiVisionLocation | null {
   if (!location) {
-    return { city: null, country: null };
+    return null;
   }
+  const raw = location.trim();
   const parts = location
     .split(",")
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0);
+    .map(normalizeAiLocationPart)
+    .filter((part): part is string => part !== null);
   if (parts.length === 0) {
-    return { city: null, country: null };
+    return null;
   }
   if (parts.length === 1) {
-    return { city: parts[0], country: null };
+    const only = parts[0] ?? null;
+    return {
+      country: only && isKnownCountryName(only) ? only : null,
+      city: null,
+      placeName: null,
+      raw,
+    };
   }
-  return { city: parts[0], country: parts[parts.length - 1] };
+  const first = parts[0] ?? null;
+  const second = parts[1] ?? null;
+  const firstIsCountry = first ? isKnownCountryName(first) : false;
+  const secondIsCountry = second ? isKnownCountryName(second) : false;
+  const country = secondIsCountry && !firstIsCountry ? second : first;
+  const city = secondIsCountry && !firstIsCountry ? first : second;
+  return {
+    country,
+    city,
+    placeName: parts.length > 2 ? parts.slice(2).join(", ") : null,
+    raw,
+  };
+}
+
+function normalizeAiLocationPart(value: string): string | null {
+  const stripped = value
+    .trim()
+    .replace(/^(country|city|area|state|province|place)\s*:\s*/i, "")
+    .trim();
+  if (!stripped || /^(null|none|unknown|n\/a|na)$/i.test(stripped)) {
+    return null;
+  }
+  return stripped;
+}
+
+function isKnownCountryName(value: string): boolean {
+  return KNOWN_COUNTRY_NAMES.has(value.trim().toLowerCase());
 }
 
 function inferAgeRange(result: PhotoAnalysisOutput): { ageMin: number | null; ageMax: number | null } {
