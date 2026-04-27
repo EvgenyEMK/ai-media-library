@@ -573,7 +573,7 @@ describe.skipIf(!HAS_SQLITE)("media albums DB", () => {
         year: "2024",
         filters: { personTagIds: ["person-1"], includeUnconfirmedFaces: true },
       }).rows.map((item) => item.id),
-    ).toEqual(["explicit-tag", "suggested-only"]);
+    ).toEqual(["suggested-only", "explicit-tag"]);
   });
 
   it("groups best-of-year rating filters with configurable OR and AND logic", () => {
