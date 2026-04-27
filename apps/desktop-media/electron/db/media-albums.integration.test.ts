@@ -547,8 +547,8 @@ describe.skipIf(!HAS_SQLITE)("media albums DB", () => {
       .getDesktopDatabase()
       .prepare(
         `INSERT INTO media_face_instances (
-          id, library_id, media_item_id, tag_id, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?)`,
+          id, library_id, media_item_id, source, tag_id, created_at, updated_at
+        ) VALUES (?, ?, ?, 'manual', ?, ?, ?)`,
       )
       .run("face-explicit", LIBRARY_ID, "explicit-tag", "person-1", now, now);
     client
