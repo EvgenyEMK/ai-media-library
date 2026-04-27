@@ -1,6 +1,7 @@
 import type { Dispatch, ReactElement, RefObject, SetStateAction } from "react";
 import type { ImageEditSuggestionsItem } from "@emk/media-viewer";
 import type { SemanticSearchResult } from "@emk/media-store";
+import type { SmartAlbumRootKind } from "@emk/shared-contracts";
 import type { ThumbnailQuickFilterState } from "@emk/media-metadata-core";
 import { DesktopMainToolbar } from "./DesktopMainToolbar";
 import { DesktopMediaWorkspace } from "./DesktopMediaWorkspace";
@@ -30,6 +31,7 @@ interface DesktopAppMainProps {
   isAlbumsSectionOpen: boolean;
   albumWorkspaceMode: AlbumWorkspaceMode;
   setAlbumWorkspaceMode: Dispatch<SetStateAction<AlbumWorkspaceMode>>;
+  smartAlbumRootKind: SmartAlbumRootKind;
   albumSearchControlsOpen: boolean;
   setAlbumSearchControlsOpen: Dispatch<SetStateAction<boolean>>;
   isSettingsSectionOpen: boolean;
@@ -43,6 +45,7 @@ interface DesktopAppMainProps {
   wrongImageRotationDetectionSettings: DesktopStoreState["wrongImageRotationDetectionSettings"];
   photoAnalysisSettings: DesktopStoreState["photoAnalysisSettings"];
   folderScanningSettings: DesktopStoreState["folderScanningSettings"];
+  smartAlbumSettings: DesktopStoreState["smartAlbumSettings"];
   aiImageSearchSettings: DesktopStoreState["aiImageSearchSettings"];
   hideAdvancedSettings: boolean;
   mediaViewerSettings: DesktopStoreState["mediaViewerSettings"];
@@ -100,6 +103,7 @@ export function DesktopAppMain({
   isAlbumsSectionOpen,
   albumWorkspaceMode,
   setAlbumWorkspaceMode,
+  smartAlbumRootKind,
   albumSearchControlsOpen,
   setAlbumSearchControlsOpen,
   isSettingsSectionOpen,
@@ -108,6 +112,7 @@ export function DesktopAppMain({
   wrongImageRotationDetectionSettings,
   photoAnalysisSettings,
   folderScanningSettings,
+  smartAlbumSettings,
   aiImageSearchSettings,
   hideAdvancedSettings,
   mediaViewerSettings,
@@ -161,10 +166,11 @@ export function DesktopAppMain({
   return (
     <main className="main-panel relative flex min-h-0 min-w-0 flex-col overflow-hidden">
       {isAlbumsSectionOpen ? (
-        <div className="min-h-0 flex-1 overflow-auto">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <DesktopAlbumsWorkspace
             mode={albumWorkspaceMode}
             onModeChange={setAlbumWorkspaceMode}
+            smartAlbumRootKind={smartAlbumRootKind}
             searchControlsOpen={albumSearchControlsOpen}
             onSearchControlsOpenChange={setAlbumSearchControlsOpen}
           />
@@ -180,6 +186,7 @@ export function DesktopAppMain({
             wrongImageRotationDetectionSettings={wrongImageRotationDetectionSettings}
             photoAnalysisSettings={photoAnalysisSettings}
             folderScanningSettings={folderScanningSettings}
+            smartAlbumSettings={smartAlbumSettings}
             aiImageSearchSettings={aiImageSearchSettings}
             hideAdvancedSettings={hideAdvancedSettings}
             mediaViewerSettings={mediaViewerSettings}
@@ -194,6 +201,10 @@ export function DesktopAppMain({
             onFolderScanningSettingChange={(key, value) =>
               store.getState().updateFolderScanningSetting(key, value)
             }
+            onSmartAlbumSettingChange={(key, value) =>
+              store.getState().updateSmartAlbumSetting(key, value)
+            }
+            onResetSmartAlbumSettings={() => store.getState().resetSmartAlbumSettings()}
             onResetFolderScanningSectionSettings={() => {
               store.getState().resetFolderScanningSettings();
               store.getState().resetPathExtractionSettings();

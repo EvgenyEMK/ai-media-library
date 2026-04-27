@@ -257,7 +257,9 @@ export function MediaItemStarRating({
 
   if (expanded && interactive && onChange) {
     const expandedBoxStyle: CSSProperties =
-      tone === "onCard" ? { ...badgeOnCardStyle, backdropFilter: "none" } : badgeOnPhotoStyle;
+      tone === "onCard"
+        ? { ...badgeOnCardStyle, backdropFilter: "none", gap: 2, padding: "2px 4px" }
+        : { ...badgeOnPhotoStyle, gap: 2, padding: "2px 4px" };
     const showClearControl = hasStarRatingToClear(starRating, showRejectedIndicator);
 
     return (
@@ -271,32 +273,39 @@ export function MediaItemStarRating({
         onPointerDown={(e) => e.stopPropagation()}
         onMouseLeave={() => setHoverStar(null)}
       >
-        {showClearControl ? (
-          <button
-            type="button"
-            aria-label="Clear star rating"
-            title="Clear rating"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 0,
-              marginRight: 2,
-              border: "none",
-              borderRadius: 4,
-              background: "transparent",
-              cursor: "pointer",
-            }}
-            onMouseEnter={() => setHoverStar(null)}
-            onClick={(e) => {
-              e.stopPropagation();
-              setHoverStar(null);
-              onChange(0);
-            }}
-          >
-            <IconUnset size={18} stroke={tone === "onPhoto" ? "rgba(248,250,252,0.9)" : "hsl(var(--foreground))"} />
-          </button>
-        ) : null}
+        <button
+          type="button"
+          aria-label="Clear star rating"
+          title="Clear rating"
+          tabIndex={showClearControl ? 0 : -1}
+          disabled={!showClearControl}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 20,
+            height: 22,
+            padding: 0,
+            marginRight: 2,
+            border: "none",
+            borderRadius: 4,
+            background: "transparent",
+            cursor: showClearControl ? "pointer" : "default",
+            opacity: showClearControl ? 1 : 0,
+            pointerEvents: showClearControl ? "auto" : "none",
+          }}
+          onMouseEnter={() => setHoverStar(null)}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!showClearControl) {
+              return;
+            }
+            setHoverStar(null);
+            onChange(0);
+          }}
+        >
+          <IconUnset size={18} stroke={tone === "onPhoto" ? "rgba(248,250,252,0.9)" : "hsl(var(--foreground))"} />
+        </button>
         <div style={{ ...rowStyle, gap: 2 }}>
           {[1, 2, 3, 4, 5].map((n) => (
             <button

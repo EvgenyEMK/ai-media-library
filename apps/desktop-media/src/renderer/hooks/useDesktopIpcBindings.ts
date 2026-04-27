@@ -117,6 +117,7 @@ export function useDesktopInitialization(): void {
             s.aiSelectedModel = settings.photoAnalysis.model;
           }
           s.folderScanningSettings = settings.folderScanning;
+          s.smartAlbumSettings = settings.smartAlbums;
           s.aiImageSearchSettings = settings.aiImageSearch;
           s.mediaViewerSettings = settings.mediaViewer;
           s.pathExtractionSettings = settings.pathExtraction;
@@ -307,6 +308,14 @@ export function useDesktopSettingsPersistence(): void {
             prev.folderScanningSettings.writeEmbeddedMetadataOnUserEdit ||
           state.folderScanningSettings.detectLocationFromGps !==
             prev.folderScanningSettings.detectLocationFromGps ||
+          state.smartAlbumSettings.defaultStarRating !==
+            prev.smartAlbumSettings.defaultStarRating ||
+          state.smartAlbumSettings.defaultStarRatingOperator !==
+            prev.smartAlbumSettings.defaultStarRatingOperator ||
+          state.smartAlbumSettings.defaultAiRating !==
+            prev.smartAlbumSettings.defaultAiRating ||
+          state.smartAlbumSettings.defaultAiRatingOperator !==
+            prev.smartAlbumSettings.defaultAiRatingOperator ||
           state.aiImageSearchSettings.hideResultsBelowVlmSimilarity !==
             prev.aiImageSearchSettings.hideResultsBelowVlmSimilarity ||
           state.aiImageSearchSettings.hideResultsBelowDescriptionSimilarity !==
@@ -342,6 +351,7 @@ export function useDesktopSettingsPersistence(): void {
             faceDetection: state.faceDetectionSettings,
             photoAnalysis: state.photoAnalysisSettings,
             folderScanning: state.folderScanningSettings,
+            smartAlbums: state.smartAlbumSettings,
             aiImageSearch: state.aiImageSearchSettings,
             mediaViewer: state.mediaViewerSettings,
             pathExtraction: state.pathExtractionSettings,

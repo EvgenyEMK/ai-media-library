@@ -163,6 +163,11 @@ const api: DesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.removeMediaItemFromAlbum, albumId, mediaItemId),
   setAlbumCover: (albumId, mediaItemId) =>
     ipcRenderer.invoke(IPC_CHANNELS.setAlbumCover, albumId, mediaItemId),
+  listSmartAlbumPlaces: (request) =>
+    ipcRenderer.invoke(IPC_CHANNELS.listSmartAlbumPlaces, request),
+  listSmartAlbumYears: (request) => ipcRenderer.invoke(IPC_CHANNELS.listSmartAlbumYears, request),
+  listSmartAlbumItems: (request) =>
+    ipcRenderer.invoke(IPC_CHANNELS.listSmartAlbumItems, request),
   onMediaItemMetadataRefreshed: (listener) => {
     const wrapped = (
       _event: Electron.IpcRendererEvent,
@@ -326,7 +331,8 @@ const api: DesktopApi = {
       ipcRenderer.removeListener(IPC_CHANNELS.pathAnalysisProgress, wrapped);
     };
   },
-  initGeocoder: () => ipcRenderer.invoke(IPC_CHANNELS.initGeocoder),
+  getGeocoderCacheStatus: () => ipcRenderer.invoke(IPC_CHANNELS.getGeocoderCacheStatus),
+  initGeocoder: (options) => ipcRenderer.invoke(IPC_CHANNELS.initGeocoder, options),
   onGeocoderInitProgress: (listener) => {
     const wrapped = (
       _event: Electron.IpcRendererEvent,

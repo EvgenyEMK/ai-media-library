@@ -42,7 +42,18 @@ function formatCatalogLocationLine(metadata: DesktopMediaItemMetadata): string |
   const parts = [metadata.country, metadata.locationArea, metadata.city].filter(
     (part): part is string => typeof part === "string" && hasVisibleFieldValue(part),
   );
-  return parts.length > 0 ? parts.join(" | ") : null;
+  if (parts.length === 0) {
+    return null;
+  }
+  const base = parts.join(" | ");
+  const source = (metadata.locationSource ?? "").trim().toLowerCase();
+  if (source === "path_llm" || source === "path_script") {
+    return `${base} (based on AI file path analysis)`;
+  }
+  if (source === "ai_vision") {
+    return `${base} (based on AI image analysis)`;
+  }
+  return base;
 }
 
 function primaryInfoHeadline(item: DesktopViewerItem, metadata: DesktopMediaItemMetadata): string {

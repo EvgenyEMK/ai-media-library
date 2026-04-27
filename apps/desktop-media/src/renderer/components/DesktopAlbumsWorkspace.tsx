@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
-import { ArrowLeft, Filter, Grid3X3, List, Plus, Search, Undo2 } from "lucide-react";
 import {
   DEFAULT_THUMBNAIL_QUICK_FILTERS,
   countActiveQuickFilters,
   type ThumbnailQuickFilterState,
 } from "@emk/media-metadata-core";
-import type { AlbumMediaItem } from "@emk/shared-contracts";
+import type {
+  AlbumMediaItem,
+  SmartAlbumFilters,
+  SmartAlbumPlacesRequest,
+  SmartAlbumRootKind,
+} from "@emk/shared-contracts";
 import type { DesktopPersonTagWithFaceCount } from "../../shared/ipc";
 import { createDesktopAlbumActions } from "../actions/album-actions";
 import { PeoplePaginationBar } from "./people-pagination-bar";
@@ -17,14 +21,30 @@ import type { AlbumWorkspaceMode } from "../types/app-types";
 import { DesktopAlbumCard } from "./DesktopAlbumCard";
 import { DesktopAlbumContentGrid } from "./DesktopAlbumContentGrid";
 import { ALBUM_ITEMS_PAGE_SIZE } from "./DesktopAlbumDetailPanel";
-import { QuickFiltersMenu } from "./QuickFiltersMenu";
-import { ToolbarIconButton } from "./ToolbarIconButton";
+import { BestOfYearFiltersPanel } from "./BestOfYearFiltersPanel";
+import { DesktopAlbumsWorkspaceHeader } from "./DesktopAlbumsWorkspaceHeader";
+import { SmartAlbumsWorkspace } from "./SmartAlbumsWorkspace";
+import { EMPTY_SMART_ALBUM_FILTERS, smartAlbumSettingsToFilters, useSmartAlbums } from "./useSmartAlbums";
 
 const ALBUM_PAGE_SIZE = 24;
+
+function countActiveSmartAlbumFilters(filters: SmartAlbumFilters): number {
+  let count = 0;
+  if (filters.query?.trim()) count += 1;
+  if ((filters.personTagIds ?? []).length > 0) count += 1;
+  if (Number.isFinite(filters.starRatingMin)) count += 1;
+  if (Number.isFinite(filters.aiAestheticMin)) count += 1;
+  return count;
+}
+
+function smartAlbumFiltersEqual(left: SmartAlbumFilters, right: SmartAlbumFilters): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
 
 interface DesktopAlbumsWorkspaceProps {
   mode: AlbumWorkspaceMode;
   onModeChange: (mode: AlbumWorkspaceMode) => void;
+  smartAlbumRootKind: SmartAlbumRootKind;
   searchControlsOpen: boolean;
   onSearchControlsOpenChange: (open: boolean) => void;
 }
@@ -32,6 +52,7 @@ interface DesktopAlbumsWorkspaceProps {
 export function DesktopAlbumsWorkspace({
   mode,
   onModeChange,
+  smartAlbumRootKind,
   searchControlsOpen,
   onSearchControlsOpenChange,
 }: DesktopAlbumsWorkspaceProps): ReactElement {
@@ -39,8 +60,15 @@ export function DesktopAlbumsWorkspace({
   const albums = useDesktopStore((s) => s.albums);
   const selectedAlbumId = useDesktopStore((s) => s.selectedAlbumId);
   const viewMode = useDesktopStore((s) => s.viewMode);
+  const smartAlbumSettings = useDesktopStore((s) => s.smartAlbumSettings);
   const actions = useMemo(() => createDesktopAlbumActions(store), [store]);
   const quickFiltersMenuWrapRef = useRef<HTMLDivElement>(null);
+  const defaultSmartAlbumFilters = useMemo(
+    () => smartAlbumSettingsToFilters(smartAlbumSettings),
+    [smartAlbumSettings],
+  );
+  const previousDefaultSmartAlbumFiltersRef = useRef(defaultSmartAlbumFilters);
+  const smartAlbums = useSmartAlbums(defaultSmartAlbumFilters);
 
   const [titleQuery, setTitleQuery] = useState("");
   const [locationQuery, setLocationQuery] = useState("");
@@ -53,22 +81,90 @@ export function DesktopAlbumsWorkspace({
   const [albumItemsPage, setAlbumItemsPage] = useState(0);
   const [albumItems, setAlbumItems] = useState<AlbumMediaItem[]>([]);
   const [albumItemsTotal, setAlbumItemsTotal] = useState(0);
+  const {
+    smartPlaceCountries,
+    setSmartPlaceCountries,
+    smartYears,
+    setSmartYears,
+    expandedSmartCountries,
+    setExpandedSmartCountries,
+    expandedSmartGroups,
+    setExpandedSmartGroups,
+    activeSmartAlbum,
+    setActiveSmartAlbum,
+    smartItemsPage,
+    setSmartItemsPage,
+    smartItems,
+    setSmartItems,
+    smartItemsTotal,
+    setSmartItemsTotal,
+    smartAlbumFilters,
+    setSmartAlbumFilters,
+    randomizeEnabled,
+    setRandomizeEnabled,
+    randomRefreshKey,
+    refreshRandomOrder,
+    randomCandidateLimit,
+  } = smartAlbums;
   const [newTitle, setNewTitle] = useState("");
   const [albumQuickFilters, setAlbumQuickFilters] = useState<ThumbnailQuickFilterState>(
     DEFAULT_THUMBNAIL_QUICK_FILTERS,
   );
   const [albumQuickFiltersOpen, setAlbumQuickFiltersOpen] = useState(false);
+  const [smartFilterPanelOpen, setSmartFilterPanelOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const selectedAlbum = albums.find((album) => album.id === selectedAlbumId) ?? null;
+  const smartPlaceRequest = useMemo<SmartAlbumPlacesRequest | null>(
+    () =>
+      smartAlbumRootKind === "best-of-year"
+        ? null
+        : {
+            grouping:
+              smartAlbumRootKind === "country-area-city"
+                ? "area-city"
+                : smartAlbumRootKind === "country-month-area"
+                  ? "month-area"
+                  : "year-city",
+            source: smartAlbumRootKind === "ai-countries" ? "non-gps" : "gps",
+          },
+    [smartAlbumRootKind],
+  );
+  const smartPlaceRootTitle =
+    smartAlbumRootKind === "country-area-city"
+      ? "Country > Area > City"
+      : smartAlbumRootKind === "country-month-area"
+        ? "Country > YYYY-MM Area"
+      : smartAlbumRootKind === "ai-countries"
+        ? "AI countries"
+        : "Country > Year > Area";
+  const smartPlaceGroupLabel =
+    smartPlaceRequest?.grouping === "area-city"
+      ? "areas"
+      : smartPlaceRequest?.grouping === "month-area"
+        ? "months"
+        : "years";
+  const smartPlaceEntryLabel =
+    smartPlaceRequest?.grouping === "area-city"
+      ? "cities"
+      : smartPlaceRequest?.grouping === "month-area"
+        ? "areas"
+        : "areas";
   const personTagKey = personTagIds.join("|");
+  const smartFilterPersonTagKey = (smartAlbumFilters.personTagIds ?? []).join("|");
   const showingCreate = mode === "create";
   const showingDetail = mode === "detail" && selectedAlbum !== null;
+  const showingSmart = mode === "smart";
   const albumQuickFiltersActiveCount = useMemo(
     () => countActiveQuickFilters(albumQuickFilters),
     [albumQuickFilters],
   );
+  const smartFiltersActiveCount = useMemo(
+    () => countActiveSmartAlbumFilters(smartAlbumFilters),
+    [smartAlbumFilters],
+  );
+  const showSmartFilterPanel = smartFilterPanelOpen || smartFiltersActiveCount === 0;
 
   const loadAlbums = useCallback(async () => {
     setIsLoading(true);
@@ -106,6 +202,80 @@ export function DesktopAlbumsWorkspace({
     setAlbumItemsTotal(result.totalCount);
   }, [actions, albumItemsPage, selectedAlbumId]);
 
+  const loadSmartRoots = useCallback(async () => {
+    if (!showingSmart) {
+      return;
+    }
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      if (smartPlaceRequest) {
+        const result = await actions.loadSmartAlbumPlaces(smartPlaceRequest);
+        setSmartPlaceCountries(result.countries);
+      } else {
+        const result = await actions.loadSmartAlbumYears({ filters: smartAlbumFilters });
+        setSmartYears(result.years);
+      }
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to load smart albums.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [actions, showingSmart, smartAlbumRootKind, smartAlbumFilters, smartPlaceRequest]);
+
+  const loadSmartAlbumItems = useCallback(async () => {
+    if (!activeSmartAlbum) {
+      setSmartItems([]);
+      setSmartItemsTotal(0);
+      return;
+    }
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      const result = activeSmartAlbum.kind === "place"
+        ? await actions.loadSmartAlbumItems({
+            kind: "place",
+            country: activeSmartAlbum.entry.country,
+            city: activeSmartAlbum.entry.city,
+            group: activeSmartAlbum.entry.group,
+            grouping: smartPlaceRequest?.grouping ?? "year-city",
+            source: smartPlaceRequest?.source ?? "gps",
+            offset: smartItemsPage * ALBUM_ITEMS_PAGE_SIZE,
+            limit: ALBUM_ITEMS_PAGE_SIZE,
+          })
+        : await actions.loadSmartAlbumItems({
+            kind: "best-of-year",
+            year: activeSmartAlbum.year,
+            randomize: randomizeEnabled,
+            randomCandidateLimit,
+            filters: smartAlbumFilters,
+            offset: smartItemsPage * ALBUM_ITEMS_PAGE_SIZE,
+            limit: ALBUM_ITEMS_PAGE_SIZE,
+          });
+      setSmartItems(result.rows);
+      setSmartItemsTotal(result.totalCount);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to load smart album items.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [
+    actions,
+    activeSmartAlbum,
+    randomCandidateLimit,
+    randomizeEnabled,
+    randomRefreshKey,
+    smartAlbumFilters,
+    smartItemsPage,
+    smartPlaceRequest,
+  ]);
+
+  const refreshAlbumDetailState = useCallback((): void => {
+    void Promise.all([loadAlbumItems(), loadAlbums()]).catch((error) => {
+      setErrorMessage(error instanceof Error ? error.message : "Failed to load album items.");
+    });
+  }, [loadAlbumItems, loadAlbums]);
+
   useEffect(() => {
     void window.desktopApi.listPersonTagsWithFaceCounts().then((tags: DesktopPersonTagWithFaceCount[]) => {
       setPersonTags(
@@ -120,6 +290,14 @@ export function DesktopAlbumsWorkspace({
   }, []);
 
   useEffect(() => {
+    const previousDefault = previousDefaultSmartAlbumFiltersRef.current;
+    previousDefaultSmartAlbumFiltersRef.current = defaultSmartAlbumFilters;
+    setSmartAlbumFilters((current) =>
+      smartAlbumFiltersEqual(current, previousDefault) ? defaultSmartAlbumFilters : current,
+    );
+  }, [defaultSmartAlbumFilters, setSmartAlbumFilters]);
+
+  useEffect(() => {
     void loadAlbums();
   }, [loadAlbums, personTagKey]);
 
@@ -130,12 +308,67 @@ export function DesktopAlbumsWorkspace({
   }, [loadAlbumItems]);
 
   useEffect(() => {
+    if (!showingSmart) {
+      return;
+    }
+    setActiveSmartAlbum(null);
+    setExpandedSmartCountries([]);
+    setExpandedSmartGroups([]);
+    setSmartItemsPage(0);
+    void loadSmartRoots();
+  }, [showingSmart, smartAlbumRootKind]);
+
+  useEffect(() => {
+    if (!showingSmart) {
+      return;
+    }
+    void loadSmartAlbumItems();
+  }, [loadSmartAlbumItems, showingSmart]);
+
+  useEffect(() => {
+    if (!showingSmart || smartPlaceRequest || activeSmartAlbum) {
+      return;
+    }
+    void loadSmartRoots();
+  }, [
+    activeSmartAlbum,
+    loadSmartRoots,
+    showingSmart,
+    smartAlbumFilters.query,
+    smartFilterPersonTagKey,
+    smartAlbumFilters.includeUnconfirmedFaces,
+    smartAlbumFilters.starRatingMin,
+    smartAlbumFilters.aiAestheticMin,
+    smartAlbumFilters.starRatingOperator,
+    smartAlbumFilters.aiAestheticOperator,
+    smartAlbumFilters.ratingLogic,
+    smartPlaceRequest,
+  ]);
+
+  useEffect(() => {
     setAlbumPage(0);
   }, [titleQuery, locationQuery, yearMonthFrom, yearMonthTo, personTagKey]);
 
   useEffect(() => {
     setAlbumItemsPage(0);
   }, [selectedAlbum?.id]);
+
+  useEffect(() => {
+    setSmartItemsPage(0);
+  }, [activeSmartAlbum]);
+
+  useEffect(() => {
+    setSmartItemsPage(0);
+  }, [
+    smartAlbumFilters.query,
+    smartFilterPersonTagKey,
+    smartAlbumFilters.includeUnconfirmedFaces,
+    smartAlbumFilters.starRatingMin,
+    smartAlbumFilters.aiAestheticMin,
+    smartAlbumFilters.starRatingOperator,
+    smartAlbumFilters.aiAestheticOperator,
+    smartAlbumFilters.ratingLogic,
+  ]);
 
   useEffect(() => {
     if (!albumQuickFiltersOpen) {
@@ -158,6 +391,16 @@ export function DesktopAlbumsWorkspace({
     );
   };
 
+  const toggleSmartFilterPersonTag = (tagId: string): void => {
+    setSmartAlbumFilters((current) => {
+      const existing = current.personTagIds ?? [];
+      const next = existing.includes(tagId)
+        ? existing.filter((id) => id !== tagId)
+        : [...existing, tagId];
+      return { ...current, personTagIds: next };
+    });
+  };
+
   const handleCreate = async (): Promise<void> => {
     const title = newTitle.trim();
     if (!title) return;
@@ -177,117 +420,75 @@ export function DesktopAlbumsWorkspace({
     onModeChange("list");
   };
 
+  const smartRootTitle = smartAlbumRootKind === "best-of-year" ? "Best of Year" : smartPlaceRootTitle;
+  const activeSmartTitle = activeSmartAlbum?.kind === "place"
+    ? `${activeSmartAlbum.entry.country} > ${activeSmartAlbum.entry.group} > ${activeSmartAlbum.entry.label}`
+    : activeSmartAlbum?.kind === "best-of-year"
+      ? `Best of ${activeSmartAlbum.year}`
+      : smartRootTitle;
+
+  const handleBackToSmartRoot = (): void => {
+    setActiveSmartAlbum(null);
+    setSmartItemsPage(0);
+  };
+
+  const toggleSmartCountry = (country: string): void => {
+    setExpandedSmartCountries((current) =>
+      current.includes(country) ? current.filter((value) => value !== country) : [...current, country],
+    );
+  };
+
+  const toggleSmartGroup = (country: string, group: string): void => {
+    const key = `${country}::${group}`;
+    setExpandedSmartGroups((current) =>
+      current.includes(key) ? current.filter((value) => value !== key) : [...current, key],
+    );
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="border-b border-border bg-card/60 p-4">
-        {showingDetail ? (
-          <div className="flex min-w-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={handleBackToList}
-              className="inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-border hover:bg-muted"
-              aria-label="Back to albums"
-              title="Back to albums"
-            >
-              <ArrowLeft size={18} aria-hidden="true" />
-            </button>
-            <h1 className="mr-auto min-w-0 truncate text-xl font-semibold">{selectedAlbum.title}</h1>
-            <div className="relative flex gap-2" ref={quickFiltersMenuWrapRef}>
-              <ToolbarIconButton
-                title={albumQuickFiltersOpen ? "Close filters" : "Open filters"}
-                ariaExpanded={albumQuickFiltersOpen}
-                ariaPressed={albumQuickFiltersActiveCount > 0}
-                isActive={albumQuickFiltersActiveCount > 0}
-                badgeCount={albumQuickFiltersActiveCount}
-                onClick={() => setAlbumQuickFiltersOpen((open) => !open)}
-              >
-                <Filter size={16} aria-hidden="true" />
-              </ToolbarIconButton>
-              <QuickFiltersMenu
-                isOpen={albumQuickFiltersOpen}
-                filters={albumQuickFilters}
-                onFiltersChange={setAlbumQuickFilters}
-                placementClassName="fixed right-4 top-16 max-h-[calc(100vh-5rem)] overflow-auto"
-              />
-              <ToolbarIconButton
-                title="Grid view"
-                ariaPressed={viewMode === "grid"}
-                isActive={viewMode === "grid"}
-                onClick={() => store.getState().setViewMode("grid")}
-              >
-                <Grid3X3 size={16} aria-hidden="true" />
-              </ToolbarIconButton>
-              <ToolbarIconButton
-                title="List view"
-                ariaPressed={viewMode === "list"}
-                isActive={viewMode === "list"}
-                onClick={() => store.getState().setViewMode("list")}
-              >
-                <List size={16} aria-hidden="true" />
-              </ToolbarIconButton>
-            </div>
-          </div>
-        ) : showingCreate ? (
-          <div className="space-y-3">
-            <h1 className="text-xl font-semibold">Albums</h1>
-            <div className="flex max-w-xl flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => onModeChange("list")}
-                className="inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-border hover:bg-muted"
-                aria-label="Back to albums"
-                title="Back to albums"
-              >
-                <Undo2 size={18} aria-hidden="true" />
-              </button>
-              <Input
-                value={newTitle}
-                onChange={(event) => setNewTitle(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") void handleCreate();
-                }}
-                placeholder="New album title"
-                className="h-9 min-w-0 flex-1"
-              />
-              <button
-                type="button"
-                onClick={() => void handleCreate()}
-                className="rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
-              >
-                Create
-              </button>
-            </div>
-          </div>
-        ) : (
+      <div className="sticky top-0 z-20">
+        <DesktopAlbumsWorkspaceHeader
+          showingSmart={showingSmart}
+          showingDetail={showingDetail}
+          showingCreate={showingCreate}
+          activeSmartTitle={activeSmartTitle}
+          selectedAlbumTitle={selectedAlbum?.title ?? null}
+          activeSmartAlbumKind={activeSmartAlbum?.kind ?? null}
+          smartAlbumRootKind={smartAlbumRootKind}
+          smartFiltersOpen={showSmartFilterPanel}
+          smartFiltersActiveCount={smartFiltersActiveCount}
+          onSmartFiltersOpenChange={setSmartFilterPanelOpen}
+          randomizeEnabled={randomizeEnabled}
+          onRandomizeEnabledChange={(enabled) => {
+            setRandomizeEnabled(enabled);
+            setSmartItemsPage(0);
+          }}
+          onRandomizeRefresh={() => {
+            setSmartItemsPage(0);
+            refreshRandomOrder();
+          }}
+          onBackToSmartRoot={handleBackToSmartRoot}
+          onBackToList={handleBackToList}
+          onModeChange={onModeChange}
+          newTitle={newTitle}
+          onNewTitleChange={setNewTitle}
+          onCreate={() => void handleCreate()}
+          searchControlsOpen={searchControlsOpen}
+          onSearchControlsOpenChange={onSearchControlsOpenChange}
+          store={store}
+          viewMode={viewMode}
+          albumQuickFiltersOpen={albumQuickFiltersOpen}
+          onAlbumQuickFiltersOpenChange={setAlbumQuickFiltersOpen}
+          albumQuickFiltersActiveCount={albumQuickFiltersActiveCount}
+          albumQuickFilters={albumQuickFilters}
+          onAlbumQuickFiltersChange={setAlbumQuickFilters}
+          quickFiltersMenuWrapRef={quickFiltersMenuWrapRef}
+        />
+        {!showingSmart && !showingDetail && !showingCreate ? (
           <>
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="mr-auto text-xl font-semibold">Albums</h1>
-              <button
-                type="button"
-                onClick={() => onSearchControlsOpenChange(!searchControlsOpen)}
-                className={`inline-flex size-9 items-center justify-center rounded-md border border-border hover:bg-muted ${
-                  searchControlsOpen ? "bg-primary/10 text-foreground" : ""
-                }`}
-                aria-label={searchControlsOpen ? "Hide album search" : "Show album search"}
-                title={searchControlsOpen ? "Hide album search" : "Show album search"}
-              >
-                <Search size={18} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  store.getState().selectAlbum(null);
-                  onModeChange("create");
-                }}
-                className="inline-flex size-9 items-center justify-center rounded-md border border-border hover:bg-muted"
-                aria-label="Create album"
-                title="Create album"
-              >
-                <Plus size={18} aria-hidden="true" />
-              </button>
-            </div>
             {searchControlsOpen ? (
-              <>
+              <div className="border-b border-border bg-card/90 px-4 pb-4 backdrop-blur">
                 <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-4">
                   <label className="grid gap-1">
                     <span className="text-xs font-medium text-muted-foreground">Title</span>
@@ -317,26 +518,59 @@ export function DesktopAlbumsWorkspace({
                     onToggleTag={togglePersonTag}
                   />
                 </div>
-              </>
+              </div>
             ) : null}
           </>
-        )}
+        ) : null}
+        {showingSmart && smartAlbumRootKind === "best-of-year" && showSmartFilterPanel ? (
+          <BestOfYearFiltersPanel
+            filters={smartAlbumFilters}
+            personTags={personTags}
+            onClear={() => setSmartAlbumFilters(EMPTY_SMART_ALBUM_FILTERS)}
+            onFiltersChange={setSmartAlbumFilters}
+            onTogglePersonTag={toggleSmartFilterPersonTag}
+          />
+        ) : null}
       </div>
       {errorMessage ? (
         <div className="mx-4 mt-3 rounded-md border border-destructive/60 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {errorMessage}
         </div>
       ) : null}
-      {showingCreate ? null : showingDetail ? (
+      {showingSmart ? (
+        <SmartAlbumsWorkspace
+          isLoading={isLoading}
+          activeSmartAlbum={activeSmartAlbum}
+          smartPlaceRequest={smartPlaceRequest}
+          smartPlaceCountries={smartPlaceCountries}
+          smartYears={smartYears}
+          expandedSmartCountries={expandedSmartCountries}
+          expandedSmartGroups={expandedSmartGroups}
+          smartPlaceGroupLabel={smartPlaceGroupLabel}
+          smartPlaceEntryLabel={smartPlaceEntryLabel}
+          smartItems={smartItems}
+          smartItemsPage={smartItemsPage}
+          smartItemsTotal={smartItemsTotal}
+          quickFilters={albumQuickFilters}
+          viewMode={viewMode}
+          store={store}
+          onToggleCountry={toggleSmartCountry}
+          onToggleGroup={toggleSmartGroup}
+          onActiveSmartAlbumChange={setActiveSmartAlbum}
+          onSmartItemsPageChange={setSmartItemsPage}
+        />
+      ) : showingCreate ? null : showingDetail ? (
         <div className="min-h-0 flex-1 overflow-auto">
           <DesktopAlbumContentGrid
             store={store}
+            albumId={selectedAlbum.id}
             albumItems={albumItems}
             albumItemsPage={albumItemsPage}
             albumItemsTotal={albumItemsTotal}
             quickFilters={albumQuickFilters}
             viewMode={viewMode}
             onAlbumItemsPageChange={setAlbumItemsPage}
+            onAlbumContentChanged={refreshAlbumDetailState}
           />
         </div>
       ) : (

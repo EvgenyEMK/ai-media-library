@@ -41,6 +41,10 @@ interface DesktopMediaItemActionsMenuProps {
   filePath: string;
   mediaType?: "image" | "video";
   onOpenChange?: (open: boolean) => void;
+  albumContext?: {
+    albumId: string;
+    onAlbumChanged?: () => void;
+  };
 }
 
 function AlbumsMenuPanel({
@@ -162,8 +166,11 @@ export function DesktopMediaItemActionsMenu({
   filePath,
   mediaType = "image",
   onOpenChange,
+  albumContext,
 }: DesktopMediaItemActionsMenuProps): ReactElement {
   const [albumsPanelOpen, setAlbumsPanelOpen] = useState(false);
+  const store = useDesktopStoreApi();
+  const albumActions = useMemo(() => createDesktopAlbumActions(store), [store]);
   const handleOpenChange = (open: boolean): void => {
     if (!open) {
       setAlbumsPanelOpen(false);
@@ -179,6 +186,28 @@ export function DesktopMediaItemActionsMenu({
         },
       ]
     : [];
+  const albumContextActions = albumContext
+    ? [
+        {
+          id: "set-album-cover",
+          label: "Set as album cover",
+          onSelect: () => {
+            void albumActions
+              .setAlbumCover(albumContext.albumId, filePath)
+              .then(() => albumContext.onAlbumChanged?.());
+          },
+        },
+        {
+          id: "remove-from-album",
+          label: "Remove from album",
+          onSelect: () => {
+            void albumActions
+              .removeMediaItemFromAlbum(albumContext.albumId, filePath)
+              .then(() => albumContext.onAlbumChanged?.());
+          },
+        },
+      ]
+    : [];
 
   return (
     <MediaItemActionsMenu
@@ -186,6 +215,7 @@ export function DesktopMediaItemActionsMenu({
       actions={albumsPanelOpen
         ? []
         : [
+            ...albumContextActions,
             {
               id: "albums",
               label: "Albums",

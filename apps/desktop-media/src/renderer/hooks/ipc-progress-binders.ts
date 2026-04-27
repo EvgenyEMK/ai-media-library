@@ -283,6 +283,8 @@ export function bindMetadataScanProgress(store: DesktopStore): () => void {
         s.metadataPhase = "preparing";
         s.metadataPhaseProcessed = 0;
         s.metadataPhaseTotal = event.total;
+        s.metadataGpsGeocodingEnabled = false;
+        s.metadataGeoDataUpdated = 0;
         s.metadataItemOrder = [];
         s.metadataItemsByKey = {};
         s.metadataManualScanResult = null;
@@ -301,6 +303,10 @@ export function bindMetadataScanProgress(store: DesktopStore): () => void {
         s.metadataPhase = event.phase;
         s.metadataPhaseProcessed = event.processed;
         s.metadataPhaseTotal = event.total;
+        if (event.phase === "geocoding") {
+          s.metadataGpsGeocodingEnabled = true;
+          s.metadataGeoDataUpdated = event.geoDataUpdated ?? s.metadataGeoDataUpdated;
+        }
       });
       return;
     }
@@ -317,7 +323,7 @@ export function bindMetadataScanProgress(store: DesktopStore): () => void {
     if (event.type === "job-completed") {
       flushPendingItems();
       console.log(
-        `[metadata-scan][renderer][${new Date().toISOString()}] job-completed received jobId=${event.jobId} created=${event.created} updated=${event.updated} unchanged=${event.unchanged} cancelled=${event.cancelled} needsAiFollowUp=${event.filesNeedingAiPipelineFollowUp}`,
+        `[metadata-scan][renderer][${new Date().toISOString()}] job-completed received jobId=${event.jobId} created=${event.created} updated=${event.updated} unchanged=${event.unchanged} cancelled=${event.cancelled} geoDataUpdated=${event.geoDataUpdated} needsAiFollowUp=${event.filesNeedingAiPipelineFollowUp}`,
       );
       const wasRunning = store.getState().metadataStatus === "running";
       const completedJobId = event.jobId;
@@ -326,12 +332,14 @@ export function bindMetadataScanProgress(store: DesktopStore): () => void {
         event.updated > 0 ||
         event.failed > 0 ||
         event.cancelled > 0 ||
+        event.geoDataUpdated > 0 ||
         event.pathMoves.length > 0 ||
         event.filesDeleted.length > 0;
       const hadCatalogMutations =
         event.created > 0 ||
         event.updated > 0 ||
         event.failed > 0 ||
+        event.geoDataUpdated > 0 ||
         event.pathMoves.length > 0 ||
         event.filesDeleted.length > 0;
       const foldersNeedingAiFollowUpCount = event.foldersTouched.filter(
@@ -359,7 +367,11 @@ export function bindMetadataScanProgress(store: DesktopStore): () => void {
           unchanged: event.unchanged,
           failed: event.failed,
           cancelled: event.cancelled,
+          gpsGeocodingEnabled: event.gpsGeocodingEnabled,
+          geoDataUpdated: event.geoDataUpdated,
         };
+        s.metadataGpsGeocodingEnabled = event.gpsGeocodingEnabled;
+        s.metadataGeoDataUpdated = event.geoDataUpdated;
         if (event.filesNeedingAiPipelineFollowUp > 0) {
           s.metadataScanFollowUp = {
             scanRootFolderPath: event.folderPath,

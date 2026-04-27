@@ -6,7 +6,7 @@ export interface GeocodedLocation {
   distance: number;
 }
 
-export type GeocoderStatus = "idle" | "downloading" | "parsing" | "ready" | "error";
+export type GeocoderStatus = "idle" | "downloading" | "loading-cache" | "parsing" | "ready" | "error";
 
 export interface GeocoderInitProgress {
   status: GeocoderStatus;

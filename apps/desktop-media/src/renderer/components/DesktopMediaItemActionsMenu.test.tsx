@@ -42,6 +42,7 @@ function installDesktopApiMock(): Record<string, ReturnType<typeof vi.fn>> {
       .mockResolvedValue([{ albumId: "member", title: "Member Album" }, { albumId: "alpha", title: "Alpha Album" }]),
     addMediaItemsToAlbum: vi.fn().mockResolvedValue(undefined),
     removeMediaItemFromAlbum: vi.fn().mockResolvedValue(undefined),
+    setAlbumCover: vi.fn().mockResolvedValue(undefined),
     revealItemInFolder: vi.fn().mockResolvedValue({ success: true }),
     _logToMain: vi.fn(),
   };
@@ -65,6 +66,38 @@ function renderMenu(): void {
       }}
     >
       <DesktopMediaItemActionsMenu filePath="C:/photos/item.jpg" />
+    </DesktopStoreProvider>,
+  );
+}
+
+function renderMenuInAlbumContext(): void {
+  render(
+    <DesktopStoreProvider
+      initialState={{
+        albums,
+        recentAlbumIds: ["recent"],
+      }}
+    >
+      <DesktopMediaItemActionsMenu
+        filePath="C:/photos/item.jpg"
+        albumContext={{ albumId: "member" }}
+      />
+    </DesktopStoreProvider>,
+  );
+}
+
+function renderMenuInAlbumContextWithCallback(onAlbumChanged: () => void): void {
+  render(
+    <DesktopStoreProvider
+      initialState={{
+        albums,
+        recentAlbumIds: ["recent"],
+      }}
+    >
+      <DesktopMediaItemActionsMenu
+        filePath="C:/photos/item.jpg"
+        albumContext={{ albumId: "member", onAlbumChanged }}
+      />
     </DesktopStoreProvider>,
   );
 }
@@ -119,7 +152,7 @@ describe("DesktopMediaItemActionsMenu", () => {
       .getAllByRole("button")
       .map((button) => button.textContent?.trim())
       .filter((label): label is string => Boolean(label) && label !== "Albums");
-    expect(labels.slice(0, 3)).toEqual(["Member Album", "Recent Album", "Alpha Album"]);
+    expect(labels.slice(0, 3)).toEqual(["Member Album", "Alpha Album", "Recent Album"]);
   });
 
   it("returns to the main menu and resets on close", async () => {
@@ -128,13 +161,63 @@ describe("DesktopMediaItemActionsMenu", () => {
 
     await openAlbumsPanel();
     fireEvent.click(screen.getByRole("menuitem", { name: /Albums/ }));
-    expect(await screen.findByRole("menuitem", { name: "Reveal in File Explorer" })).toBeVisible();
+    expect(await screen.findByRole("menuitem", { name: "Show in File Explorer" })).toBeVisible();
 
     fireEvent.click(screen.getByRole("menuitem", { name: /Albums/ }));
     fireEvent.click(screen.getByLabelText("Close menu"));
     await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
 
     fireEvent.click(screen.getByTitle("Open media item actions"));
-    expect(await screen.findByRole("menuitem", { name: "Reveal in File Explorer" })).toBeVisible();
+    expect(await screen.findByRole("menuitem", { name: "Show in File Explorer" })).toBeVisible();
+  });
+
+  it("shows album-only actions first in album context", async () => {
+    installDesktopApiMock();
+    renderMenuInAlbumContext();
+
+    fireEvent.click(screen.getByTitle("Open media item actions"));
+    const menu = await screen.findByRole("menu");
+    const labels = within(menu)
+      .getAllByRole("menuitem")
+      .map((item) => item.textContent?.trim())
+      .filter((label): label is string => Boolean(label));
+
+    expect(labels[0]).toBe("Set as album cover");
+    expect(labels[1]).toBe("Remove from album");
+  });
+
+  it("does not show album-only actions in folder context", async () => {
+    installDesktopApiMock();
+    renderMenu();
+
+    fireEvent.click(screen.getByTitle("Open media item actions"));
+    expect(screen.queryByRole("menuitem", { name: "Set as album cover" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "Remove from album" })).toBeNull();
+  });
+
+  it("runs set cover action in album context", async () => {
+    const desktopApi = installDesktopApiMock();
+    const onAlbumChanged = vi.fn();
+    renderMenuInAlbumContextWithCallback(onAlbumChanged);
+
+    fireEvent.click(screen.getByTitle("Open media item actions"));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Set as album cover" }));
+
+    await waitFor(() => expect(desktopApi.setAlbumCover).toHaveBeenCalledWith("member", "C:/photos/item.jpg"));
+    await waitFor(() => expect(onAlbumChanged).toHaveBeenCalledTimes(1));
+  });
+
+  it("runs remove action in album context", async () => {
+    const desktopApi = installDesktopApiMock();
+    const onAlbumChanged = vi.fn();
+    renderMenuInAlbumContextWithCallback(onAlbumChanged);
+
+    fireEvent.click(screen.getByTitle("Open media item actions"));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Remove from album" }));
+
+    await waitFor(() =>
+      expect(desktopApi.removeMediaItemFromAlbum).toHaveBeenCalledWith("member", "C:/photos/item.jpg"),
+    );
+    await waitFor(() => expect(onAlbumChanged).toHaveBeenCalledTimes(1));
   });
 });

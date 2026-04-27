@@ -43,7 +43,9 @@ export function GeocoderInitCard({
           <span>
             {geocoderInitStatus === "downloading"
               ? UI_TEXT.geocoderInitDownloading
-              : UI_TEXT.geocoderInitParsing}
+              : geocoderInitStatus === "loading-cache"
+                ? UI_TEXT.geocoderInitLoadingCache
+                : UI_TEXT.geocoderInitParsing}
           </span>
         </div>
       ) : geocoderInitStatus === "ready" ? (

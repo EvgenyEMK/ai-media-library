@@ -8,6 +8,11 @@ import type {
   FaceBeingBoundingBox,
   MediaAlbumSummary,
   ProviderRawBoundingBoxReference,
+  SmartAlbumItemsRequest,
+  SmartAlbumYearsRequest,
+  SmartAlbumPlacesRequest,
+  SmartAlbumPlacesResult,
+  SmartAlbumYearsResult,
 } from "@emk/shared-contracts";
 import type { SemanticSearchSignalMode } from "@emk/media-store";
 
@@ -102,6 +107,9 @@ export const IPC_CHANNELS = {
   addMediaItemsToAlbum: "media:add-media-items-to-album",
   removeMediaItemFromAlbum: "media:remove-media-item-from-album",
   setAlbumCover: "media:set-album-cover",
+  listSmartAlbumPlaces: "media:list-smart-album-places",
+  listSmartAlbumYears: "media:list-smart-album-years",
+  listSmartAlbumItems: "media:list-smart-album-items",
   /** Pushed from main → renderer after a background file-metadata write refreshes the catalog row. */
   mediaItemMetadataRefreshed: "media:media-item-metadata-refreshed",
   listPersonTags: "media:list-person-tags",
@@ -171,6 +179,7 @@ export const IPC_CHANNELS = {
   analyzeFolderPathMetadata: "media:analyze-folder-path-metadata",
   cancelPathAnalysis: "media:cancel-path-analysis",
   pathAnalysisProgress: "media:path-analysis-progress",
+  getGeocoderCacheStatus: "media:get-geocoder-cache-status",
   initGeocoder: "media:init-geocoder",
   geocoderInitProgress: "media:geocoder-init-progress",
 } as const;
@@ -190,6 +199,7 @@ export interface AppSettings {
   faceDetection: FaceDetectionSettings;
   photoAnalysis: PhotoAnalysisSettings;
   folderScanning: FolderScanningSettings;
+  smartAlbums: SmartAlbumSettings;
   aiImageSearch: AiImageSearchSettings;
   mediaViewer: MediaViewerSettings;
   pathExtraction: PathExtractionSettings;
@@ -484,6 +494,16 @@ export interface AiImageSearchSettings {
   keywordMatchThresholdDescription: number;
 }
 
+export type SmartAlbumRatingOperator = "gte" | "eq";
+
+export interface SmartAlbumSettings {
+  defaultStarRating: number | null;
+  defaultStarRatingOperator: SmartAlbumRatingOperator;
+  defaultAiRating: number | null;
+  defaultAiRatingOperator: SmartAlbumRatingOperator;
+  excludedImageCategories: string[];
+}
+
 export const DEFAULT_FACE_DETECTION_SETTINGS: FaceDetectionSettings = {
   detectorModel: "yolov12l-face",
   minConfidenceThreshold: 0.75,
@@ -540,6 +560,20 @@ export const DEFAULT_AI_IMAGE_SEARCH_SETTINGS: AiImageSearchSettings = {
   keywordMatchThresholdDescription: 0.5,
 };
 
+export const DEFAULT_SMART_ALBUM_SETTINGS: SmartAlbumSettings = {
+  defaultStarRating: 4,
+  defaultStarRatingOperator: "gte",
+  defaultAiRating: 4,
+  defaultAiRatingOperator: "gte",
+  excludedImageCategories: [
+    "document*",
+    "invoice_or_receipt",
+    "presentation_slide",
+    "diagram",
+    "*screenshot*",
+  ],
+};
+
 export const DEFAULT_PATH_EXTRACTION_SETTINGS: PathExtractionSettings = {
   extractDates: true,
   useLlm: false,
@@ -560,6 +594,7 @@ export const DEFAULT_APP_SETTINGS: Omit<AppSettings, "clientId"> = {
   faceDetection: DEFAULT_FACE_DETECTION_SETTINGS,
   photoAnalysis: DEFAULT_PHOTO_ANALYSIS_SETTINGS,
   folderScanning: DEFAULT_FOLDER_SCANNING_SETTINGS,
+  smartAlbums: DEFAULT_SMART_ALBUM_SETTINGS,
   aiImageSearch: DEFAULT_AI_IMAGE_SEARCH_SETTINGS,
   mediaViewer: DEFAULT_MEDIA_VIEWER_SETTINGS,
   pathExtraction: DEFAULT_PATH_EXTRACTION_SETTINGS,
@@ -684,6 +719,8 @@ export interface DesktopMediaItemMetadata {
   locationArea: string | null;
   locationPlace: string | null;
   locationName: string | null;
+  /** Catalog location provenance (`gps`, `path_llm`, `path_script`, `ai_vision`, ...). */
+  locationSource: string | null;
   displayTitle: string | null;
   checksumSha256: string | null;
   contentHash: string | null;
@@ -1084,7 +1121,7 @@ export interface ScanFolderMetadataResult {
   total: number;
 }
 
-export type MetadataScanPhase = "preparing" | "scanning";
+export type MetadataScanPhase = "preparing" | "scanning" | "geocoding";
 
 export type MetadataScanTriggerSource = "manual" | "auto";
 
@@ -1136,6 +1173,7 @@ export type MetadataScanProgressEvent =
       phase: MetadataScanPhase;
       processed: number;
       total: number;
+      geoDataUpdated?: number;
     }
   | {
       type: "item-updated";
@@ -1155,6 +1193,8 @@ export type MetadataScanProgressEvent =
       unchanged: number;
       failed: number;
       cancelled: number;
+      gpsGeocodingEnabled: boolean;
+      geoDataUpdated: number;
       /** True when the user cancelled after some work; reconciliation may still have run if prepare finished. */
       scanCancelled: boolean;
       filesCreated: MetadataScanFilePathRef[];
@@ -1207,12 +1247,16 @@ export type PathAnalysisProgressEvent =
 
 export type PathAnalysisProgressListener = (event: PathAnalysisProgressEvent) => void;
 
-export type GeocoderInitStatus = "idle" | "downloading" | "parsing" | "ready" | "error";
+export type GeocoderInitStatus = "idle" | "downloading" | "loading-cache" | "parsing" | "ready" | "error";
 
 export type GeocoderInitProgressEvent = {
   status: GeocoderInitStatus;
   error?: string;
 };
+
+export interface GeocoderCacheStatus {
+  hasLocalCopy: boolean;
+}
 
 export interface DesktopPersonTag {
   id: string;
@@ -1722,6 +1766,9 @@ export interface DesktopApi {
   addMediaItemsToAlbum: (albumId: string, mediaItemIds: string[]) => Promise<void>;
   removeMediaItemFromAlbum: (albumId: string, mediaItemId: string) => Promise<void>;
   setAlbumCover: (albumId: string, mediaItemId: string | null) => Promise<void>;
+  listSmartAlbumPlaces: (request: SmartAlbumPlacesRequest) => Promise<SmartAlbumPlacesResult>;
+  listSmartAlbumYears: (request?: SmartAlbumYearsRequest) => Promise<SmartAlbumYearsResult>;
+  listSmartAlbumItems: (request: SmartAlbumItemsRequest) => Promise<AlbumItemsResult>;
   onMediaItemMetadataRefreshed: (
     listener: (byPath: Record<string, DesktopMediaItemMetadata>) => void,
   ) => () => void;
@@ -1870,7 +1917,8 @@ export interface DesktopApi {
   }) => Promise<{ jobId: string; total: number }>;
   cancelPathAnalysis: (jobId: string) => Promise<boolean>;
   onPathAnalysisProgress: (listener: PathAnalysisProgressListener) => () => void;
-  initGeocoder: () => Promise<void>;
+  getGeocoderCacheStatus: () => Promise<GeocoderCacheStatus>;
+  initGeocoder: (options?: { forceRefresh?: boolean }) => Promise<void>;
   onGeocoderInitProgress: (listener: (event: GeocoderInitProgressEvent) => void) => () => void;
   // TEMPORARY: description embedding backfill — remove after migration
   indexDescriptionEmbeddings: (request: {

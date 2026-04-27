@@ -7,6 +7,7 @@ import {
   DEFAULT_MEDIA_VIEWER_SETTINGS,
   DEFAULT_PATH_EXTRACTION_SETTINGS,
   DEFAULT_PHOTO_ANALYSIS_SETTINGS,
+  DEFAULT_SMART_ALBUM_SETTINGS,
   DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS,
   type AiImageSearchSettings,
   type FaceDetectionSettings,
@@ -18,6 +19,7 @@ import {
   type GeocoderInitStatus,
   type PathExtractionSettings,
   type PhotoAnalysisSettings,
+  type SmartAlbumSettings,
   type MetadataManualScanResultPayload,
   type WrongImageRotationDetectionSettings,
 } from "../../shared/ipc";
@@ -47,6 +49,7 @@ export interface DesktopSlice {
   wrongImageRotationDetectionSettings: WrongImageRotationDetectionSettings;
   photoAnalysisSettings: PhotoAnalysisSettings;
   folderScanningSettings: FolderScanningSettings;
+  smartAlbumSettings: SmartAlbumSettings;
   aiImageSearchSettings: AiImageSearchSettings;
   mediaViewerSettings: MediaViewerSettings;
   pathExtractionSettings: PathExtractionSettings;
@@ -128,6 +131,12 @@ export interface DesktopSlice {
     value: FolderScanningSettings[K],
   ) => void;
   resetFolderScanningSettings: () => void;
+  setSmartAlbumSettings: (settings: SmartAlbumSettings) => void;
+  updateSmartAlbumSetting: <K extends keyof SmartAlbumSettings>(
+    key: K,
+    value: SmartAlbumSettings[K],
+  ) => void;
+  resetSmartAlbumSettings: () => void;
   setAiImageSearchSettings: (settings: AiImageSearchSettings) => void;
   updateAiImageSearchSetting: <K extends keyof AiImageSearchSettings>(
     key: K,
@@ -172,6 +181,7 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   wrongImageRotationDetectionSettings: { ...DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS },
   photoAnalysisSettings: { ...DEFAULT_PHOTO_ANALYSIS_SETTINGS },
   folderScanningSettings: { ...DEFAULT_FOLDER_SCANNING_SETTINGS },
+  smartAlbumSettings: { ...DEFAULT_SMART_ALBUM_SETTINGS },
   aiImageSearchSettings: { ...DEFAULT_AI_IMAGE_SEARCH_SETTINGS },
   mediaViewerSettings: { ...DEFAULT_MEDIA_VIEWER_SETTINGS },
   pathExtractionSettings: { ...DEFAULT_PATH_EXTRACTION_SETTINGS },
@@ -374,6 +384,21 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
       state.folderScanningSettings = { ...DEFAULT_FOLDER_SCANNING_SETTINGS };
     }),
 
+  setSmartAlbumSettings: (settings) =>
+    set((state) => {
+      state.smartAlbumSettings = settings;
+    }),
+
+  updateSmartAlbumSetting: (key, value) =>
+    set((state) => {
+      state.smartAlbumSettings[key] = value;
+    }),
+
+  resetSmartAlbumSettings: () =>
+    set((state) => {
+      state.smartAlbumSettings = { ...DEFAULT_SMART_ALBUM_SETTINGS };
+    }),
+
   setAiImageSearchSettings: (settings) =>
     set((state) => {
       state.aiImageSearchSettings = settings;
@@ -445,7 +470,7 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
     set((state) => {
       state.geocoderInitStatus = status;
       state.geocoderInitError = error ?? null;
-      if (status === "downloading" || status === "parsing") {
+      if (status === "downloading" || status === "loading-cache" || status === "parsing") {
         state.geocoderInitPanelVisible = true;
       }
     }),

@@ -1,6 +1,7 @@
 import { useEffect, useId, useState, type ReactElement } from "react";
 import { ChevronDown, Square, Star } from "lucide-react";
 import {
+  MediaItemStarRating,
   SettingsCheckboxField,
   SettingsNumberField,
   SettingsSectionCard,
@@ -14,6 +15,7 @@ import {
   DEFAULT_MEDIA_VIEWER_SETTINGS,
   DEFAULT_PATH_EXTRACTION_SETTINGS,
   DEFAULT_PHOTO_ANALYSIS_SETTINGS,
+  DEFAULT_SMART_ALBUM_SETTINGS,
   DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS,
   FACE_DETECTOR_MODEL_OPTIONS,
   type AiImageSearchSettings,
@@ -31,6 +33,8 @@ import {
   type PathExtractionSettings,
   type PhotoAnalysisSettings,
   type PhotoPendingFolderIconTint,
+  type SmartAlbumRatingOperator,
+  type SmartAlbumSettings,
   type WrongImageRotationDetectionSettings,
 } from "../../shared/ipc";
 import { cn } from "../lib/cn";
@@ -47,6 +51,7 @@ interface DesktopSettingsSectionProps {
   wrongImageRotationDetectionSettings: WrongImageRotationDetectionSettings;
   photoAnalysisSettings: PhotoAnalysisSettings;
   folderScanningSettings: FolderScanningSettings;
+  smartAlbumSettings: SmartAlbumSettings;
   aiImageSearchSettings: AiImageSearchSettings;
   hideAdvancedSettings: boolean;
   mediaViewerSettings: MediaViewerSettings;
@@ -71,6 +76,11 @@ interface DesktopSettingsSectionProps {
     key: K,
     value: FolderScanningSettings[K],
   ) => void;
+  onSmartAlbumSettingChange: <K extends keyof SmartAlbumSettings>(
+    key: K,
+    value: SmartAlbumSettings[K],
+  ) => void;
+  onResetSmartAlbumSettings: () => void;
   onResetFolderScanningSectionSettings: () => void;
   onAiImageSearchSettingChange: <K extends keyof AiImageSearchSettings>(
     key: K,
@@ -99,6 +109,12 @@ const UI_TEXT = {
   scanForFileChanges: "Scan for file changes",
   /** Shorter than “folder change scanning and file metadata management”; covers scan policy + embedded writes + path helpers. */
   fileMetadataManagement: "Folder scanning & file metadata",
+  smartAlbums: "Smart albums",
+  defaultRatingTitle: "Default Rating",
+  defaultAiRatingTitle: "Default AI rating",
+  excludedImageCategoriesTitle: "Excluded image categories",
+  smartAlbumsDescription:
+    "These defaults are applied when opening Best of Year smart albums. You can still adjust or clear filters in the album view.",
   emptyFolderAiSummaryTitle: "On empty folder selection show AI analysis status summary for subfolders",
   emptyFolderAiSummaryDescription: `When the folder you select has no images or videos in it directly but it contains sub-folders, open the Folder AI analysis summary in the main pane—the same view as “Folder AI analysis summary” on the folder’s right-click menu. It shows a table with face detection, AI image analysis, and AI search index status for this folder and all sub-folders (large trees may take a few seconds). If the folder has no sub-folders, this summary is not shown.`,
   pathExtractDatesTitle: "Extract date(s) from file path",
@@ -155,7 +171,11 @@ const UI_TEXT = {
     "During metadata scan, GPS coordinates are matched against offline GeoNames data to fill Country, State/Province, and City for search filters and folder views. First-time setup downloads about 2 GB of cached geographic data.",
   gpsLocationDetectionConfirmTitle: "Download location data?",
   gpsLocationDetectionConfirmMessage: "This will download approximately 2 GB of geographic data from GeoNames. The download happens in the background and data is cached locally for future use.",
+  gpsLocationDetectionLocalCopyTitle: "Use local location data?",
+  gpsLocationDetectionLocalCopyMessage: "GeoNames data is already present on this device. You can use the local copy now, or download it again if you want the latest GeoNames data.",
   gpsLocationDetectionConfirmOk: "Download",
+  gpsLocationDetectionUseLocalCopy: "Use local copy",
+  gpsLocationDetectionDownloadAgain: "Download again",
   gpsLocationDetectionConfirmCancel: "Cancel",
   /** Single label for all section reset buttons (one i18n key). */
   resetToDefaults: "Reset to defaults",
@@ -182,11 +202,49 @@ function settingsCustomOptionSurfaceClass(variant: SettingsOptionSurfaceVariant)
   return SETTINGS_CUSTOM_OPTION_SURFACE_CLASSES[variant];
 }
 
+function SmartAlbumDefaultRatingSetting({
+  title,
+  value,
+  operator,
+  onOperatorChange,
+  onChange,
+}: {
+  title: string;
+  value: number | null;
+  operator: SmartAlbumRatingOperator;
+  onOperatorChange: (operator: SmartAlbumRatingOperator) => void;
+  onChange: (value: number | null) => void;
+}): ReactElement {
+  return (
+    <div className={cn(settingsCustomOptionSurfaceClass("accent-stripe"), "border-l-primary/70")}>
+      <div className="flex flex-wrap items-center gap-3">
+        <h4 className="m-0 min-w-36 text-base font-medium text-foreground">{title}</h4>
+        <button
+          type="button"
+          className="inline-flex h-8 min-w-11 items-center justify-center rounded-md border border-border bg-secondary px-2 text-sm font-semibold text-foreground hover:bg-muted"
+          onClick={() => onOperatorChange(operator === "gte" ? "eq" : "gte")}
+          aria-label={`${title} operator ${operator === "gte" ? "greater than or equal" : "equals"}`}
+          title="Click to switch between >= and ="
+        >
+          {operator === "gte" ? ">=" : "="}
+        </button>
+        <MediaItemStarRating
+          starRating={value}
+          onChange={(next) => onChange(next > 0 ? next : null)}
+          expanded
+          tone="onCard"
+        />
+      </div>
+    </div>
+  );
+}
+
 export function DesktopSettingsSection({
   faceDetectionSettings,
   wrongImageRotationDetectionSettings,
   photoAnalysisSettings,
   folderScanningSettings,
+  smartAlbumSettings,
   aiImageSearchSettings,
   hideAdvancedSettings,
   mediaViewerSettings,
@@ -197,6 +255,8 @@ export function DesktopSettingsSection({
   onPhotoAnalysisSettingChange,
   onResetPhotoAnalysisSettings,
   onFolderScanningSettingChange,
+  onSmartAlbumSettingChange,
+  onResetSmartAlbumSettings,
   onResetFolderScanningSectionSettings,
   onAiImageSearchSettingChange,
   onResetAiImageSearchSettings,
@@ -210,6 +270,7 @@ export function DesktopSettingsSection({
   onAiInferencePreferredGpuIdChange,
 }: DesktopSettingsSectionProps): ReactElement {
   const [showGpsConfirm, setShowGpsConfirm] = useState(false);
+  const [gpsConfirmHasLocalCopy, setGpsConfirmHasLocalCopy] = useState(false);
   const [showWindowsGpuGuide, setShowWindowsGpuGuide] = useState(false);
   const [showAiModelHelp, setShowAiModelHelp] = useState(false);
   const [showPhotoDownscaleDescription, setShowPhotoDownscaleDescription] = useState(false);
@@ -255,16 +316,25 @@ export function DesktopSettingsSection({
 
   const handleGpsToggle = (next: boolean): void => {
     if (next && !folderScanningSettings.detectLocationFromGps) {
+      setGpsConfirmHasLocalCopy(false);
       setShowGpsConfirm(true);
+      void window.desktopApi
+        .getGeocoderCacheStatus()
+        .then((status) => {
+          setGpsConfirmHasLocalCopy(status.hasLocalCopy);
+        })
+        .catch(() => {
+          setGpsConfirmHasLocalCopy(false);
+        });
       return;
     }
     onFolderScanningSettingChange("detectLocationFromGps", next);
   };
 
-  const confirmGpsEnable = (): void => {
+  const enableGpsLocationDetection = (options?: { forceRefresh?: boolean }): void => {
     setShowGpsConfirm(false);
     onFolderScanningSettingChange("detectLocationFromGps", true);
-    void window.desktopApi.initGeocoder();
+    void window.desktopApi.initGeocoder(options);
   };
 
   const cancelGpsEnable = (): void => {
@@ -311,6 +381,68 @@ export function DesktopSettingsSection({
                   DEFAULT_MEDIA_VIEWER_SETTINGS.autoPlayVideoOnOpen &&
                 mediaViewerSettings.skipVideosInSlideshow ===
                   DEFAULT_MEDIA_VIEWER_SETTINGS.skipVideosInSlideshow
+              }
+            >
+              {UI_TEXT.resetToDefaults}
+            </button>
+          </div>
+        </div>
+      </SettingsSectionCard>
+
+      <SettingsSectionCard title={UI_TEXT.smartAlbums}>
+        <div className="space-y-3">
+          <p className="m-0 text-sm leading-relaxed text-muted-foreground">
+            {UI_TEXT.smartAlbumsDescription}
+          </p>
+          <SmartAlbumDefaultRatingSetting
+            title={UI_TEXT.defaultRatingTitle}
+            value={smartAlbumSettings.defaultStarRating}
+            operator={smartAlbumSettings.defaultStarRatingOperator}
+            onOperatorChange={(next) =>
+              onSmartAlbumSettingChange("defaultStarRatingOperator", next)
+            }
+            onChange={(next) => onSmartAlbumSettingChange("defaultStarRating", next)}
+          />
+          <SmartAlbumDefaultRatingSetting
+            title={UI_TEXT.defaultAiRatingTitle}
+            value={smartAlbumSettings.defaultAiRating}
+            operator={smartAlbumSettings.defaultAiRatingOperator}
+            onOperatorChange={(next) =>
+              onSmartAlbumSettingChange("defaultAiRatingOperator", next)
+            }
+            onChange={(next) => onSmartAlbumSettingChange("defaultAiRating", next)}
+          />
+          <div className={cn(settingsCustomOptionSurfaceClass("muted"), "border-l-primary/70")}>
+            <h4 className="m-0 text-base font-medium text-foreground">
+              {UI_TEXT.excludedImageCategoriesTitle}
+            </h4>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {smartAlbumSettings.excludedImageCategories.map((category) => (
+                <span
+                  key={category}
+                  className="rounded-full border border-border bg-secondary px-2 py-1 text-sm text-muted-foreground"
+                >
+                  {category}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="pt-1">
+            <button
+              type="button"
+              className="inline-flex h-10 items-center rounded-md border border-border px-3 text-base"
+              onClick={onResetSmartAlbumSettings}
+              disabled={
+                smartAlbumSettings.defaultStarRating ===
+                  DEFAULT_SMART_ALBUM_SETTINGS.defaultStarRating &&
+                smartAlbumSettings.defaultStarRatingOperator ===
+                  DEFAULT_SMART_ALBUM_SETTINGS.defaultStarRatingOperator &&
+                smartAlbumSettings.defaultAiRating ===
+                  DEFAULT_SMART_ALBUM_SETTINGS.defaultAiRating &&
+                smartAlbumSettings.defaultAiRatingOperator ===
+                  DEFAULT_SMART_ALBUM_SETTINGS.defaultAiRatingOperator &&
+                smartAlbumSettings.excludedImageCategories.join("|") ===
+                  DEFAULT_SMART_ALBUM_SETTINGS.excludedImageCategories.join("|")
               }
             >
               {UI_TEXT.resetToDefaults}
@@ -368,19 +500,35 @@ export function DesktopSettingsSection({
           {showGpsConfirm ? (
             <div className="rounded-md border border-amber-700/60 border-l-4 border-l-primary/70 bg-amber-950/40 p-3">
               <p className="m-0 text-sm font-medium text-amber-200">
-                {UI_TEXT.gpsLocationDetectionConfirmTitle}
+                {gpsConfirmHasLocalCopy
+                  ? UI_TEXT.gpsLocationDetectionLocalCopyTitle
+                  : UI_TEXT.gpsLocationDetectionConfirmTitle}
               </p>
               <p className="m-0 mt-1 text-sm text-amber-200/80">
-                {UI_TEXT.gpsLocationDetectionConfirmMessage}
+                {gpsConfirmHasLocalCopy
+                  ? UI_TEXT.gpsLocationDetectionLocalCopyMessage
+                  : UI_TEXT.gpsLocationDetectionConfirmMessage}
               </p>
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   type="button"
                   className="inline-flex h-8 items-center rounded-md bg-amber-700 px-3 text-sm text-white hover:bg-amber-600"
-                  onClick={confirmGpsEnable}
+                  onClick={() => enableGpsLocationDetection({ forceRefresh: false })}
+                  autoFocus={gpsConfirmHasLocalCopy}
                 >
-                  {UI_TEXT.gpsLocationDetectionConfirmOk}
+                  {gpsConfirmHasLocalCopy
+                    ? UI_TEXT.gpsLocationDetectionUseLocalCopy
+                    : UI_TEXT.gpsLocationDetectionConfirmOk}
                 </button>
+                {gpsConfirmHasLocalCopy ? (
+                  <button
+                    type="button"
+                    className="inline-flex h-8 items-center rounded-md border border-amber-700/70 px-3 text-sm text-amber-100 hover:bg-amber-900/40"
+                    onClick={() => enableGpsLocationDetection({ forceRefresh: true })}
+                  >
+                    {UI_TEXT.gpsLocationDetectionDownloadAgain}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm"

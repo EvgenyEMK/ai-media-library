@@ -10,6 +10,7 @@ import {
   DEFAULT_MEDIA_VIEWER_SETTINGS,
   DEFAULT_PATH_EXTRACTION_SETTINGS,
   DEFAULT_PHOTO_ANALYSIS_SETTINGS,
+  DEFAULT_SMART_ALBUM_SETTINGS,
   DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS,
   FACE_DETECTOR_MODEL_OPTIONS,
   type AiImageSearchSettings,
@@ -25,6 +26,8 @@ import {
   type PathExtractionSettings,
   type PhotoAnalysisSettings,
   type PhotoPendingFolderIconTint,
+  type SmartAlbumRatingOperator,
+  type SmartAlbumSettings,
   type WrongImageRotationDetectionSettings,
 } from "../src/shared/ipc";
 
@@ -64,6 +67,7 @@ export async function readSettings(userDataPath: string): Promise<AppSettings> {
     faceDetection: sanitizeFaceDetectionSettings(parsed.faceDetection),
     photoAnalysis: sanitizePhotoAnalysisSettings(parsed.photoAnalysis),
     folderScanning: sanitizeFolderScanningSettings(parsed.folderScanning),
+    smartAlbums: sanitizeSmartAlbumSettings(parsed.smartAlbums),
     aiImageSearch: sanitizeAiImageSearchSettings(parsed.aiImageSearch),
     mediaViewer: sanitizeMediaViewerSettings(parsed.mediaViewer),
     pathExtraction: sanitizePathExtractionSettings(parsed.pathExtraction),
@@ -104,6 +108,44 @@ function sanitizeMediaViewerSettings(candidate: unknown): MediaViewerSettings {
       typeof value.skipVideosInSlideshow === "boolean"
         ? value.skipVideosInSlideshow
         : DEFAULT_MEDIA_VIEWER_SETTINGS.skipVideosInSlideshow,
+  };
+}
+
+function sanitizeSmartAlbumRatingStars(candidate: unknown): number | null {
+  if (candidate === null) {
+    return null;
+  }
+  if (!Number.isFinite(candidate)) {
+    return null;
+  }
+  return Math.min(5, Math.max(1, Math.trunc(candidate as number)));
+}
+
+function sanitizeSmartAlbumRatingOperator(candidate: unknown): SmartAlbumRatingOperator {
+  return candidate === "eq" ? "eq" : "gte";
+}
+
+function sanitizeSmartAlbumSettings(candidate: unknown): SmartAlbumSettings {
+  const value = isRecord(candidate) ? candidate : {};
+  const excludedImageCategories = Array.isArray(value.excludedImageCategories)
+    ? value.excludedImageCategories.filter((entry): entry is string => typeof entry === "string")
+    : DEFAULT_SMART_ALBUM_SETTINGS.excludedImageCategories;
+  return {
+    defaultStarRating:
+      "defaultStarRating" in value
+        ? sanitizeSmartAlbumRatingStars(value.defaultStarRating)
+        : DEFAULT_SMART_ALBUM_SETTINGS.defaultStarRating,
+    defaultStarRatingOperator: sanitizeSmartAlbumRatingOperator(
+      value.defaultStarRatingOperator ?? DEFAULT_SMART_ALBUM_SETTINGS.defaultStarRatingOperator,
+    ),
+    defaultAiRating:
+      "defaultAiRating" in value
+        ? sanitizeSmartAlbumRatingStars(value.defaultAiRating)
+        : DEFAULT_SMART_ALBUM_SETTINGS.defaultAiRating,
+    defaultAiRatingOperator: sanitizeSmartAlbumRatingOperator(
+      value.defaultAiRatingOperator ?? DEFAULT_SMART_ALBUM_SETTINGS.defaultAiRatingOperator,
+    ),
+    excludedImageCategories,
   };
 }
 

@@ -14,6 +14,10 @@ interface DesktopMediaItemListRowProps {
   starRating?: number | null;
   onStarRatingChange?: (next: number) => void;
   starRatingShowRejected?: boolean;
+  albumContext?: {
+    albumId: string;
+    onAlbumChanged?: () => void;
+  };
 }
 
 export function DesktopMediaItemListRow({
@@ -28,6 +32,7 @@ export function DesktopMediaItemListRow({
   starRating,
   onStarRatingChange,
   starRatingShowRejected = false,
+  albumContext,
 }: DesktopMediaItemListRowProps): ReactElement {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -48,6 +53,7 @@ export function DesktopMediaItemListRow({
           filePath={filePath}
           mediaType={mediaType}
           onOpenChange={setMenuOpen}
+          albumContext={albumContext}
         />
       )}
     />

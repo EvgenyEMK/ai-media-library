@@ -76,3 +76,41 @@ test.describe("GPS location database download flow", () => {
     }
   });
 });
+
+test.describe("GPS location database local-copy flow", () => {
+  test.use({ e2eGeocoderCachedData: true });
+
+  test("defaults to using cached GeoNames data when enabling GPS detection", async ({
+    mainWindow,
+  }) => {
+    await mainWindow.getByRole("navigation").getByText("Settings", { exact: true }).click();
+    await mainWindow.getByText("Folder scanning & file metadata", { exact: true }).click();
+
+    const gpsCheckbox = mainWindow.getByRole("checkbox", {
+      name: /Detect Country \/ City from GPS coordinates/i,
+    });
+    await expect(gpsCheckbox).toBeVisible();
+    await expect(gpsCheckbox).not.toBeChecked();
+
+    await gpsCheckbox.click();
+
+    await expect(mainWindow.getByText("Use local location data?", { exact: true })).toBeVisible();
+    const useLocalCopyButton = mainWindow.getByRole("button", { name: "Use local copy", exact: true });
+    await expect(useLocalCopyButton).toBeVisible();
+    await expect(mainWindow.getByRole("button", { name: "Download again", exact: true })).toBeVisible();
+
+    await useLocalCopyButton.click();
+    await expect(gpsCheckbox).toBeChecked();
+
+    await expect(
+      mainWindow.getByRole("heading", { name: "GPS location database" }),
+    ).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(
+      mainWindow.getByText("Location database ready.", { exact: true }),
+    ).toBeVisible({
+      timeout: 15_000,
+    });
+  });
+});

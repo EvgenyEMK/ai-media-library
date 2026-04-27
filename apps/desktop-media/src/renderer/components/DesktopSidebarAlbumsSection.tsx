@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactElement } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import type { SmartAlbumRootKind } from "@emk/shared-contracts";
 import { createDesktopAlbumActions } from "../actions/album-actions";
 import { useDesktopStore, useDesktopStoreApi } from "../stores/desktop-store";
 import { Input } from "./ui/input";
@@ -7,10 +8,16 @@ import { Input } from "./ui/input";
 const UI_TEXT = {
   compactLabel: "Albums",
   recent: "RECENT",
+  smartAlbums: "SMART ALBUMS",
   allAlbums: "All albums",
+  countryYearCity: "Country > Year > Area",
+  countryAreaCity: "Country > Area > City",
+  countryMonthArea: "Country > YYYY-MM Area",
+  aiCountries: "AI countries",
+  bestOfYear: "Best of Year",
 } as const;
 
-type ExpandedAlbumSubsection = "recent" | "all" | null;
+type ExpandedAlbumSubsection = "recent" | "smart" | "all" | null;
 
 function AlbumSectionHeader({
   title,
@@ -38,10 +45,12 @@ function AlbumSectionHeader({
 export function DesktopSidebarAlbumsSection({
   collapsed,
   onAlbumSelected,
+  onSmartAlbumSelected,
   onShowAlbumList,
 }: {
   collapsed: boolean;
   onAlbumSelected?: () => void;
+  onSmartAlbumSelected?: (kind: SmartAlbumRootKind) => void;
   onShowAlbumList?: () => void;
 }): ReactElement {
   const store = useDesktopStoreApi();
@@ -100,6 +109,11 @@ export function DesktopSidebarAlbumsSection({
     onAlbumSelected?.();
   };
 
+  const selectSmartAlbum = (kind: SmartAlbumRootKind): void => {
+    store.getState().selectAlbum(null);
+    onSmartAlbumSelected?.(kind);
+  };
+
   if (collapsed) {
     return <div className="text-xs text-muted-foreground">{UI_TEXT.compactLabel}</div>;
   }
@@ -154,6 +168,50 @@ export function DesktopSidebarAlbumsSection({
             </button>
             ))
             : null}
+        </div>
+      ) : null}
+      <AlbumSectionHeader
+        title={UI_TEXT.smartAlbums}
+        expanded={expandedSection === "smart"}
+        onToggle={() => toggleSection("smart")}
+      />
+      {expandedSection === "smart" ? (
+        <div className="space-y-1">
+          <button
+            type="button"
+            onClick={() => selectSmartAlbum("country-year-city")}
+            className="block w-full truncate rounded border-0 bg-transparent px-5 py-1.5 text-left text-sm text-foreground shadow-none outline-none hover:bg-muted"
+          >
+            {UI_TEXT.countryYearCity}
+          </button>
+          <button
+            type="button"
+            onClick={() => selectSmartAlbum("country-area-city")}
+            className="block w-full truncate rounded border-0 bg-transparent px-5 py-1.5 text-left text-sm text-foreground shadow-none outline-none hover:bg-muted"
+          >
+            {UI_TEXT.countryAreaCity}
+          </button>
+          <button
+            type="button"
+            onClick={() => selectSmartAlbum("country-month-area")}
+            className="block w-full truncate rounded border-0 bg-transparent px-5 py-1.5 text-left text-sm text-foreground shadow-none outline-none hover:bg-muted"
+          >
+            {UI_TEXT.countryMonthArea}
+          </button>
+          <button
+            type="button"
+            onClick={() => selectSmartAlbum("ai-countries")}
+            className="block w-full truncate rounded border-0 bg-transparent px-5 py-1.5 text-left text-sm text-foreground shadow-none outline-none hover:bg-muted"
+          >
+            {UI_TEXT.aiCountries}
+          </button>
+          <button
+            type="button"
+            onClick={() => selectSmartAlbum("best-of-year")}
+            className="block w-full truncate rounded border-0 bg-transparent px-5 py-1.5 text-left text-sm text-foreground shadow-none outline-none hover:bg-muted"
+          >
+            {UI_TEXT.bestOfYear}
+          </button>
         </div>
       ) : null}
     </div>

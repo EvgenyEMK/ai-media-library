@@ -69,20 +69,24 @@ function renderListThumbnail(item: AlbumMediaItem): ReactElement {
 
 export function DesktopAlbumContentGrid({
   store,
+  albumId,
   albumItems,
   albumItemsPage,
   albumItemsTotal,
   quickFilters,
   viewMode,
   onAlbumItemsPageChange,
+  onAlbumContentChanged,
 }: {
   store: DesktopStore;
+  albumId?: string;
   albumItems: AlbumMediaItem[];
   albumItemsPage: number;
   albumItemsTotal: number;
   quickFilters: ThumbnailQuickFilterState;
   viewMode: "grid" | "list";
   onAlbumItemsPageChange: (page: number) => void;
+  onAlbumContentChanged?: () => void;
 }): ReactElement {
   const mediaMetadataByItemId = useDesktopStore((s) => s.mediaMetadataByItemId);
   const commitStarRating = useMediaItemStarRatingChange();
@@ -140,9 +144,20 @@ export function DesktopAlbumContentGrid({
               autoPlayInitialVideo: filteredAlbumItems[index]?.mediaKind === "video",
             });
           }}
-          renderActions={(item) => (
-            <DesktopMediaItemActionsMenu filePath={item.id} mediaType={item.mediaType} />
-          )}
+          renderActions={
+            albumId
+              ? (item) => (
+                  <DesktopMediaItemActionsMenu
+                    filePath={item.id}
+                    mediaType={item.mediaType}
+                    albumContext={{
+                      albumId,
+                      onAlbumChanged: onAlbumContentChanged,
+                    }}
+                  />
+                )
+              : undefined
+          }
           priorityCount={24}
           scrollable={false}
         />
@@ -168,6 +183,14 @@ export function DesktopAlbumContentGrid({
                   thumbnail={renderListThumbnail(item)}
                   starRating={item.starRating}
                   onStarRatingChange={onStarRatingChangeForPath(item.sourcePath)}
+                  albumContext={
+                    albumId
+                      ? {
+                          albumId,
+                          onAlbumChanged: onAlbumContentChanged,
+                        }
+                      : undefined
+                  }
                   onRowClick={() => {
                     store.getState().openViewer(index, "album", {
                       itemListOverride: viewerEntries,
