@@ -71,6 +71,7 @@ export function App(): ReactElement {
   );
   const photoAnalysisSettings = useDesktopStore((s) => s.photoAnalysisSettings);
   const folderScanningSettings = useDesktopStore((s) => s.folderScanningSettings);
+  const smartAlbumSettings = useDesktopStore((s) => s.smartAlbumSettings);
   const aiImageSearchSettings = useDesktopStore((s) => s.aiImageSearchSettings);
   const mediaViewerSettings = useDesktopStore((s) => s.mediaViewerSettings);
   const pathExtractionSettings = useDesktopStore((s) => s.pathExtractionSettings);
@@ -367,6 +368,7 @@ export function App(): ReactElement {
         wrongImageRotationDetectionSettings={wrongImageRotationDetectionSettings}
         photoAnalysisSettings={photoAnalysisSettings}
         folderScanningSettings={folderScanningSettings}
+        smartAlbumSettings={smartAlbumSettings}
         aiImageSearchSettings={aiImageSearchSettings}
         hideAdvancedSettings={hideAdvancedSettings}
         mediaViewerSettings={mediaViewerSettings}

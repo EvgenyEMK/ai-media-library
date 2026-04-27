@@ -32,6 +32,7 @@ function insertMediaItem(args: {
   sourcePath: string;
   starRating: number | null;
   aiQuality: number | null;
+  imageCategory?: string | null;
   city?: string | null;
   country?: string | null;
   locationArea?: string | null;
@@ -55,7 +56,12 @@ function insertMediaItem(args: {
       args.starRating,
       args.aiQuality === null
         ? null
-        : JSON.stringify({ image_analysis: { photo_estetic_quality: args.aiQuality } }),
+        : JSON.stringify({
+            image_analysis: {
+              photo_estetic_quality: args.aiQuality,
+              image_category: args.imageCategory ?? null,
+            },
+          }),
       args.city ?? null,
       args.country ?? null,
       args.locationArea ?? null,
@@ -244,7 +250,7 @@ describe.skipIf(!HAS_SQLITE)("media albums DB", () => {
     });
   });
 
-  it("generates country smart album entries with single-year and multi-year city labels", () => {
+  it("generates country smart album entries grouped as year > area", () => {
     insertMediaItem({
       id: "rome-2024",
       sourcePath: "C:/photos/rome-2024.jpg",
@@ -252,6 +258,7 @@ describe.skipIf(!HAS_SQLITE)("media albums DB", () => {
       aiQuality: null,
       city: "Rome",
       country: "Italy",
+      locationArea: "Lazio",
       photoTakenAt: "2024-05-01",
     });
     insertMediaItem({
@@ -261,6 +268,7 @@ describe.skipIf(!HAS_SQLITE)("media albums DB", () => {
       aiQuality: null,
       city: "Rome",
       country: "Italy",
+      locationArea: "Lazio",
       photoTakenAt: "2025-05-01",
     });
     insertMediaItem({
@@ -270,6 +278,7 @@ describe.skipIf(!HAS_SQLITE)("media albums DB", () => {
       aiQuality: null,
       city: "Venice",
       country: "Italy",
+      locationArea: "Veneto",
       photoTakenAt: "2024-06-01",
     });
 
@@ -278,13 +287,13 @@ describe.skipIf(!HAS_SQLITE)("media albums DB", () => {
     const year2024 = italy?.groups.find((year) => year.group === "2024");
     const year2025 = italy?.groups.find((year) => year.group === "2025");
 
-    expect(year2024?.entries.map((entry) => entry.label)).toEqual(["Rome", "Venice"]);
-    expect(year2025?.entries.map((entry) => entry.label)).toEqual(["Rome"]);
+    expect(year2024?.entries.map((entry) => entry.label)).toEqual(["Lazio", "Veneto"]);
+    expect(year2025?.entries.map((entry) => entry.label)).toEqual(["Lazio"]);
     expect(
       albums.listSmartAlbumItems({
         kind: "place",
         country: "Italy",
-        city: "Rome",
+        city: "Lazio",
         group: "2024",
         grouping: "year-city",
         source: "gps",
@@ -324,6 +333,158 @@ describe.skipIf(!HAS_SQLITE)("media albums DB", () => {
     expect(aiCountries.countries.map((country) => country.country)).toEqual(["Spain"]);
   });
 
+  it("generates country smart album entries grouped as month > area", () => {
+    insertMediaItem({
+      id: "lazio-2024",
+      sourcePath: "C:/photos/lazio-2024.jpg",
+      starRating: null,
+      aiQuality: null,
+      city: "Rome",
+      country: "Italy",
+      locationArea: "Lazio",
+      photoTakenAt: "2024-05-01",
+    });
+    insertMediaItem({
+      id: "lazio-2025",
+      sourcePath: "C:/photos/lazio-2025.jpg",
+      starRating: null,
+      aiQuality: null,
+      city: "Rome",
+      country: "Italy",
+      locationArea: "Lazio",
+      photoTakenAt: "2025-06-01",
+    });
+
+    const result = albums.listSmartAlbumPlaces({ grouping: "month-area", source: "gps" });
+    const italy = result.countries.find((country) => country.country === "Italy");
+    const month2024 = italy?.groups.find((group) => group.group === "2024-05");
+    const month2025 = italy?.groups.find((group) => group.group === "2025-06");
+    expect(month2025?.entries.map((entry) => entry.label)).toEqual(["Lazio"]);
+    expect(month2024?.entries.map((entry) => entry.label)).toEqual(["Lazio"]);
+    expect(
+      albums.listSmartAlbumItems({
+        kind: "place",
+        country: "Italy",
+        city: "Lazio",
+        group: "2024-05",
+        grouping: "month-area",
+        source: "gps",
+      }).rows.map((item) => item.id),
+    ).toEqual(["lazio-2024"]);
+  });
+
+  it("consolidates dense month-area countries into year-area entries", () => {
+    for (let month = 1; month <= 10; month += 1) {
+      const monthText = String(month).padStart(2, "0");
+      insertMediaItem({
+        id: `tuscany-${monthText}`,
+        sourcePath: `C:/photos/tuscany-${monthText}.jpg`,
+        starRating: null,
+        aiQuality: null,
+        city: "Florence",
+        country: "Italy",
+        locationArea: "Tuscany",
+        photoTakenAt: `2024-${monthText}-01`,
+      });
+    }
+
+    const result = albums.listSmartAlbumPlaces({
+      grouping: "month-area",
+      source: "gps",
+      consolidateMonthAreaThreshold: 9,
+    });
+    const italy = result.countries.find((country) => country.country === "Italy");
+    expect(italy?.groups.map((group) => group.group)).toEqual(["2024"]);
+    expect(italy?.groups[0]?.entries.map((entry) => entry.label)).toEqual(["Tuscany"]);
+    expect(
+      albums.listSmartAlbumItems({
+        kind: "place",
+        country: "Italy",
+        city: "Tuscany",
+        group: "2024",
+        grouping: "month-area",
+        source: "gps",
+      }).totalCount,
+    ).toBe(10);
+  });
+
+  it("excludes document-like, slide/diagram, and screenshot categories from place smart albums", () => {
+    insertMediaItem({
+      id: "normal-place",
+      sourcePath: "C:/photos/normal-place.jpg",
+      starRating: 4,
+      aiQuality: 8,
+      imageCategory: "nature",
+      city: "Rome",
+      country: "Italy",
+      locationArea: "Lazio",
+      photoTakenAt: "2024-05-01",
+    });
+    insertMediaItem({
+      id: "doc-place",
+      sourcePath: "C:/photos/doc-place.jpg",
+      starRating: 5,
+      aiQuality: 9,
+      imageCategory: "document_other",
+      city: "Rome",
+      country: "Italy",
+      locationArea: "Lazio",
+      photoTakenAt: "2024-05-02",
+    });
+    insertMediaItem({
+      id: "screen-place",
+      sourcePath: "C:/photos/screen-place.jpg",
+      starRating: 5,
+      aiQuality: 9,
+      imageCategory: "screenshot",
+      city: "Rome",
+      country: "Italy",
+      locationArea: "Lazio",
+      photoTakenAt: "2024-05-03",
+    });
+    insertMediaItem({
+      id: "slide-place",
+      sourcePath: "C:/photos/slide-place.jpg",
+      starRating: 5,
+      aiQuality: 9,
+      imageCategory: "presentation_slide",
+      city: "Rome",
+      country: "Italy",
+      locationArea: "Lazio",
+      photoTakenAt: "2024-05-04",
+    });
+    insertMediaItem({
+      id: "diagram-place",
+      sourcePath: "C:/photos/diagram-place.jpg",
+      starRating: 5,
+      aiQuality: 9,
+      imageCategory: "diagram",
+      city: "Rome",
+      country: "Italy",
+      locationArea: "Lazio",
+      photoTakenAt: "2024-05-05",
+    });
+
+    const places = albums.listSmartAlbumPlaces({ grouping: "year-city", source: "gps" });
+    expect(places.countries.find((country) => country.country === "Italy")?.mediaCount).toBe(1);
+    expect(
+      albums.listSmartAlbumItems({
+        kind: "place",
+        country: "Italy",
+        city: "Lazio",
+        group: "2024",
+        grouping: "year-city",
+        source: "gps",
+      }).rows.map((item) => item.id),
+    ).toEqual(["normal-place"]);
+
+    const years = albums.listSmartAlbumYears();
+    expect(years.years.find((year) => year.year === "2024")?.mediaCount).toBe(1);
+    expect(
+      albums.listSmartAlbumItems({ kind: "best-of-year", year: "2024" }).rows.map((item) => item.id),
+    ).toEqual(["normal-place"]);
+  });
+
   it("generates best-of-year smart albums ordered by rating and AI quality", () => {
     insertMediaItem({
       id: "best-rated",
@@ -357,10 +518,139 @@ describe.skipIf(!HAS_SQLITE)("media albums DB", () => {
     const years = albums.listSmartAlbumYears();
     const year2024 = years.years.find((year) => year.year === "2024");
 
-    expect(year2024?.mediaCount).toBe(2);
+    expect(year2024?.mediaCount).toBe(3);
+    expect(year2024?.manualRatedCount).toBe(1);
+    expect(year2024?.aiRatedCount).toBe(3);
     expect(year2024?.coverSourcePath).toBeNull();
     expect(
       albums.listSmartAlbumItems({ kind: "best-of-year", year: "2024" }).rows.map((item) => item.id),
-    ).toEqual(["best-rated", "best-ai"]);
+    ).toEqual(["best-rated", "best-ai", "excluded-ai"]);
+  });
+
+  it("includes suggestion-only person matches for best-of-year when includeUnconfirmedFaces is enabled", () => {
+    const now = "2026-01-01T00:00:00.000Z";
+    insertMediaItem({
+      id: "explicit-tag",
+      sourcePath: "C:/photos/explicit-tag.jpg",
+      starRating: 5,
+      aiQuality: 8,
+      photoTakenAt: "2024-01-01",
+    });
+    insertMediaItem({
+      id: "suggested-only",
+      sourcePath: "C:/photos/suggested-only.jpg",
+      starRating: 5,
+      aiQuality: 8,
+      photoTakenAt: "2024-01-02",
+    });
+    client
+      .getDesktopDatabase()
+      .prepare(
+        `INSERT INTO media_face_instances (
+          id, library_id, media_item_id, tag_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run("face-explicit", LIBRARY_ID, "explicit-tag", "person-1", now, now);
+    client
+      .getDesktopDatabase()
+      .prepare(
+        `INSERT INTO media_item_person_suggestions (
+          library_id, media_item_id, tag_id, best_similarity, exemplar_face_instance_id, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(LIBRARY_ID, "suggested-only", "person-1", 0.91, null, now);
+
+    expect(
+      albums.listSmartAlbumItems({
+        kind: "best-of-year",
+        year: "2024",
+        filters: { personTagIds: ["person-1"] },
+      }).rows.map((item) => item.id),
+    ).toEqual(["explicit-tag"]);
+    expect(
+      albums.listSmartAlbumItems({
+        kind: "best-of-year",
+        year: "2024",
+        filters: { personTagIds: ["person-1"], includeUnconfirmedFaces: true },
+      }).rows.map((item) => item.id),
+    ).toEqual(["explicit-tag", "suggested-only"]);
+  });
+
+  it("groups best-of-year rating filters with configurable OR and AND logic", () => {
+    insertMediaItem({
+      id: "manual-only",
+      sourcePath: "C:/photos/manual-only.jpg",
+      starRating: 4,
+      aiQuality: 2,
+      photoTakenAt: "2024-01-01",
+    });
+    insertMediaItem({
+      id: "ai-only",
+      sourcePath: "C:/photos/ai-only.jpg",
+      starRating: null,
+      aiQuality: 8,
+      photoTakenAt: "2024-01-02",
+    });
+    insertMediaItem({
+      id: "both",
+      sourcePath: "C:/photos/both.jpg",
+      starRating: 5,
+      aiQuality: 9,
+      photoTakenAt: "2024-01-03",
+    });
+
+    expect(
+      albums.listSmartAlbumItems({
+        kind: "best-of-year",
+        year: "2024",
+        filters: {
+          starRatingMin: 4,
+          aiAestheticMin: 7,
+          ratingLogic: "or",
+        },
+      }).rows.map((item) => item.id),
+    ).toEqual(["both", "manual-only", "ai-only"]);
+    expect(
+      albums.listSmartAlbumItems({
+        kind: "best-of-year",
+        year: "2024",
+        filters: {
+          starRatingMin: 4,
+          aiAestheticMin: 7,
+          ratingLogic: "and",
+        },
+      }).rows.map((item) => item.id),
+    ).toEqual(["both"]);
+  });
+
+  it("caps randomized best-of-year candidates without capping deterministic order", () => {
+    for (const index of [1, 2, 3]) {
+      insertMediaItem({
+        id: `candidate-${index}`,
+        sourcePath: `C:/photos/candidate-${index}.jpg`,
+        starRating: 5,
+        aiQuality: 8,
+        photoTakenAt: `2024-01-0${index}`,
+      });
+    }
+
+    expect(
+      albums.listSmartAlbumItems({
+        kind: "best-of-year",
+        year: "2024",
+        randomize: false,
+        randomCandidateLimit: 1,
+        limit: 10,
+      }).rows.map((item) => item.id),
+    ).toEqual(["candidate-3", "candidate-2", "candidate-1"]);
+    expect(
+      albums.listSmartAlbumItems({
+        kind: "best-of-year",
+        year: "2024",
+        randomize: true,
+        randomCandidateLimit: 1,
+        limit: 10,
+      }).rows,
+    ).toHaveLength(1);
   });
 });

@@ -4,6 +4,7 @@ import type {
   AlbumListRequest,
   SmartAlbumItemsRequest,
   SmartAlbumPlacesRequest,
+  SmartAlbumYearsRequest,
 } from "@emk/shared-contracts";
 import { IPC_CHANNELS } from "../../src/shared/ipc";
 import {
@@ -74,8 +75,8 @@ export function registerAlbumHandlers(): void {
     return listSmartAlbumPlaces(request);
   });
 
-  ipcMain.handle(IPC_CHANNELS.listSmartAlbumYears, async () => {
-    return listSmartAlbumYears();
+  ipcMain.handle(IPC_CHANNELS.listSmartAlbumYears, async (_event, request?: SmartAlbumYearsRequest) => {
+    return listSmartAlbumYears(request);
   });
 
   ipcMain.handle(IPC_CHANNELS.listSmartAlbumItems, async (_event, request: SmartAlbumItemsRequest) => {

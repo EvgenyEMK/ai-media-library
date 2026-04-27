@@ -45,6 +45,7 @@ interface DesktopAppMainProps {
   wrongImageRotationDetectionSettings: DesktopStoreState["wrongImageRotationDetectionSettings"];
   photoAnalysisSettings: DesktopStoreState["photoAnalysisSettings"];
   folderScanningSettings: DesktopStoreState["folderScanningSettings"];
+  smartAlbumSettings: DesktopStoreState["smartAlbumSettings"];
   aiImageSearchSettings: DesktopStoreState["aiImageSearchSettings"];
   hideAdvancedSettings: boolean;
   mediaViewerSettings: DesktopStoreState["mediaViewerSettings"];
@@ -111,6 +112,7 @@ export function DesktopAppMain({
   wrongImageRotationDetectionSettings,
   photoAnalysisSettings,
   folderScanningSettings,
+  smartAlbumSettings,
   aiImageSearchSettings,
   hideAdvancedSettings,
   mediaViewerSettings,
@@ -164,7 +166,7 @@ export function DesktopAppMain({
   return (
     <main className="main-panel relative flex min-h-0 min-w-0 flex-col overflow-hidden">
       {isAlbumsSectionOpen ? (
-        <div className="min-h-0 flex-1 overflow-auto">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <DesktopAlbumsWorkspace
             mode={albumWorkspaceMode}
             onModeChange={setAlbumWorkspaceMode}
@@ -184,6 +186,7 @@ export function DesktopAppMain({
             wrongImageRotationDetectionSettings={wrongImageRotationDetectionSettings}
             photoAnalysisSettings={photoAnalysisSettings}
             folderScanningSettings={folderScanningSettings}
+            smartAlbumSettings={smartAlbumSettings}
             aiImageSearchSettings={aiImageSearchSettings}
             hideAdvancedSettings={hideAdvancedSettings}
             mediaViewerSettings={mediaViewerSettings}
@@ -198,6 +201,10 @@ export function DesktopAppMain({
             onFolderScanningSettingChange={(key, value) =>
               store.getState().updateFolderScanningSetting(key, value)
             }
+            onSmartAlbumSettingChange={(key, value) =>
+              store.getState().updateSmartAlbumSetting(key, value)
+            }
+            onResetSmartAlbumSettings={() => store.getState().resetSmartAlbumSettings()}
             onResetFolderScanningSectionSettings={() => {
               store.getState().resetFolderScanningSettings();
               store.getState().resetPathExtractionSettings();

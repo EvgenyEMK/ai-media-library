@@ -67,15 +67,31 @@ export interface AlbumMembership {
 export type SmartAlbumRootKind =
   | "country-year-city"
   | "country-area-city"
+  | "country-month-area"
   | "ai-countries"
   | "best-of-year";
 
-export type SmartAlbumPlaceGrouping = "year-city" | "area-city";
+export type SmartAlbumPlaceGrouping = "year-city" | "area-city" | "month-area";
 export type SmartAlbumPlaceSource = "gps" | "non-gps";
+
+export interface SmartAlbumFilters {
+  query?: string;
+  personTagIds?: string[];
+  includeUnconfirmedFaces?: boolean;
+  starRatingMin?: number;
+  starRatingOperator?: "gte" | "eq";
+  aiAestheticMin?: number;
+  aiAestheticOperator?: "gte" | "eq";
+  ratingLogic?: "or" | "and";
+  dateFrom?: string;
+  dateTo?: string;
+}
 
 export interface SmartAlbumPlacesRequest {
   grouping: SmartAlbumPlaceGrouping;
   source: SmartAlbumPlaceSource;
+  filters?: SmartAlbumFilters;
+  consolidateMonthAreaThreshold?: number;
 }
 
 export interface SmartAlbumPlaceEntry {
@@ -106,14 +122,18 @@ export interface SmartAlbumPlacesResult {
 export interface SmartAlbumYearSummary {
   year: string;
   mediaCount: number;
-  topStarRating: number | null;
-  topAestheticScore: number | null;
+  manualRatedCount: number;
+  aiRatedCount: number;
   coverSourcePath: string | null;
   coverMediaKind: "image" | "video";
 }
 
 export interface SmartAlbumYearsResult {
   years: SmartAlbumYearSummary[];
+}
+
+export interface SmartAlbumYearsRequest {
+  filters?: SmartAlbumFilters;
 }
 
 export type SmartAlbumItemsRequest =
@@ -124,13 +144,16 @@ export type SmartAlbumItemsRequest =
       group: string;
       grouping: SmartAlbumPlaceGrouping;
       source: SmartAlbumPlaceSource;
+      filters?: SmartAlbumFilters;
       offset?: number;
       limit?: number;
     }
   | {
       kind: "best-of-year";
       year: string;
+      filters?: SmartAlbumFilters;
       offset?: number;
       limit?: number;
       randomize?: boolean;
+      randomCandidateLimit?: number;
     };

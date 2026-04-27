@@ -37,7 +37,9 @@ function renderSection(options: {
   albums: MediaAlbumSummary[];
   recentAlbumIds?: string[];
   onAlbumSelected?: () => void;
-  onSmartAlbumSelected?: (kind: "country-year-city" | "country-area-city" | "ai-countries" | "best-of-year") => void;
+  onSmartAlbumSelected?: (
+    kind: "country-year-city" | "country-area-city" | "country-month-area" | "ai-countries" | "best-of-year"
+  ) => void;
   onShowAlbumList?: () => void;
 }) {
   render(
@@ -133,14 +135,16 @@ describe("DesktopSidebarAlbumsSection", () => {
     });
 
     fireEvent.click(await screen.findByRole("button", { name: "SMART ALBUMS" }));
-    fireEvent.click(screen.getByRole("button", { name: "County > Year > City" }));
+    fireEvent.click(screen.getByRole("button", { name: "Country > Year > Area" }));
     fireEvent.click(screen.getByRole("button", { name: "Country > Area > City" }));
+    fireEvent.click(screen.getByRole("button", { name: "Country > YYYY-MM Area" }));
     fireEvent.click(screen.getByRole("button", { name: "AI countries" }));
     fireEvent.click(screen.getByRole("button", { name: "Best of Year" }));
 
     expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(1, "country-year-city");
     expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(2, "country-area-city");
-    expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(3, "ai-countries");
-    expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(4, "best-of-year");
+    expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(3, "country-month-area");
+    expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(4, "ai-countries");
+    expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(5, "best-of-year");
   });
 });

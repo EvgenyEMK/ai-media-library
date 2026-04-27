@@ -266,19 +266,21 @@ export function SemanticSearchPanel({
           onToggleTag={togglePersonTag}
         />
 
-        {semanticPersonTagIds.length > 0 ? (
-          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-ai-search-text/80">
-            <input
-              type="checkbox"
-              className="cursor-pointer accent-ai-search-accent"
-              checked={semanticIncludeUnconfirmedFaces}
-              onChange={(e) =>
-                store.getState().setSemanticIncludeUnconfirmedFaces(e.target.checked)
-              }
-            />
-            <span>Include unconfirmed similar faces</span>
-          </label>
-        ) : null}
+        <label
+          className="flex cursor-pointer items-center gap-1.5 text-xs text-ai-search-text/80 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60"
+          title={semanticPersonTagIds.length === 0 ? "Select at least one person tag" : undefined}
+        >
+          <input
+            type="checkbox"
+            className="cursor-pointer accent-ai-search-accent"
+            checked={semanticIncludeUnconfirmedFaces}
+            disabled={semanticPersonTagIds.length === 0}
+            onChange={(e) =>
+              store.getState().setSemanticIncludeUnconfirmedFaces(e.target.checked)
+            }
+          />
+          <span>Include unconfirmed similar faces</span>
+        </label>
       </div>
     </section>
   );

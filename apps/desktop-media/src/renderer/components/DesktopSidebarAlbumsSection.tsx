@@ -10,8 +10,9 @@ const UI_TEXT = {
   recent: "RECENT",
   smartAlbums: "SMART ALBUMS",
   allAlbums: "All albums",
-  countryYearCity: "County > Year > City",
+  countryYearCity: "Country > Year > Area",
   countryAreaCity: "Country > Area > City",
+  countryMonthArea: "Country > YYYY-MM Area",
   aiCountries: "AI countries",
   bestOfYear: "Best of Year",
 } as const;
@@ -189,6 +190,13 @@ export function DesktopSidebarAlbumsSection({
             className="block w-full truncate rounded border-0 bg-transparent px-5 py-1.5 text-left text-sm text-foreground shadow-none outline-none hover:bg-muted"
           >
             {UI_TEXT.countryAreaCity}
+          </button>
+          <button
+            type="button"
+            onClick={() => selectSmartAlbum("country-month-area")}
+            className="block w-full truncate rounded border-0 bg-transparent px-5 py-1.5 text-left text-sm text-foreground shadow-none outline-none hover:bg-muted"
+          >
+            {UI_TEXT.countryMonthArea}
           </button>
           <button
             type="button"

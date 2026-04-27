@@ -7,6 +7,7 @@ import type {
   MediaAlbumSummary,
   SmartAlbumItemsRequest,
   SmartAlbumPlacesRequest,
+  SmartAlbumYearsRequest,
   SmartAlbumPlacesResult,
   SmartAlbumYearsResult,
 } from "@emk/shared-contracts";
@@ -23,7 +24,7 @@ export interface DesktopAlbumActions {
   removeMediaItemFromAlbum: (albumId: string, mediaItemId: string) => Promise<void>;
   setAlbumCover: (albumId: string, mediaItemId: string | null) => Promise<void>;
   loadSmartAlbumPlaces: (request: SmartAlbumPlacesRequest) => Promise<SmartAlbumPlacesResult>;
-  loadSmartAlbumYears: () => Promise<SmartAlbumYearsResult>;
+  loadSmartAlbumYears: (request?: SmartAlbumYearsRequest) => Promise<SmartAlbumYearsResult>;
   loadSmartAlbumItems: (request: SmartAlbumItemsRequest) => Promise<AlbumItemsResult>;
 }
 
@@ -72,8 +73,8 @@ export function createDesktopAlbumActions(store: DesktopStore): DesktopAlbumActi
     loadSmartAlbumPlaces(request) {
       return window.desktopApi.listSmartAlbumPlaces(request);
     },
-    loadSmartAlbumYears() {
-      return window.desktopApi.listSmartAlbumYears();
+    loadSmartAlbumYears(request) {
+      return window.desktopApi.listSmartAlbumYears(request);
     },
     loadSmartAlbumItems(request) {
       return window.desktopApi.listSmartAlbumItems(request);

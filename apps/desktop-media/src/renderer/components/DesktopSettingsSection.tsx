@@ -1,6 +1,7 @@
 import { useEffect, useId, useState, type ReactElement } from "react";
 import { ChevronDown, Square, Star } from "lucide-react";
 import {
+  MediaItemStarRating,
   SettingsCheckboxField,
   SettingsNumberField,
   SettingsSectionCard,
@@ -14,6 +15,7 @@ import {
   DEFAULT_MEDIA_VIEWER_SETTINGS,
   DEFAULT_PATH_EXTRACTION_SETTINGS,
   DEFAULT_PHOTO_ANALYSIS_SETTINGS,
+  DEFAULT_SMART_ALBUM_SETTINGS,
   DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS,
   FACE_DETECTOR_MODEL_OPTIONS,
   type AiImageSearchSettings,
@@ -31,6 +33,8 @@ import {
   type PathExtractionSettings,
   type PhotoAnalysisSettings,
   type PhotoPendingFolderIconTint,
+  type SmartAlbumRatingOperator,
+  type SmartAlbumSettings,
   type WrongImageRotationDetectionSettings,
 } from "../../shared/ipc";
 import { cn } from "../lib/cn";
@@ -47,6 +51,7 @@ interface DesktopSettingsSectionProps {
   wrongImageRotationDetectionSettings: WrongImageRotationDetectionSettings;
   photoAnalysisSettings: PhotoAnalysisSettings;
   folderScanningSettings: FolderScanningSettings;
+  smartAlbumSettings: SmartAlbumSettings;
   aiImageSearchSettings: AiImageSearchSettings;
   hideAdvancedSettings: boolean;
   mediaViewerSettings: MediaViewerSettings;
@@ -71,6 +76,11 @@ interface DesktopSettingsSectionProps {
     key: K,
     value: FolderScanningSettings[K],
   ) => void;
+  onSmartAlbumSettingChange: <K extends keyof SmartAlbumSettings>(
+    key: K,
+    value: SmartAlbumSettings[K],
+  ) => void;
+  onResetSmartAlbumSettings: () => void;
   onResetFolderScanningSectionSettings: () => void;
   onAiImageSearchSettingChange: <K extends keyof AiImageSearchSettings>(
     key: K,
@@ -99,6 +109,12 @@ const UI_TEXT = {
   scanForFileChanges: "Scan for file changes",
   /** Shorter than “folder change scanning and file metadata management”; covers scan policy + embedded writes + path helpers. */
   fileMetadataManagement: "Folder scanning & file metadata",
+  smartAlbums: "Smart albums",
+  defaultRatingTitle: "Default Rating",
+  defaultAiRatingTitle: "Default AI rating",
+  excludedImageCategoriesTitle: "Excluded image categories",
+  smartAlbumsDescription:
+    "These defaults are applied when opening Best of Year smart albums. You can still adjust or clear filters in the album view.",
   emptyFolderAiSummaryTitle: "On empty folder selection show AI analysis status summary for subfolders",
   emptyFolderAiSummaryDescription: `When the folder you select has no images or videos in it directly but it contains sub-folders, open the Folder AI analysis summary in the main pane—the same view as “Folder AI analysis summary” on the folder’s right-click menu. It shows a table with face detection, AI image analysis, and AI search index status for this folder and all sub-folders (large trees may take a few seconds). If the folder has no sub-folders, this summary is not shown.`,
   pathExtractDatesTitle: "Extract date(s) from file path",
@@ -186,11 +202,49 @@ function settingsCustomOptionSurfaceClass(variant: SettingsOptionSurfaceVariant)
   return SETTINGS_CUSTOM_OPTION_SURFACE_CLASSES[variant];
 }
 
+function SmartAlbumDefaultRatingSetting({
+  title,
+  value,
+  operator,
+  onOperatorChange,
+  onChange,
+}: {
+  title: string;
+  value: number | null;
+  operator: SmartAlbumRatingOperator;
+  onOperatorChange: (operator: SmartAlbumRatingOperator) => void;
+  onChange: (value: number | null) => void;
+}): ReactElement {
+  return (
+    <div className={cn(settingsCustomOptionSurfaceClass("accent-stripe"), "border-l-primary/70")}>
+      <div className="flex flex-wrap items-center gap-3">
+        <h4 className="m-0 min-w-36 text-base font-medium text-foreground">{title}</h4>
+        <button
+          type="button"
+          className="inline-flex h-8 min-w-11 items-center justify-center rounded-md border border-border bg-secondary px-2 text-sm font-semibold text-foreground hover:bg-muted"
+          onClick={() => onOperatorChange(operator === "gte" ? "eq" : "gte")}
+          aria-label={`${title} operator ${operator === "gte" ? "greater than or equal" : "equals"}`}
+          title="Click to switch between >= and ="
+        >
+          {operator === "gte" ? ">=" : "="}
+        </button>
+        <MediaItemStarRating
+          starRating={value}
+          onChange={(next) => onChange(next > 0 ? next : null)}
+          expanded
+          tone="onCard"
+        />
+      </div>
+    </div>
+  );
+}
+
 export function DesktopSettingsSection({
   faceDetectionSettings,
   wrongImageRotationDetectionSettings,
   photoAnalysisSettings,
   folderScanningSettings,
+  smartAlbumSettings,
   aiImageSearchSettings,
   hideAdvancedSettings,
   mediaViewerSettings,
@@ -201,6 +255,8 @@ export function DesktopSettingsSection({
   onPhotoAnalysisSettingChange,
   onResetPhotoAnalysisSettings,
   onFolderScanningSettingChange,
+  onSmartAlbumSettingChange,
+  onResetSmartAlbumSettings,
   onResetFolderScanningSectionSettings,
   onAiImageSearchSettingChange,
   onResetAiImageSearchSettings,
@@ -325,6 +381,68 @@ export function DesktopSettingsSection({
                   DEFAULT_MEDIA_VIEWER_SETTINGS.autoPlayVideoOnOpen &&
                 mediaViewerSettings.skipVideosInSlideshow ===
                   DEFAULT_MEDIA_VIEWER_SETTINGS.skipVideosInSlideshow
+              }
+            >
+              {UI_TEXT.resetToDefaults}
+            </button>
+          </div>
+        </div>
+      </SettingsSectionCard>
+
+      <SettingsSectionCard title={UI_TEXT.smartAlbums}>
+        <div className="space-y-3">
+          <p className="m-0 text-sm leading-relaxed text-muted-foreground">
+            {UI_TEXT.smartAlbumsDescription}
+          </p>
+          <SmartAlbumDefaultRatingSetting
+            title={UI_TEXT.defaultRatingTitle}
+            value={smartAlbumSettings.defaultStarRating}
+            operator={smartAlbumSettings.defaultStarRatingOperator}
+            onOperatorChange={(next) =>
+              onSmartAlbumSettingChange("defaultStarRatingOperator", next)
+            }
+            onChange={(next) => onSmartAlbumSettingChange("defaultStarRating", next)}
+          />
+          <SmartAlbumDefaultRatingSetting
+            title={UI_TEXT.defaultAiRatingTitle}
+            value={smartAlbumSettings.defaultAiRating}
+            operator={smartAlbumSettings.defaultAiRatingOperator}
+            onOperatorChange={(next) =>
+              onSmartAlbumSettingChange("defaultAiRatingOperator", next)
+            }
+            onChange={(next) => onSmartAlbumSettingChange("defaultAiRating", next)}
+          />
+          <div className={cn(settingsCustomOptionSurfaceClass("muted"), "border-l-primary/70")}>
+            <h4 className="m-0 text-base font-medium text-foreground">
+              {UI_TEXT.excludedImageCategoriesTitle}
+            </h4>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {smartAlbumSettings.excludedImageCategories.map((category) => (
+                <span
+                  key={category}
+                  className="rounded-full border border-border bg-secondary px-2 py-1 text-sm text-muted-foreground"
+                >
+                  {category}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="pt-1">
+            <button
+              type="button"
+              className="inline-flex h-10 items-center rounded-md border border-border px-3 text-base"
+              onClick={onResetSmartAlbumSettings}
+              disabled={
+                smartAlbumSettings.defaultStarRating ===
+                  DEFAULT_SMART_ALBUM_SETTINGS.defaultStarRating &&
+                smartAlbumSettings.defaultStarRatingOperator ===
+                  DEFAULT_SMART_ALBUM_SETTINGS.defaultStarRatingOperator &&
+                smartAlbumSettings.defaultAiRating ===
+                  DEFAULT_SMART_ALBUM_SETTINGS.defaultAiRating &&
+                smartAlbumSettings.defaultAiRatingOperator ===
+                  DEFAULT_SMART_ALBUM_SETTINGS.defaultAiRatingOperator &&
+                smartAlbumSettings.excludedImageCategories.join("|") ===
+                  DEFAULT_SMART_ALBUM_SETTINGS.excludedImageCategories.join("|")
               }
             >
               {UI_TEXT.resetToDefaults}

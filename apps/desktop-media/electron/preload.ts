@@ -165,7 +165,7 @@ const api: DesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.setAlbumCover, albumId, mediaItemId),
   listSmartAlbumPlaces: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.listSmartAlbumPlaces, request),
-  listSmartAlbumYears: () => ipcRenderer.invoke(IPC_CHANNELS.listSmartAlbumYears),
+  listSmartAlbumYears: (request) => ipcRenderer.invoke(IPC_CHANNELS.listSmartAlbumYears, request),
   listSmartAlbumItems: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.listSmartAlbumItems, request),
   onMediaItemMetadataRefreshed: (listener) => {

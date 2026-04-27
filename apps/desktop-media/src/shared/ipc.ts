@@ -9,6 +9,7 @@ import type {
   MediaAlbumSummary,
   ProviderRawBoundingBoxReference,
   SmartAlbumItemsRequest,
+  SmartAlbumYearsRequest,
   SmartAlbumPlacesRequest,
   SmartAlbumPlacesResult,
   SmartAlbumYearsResult,
@@ -198,6 +199,7 @@ export interface AppSettings {
   faceDetection: FaceDetectionSettings;
   photoAnalysis: PhotoAnalysisSettings;
   folderScanning: FolderScanningSettings;
+  smartAlbums: SmartAlbumSettings;
   aiImageSearch: AiImageSearchSettings;
   mediaViewer: MediaViewerSettings;
   pathExtraction: PathExtractionSettings;
@@ -492,6 +494,16 @@ export interface AiImageSearchSettings {
   keywordMatchThresholdDescription: number;
 }
 
+export type SmartAlbumRatingOperator = "gte" | "eq";
+
+export interface SmartAlbumSettings {
+  defaultStarRating: number | null;
+  defaultStarRatingOperator: SmartAlbumRatingOperator;
+  defaultAiRating: number | null;
+  defaultAiRatingOperator: SmartAlbumRatingOperator;
+  excludedImageCategories: string[];
+}
+
 export const DEFAULT_FACE_DETECTION_SETTINGS: FaceDetectionSettings = {
   detectorModel: "yolov12l-face",
   minConfidenceThreshold: 0.75,
@@ -548,6 +560,20 @@ export const DEFAULT_AI_IMAGE_SEARCH_SETTINGS: AiImageSearchSettings = {
   keywordMatchThresholdDescription: 0.5,
 };
 
+export const DEFAULT_SMART_ALBUM_SETTINGS: SmartAlbumSettings = {
+  defaultStarRating: 4,
+  defaultStarRatingOperator: "gte",
+  defaultAiRating: 4,
+  defaultAiRatingOperator: "gte",
+  excludedImageCategories: [
+    "document*",
+    "invoice_or_receipt",
+    "presentation_slide",
+    "diagram",
+    "*screenshot*",
+  ],
+};
+
 export const DEFAULT_PATH_EXTRACTION_SETTINGS: PathExtractionSettings = {
   extractDates: true,
   useLlm: false,
@@ -568,6 +594,7 @@ export const DEFAULT_APP_SETTINGS: Omit<AppSettings, "clientId"> = {
   faceDetection: DEFAULT_FACE_DETECTION_SETTINGS,
   photoAnalysis: DEFAULT_PHOTO_ANALYSIS_SETTINGS,
   folderScanning: DEFAULT_FOLDER_SCANNING_SETTINGS,
+  smartAlbums: DEFAULT_SMART_ALBUM_SETTINGS,
   aiImageSearch: DEFAULT_AI_IMAGE_SEARCH_SETTINGS,
   mediaViewer: DEFAULT_MEDIA_VIEWER_SETTINGS,
   pathExtraction: DEFAULT_PATH_EXTRACTION_SETTINGS,
@@ -1740,7 +1767,7 @@ export interface DesktopApi {
   removeMediaItemFromAlbum: (albumId: string, mediaItemId: string) => Promise<void>;
   setAlbumCover: (albumId: string, mediaItemId: string | null) => Promise<void>;
   listSmartAlbumPlaces: (request: SmartAlbumPlacesRequest) => Promise<SmartAlbumPlacesResult>;
-  listSmartAlbumYears: () => Promise<SmartAlbumYearsResult>;
+  listSmartAlbumYears: (request?: SmartAlbumYearsRequest) => Promise<SmartAlbumYearsResult>;
   listSmartAlbumItems: (request: SmartAlbumItemsRequest) => Promise<AlbumItemsResult>;
   onMediaItemMetadataRefreshed: (
     listener: (byPath: Record<string, DesktopMediaItemMetadata>) => void,
