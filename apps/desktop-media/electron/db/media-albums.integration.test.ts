@@ -46,7 +46,7 @@ function insertMediaItem(args: {
       `INSERT INTO media_items (
         id, library_id, source_path, filename, star_rating, ai_metadata,
         city, country, location_area, location_source, photo_taken_at, media_kind, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'image', ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'image', ?, ?)`,
     )
     .run(
       args.id,
