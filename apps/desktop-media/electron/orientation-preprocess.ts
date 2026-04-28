@@ -11,12 +11,13 @@ export async function runWrongImageRotationPrecheck(params: {
   imagePath: string;
   settings: AppSettings;
   signal?: AbortSignal;
-}): Promise<void> {
-  const { imagePath, settings, signal } = params;
-  if (!settings.wrongImageRotationDetection.enabled) return;
+  force?: boolean;
+}): Promise<"processed" | "skipped" | "failed" | "disabled"> {
+  const { imagePath, settings, signal, force = false } = params;
+  if (!settings.wrongImageRotationDetection.enabled) return "disabled";
 
   const already = getOrientationDetectionStateByPath(imagePath);
-  if (already) return;
+  if (already && !force) return "skipped";
 
   const model = settings.faceDetection.imageOrientationDetection.model;
 
@@ -39,19 +40,20 @@ export async function runWrongImageRotationPrecheck(params: {
         confidence: prediction.confidence,
         model: prediction.model,
       });
-      return;
+      return "processed";
     } catch {
       // Continue to fallback.
     }
   }
 
-  if (!settings.wrongImageRotationDetection.useFaceLandmarkFeaturesFallback) return;
+  if (!settings.wrongImageRotationDetection.useFaceLandmarkFeaturesFallback) return "failed";
   const fromLandmarks = checkExistingFaceLandmarksForRotation(imagePath);
-  if (!fromLandmarks) return;
+  if (!fromLandmarks) return "failed";
   upsertOrientationDetectionResult(imagePath, {
     source: "face_landmarks",
     correctionAngleClockwise: fromLandmarks.finalAngle,
     confidence: fromLandmarks.landmarkResult?.confidence ?? null,
     model: null,
   });
+  return "processed";
 }

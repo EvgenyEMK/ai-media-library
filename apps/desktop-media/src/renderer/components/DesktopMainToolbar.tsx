@@ -21,6 +21,7 @@ interface DesktopMainToolbarProps {
   displaySemanticResultsCount: number;
   filteredDisplaySemanticResultsCount: number;
   selectedFolder: string | null;
+  onOpenFolderAiSummary: (folderPath: string) => void;
   mediaImagesCount: number;
   mediaVideosCount: number;
   aiPipelineStripRefreshKey: string;
@@ -48,6 +49,7 @@ export function DesktopMainToolbar({
   displaySemanticResultsCount,
   filteredDisplaySemanticResultsCount,
   selectedFolder,
+  onOpenFolderAiSummary,
   mediaImagesCount,
   mediaVideosCount,
   aiPipelineStripRefreshKey,
@@ -85,6 +87,7 @@ export function DesktopMainToolbar({
           refreshKey={aiPipelineStripRefreshKey}
           imagesCount={mediaImagesCount}
           videosCount={mediaVideosCount}
+          onOpenFolderAiSummary={onOpenFolderAiSummary}
         />
       </div>
       <div className="relative flex gap-2">

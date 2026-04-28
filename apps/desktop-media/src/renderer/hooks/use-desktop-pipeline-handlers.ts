@@ -40,6 +40,7 @@ export type DesktopPipelineHandlers = {
   handleCancelDescEmbedBackfill: () => Promise<void>;
   handleAnalyzeFolderPathMetadata: (folderPath: string, recursive: boolean) => Promise<void>;
   handleCancelPathAnalysis: () => Promise<void>;
+  handleCancelImageRotation: () => Promise<void>;
 };
 
 export function useDesktopPipelineHandlers(opts: {
@@ -113,9 +114,14 @@ export function useDesktopPipelineHandlers(opts: {
       ...faceAndScan,
       ...semantic,
       ...pathAnalysis,
+      handleCancelImageRotation: async () => {
+        const jobId = store.getState().imageRotationJobId;
+        if (!jobId) return;
+        await window.desktopApi.cancelImageRotationDetection(jobId);
+      },
       handleIndexDescEmbeddings: descEmbedHandlers.handleIndexDescEmbeddings,
       handleCancelDescEmbedBackfill: descEmbedHandlers.handleCancelDescEmbedBackfill,
     }),
-    [photo, faceAndScan, semantic, pathAnalysis, descEmbedHandlers],
+    [photo, faceAndScan, semantic, pathAnalysis, descEmbedHandlers, store],
   );
 }

@@ -75,6 +75,16 @@ export function useDesktopProgressDockState({
   const pathAnalysisTotal = useDesktopStore((s) => s.pathAnalysisTotal);
   const pathAnalysisFolderPath = useDesktopStore((s) => s.pathAnalysisFolderPath);
   const pathAnalysisError = useDesktopStore((s) => s.pathAnalysisError);
+  const imageRotationPanelVisible = useDesktopStore((s) => s.imageRotationPanelVisible);
+  const imageRotationStatus = useDesktopStore((s) => s.imageRotationStatus);
+  const imageRotationJobId = useDesktopStore((s) => s.imageRotationJobId);
+  const imageRotationProcessed = useDesktopStore((s) => s.imageRotationProcessed);
+  const imageRotationTotal = useDesktopStore((s) => s.imageRotationTotal);
+  const imageRotationWronglyRotated = useDesktopStore((s) => s.imageRotationWronglyRotated);
+  const imageRotationSkipped = useDesktopStore((s) => s.imageRotationSkipped);
+  const imageRotationFailed = useDesktopStore((s) => s.imageRotationFailed);
+  const imageRotationFolderPath = useDesktopStore((s) => s.imageRotationFolderPath);
+  const imageRotationError = useDesktopStore((s) => s.imageRotationError);
   const geocoderInitStatus = useDesktopStore((s) => s.geocoderInitStatus);
   const geocoderInitError = useDesktopStore((s) => s.geocoderInitError);
   const geocoderInitPanelVisible = useDesktopStore((s) => s.geocoderInitPanelVisible);
@@ -147,9 +157,17 @@ export function useDesktopProgressDockState({
       geocoderInitStatus === "error");
 
   const isPathAnalysisRunning = pathAnalysisStatus === "running";
+  const isImageRotationRunning = imageRotationStatus === "running";
   const pathAnalysisQualifies =
     pathAnalysisPanelVisible &&
     (isPathAnalysisRunning || Boolean(pathAnalysisError));
+  const imageRotationQualifies =
+    imageRotationPanelVisible &&
+    (isImageRotationRunning ||
+      imageRotationStatus === "completed" ||
+      imageRotationStatus === "cancelled" ||
+      imageRotationStatus === "failed" ||
+      Boolean(imageRotationError));
 
   const isSimilarUntaggedCountsRunning = similarUntaggedCountsStatus === "running";
   const similarUntaggedCountsProgressPercent =
@@ -173,6 +191,7 @@ export function useDesktopProgressDockState({
     descEmbedQualifies ||
     similarUntaggedCountsQualifies ||
     pathAnalysisQualifies ||
+    imageRotationQualifies ||
     geocoderQualifies;
   const hasAnyRunningOperation =
     isAnalyzing ||
@@ -183,6 +202,7 @@ export function useDesktopProgressDockState({
     descEmbedRunning ||
     isSimilarUntaggedCountsRunning ||
     isPathAnalysisRunning ||
+    isImageRotationRunning ||
     isGeocoderInitRunning;
 
   return {
@@ -194,6 +214,7 @@ export function useDesktopProgressDockState({
     faceClusteringPanelVisible,
     similarUntaggedCountsPanelVisible,
     pathAnalysisPanelVisible,
+    imageRotationPanelVisible,
     geocoderInitPanelVisible,
     metadataPanelVisible,
     hasAnyQualifyingCard,
@@ -206,6 +227,7 @@ export function useDesktopProgressDockState({
     descEmbedQualifies,
     similarUntaggedCountsQualifies,
     pathAnalysisQualifies,
+    imageRotationQualifies,
     geocoderQualifies,
     isAnalyzing,
     isDetectingFaces,
@@ -214,6 +236,7 @@ export function useDesktopProgressDockState({
     isFaceClusteringRunning,
     isGeocoderInitRunning,
     isPathAnalysisRunning,
+    isImageRotationRunning,
     isSimilarUntaggedCountsRunning,
     descEmbedRunning,
     descEmbedProgressPercent,
@@ -255,6 +278,15 @@ export function useDesktopProgressDockState({
     pathAnalysisTotal,
     pathAnalysisFolderPath,
     pathAnalysisError,
+    imageRotationJobId,
+    imageRotationStatus,
+    imageRotationProcessed,
+    imageRotationTotal,
+    imageRotationWronglyRotated,
+    imageRotationSkipped,
+    imageRotationFailed,
+    imageRotationFolderPath,
+    imageRotationError,
     geocoderInitStatus,
     geocoderInitError,
   };

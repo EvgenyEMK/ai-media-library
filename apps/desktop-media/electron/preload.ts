@@ -15,8 +15,8 @@ const api: DesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.revealItemInFolder, filePath),
   listFolderImages: (folderPath) =>
     ipcRenderer.invoke(IPC_CHANNELS.listFolderImages, folderPath),
-  startFolderImagesStream: (folderPath) =>
-    ipcRenderer.invoke(IPC_CHANNELS.startFolderImagesStream, folderPath),
+  startFolderImagesStream: (request) =>
+    ipcRenderer.invoke(IPC_CHANNELS.startFolderImagesStream, request),
   onFolderImagesProgress: (listener) => {
     const wrapped = (
       _event: Electron.IpcRendererEvent,
@@ -31,8 +31,8 @@ const api: DesktopApi = {
   },
   listFolderMedia: (folderPath) =>
     ipcRenderer.invoke(IPC_CHANNELS.listFolderMedia, folderPath),
-  startFolderMediaStream: (folderPath) =>
-    ipcRenderer.invoke(IPC_CHANNELS.startFolderMediaStream, folderPath),
+  startFolderMediaStream: (request) =>
+    ipcRenderer.invoke(IPC_CHANNELS.startFolderMediaStream, request),
   onFolderMediaProgress: (listener) => {
     const wrapped = (
       _event: Electron.IpcRendererEvent,
@@ -51,6 +51,8 @@ const api: DesktopApi = {
   saveSettings: (settings) => ipcRenderer.invoke(IPC_CHANNELS.saveSettings, settings),
   getFolderAnalysisStatuses: () =>
     ipcRenderer.invoke(IPC_CHANNELS.getFolderAnalysisStatuses),
+  getFolderAiSummaryOverview: (folderPath, options) =>
+    ipcRenderer.invoke(IPC_CHANNELS.getFolderAiSummaryOverview, folderPath, options),
   getFolderAiSummaryReport: (folderPath) =>
     ipcRenderer.invoke(IPC_CHANNELS.getFolderAiSummaryReport, folderPath),
   getFolderAiFailedFiles: (folderPath, pipeline, recursive) =>
@@ -59,6 +61,22 @@ const api: DesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.getFolderAiCoverage, folderPath, recursive),
   getFolderAiRollupsBatch: (folderPaths) =>
     ipcRenderer.invoke(IPC_CHANNELS.getFolderAiRollupsBatch, folderPaths),
+  detectFolderImageRotation: (request) =>
+    ipcRenderer.invoke(IPC_CHANNELS.detectFolderImageRotation, request),
+  cancelImageRotationDetection: (jobId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.cancelImageRotationDetection, jobId),
+  onImageRotationProgress: (listener) => {
+    const wrapped = (
+      _event: Electron.IpcRendererEvent,
+      payload: Parameters<typeof listener>[0],
+    ) => {
+      listener(payload);
+    };
+    ipcRenderer.on(IPC_CHANNELS.imageRotationProgress, wrapped);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.imageRotationProgress, wrapped);
+    };
+  },
   analyzeFolderPhotos: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.analyzeFolderPhotos, request),
   cancelPhotoAnalysis: (jobId) =>

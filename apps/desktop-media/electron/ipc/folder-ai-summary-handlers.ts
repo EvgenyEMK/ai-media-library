@@ -5,14 +5,62 @@ import {
   inferCatalogMediaKind,
   type FolderAiFailedFileItem,
   type FolderAiPipelineKind,
+  type FolderAiSummaryOverviewRequestOptions,
+  type FolderAiSummaryOverviewReport,
   type FolderAiSummaryReport,
 } from "../../src/shared/ipc";
 import { getDesktopDatabase } from "../db/client";
 import { getFolderAiCoverage, getFolderAiRollupsForPaths } from "../db/folder-ai-coverage";
+import {
+  getFolderMetadataScanCompletedAtByPath,
+  getFolderSummaryOverview,
+} from "../db/folder-summary-overview";
 import { readFolderChildren } from "../fs-media";
 import { MULTIMODAL_EMBED_MODEL } from "../semantic-embeddings";
 
 export function registerFolderAiSummaryHandlers(): void {
+  ipcMain.handle(
+    IPC_CHANNELS.getFolderAiSummaryOverview,
+    async (
+      _event,
+      folderPath: string,
+      options?: FolderAiSummaryOverviewRequestOptions,
+    ): Promise<FolderAiSummaryOverviewReport> => {
+      const normalized = folderPath?.trim();
+      if (!normalized) {
+        return {
+          selectedWithSubfolders: getFolderSummaryOverview({ folderPath: "", recursive: true }),
+          selectedDirectOnly: getFolderSummaryOverview({ folderPath: "", recursive: false }),
+          subfolders: [],
+        };
+      }
+
+      const includeSubfolders = options?.includeSubfolders !== false;
+      const children = includeSubfolders ? await readFolderChildren(normalized) : [];
+      const subfolders = includeSubfolders
+        ? children.map((node) => ({
+            folderPath: node.path,
+            name: node.name,
+            overview: getFolderSummaryOverview({ folderPath: node.path, recursive: true }),
+          }))
+        : [];
+      const directSubfolderScanCompletedAtByPath = getFolderMetadataScanCompletedAtByPath(
+        children.map((node) => node.path),
+      );
+      const notFullyScannedDirectSubfolderCount = children.filter(
+        (node) => directSubfolderScanCompletedAtByPath[node.path] == null,
+      ).length;
+      const selectedWithSubfolders = getFolderSummaryOverview({ folderPath: normalized, recursive: true });
+      selectedWithSubfolders.scanFreshness.notFullyScannedDirectSubfolderCount =
+        notFullyScannedDirectSubfolderCount;
+      return {
+        selectedWithSubfolders,
+        selectedDirectOnly: getFolderSummaryOverview({ folderPath: normalized, recursive: false }),
+        subfolders,
+      };
+    },
+  );
+
   ipcMain.handle(
     IPC_CHANNELS.getFolderAiSummaryReport,
     async (_event, folderPath: string): Promise<FolderAiSummaryReport> => {
@@ -85,7 +133,10 @@ export function registerFolderAiSummaryHandlers(): void {
                mi.photo_analysis_error AS error_text
              FROM media_items mi
              WHERE mi.photo_analysis_failed_at IS NOT NULL
-               AND mi.photo_analysis_processed_at IS NULL
+               AND (
+                 mi.photo_analysis_processed_at IS NULL
+                 OR mi.photo_analysis_failed_at >= mi.photo_analysis_processed_at
+               )
                ${whereSql}
              ORDER BY mi.photo_analysis_failed_at DESC, mi.source_path COLLATE NOCASE ASC`,
           )
@@ -101,7 +152,10 @@ export function registerFolderAiSummaryHandlers(): void {
                mi.face_detection_error AS error_text
              FROM media_items mi
              WHERE mi.face_detection_failed_at IS NOT NULL
-               AND mi.face_detection_processed_at IS NULL
+               AND (
+                 mi.face_detection_processed_at IS NULL
+                 OR mi.face_detection_failed_at >= mi.face_detection_processed_at
+               )
                ${whereSql}
              ORDER BY mi.face_detection_failed_at DESC, mi.source_path COLLATE NOCASE ASC`,
           )
@@ -114,7 +168,7 @@ export function registerFolderAiSummaryHandlers(): void {
                mi.filename,
                mi.mime_type,
                me.updated_at AS failed_at,
-               me.error_text AS error_text
+               me.last_error AS error_text
              FROM media_embeddings me
              INNER JOIN media_items mi ON mi.id = me.media_item_id
              WHERE me.embedding_type = 'image'

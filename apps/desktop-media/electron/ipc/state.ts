@@ -1,6 +1,7 @@
 import type {
   RunningAnalysisJob,
   RunningFaceDetectionJobContext,
+  RunningImageRotationJob,
   RunningMetadataScanJob,
   RunningPathAnalysisJob,
   RunningSemanticIndexJob,
@@ -20,6 +21,7 @@ export const analyzedPhotosByFolder = new Map<string, Set<string>>();
 export const detectedFacesByFolder = new Map<string, Set<string>>();
 export const runningMetadataScanJobs = new Map<string, RunningMetadataScanJob>();
 export const runningPathAnalysisJobs = new Map<string, RunningPathAnalysisJob>();
+export const runningImageRotationJobs = new Map<string, RunningImageRotationJob>();
 export const vectorStore = new SQLiteVectorStoreAdapter();
 
 export const semanticIndexJobRef = {

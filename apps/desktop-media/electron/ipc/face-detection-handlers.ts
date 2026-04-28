@@ -11,6 +11,7 @@ import {
   type FaceDetectionOutput,
   type FaceDetectionItemState,
   type FaceDetectionServiceStatus,
+  type ImageRotationProgressEvent,
 } from "../../src/shared/ipc";
 import { listFolderImages } from "../fs-media";
 import { detectFacesInPhotoWithOrientation } from "../face-detection";
@@ -20,6 +21,7 @@ import {
   getFaceDetectionFailedPaths,
   getOrientationDetectionStateByPath,
   markFaceDetectionFailed,
+  upsertOrientationDetectionFailure,
   upsertFaceDetectionResult,
 } from "../db/media-analysis";
 import {
@@ -45,6 +47,7 @@ import {
 } from "../native-face";
 import { emitFaceDetectionProgress } from "./progress-emitters";
 import {
+  runningImageRotationJobs,
   runningJobs,
   runningFaceDetectionJobs,
   detectedFacesByFolder,
@@ -395,6 +398,7 @@ export function registerFaceDetectionHandlers(): void {
 
       const jobId = randomUUID();
       const job: RunningAnalysisJob = {
+        kind: "face-detection",
         cancelled: false,
         controllers: new Set<AbortController>(),
       };
@@ -482,6 +486,103 @@ export function registerFaceDetectionHandlers(): void {
       return getFaceDetectionServiceStatus();
     },
   );
+
+  ipcMain.handle(
+    IPC_CHANNELS.detectFolderImageRotation,
+    async (event, request: { folderPath: string; recursive?: boolean; mode?: "missing" | "all" }): Promise<{ jobId: string; total: number }> => {
+      const folderPath = request.folderPath?.trim();
+      if (!folderPath) {
+        throw new Error("Folder path is required for image rotation detection");
+      }
+      const jobId = randomUUID();
+      const senderWindow = BrowserWindow.fromWebContents(event.sender);
+      const emit = (payload: ImageRotationProgressEvent): void => {
+        senderWindow?.webContents.send(IPC_CHANNELS.imageRotationProgress, payload);
+      };
+      const folders = request.recursive === true
+        ? await collectFoldersRecursivelyWithProgress(folderPath)
+        : [folderPath];
+      const imagesByFolder = await Promise.all(folders.map((folder) => listFolderImages(folder)));
+      const imagePaths = imagesByFolder.flat().map((image) => image.path);
+      runningImageRotationJobs.set(jobId, { cancelled: false, folderPath });
+      emit({ type: "job-started", jobId, folderPath, total: imagePaths.length });
+
+      void (async () => {
+        try {
+          await ensureCatalogForImagesWithProgress(imagePaths);
+
+          const savedSettings = await readSettings(app.getPath("userData"));
+          const rotationSettings: AppSettings = {
+            ...savedSettings,
+            wrongImageRotationDetection: {
+              ...savedSettings.wrongImageRotationDetection,
+              enabled: true,
+            },
+          };
+
+          let processed = 0;
+          let wronglyRotated = 0;
+          let skipped = 0;
+          let failed = 0;
+          const force = request.mode === "all";
+          for (const imagePath of imagePaths) {
+            if (runningImageRotationJobs.get(jobId)?.cancelled) {
+              emit({ type: "job-cancelled", jobId, folderPath, processed: processed + skipped + failed, total: imagePaths.length, wronglyRotated, skipped, failed });
+              return;
+            }
+            let result: "processed" | "skipped" | "failed" | "disabled";
+            try {
+              result = await runWrongImageRotationPrecheck({ imagePath, settings: rotationSettings, force });
+            } catch (error) {
+              result = "failed";
+              upsertOrientationDetectionFailure(
+                imagePath,
+                error instanceof Error ? error.message : String(error),
+              );
+            }
+            if (runningImageRotationJobs.get(jobId)?.cancelled) {
+              emit({ type: "job-cancelled", jobId, folderPath, processed: processed + skipped + failed, total: imagePaths.length, wronglyRotated, skipped, failed });
+              return;
+            }
+            const state = getOrientationDetectionStateByPath(imagePath);
+            if (result === "skipped") {
+              skipped += 1;
+            } else if (result === "processed" && state) {
+              processed += 1;
+            } else if (result === "failed" || result === "disabled" || !state) {
+              failed += 1;
+              upsertOrientationDetectionFailure(imagePath, result === "disabled" ? "Image rotation detection is disabled" : "No orientation result was produced");
+            }
+            if (state && [90, 180, 270].includes(state.correctionAngleClockwise)) {
+              wronglyRotated += 1;
+            }
+            emit({ type: "progress", jobId, folderPath, processed: processed + skipped + failed, total: imagePaths.length, wronglyRotated, skipped, failed });
+          }
+          emit({ type: "job-completed", jobId, folderPath, processed: processed + skipped + failed, total: imagePaths.length, wronglyRotated, skipped, failed });
+        } catch (error) {
+          emit({
+            type: "job-failed",
+            jobId,
+            folderPath,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        } finally {
+          runningImageRotationJobs.delete(jobId);
+        }
+      })();
+
+      return { jobId, total: imagePaths.length };
+    },
+  );
+
+  ipcMain.handle(IPC_CHANNELS.cancelImageRotationDetection, async (_event, jobId: string) => {
+    const job = runningImageRotationJobs.get(jobId);
+    if (!job) {
+      return false;
+    }
+    job.cancelled = true;
+    return true;
+  });
 
   ipcMain.handle(
     IPC_CHANNELS.detectFacesForMediaItem,

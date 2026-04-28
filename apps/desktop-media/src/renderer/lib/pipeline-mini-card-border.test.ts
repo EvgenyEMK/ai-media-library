@@ -23,6 +23,17 @@ function coverage(
     photo,
     face,
     semantic,
+    rotation: pipe("empty", photo.totalImages, 0),
+    geo: {
+      images: {
+        total: photo.totalImages,
+        withGpsCount: 0,
+        withoutGpsCount: photo.totalImages,
+        locationDetailsDoneCount: 0,
+      },
+      videos: { total: 0, withGpsCount: 0, withoutGpsCount: 0, locationDetailsDoneCount: 0 },
+      locationDetails: { doneCount: 0, totalWithGps: 0, label: "empty" },
+    },
   };
 }
 

@@ -10,6 +10,7 @@ import {
   bindMetadataScanProgress,
   bindSemanticIndexProgress,
   bindPathAnalysisProgress,
+  bindImageRotationProgress,
 } from "./ipc-progress-binders";
 import {
   clearPendingRefreshTimers,
@@ -28,6 +29,7 @@ export function useDesktopIpcBindings(): void {
     const cleanupMetadata = bindMetadataScanProgress(store);
     const cleanupSemantic = bindSemanticIndexProgress(store);
     const cleanupPathAnalysis = bindPathAnalysisProgress(store);
+    const cleanupImageRotation = bindImageRotationProgress(store);
     const cleanupGeocoder = bindGeocoderInitProgress(store);
     const cleanupMetadataRefreshed = window.desktopApi.onMediaItemMetadataRefreshed((byPath) => {
       store.setState((s) => {
@@ -82,6 +84,7 @@ export function useDesktopIpcBindings(): void {
       cleanupMetadata();
       cleanupSemantic();
       cleanupPathAnalysis();
+      cleanupImageRotation();
       cleanupGeocoder();
       cleanupMetadataRefreshed();
       cleanupFaceModelDownload();
@@ -308,6 +311,8 @@ export function useDesktopSettingsPersistence(): void {
             prev.folderScanningSettings.writeEmbeddedMetadataOnUserEdit ||
           state.folderScanningSettings.detectLocationFromGps !==
             prev.folderScanningSettings.detectLocationFromGps ||
+          state.folderScanningSettings.markFolderScanOutdatedAfterDays !==
+            prev.folderScanningSettings.markFolderScanOutdatedAfterDays ||
           state.smartAlbumSettings.defaultStarRating !==
             prev.smartAlbumSettings.defaultStarRating ||
           state.smartAlbumSettings.defaultStarRatingOperator !==

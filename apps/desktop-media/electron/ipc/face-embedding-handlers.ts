@@ -72,8 +72,10 @@ export function registerFaceEmbeddingHandlers(): void {
       const facesNeeding = getFacesNeedingEmbeddings(DEFAULT_LIBRARY_ID, folderPath);
       const jobId = randomUUID();
       const job: RunningAnalysisJob = {
+        kind: "face-embedding",
         cancelled: false,
         controllers: new Set<AbortController>(),
+        rootFolderPath: folderPath,
       };
       runningJobs.set(jobId, job);
 

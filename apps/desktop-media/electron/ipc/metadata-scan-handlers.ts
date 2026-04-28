@@ -22,6 +22,7 @@ import {
 } from "../db/media-item-reconciliation";
 import {
   DEFAULT_LIBRARY_ID,
+  markFoldersMetadataScanned,
   pruneFolderAnalysisStatusesNotInSet,
 } from "../db/folder-analysis-status";
 import { readSettings } from "../storage";
@@ -40,6 +41,8 @@ import {
   reverseGeocodeBatch,
 } from "../geocoder/reverse-geocoder";
 import { getMediaItemsNeedingGpsGeocoding, updateMediaItemLocationFromGps } from "../db/media-item-geocoding";
+
+const FOLDER_SCAN_TIMESTAMP_BATCH_SIZE = 25;
 
 export function registerMetadataScanHandlers(): void {
   ipcMain.handle(
@@ -107,13 +110,18 @@ export async function runMetadataScanJob(params: {
   runningMetadataScanJobs.set(jobId, job);
 
   let scanEntries: Array<{ folderPath: string; path: string; name: string }>;
+  let scanFolders: string[];
 
   if (params.knownCatalogEntries) {
     scanEntries = params.knownCatalogEntries;
+    scanFolders = Array.from(
+      new Set([params.folderPath, ...params.knownCatalogEntries.map((entry) => entry.folderPath)]),
+    );
   } else {
     const folders = params.recursive
       ? await collectFoldersRecursivelyWithProgress(params.folderPath)
       : [params.folderPath];
+    scanFolders = folders;
     scanEntries = await collectLibraryFileEntriesForFoldersWithProgress(folders);
   }
 
@@ -220,6 +228,27 @@ export async function runMetadataScanJob(params: {
     string,
     { created: number; updated: number; needsAiFollowUp: number }
   >();
+  const folderScanRemaining = new Map(
+    Array.from(entriesByFolder.entries()).map(([folderPath, paths]) => [folderPath, paths.length]),
+  );
+  const completedFolderScanBatch = new Set<string>();
+  const persistedFolderScanPaths = new Set<string>();
+  const queueCompletedFolderScan = (folderPath: string): void => {
+    if (persistedFolderScanPaths.has(folderPath)) return;
+    completedFolderScanBatch.add(folderPath);
+    if (completedFolderScanBatch.size >= FOLDER_SCAN_TIMESTAMP_BATCH_SIZE) {
+      flushCompletedFolderScanBatch();
+    }
+  };
+  const flushCompletedFolderScanBatch = (): void => {
+    if (completedFolderScanBatch.size === 0) return;
+    const folderPaths = Array.from(completedFolderScanBatch);
+    markFoldersMetadataScanned(folderPaths, undefined, DEFAULT_LIBRARY_ID);
+    for (const folderPath of folderPaths) {
+      persistedFolderScanPaths.add(folderPath);
+    }
+    completedFolderScanBatch.clear();
+  };
 
   let pathExtractionEnabled = true;
   let gpsGeocodingEnabled = false;
@@ -233,6 +262,13 @@ export async function runMetadataScanJob(params: {
 
   try {
     if (!job.cancelled) {
+      for (const folderPath of scanFolders) {
+        if (!entriesByFolder.has(folderPath)) {
+          queueCompletedFolderScan(folderPath);
+        }
+      }
+      flushCompletedFolderScanBatch();
+
       console.log(`[metadata-scan][${scanTs()}] scanning phase START total=${scanEntries.length}`);
       emitMetadataScanProgress({
         type: "phase-updated",
@@ -302,6 +338,13 @@ export async function runMetadataScanJob(params: {
           }
         }
         scanningProcessed += 1;
+        const remainingForFolder = (folderScanRemaining.get(entry.folderPath) ?? 1) - 1;
+        if (remainingForFolder <= 0) {
+          folderScanRemaining.delete(entry.folderPath);
+          queueCompletedFolderScan(entry.folderPath);
+        } else {
+          folderScanRemaining.set(entry.folderPath, remainingForFolder);
+        }
 
         if (scanningProcessed % YIELD_INTERVAL === 0) {
           await new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -339,6 +382,10 @@ export async function runMetadataScanJob(params: {
             total: scanEntries.length,
           });
         }
+      }
+      if (!job.cancelled) {
+        queueCompletedFolderScan(params.folderPath);
+        flushCompletedFolderScanBatch();
       }
     } else {
       cancelled = scanEntries.length;
@@ -462,6 +509,7 @@ export async function runMetadataScanJob(params: {
       pruneFolderAnalysisStatusesNotInSet(params.folderPath, observedFolders, DEFAULT_LIBRARY_ID);
     }
   } finally {
+    flushCompletedFolderScanBatch();
     if (job.powerSaveToken) {
       releasePowerSave(job.powerSaveToken);
       job.powerSaveToken = undefined;

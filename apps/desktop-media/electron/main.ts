@@ -7,6 +7,7 @@ import { createMainWindow } from "./window";
 import {
   runningJobs,
   runningFaceDetectionJobs,
+  runningImageRotationJobs,
   runningMetadataScanJobs,
   runningPathAnalysisJobs,
   semanticIndexJobRef,
@@ -68,7 +69,7 @@ function registerAllIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.getActiveJobStatuses, (): ActiveJobStatuses => {
     let photoAnalysis: ActiveJobStatuses["photoAnalysis"] = null;
     for (const [jobId, job] of runningJobs) {
-      if (!job.cancelled) {
+      if (job.kind === "photo" && !job.cancelled) {
         photoAnalysis = { jobId, folderPath: job.rootFolderPath ?? "" };
         break;
       }
@@ -104,7 +105,15 @@ function registerAllIpcHandlers(): void {
       }
     }
 
-    return { photoAnalysis, faceDetection, semanticIndex, metadataScan, pathAnalysis };
+    let imageRotation: ActiveJobStatuses["imageRotation"] = null;
+    for (const [jobId, job] of runningImageRotationJobs) {
+      if (!job.cancelled) {
+        imageRotation = { jobId, folderPath: job.folderPath };
+        break;
+      }
+    }
+
+    return { photoAnalysis, faceDetection, semanticIndex, metadataScan, pathAnalysis, imageRotation };
   });
 }
 

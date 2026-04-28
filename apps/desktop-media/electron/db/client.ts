@@ -227,6 +227,7 @@ CREATE TABLE IF NOT EXISTS folder_analysis_status (
   photo_analyzed_at TEXT,
   face_analyzed_at TEXT,
   semantic_indexed_at TEXT,
+  metadata_scanned_at TEXT,
   last_updated_at TEXT NOT NULL,
   PRIMARY KEY (library_id, folder_path)
 );
@@ -641,6 +642,14 @@ const MIGRATIONS: Array<{ id: string; sql: string }> = [
         ON media_album_person_tags (library_id, tag_id);
     `,
   },
+  {
+    id: "023_folder_metadata_scan_timestamp",
+    sql: `
+      ALTER TABLE folder_analysis_status ADD COLUMN metadata_scanned_at TEXT;
+      CREATE INDEX IF NOT EXISTS idx_folder_analysis_status_metadata_scanned
+        ON folder_analysis_status (library_id, metadata_scanned_at)
+    `,
+  },
 ];
 
 let db: SQLiteDatabase | null = null;
@@ -757,6 +766,7 @@ export function initDesktopDatabase(userDataPath: string): void {
   runPendingMigrations(nextDb);
   reconcileCriticalSchema(nextDb);
   reconcileFolderAnalysisSemanticColumns(nextDb);
+  reconcileFolderAnalysisMetadataScanColumn(nextDb);
   reconcileMediaEmbeddingsSchema(nextDb);
   backfillFts5FromAiMetadata(nextDb);
   initializeVectorBackend(nextDb);
@@ -925,6 +935,23 @@ function reconcileFolderAnalysisSemanticColumns(database: SQLiteDatabase): void 
   if (!columns.has("semantic_indexed_at")) {
     database.exec("ALTER TABLE folder_analysis_status ADD COLUMN semantic_indexed_at TEXT");
   }
+}
+
+function reconcileFolderAnalysisMetadataScanColumn(database: SQLiteDatabase): void {
+  const columns = new Set(
+    (
+      database
+        .prepare("PRAGMA table_info(folder_analysis_status)")
+        .all() as Array<{ name: string }>
+    ).map((column) => column.name),
+  );
+  if (!columns.has("metadata_scanned_at")) {
+    database.exec("ALTER TABLE folder_analysis_status ADD COLUMN metadata_scanned_at TEXT");
+  }
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS idx_folder_analysis_status_metadata_scanned
+      ON folder_analysis_status (library_id, metadata_scanned_at)
+  `);
 }
 
 function reconcileMediaEmbeddingsSchema(database: SQLiteDatabase): void {

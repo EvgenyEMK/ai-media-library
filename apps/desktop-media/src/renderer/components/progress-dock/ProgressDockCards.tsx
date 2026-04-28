@@ -7,6 +7,7 @@ import { DescEmbedBackfillCard } from "./cards/DescEmbedBackfillCard";
 import { FaceClusteringCard } from "./cards/FaceClusteringCard";
 import { FaceDetectionCard } from "./cards/FaceDetectionCard";
 import { GeocoderInitCard } from "./cards/GeocoderInitCard";
+import { ImageRotationCard } from "./cards/ImageRotationCard";
 import { MetadataScanCard } from "./cards/MetadataScanCard";
 import { PathAnalysisCard } from "./cards/PathAnalysisCard";
 import { SemanticIndexCard } from "./cards/SemanticIndexCard";
@@ -25,6 +26,7 @@ interface ProgressDockCardsProps {
   onCancelFaceClustering: () => void;
   onCancelSimilarUntaggedFaceCounts: () => void;
   onCancelPathAnalysis: () => void;
+  onCancelImageRotation: () => void;
   descEmbedBackfill?: DescEmbedBackfillState;
   onCancelDescEmbedBackfill?: () => void;
   onDismissDescEmbedBackfill?: () => void;
@@ -43,6 +45,7 @@ export function ProgressDockCards({
   onCancelFaceClustering,
   onCancelSimilarUntaggedFaceCounts,
   onCancelPathAnalysis,
+  onCancelImageRotation,
   descEmbedBackfill,
   onCancelDescEmbedBackfill,
   onDismissDescEmbedBackfill,
@@ -131,6 +134,22 @@ export function ProgressDockCards({
           pathAnalysisFolderPath={d.pathAnalysisFolderPath}
           pathAnalysisError={d.pathAnalysisError}
           onCancelPathAnalysis={onCancelPathAnalysis}
+        />
+      ) : null}
+
+      {d.imageRotationQualifies ? (
+        <ImageRotationCard
+          store={store}
+          isImageRotationRunning={d.isImageRotationRunning}
+          imageRotationJobId={d.imageRotationJobId}
+          imageRotationProcessed={d.imageRotationProcessed}
+          imageRotationTotal={d.imageRotationTotal}
+          imageRotationWronglyRotated={d.imageRotationWronglyRotated}
+          imageRotationSkipped={d.imageRotationSkipped}
+          imageRotationFailed={d.imageRotationFailed}
+          imageRotationFolderPath={d.imageRotationFolderPath}
+          imageRotationError={d.imageRotationError}
+          onCancelImageRotation={onCancelImageRotation}
         />
       ) : null}
 

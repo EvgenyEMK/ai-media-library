@@ -1,4 +1,5 @@
 import { useCallback, type ReactElement, type Dispatch, type SetStateAction } from "react";
+import { BarChart3 } from "lucide-react";
 import {
   ImageEditSuggestionsView,
   MediaThumbnailGrid,
@@ -115,6 +116,12 @@ export function DesktopMediaWorkspace({
   const mediaMetadataByItemId = useDesktopStore((s) => s.mediaMetadataByItemId);
   const metadataManualScanResult = useDesktopStore((s) => s.metadataManualScanResult);
   const metadataScanFollowUp = useDesktopStore((s) => s.metadataScanFollowUp);
+  const showSummaryOnEmptyFolderSelection = useDesktopStore(
+    (s) => s.folderScanningSettings.showFolderAiSummaryWhenSelectingEmptyFolder,
+  );
+  const selectedFolderChildrenCount = useDesktopStore((s) =>
+    selectedFolder ? (s.childrenByPath[selectedFolder]?.length ?? 0) : 0,
+  );
   const commitStarRating = useMediaItemStarRatingChange();
   const onStarRatingChangeForPath = useCallback(
     (path: string) => (next: number) => {
@@ -153,6 +160,12 @@ export function DesktopMediaWorkspace({
     },
     [filteredMediaItems, store],
   );
+  const showEmptyFolderSummaryCta =
+    Boolean(selectedFolder) &&
+    mediaItemsLength === 0 &&
+    !isFolderLoading &&
+    selectedFolderChildrenCount > 0 &&
+    !showSummaryOnEmptyFolderSelection;
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -213,7 +226,19 @@ export function DesktopMediaWorkspace({
         ) : (
           <>
             {selectedFolder && mediaItemsLength === 0 && !isFolderLoading && (
-              <div className={MEDIA_PANE_EMPTY_STATE_CLASS}>{UI_TEXT.noPhotos}</div>
+              <div className={MEDIA_PANE_EMPTY_STATE_CLASS}>
+                <div>{UI_TEXT.noPhotos}</div>
+                {showEmptyFolderSummaryCta ? (
+                  <button
+                    type="button"
+                    className="mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-md border border-primary bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-95"
+                    onClick={() => handleOpenFolderAiSummary(selectedFolder)}
+                  >
+                    <BarChart3 size={17} aria-hidden="true" />
+                    <span>{UI_TEXT.folderAiSummaryTreeActionCta}</span>
+                  </button>
+                ) : null}
+              </div>
             )}
             {selectedFolder &&
               mediaItemsLength > 0 &&

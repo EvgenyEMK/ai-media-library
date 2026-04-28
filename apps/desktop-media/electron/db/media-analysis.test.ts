@@ -3,6 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  getAlreadyAnalyzedPhotoPaths,
+  getAlreadyFaceDetectedPhotoPaths,
   mergeRotationEditSuggestion,
   parseAiVisionLocation,
   upsertPhotoAnalysisResult,
@@ -288,5 +290,100 @@ describe.skipIf(!HAS_SQLITE)("upsertPhotoAnalysisResult location persistence", (
         },
       },
     });
+  });
+
+  it("does not treat a photo-analysis result as current when a newer failure exists", () => {
+    const db = getDesktopDatabase();
+    const pathWithLaterFailure = "C:/photos/later-failure.jpg";
+    const pathWithLaterSuccess = "C:/photos/later-success.jpg";
+    const aiMetadata = JSON.stringify({
+      image_analysis: {
+        image_category: "landscape",
+        title: "Alpine Lake",
+        description: "A lake in the mountains.",
+      },
+    });
+
+    db.prepare(
+      `INSERT INTO media_items (
+        id, library_id, source_path, filename, ai_metadata,
+        photo_analysis_processed_at, photo_analysis_failed_at, created_at, updated_at
+      ) VALUES (?, 'local-default', ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "photo-later-failure",
+      pathWithLaterFailure,
+      "later-failure.jpg",
+      aiMetadata,
+      "2026-01-01T00:00:00.000Z",
+      "2026-01-02T00:00:00.000Z",
+      "2026-01-01T00:00:00.000Z",
+      "2026-01-02T00:00:00.000Z",
+    );
+    db.prepare(
+      `INSERT INTO media_items (
+        id, library_id, source_path, filename, ai_metadata,
+        photo_analysis_processed_at, photo_analysis_failed_at, created_at, updated_at
+      ) VALUES (?, 'local-default', ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "photo-later-success",
+      pathWithLaterSuccess,
+      "later-success.jpg",
+      aiMetadata,
+      "2026-01-03T00:00:00.000Z",
+      "2026-01-02T00:00:00.000Z",
+      "2026-01-01T00:00:00.000Z",
+      "2026-01-03T00:00:00.000Z",
+    );
+
+    const analyzed = getAlreadyAnalyzedPhotoPaths("", [
+      pathWithLaterFailure,
+      pathWithLaterSuccess,
+    ]);
+
+    expect(analyzed.has(pathWithLaterFailure)).toBe(false);
+    expect(analyzed.has(pathWithLaterSuccess)).toBe(true);
+  });
+
+  it("does not treat a face-detection result as current when a newer failure exists", () => {
+    const db = getDesktopDatabase();
+    const pathWithLaterFailure = "C:/photos/face-later-failure.jpg";
+    const pathWithLaterSuccess = "C:/photos/face-later-success.jpg";
+
+    db.prepare(
+      `INSERT INTO media_items (
+        id, library_id, source_path, filename,
+        face_detection_processed_at, face_detection_failed_at, created_at, updated_at
+      ) VALUES (?, 'local-default', ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "face-later-failure",
+      pathWithLaterFailure,
+      "face-later-failure.jpg",
+      "2026-01-01T00:00:00.000Z",
+      "2026-01-02T00:00:00.000Z",
+      "2026-01-01T00:00:00.000Z",
+      "2026-01-02T00:00:00.000Z",
+    );
+    db.prepare(
+      `INSERT INTO media_items (
+        id, library_id, source_path, filename,
+        face_detection_processed_at, face_detection_failed_at, created_at, updated_at
+      ) VALUES (?, 'local-default', ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      "face-later-success",
+      pathWithLaterSuccess,
+      "face-later-success.jpg",
+      "2026-01-03T00:00:00.000Z",
+      "2026-01-02T00:00:00.000Z",
+      "2026-01-01T00:00:00.000Z",
+      "2026-01-03T00:00:00.000Z",
+    );
+
+    const detected = getAlreadyFaceDetectedPhotoPaths("", [
+      pathWithLaterFailure,
+      pathWithLaterSuccess,
+    ]);
+
+    expect(detected.has(pathWithLaterFailure)).toBe(false);
+    expect(detected.has(pathWithLaterSuccess)).toBe(true);
   });
 });

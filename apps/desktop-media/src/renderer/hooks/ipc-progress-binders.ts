@@ -61,6 +61,7 @@ export function bindPhotoAnalysisProgress(store: DesktopStore): () => void {
           photoAnalyzedAt: s.folderAnalysisByPath[event.folderPath]?.photoAnalyzedAt ?? null,
           faceAnalyzedAt: s.folderAnalysisByPath[event.folderPath]?.faceAnalyzedAt ?? null,
           semanticIndexedAt: s.folderAnalysisByPath[event.folderPath]?.semanticIndexedAt ?? null,
+          metadataScannedAt: s.folderAnalysisByPath[event.folderPath]?.metadataScannedAt ?? null,
           lastUpdatedAt: new Date().toISOString(),
         };
       });
@@ -115,6 +116,12 @@ export function bindPhotoAnalysisProgress(store: DesktopStore): () => void {
         s.aiJobId = null;
         s.aiAverageSecondsPerFile = event.averageSecondsPerFile;
         s.aiCurrentFolderPath = null;
+        s.lastAiPipelineCompletion = {
+          jobId: event.jobId,
+          folderPath: event.folderPath,
+          kind: "photo",
+          completedAt: new Date().toISOString(),
+        };
       });
       void refreshFolderAnalysisStatuses(store);
     }
@@ -148,6 +155,7 @@ export function bindFaceDetectionProgress(store: DesktopStore): () => void {
           photoAnalyzedAt: s.folderAnalysisByPath[event.folderPath]?.photoAnalyzedAt ?? null,
           faceAnalyzedAt: s.folderAnalysisByPath[event.folderPath]?.faceAnalyzedAt ?? null,
           semanticIndexedAt: s.folderAnalysisByPath[event.folderPath]?.semanticIndexedAt ?? null,
+          metadataScannedAt: s.folderAnalysisByPath[event.folderPath]?.metadataScannedAt ?? null,
           lastUpdatedAt: new Date().toISOString(),
         };
       });
@@ -193,6 +201,12 @@ export function bindFaceDetectionProgress(store: DesktopStore): () => void {
         s.faceStatus = "completed";
         s.faceAverageSecondsPerFile = event.averageSecondsPerFile;
         s.faceCurrentFolderPath = null;
+        s.lastAiPipelineCompletion = {
+          jobId: event.jobId,
+          folderPath: event.folderPath,
+          kind: "face",
+          completedAt: new Date().toISOString(),
+        };
       });
       const images = store.getState().mediaItems;
       if (images.length > 0) {
@@ -200,6 +214,62 @@ export function bindFaceDetectionProgress(store: DesktopStore): () => void {
       }
       void refreshFolderAnalysisStatuses(store);
     }
+  });
+}
+
+export function bindImageRotationProgress(store: DesktopStore): () => void {
+  return window.desktopApi.onImageRotationProgress((event) => {
+    store.setState((s) => {
+      s.imageRotationPanelVisible = true;
+      if (event.type === "job-started") {
+        s.imageRotationStatus = "running";
+        s.imageRotationJobId = event.jobId;
+        s.imageRotationFolderPath = event.folderPath;
+        s.imageRotationProcessed = 0;
+        s.imageRotationTotal = event.total;
+        s.imageRotationWronglyRotated = 0;
+        s.imageRotationSkipped = 0;
+        s.imageRotationFailed = 0;
+        s.imageRotationError = null;
+      } else if (event.type === "progress") {
+        s.imageRotationStatus = "running";
+        s.imageRotationProcessed = event.processed;
+        s.imageRotationTotal = event.total;
+        s.imageRotationWronglyRotated = event.wronglyRotated;
+        s.imageRotationSkipped = event.skipped;
+        s.imageRotationFailed = event.failed;
+      } else if (event.type === "job-completed") {
+        s.imageRotationStatus = "completed";
+        s.imageRotationJobId = null;
+        s.imageRotationFolderPath = null;
+        s.imageRotationProcessed = event.processed;
+        s.imageRotationTotal = event.total;
+        s.imageRotationWronglyRotated = event.wronglyRotated;
+        s.imageRotationSkipped = event.skipped;
+        s.imageRotationFailed = event.failed;
+        s.lastAiPipelineCompletion = {
+          jobId: event.jobId,
+          folderPath: event.folderPath,
+          kind: "rotation",
+          completedAt: new Date().toISOString(),
+        };
+      } else if (event.type === "job-cancelled") {
+        s.imageRotationStatus = "cancelled";
+        s.imageRotationJobId = null;
+        s.imageRotationFolderPath = null;
+        s.imageRotationProcessed = event.processed;
+        s.imageRotationTotal = event.total;
+        s.imageRotationWronglyRotated = event.wronglyRotated;
+        s.imageRotationSkipped = event.skipped;
+        s.imageRotationFailed = event.failed;
+        s.imageRotationPanelVisible = false;
+      } else {
+        s.imageRotationStatus = "failed";
+        s.imageRotationJobId = null;
+        s.imageRotationFolderPath = null;
+        s.imageRotationError = event.error;
+      }
+    });
   });
 }
 
@@ -345,6 +415,9 @@ export function bindMetadataScanProgress(store: DesktopStore): () => void {
       const foldersNeedingAiFollowUpCount = event.foldersTouched.filter(
         (ft) => ft.needsAiFollowUp > 0,
       ).length;
+      const completionTouchedFolders = Array.from(
+        new Set([event.folderPath, ...event.foldersTouched.map((folder) => folder.folderPath)]),
+      );
 
       const manualDetailEligible =
         event.triggerSource === "manual" &&
@@ -392,6 +465,14 @@ export function bindMetadataScanProgress(store: DesktopStore): () => void {
             filesDeleted: event.filesDeleted,
           };
         }
+        s.lastMetadataScanCompletion = {
+          jobId: event.jobId,
+          folderPath: event.folderPath,
+          recursive: event.recursive,
+          completedAt: new Date().toISOString(),
+          changed: hadCatalogMutations,
+          foldersTouched: completionTouchedFolders,
+        };
       });
 
       if (wasRunning && !hasDockRelevantChanges) {
@@ -518,6 +599,7 @@ export function bindSemanticIndexProgress(store: DesktopStore): () => void {
           photoAnalyzedAt: s.folderAnalysisByPath[event.folderPath]?.photoAnalyzedAt ?? null,
           faceAnalyzedAt: s.folderAnalysisByPath[event.folderPath]?.faceAnalyzedAt ?? null,
           semanticIndexedAt: s.folderAnalysisByPath[event.folderPath]?.semanticIndexedAt ?? null,
+          metadataScannedAt: s.folderAnalysisByPath[event.folderPath]?.metadataScannedAt ?? null,
           lastUpdatedAt: new Date().toISOString(),
         };
         s.semanticIndexPhase = "initializing-model";
@@ -579,6 +661,12 @@ export function bindSemanticIndexProgress(store: DesktopStore): () => void {
             ? `Top failures: ${topFailureText}`
             : `Semantic indexing failed for ${event.failed} file(s).`;
         }
+        s.lastAiPipelineCompletion = {
+          jobId: event.jobId,
+          folderPath: event.folderPath,
+          kind: "semantic",
+          completedAt: new Date().toISOString(),
+        };
       });
       void refreshFolderAnalysisStatuses(store);
     }

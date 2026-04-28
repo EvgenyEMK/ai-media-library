@@ -24,6 +24,22 @@ import {
   type WrongImageRotationDetectionSettings,
 } from "../../shared/ipc";
 
+export interface MetadataScanCompletionSignal {
+  jobId: string;
+  folderPath: string;
+  recursive: boolean;
+  completedAt: string;
+  changed: boolean;
+  foldersTouched: string[];
+}
+
+export interface AiPipelineCompletionSignal {
+  jobId: string;
+  folderPath: string;
+  kind: "photo" | "face" | "semantic" | "rotation";
+  completedAt: string;
+}
+
 export interface DesktopSlice {
   clientId: string;
   libraryRoots: string[];
@@ -43,6 +59,8 @@ export interface DesktopSlice {
 
   /** Manual “Scan for file changes” only: detailed per-group file lists after the job. */
   metadataManualScanResult: MetadataManualScanResultPayload | null;
+  lastMetadataScanCompletion: MetadataScanCompletionSignal | null;
+  lastAiPipelineCompletion: AiPipelineCompletionSignal | null;
 
   isFolderLoading: boolean;
   faceDetectionSettings: FaceDetectionSettings;
@@ -76,6 +94,17 @@ export interface DesktopSlice {
   pathAnalysisPanelVisible: boolean;
   pathAnalysisError: string | null;
 
+  imageRotationJobId: string | null;
+  imageRotationStatus: "idle" | "running" | "completed" | "cancelled" | "failed";
+  imageRotationProcessed: number;
+  imageRotationTotal: number;
+  imageRotationWronglyRotated: number;
+  imageRotationSkipped: number;
+  imageRotationFailed: number;
+  imageRotationFolderPath: string | null;
+  imageRotationError: string | null;
+  imageRotationPanelVisible: boolean;
+
   geocoderInitStatus: GeocoderInitStatus;
   geocoderInitError: string | null;
   geocoderInitPanelVisible: boolean;
@@ -106,6 +135,8 @@ export interface DesktopSlice {
   }) => void;
   clearMetadataScanFollowUp: () => void;
   setMetadataManualScanResult: (payload: MetadataManualScanResultPayload | null) => void;
+  setLastMetadataScanCompletion: (payload: MetadataScanCompletionSignal) => void;
+  setLastAiPipelineCompletion: (payload: AiPipelineCompletionSignal) => void;
   setFolderLoading: (loading: boolean) => void;
   setFaceDetectionSettings: (settings: FaceDetectionSettings) => void;
   setWrongImageRotationDetectionSettings: (settings: WrongImageRotationDetectionSettings) => void;
@@ -160,6 +191,7 @@ export interface DesktopSlice {
 
   setGeocoderInitStatus: (status: GeocoderInitStatus, error?: string) => void;
   setGeocoderInitPanelVisible: (visible: boolean) => void;
+  setImageRotationPanelVisible: (visible: boolean) => void;
 
   resetSimilarUntaggedCountsJob: () => void;
   setSimilarUntaggedCountsPanelVisible: (visible: boolean) => void;
@@ -176,6 +208,8 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   folderRollupByPath: {},
   metadataScanFollowUp: null,
   metadataManualScanResult: null,
+  lastMetadataScanCompletion: null,
+  lastAiPipelineCompletion: null,
   isFolderLoading: false,
   faceDetectionSettings: { ...DEFAULT_FACE_DETECTION_SETTINGS },
   wrongImageRotationDetectionSettings: { ...DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS },
@@ -206,6 +240,17 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   pathAnalysisFolderPath: null,
   pathAnalysisPanelVisible: false,
   pathAnalysisError: null,
+
+  imageRotationJobId: null,
+  imageRotationStatus: "idle",
+  imageRotationProcessed: 0,
+  imageRotationTotal: 0,
+  imageRotationWronglyRotated: 0,
+  imageRotationSkipped: 0,
+  imageRotationFailed: 0,
+  imageRotationFolderPath: null,
+  imageRotationError: null,
+  imageRotationPanelVisible: false,
 
   geocoderInitStatus: "idle",
   geocoderInitError: null,
@@ -288,6 +333,16 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   setMetadataManualScanResult: (payload) =>
     set((state) => {
       state.metadataManualScanResult = payload;
+    }),
+
+  setLastMetadataScanCompletion: (payload) =>
+    set((state) => {
+      state.lastMetadataScanCompletion = payload;
+    }),
+
+  setLastAiPipelineCompletion: (payload) =>
+    set((state) => {
+      state.lastAiPipelineCompletion = payload;
     }),
 
   setFolderLoading: (loading) =>
@@ -478,5 +533,10 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   setGeocoderInitPanelVisible: (visible) =>
     set((state) => {
       state.geocoderInitPanelVisible = visible;
+    }),
+
+  setImageRotationPanelVisible: (visible) =>
+    set((state) => {
+      state.imageRotationPanelVisible = visible;
     }),
 });
