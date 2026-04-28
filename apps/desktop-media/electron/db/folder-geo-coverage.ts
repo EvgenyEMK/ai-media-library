@@ -13,6 +13,12 @@ function escapeLikePattern(value: string): string {
   return value.replace(/[%_~]/g, "~$&");
 }
 
+function separatorForFolderPath(folderPath: string): string {
+  if (folderPath.includes("\\")) return "\\";
+  if (folderPath.includes("/")) return "/";
+  return path.sep;
+}
+
 function extensionPredicate(alias: string, extensions: Set<string>): string {
   const extClauses = [...extensions].map((ext) => {
     const pat = `%${ext}`.replace(/'/g, "''");
@@ -80,7 +86,7 @@ export function getFolderGeoCoverage(params: {
   const folderPath = params.folderPath?.trim();
   if (!folderPath) return emptyGeoCoverage();
 
-  const sep = path.sep;
+  const sep = separatorForFolderPath(folderPath);
   const folderPrefix = folderPath.endsWith(sep) ? folderPath : `${folderPath}${sep}`;
   const likePattern = `${escapeLikePattern(folderPrefix)}%`;
   const depthClause = params.recursive

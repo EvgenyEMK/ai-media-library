@@ -17,6 +17,12 @@ function escapeLikePattern(value: string): string {
   return value.replace(/[%_~]/g, "~$&");
 }
 
+function separatorForFolderPath(folderPath: string): string {
+  if (folderPath.includes("\\")) return "\\";
+  if (folderPath.includes("/")) return "/";
+  return path.sep;
+}
+
 function buildImageFilePredicate(): string {
   const extClauses = [...IMAGE_EXTENSIONS].map((ext) => {
     const pat = `%${ext}`.replace(/'/g, "''");
@@ -59,7 +65,7 @@ export function getFolderAiCoverage(params: {
     return emptyReport("", params.recursive);
   }
 
-  const sep = path.sep;
+  const sep = separatorForFolderPath(folderPath);
   const folderPrefix = folderPath.endsWith(sep) ? folderPath : `${folderPath}${sep}`;
   const likePattern = `${escapeLikePattern(folderPrefix)}%`;
   const imagePred = buildImageFilePredicate();
@@ -191,7 +197,6 @@ export function getFolderAiRollupsForPaths(
 ): Record<string, FolderAiSidebarRollup> {
   const resolvedLibraryId = libraryId ?? DEFAULT_LIBRARY_ID;
   const modelVersion = MULTIMODAL_EMBED_MODEL;
-  const sep = path.sep;
   const imagePred = buildImageFilePredicate();
 
   const trimmedPaths = folderPaths
@@ -200,6 +205,7 @@ export function getFolderAiRollupsForPaths(
 
   if (trimmedPaths.length === 0) return {};
 
+  const sep = separatorForFolderPath(trimmedPaths[0]);
   const db = getDesktopDatabase();
 
   const prefixes = trimmedPaths.map((p) => (p.endsWith(sep) ? p : `${p}${sep}`));
