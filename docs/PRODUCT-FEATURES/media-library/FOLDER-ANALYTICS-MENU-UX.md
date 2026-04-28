@@ -7,6 +7,7 @@ This document defines the product UX and business logic for the folder-level ana
 It covers:
 - The top-right `More actions` (`...`) menu behavior in folder content view
 - The **sidebar folder row** context menu (`…` or right-click), which exposes the same folder-scoped analytics controls for the row’s folder
+- The `Folder AI analysis summary` action from the sidebar row menu
 - Face detection controls and runtime behavior
 - Photo AI analysis controls and runtime behavior
 - AI search indexing controls and runtime behavior
@@ -95,6 +96,8 @@ A photo is skipped when the app considers face detection **already completed** f
 - In-memory per-folder processed set (current session), or
 - Persisted DB: `face_detection_processed_at` is set for the media item (success marker).
 
+If a later retry failure exists for a file that also has an older success timestamp, the latest failure wins for skip/coverage purposes; the item is not treated as current in `missing` mode until a newer successful run clears the failure marker.
+
 Skipped items do not run face detection again unless **Override existing** is enabled.
 
 ### 3.4 Progress Semantics
@@ -129,6 +132,8 @@ A photo is skipped when the app considers photo AI **already completed** for tha
 
 - In-memory per-folder analyzed set (current session), or
 - Persisted DB: `photo_analysis_processed_at` is set and stored AI metadata matches the expected “full analysis” signature for coverage/skip logic.
+
+If a later retry failure exists for a file that also has an older success timestamp, the latest failure wins for skip/coverage purposes; the item is not treated as current in `missing` mode until a newer successful run clears the failure marker.
 
 Skipped items do not run analysis again unless **Override existing** is enabled.
 
@@ -231,6 +236,12 @@ The sidebar rollup is optimized for **done / partial / not done** at a glance; i
 
 From the **sidebar** folder row `…` menu (**Folder AI analysis summary**), the main content area switches to a dedicated summary view (not the photo grid).
 
+If the user selects a folder with no direct media items and at least one child folder, the app can also open this same summary view automatically, controlled by **On empty folder selection show AI analysis status summary for subfolders**.
+
+Opening this view is read-only by default: it must not start an automatic direct-folder metadata scan. Empty direct folders with child folders are excluded from folder-selection auto metadata scan, and opening the summary suppresses auto-scan even though it updates the selected folder and streams folder media state in the background.
+
+The dashboard-first redesign, geo-location coverage, lazy details loading, and loading indicators are specified in [Folder AI Analysis Summary Dashboard PRD](./FOLDER-AI-ANALYSIS-SUMMARY-DASHBOARD-PRD.md). The historical table details below remain relevant for the **Details: AI pipelines** tab.
+
 #### 7.3.1 Header and chrome
 
 - **Single header row**: title **Folder AI analysis summary** on the left; on the right, **icon-only** actions:
@@ -272,7 +283,7 @@ For each image in scope, the summary counts **successful completion** from the l
 
 **Failures vs not started**
 
-- **Face detection** and **AI photo analysis** can record a **last failure** (timestamp + short error text) when a run ends in error. Summary **failed** counts include images that have a failure recorded **and** no success timestamp for that pipeline (so “failed” is distinguishable from “not yet run”).
+- **Face detection** and **AI photo analysis** can record a **last failure** (timestamp + short error text) when a run ends in error. Summary **failed** counts include images where the last failure timestamp is newer than or equal to the success timestamp, or where no success timestamp exists. Successful runs clear the failure marker, so the latest recorded state is what the summary shows.
 - **AI search index** uses the embedding row’s **failed** status in the vector store for the same idea.
 
 When a **metadata refresh** invalidates prior AI results for an item, success and failure markers for face detection and photo analysis are cleared together so the summary matches “needs re-run” state.
@@ -296,8 +307,8 @@ When a **metadata refresh** invalidates prior AI results for an item, success an
 
 #### 7.3.5 Relation to other surfaces
 
-- The **main panel pipeline strip** (§7.1) remains **direct-only** for the selected folder. When the summary table includes **Total with sub-folders**, that row is the **recursive** rollup for the same three pipelines; when the table shows only the single **folder name** row (no immediate sub-folders), that row aligns with **direct-only** scope and matches the strip’s notion of “this folder’s direct images.”
-- Data is loaded via the desktop IPC summary report (`getFolderAiSummaryReport`), which returns both **recursive** and **direct-only** coverage for the selected path plus **recursive** coverage per immediate child folder.
+- The **main panel pipeline strip** (§7.1) remains **direct-only** for the selected folder. When the summary table includes **Total with sub-folders**, that row is the **recursive** rollup for the same pipelines; when the table shows only the single **folder name** row (no immediate sub-folders), that row aligns with **direct-only** scope and matches the strip’s notion of “this folder’s direct images.”
+- Initial Summary tab data is loaded via lightweight aggregate coverage calls for the selected folder recursive and direct-only scopes. Row-level data for **Details: AI pipelines** and **Details: Geo-location** is lazy-loaded on first Details tab open via the desktop IPC summary report (`getFolderAiSummaryReport`), which returns both selected-folder scopes plus recursive coverage per immediate child folder.
 - File-level star ratings (XMP / Windows EXIF, catalog column, FTS, quick filters): [File star rating](./FILE-STAR-RATING.md).
 
 ### 7.4 Metadata scan follow-up (AI pipelines)

@@ -126,7 +126,10 @@ export function useFolderTreeHandlers(opts: {
       void refreshFolderAiRollups(store);
     };
 
-    const handleSelectFolder = async (folderPath: string): Promise<void> => {
+    const handleSelectFolder = async (
+      folderPath: string,
+      options: { suppressAutoMetadataScan?: boolean } = {},
+    ): Promise<void> => {
       activeFolderRequestIdRef.current = null;
       lastCompletedFolderRequestIdRef.current = null;
       setFolderLoadProgress({ loaded: 0, total: null });
@@ -142,7 +145,10 @@ export function useFolderTreeHandlers(opts: {
         s.semanticPanelOpen = false;
       });
       try {
-        const { requestId } = await window.desktopApi.startFolderMediaStream(folderPath);
+        const { requestId } = await window.desktopApi.startFolderMediaStream({
+          folderPath,
+          suppressAutoMetadataScan: options.suppressAutoMetadataScan,
+        });
         activeFolderRequestIdRef.current = requestId;
         if (DEBUG_PHOTO_AI) {
           console.log(
@@ -162,7 +168,7 @@ export function useFolderTreeHandlers(opts: {
 
     const handleOpenFolderAiSummary = (folderPath: string): void => {
       void (async () => {
-        await handleSelectFolder(folderPath);
+        await handleSelectFolder(folderPath, { suppressAutoMetadataScan: true });
         setMainPaneViewMode("folderAiSummary");
       })();
     };

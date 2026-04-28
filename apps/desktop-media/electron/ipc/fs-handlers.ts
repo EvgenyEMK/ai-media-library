@@ -31,6 +31,7 @@ import { resolveCacheRoot } from "../app-paths";
 import { getMediaEmbeddingsCompatStatus } from "../db/client";
 import { getSemanticIndexDebugLogPath } from "../semantic-index-debug-log";
 import { releasePowerSave } from "./power-save-manager";
+import { shouldRunAutoMetadataScan } from "./auto-metadata-scan-policy";
 import {
   resetAgeGenderEstimator,
   resetLandmarkRefiner,
@@ -45,6 +46,26 @@ function ts(): string {
 }
 function isDebugEnabled(): boolean {
   return process.env.EMK_DEBUG_PHOTO_AI === "1";
+}
+
+interface FolderStreamRequest {
+  folderPath: string;
+  suppressAutoMetadataScan?: boolean;
+}
+
+function normalizeFolderStreamRequest(request: string | FolderStreamRequest): FolderStreamRequest {
+  if (typeof request === "string") {
+    return { folderPath: request };
+  }
+  return request;
+}
+
+async function countChildFolders(folderPath: string): Promise<number> {
+  try {
+    return (await readFolderChildren(folderPath)).length;
+  } catch {
+    return 0;
+  }
 }
 
 function cancelRunningAutoMetadataScans(): void {
@@ -127,10 +148,13 @@ export function registerFsHandlers(): void {
       })),
     ];
     const settings = await readSettings(app.getPath("userData"));
-    if (
-      knownCatalogEntries.length < settings.folderScanning.autoMetadataScanOnSelectMaxFiles &&
-      !hasRunningManualMetadataScan()
-    ) {
+    const childFolderCount = knownCatalogEntries.length === 0 ? await countChildFolders(folderPath) : 0;
+    if (shouldRunAutoMetadataScan({
+      directMediaCount: knownCatalogEntries.length,
+      childFolderCount,
+      autoScanMaxFiles: settings.folderScanning.autoMetadataScanOnSelectMaxFiles,
+      hasRunningManualScan: hasRunningManualMetadataScan(),
+    })) {
       void runMetadataScanJob({
         folderPath,
         recursive: false,
@@ -140,8 +164,9 @@ export function registerFsHandlers(): void {
     return images;
   });
 
-  ipcMain.handle(IPC_CHANNELS.startFolderImagesStream, async (event, folderPath: string) => {
-    const normalizedFolderPath = folderPath?.trim();
+  ipcMain.handle(IPC_CHANNELS.startFolderImagesStream, async (event, request: string | FolderStreamRequest) => {
+    const streamRequest = normalizeFolderStreamRequest(request);
+    const normalizedFolderPath = streamRequest.folderPath?.trim();
     if (!normalizedFolderPath) {
       throw new Error("Folder path is required for image streaming");
     }
@@ -158,7 +183,7 @@ export function registerFsHandlers(): void {
       );
     }
     setTimeout(() => {
-      void runFolderImagesStream(browserWindow, requestId, normalizedFolderPath);
+      void runFolderImagesStream(browserWindow, requestId, normalizedFolderPath, streamRequest.suppressAutoMetadataScan === true);
     }, 0);
     return { requestId };
   });
@@ -167,8 +192,9 @@ export function registerFsHandlers(): void {
     return listFolderMedia(folderPath);
   });
 
-  ipcMain.handle(IPC_CHANNELS.startFolderMediaStream, async (event, folderPath: string) => {
-    const normalizedFolderPath = folderPath?.trim();
+  ipcMain.handle(IPC_CHANNELS.startFolderMediaStream, async (event, request: string | FolderStreamRequest) => {
+    const streamRequest = normalizeFolderStreamRequest(request);
+    const normalizedFolderPath = streamRequest.folderPath?.trim();
     if (!normalizedFolderPath) {
       throw new Error("Folder path is required for media streaming");
     }
@@ -185,7 +211,7 @@ export function registerFsHandlers(): void {
       );
     }
     setTimeout(() => {
-      void runFolderMediaStream(browserWindow, requestId, normalizedFolderPath);
+      void runFolderMediaStream(browserWindow, requestId, normalizedFolderPath, streamRequest.suppressAutoMetadataScan === true);
     }, 0);
     return { requestId };
   });
@@ -253,6 +279,7 @@ async function runFolderMediaStream(
   browserWindow: BrowserWindow,
   requestId: string,
   folderPath: string,
+  suppressAutoMetadataScan = false,
 ): Promise<void> {
   let loaded = 0;
   const observedCatalogPaths: string[] = [];
@@ -310,10 +337,14 @@ async function runFolderMediaStream(
       name: path.basename(p),
     }));
     const settings = await readSettings(app.getPath("userData"));
-    if (
-      knownCatalogEntries.length < settings.folderScanning.autoMetadataScanOnSelectMaxFiles &&
-      !hasRunningManualMetadataScan()
-    ) {
+    const childFolderCount = result.loaded === 0 ? await countChildFolders(folderPath) : 0;
+    if (shouldRunAutoMetadataScan({
+      directMediaCount: knownCatalogEntries.length,
+      childFolderCount,
+      autoScanMaxFiles: settings.folderScanning.autoMetadataScanOnSelectMaxFiles,
+      hasRunningManualScan: hasRunningManualMetadataScan(),
+      suppressAutoMetadataScan,
+    })) {
       setTimeout(() => {
         void runMetadataScanJob({
           folderPath,
@@ -342,6 +373,7 @@ async function runFolderImagesStream(
   browserWindow: BrowserWindow,
   requestId: string,
   folderPath: string,
+  suppressAutoMetadataScan = false,
 ): Promise<void> {
   let loaded = 0;
   const observedPaths: string[] = [];
@@ -409,10 +441,14 @@ async function runFolderImagesStream(
       })),
     ];
     const settings = await readSettings(app.getPath("userData"));
-    if (
-      knownCatalogEntries.length < settings.folderScanning.autoMetadataScanOnSelectMaxFiles &&
-      !hasRunningManualMetadataScan()
-    ) {
+    const childFolderCount = knownCatalogEntries.length === 0 ? await countChildFolders(folderPath) : 0;
+    if (shouldRunAutoMetadataScan({
+      directMediaCount: knownCatalogEntries.length,
+      childFolderCount,
+      autoScanMaxFiles: settings.folderScanning.autoMetadataScanOnSelectMaxFiles,
+      hasRunningManualScan: hasRunningManualMetadataScan(),
+      suppressAutoMetadataScan,
+    })) {
       // Delay scan start so the renderer can complete its pending
       // getMediaItemsByPaths calls for the final stream batches before the
       // scan's synchronous DB work starts competing for the main thread.

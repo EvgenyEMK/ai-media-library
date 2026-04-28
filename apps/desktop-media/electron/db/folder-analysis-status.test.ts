@@ -7,6 +7,7 @@ interface FolderRow {
   photo_in_progress: number;
   face_in_progress: number;
   semantic_in_progress: number;
+  metadata_scanned_at: string | null;
   last_updated_at: string;
 }
 
@@ -67,6 +68,32 @@ class FakeDb {
         },
       };
     }
+    if (sql.includes("INSERT INTO folder_analysis_status") && sql.includes("metadata_scanned_at")) {
+      return {
+        all: () => [],
+        run: (...args: unknown[]) => {
+          const [libraryId, folderPath, scannedAt, lastUpdatedAt] = args as [string, string, string, string];
+          const existing = this.rows.find(
+            (row) => row.library_id === libraryId && row.folder_path === folderPath,
+          );
+          if (existing) {
+            existing.metadata_scanned_at = scannedAt;
+            existing.last_updated_at = lastUpdatedAt;
+          } else {
+            this.rows.push({
+              library_id: libraryId,
+              folder_path: folderPath,
+              photo_in_progress: 0,
+              face_in_progress: 0,
+              semantic_in_progress: 0,
+              metadata_scanned_at: scannedAt,
+              last_updated_at: lastUpdatedAt,
+            });
+          }
+          return { changes: 1 };
+        },
+      };
+    }
     if (sql.includes("SET last_updated_at = ?") && sql.includes("folder_path = ?")) {
       return {
         all: () => [],
@@ -95,6 +122,7 @@ vi.mock("./client", () => ({
 
 import {
   clearAllInProgressFlags,
+  markFoldersMetadataScanned,
   pruneFolderAnalysisStatusesForMissingChildren,
   pruneFolderAnalysisStatusesNotInSet,
 } from "./folder-analysis-status";
@@ -106,6 +134,7 @@ function insertStatusRow(folderPath: string, opts?: { photo?: number; face?: num
     photo_in_progress: opts?.photo ?? 0,
     face_in_progress: opts?.face ?? 0,
     semantic_in_progress: opts?.semantic ?? 0,
+    metadata_scanned_at: null,
     last_updated_at: "2026-01-01T00:00:00.000Z",
   });
 }
@@ -142,6 +171,33 @@ describe("folder-analysis-status cleanup helpers", () => {
       { photo_in_progress: 0, face_in_progress: 0, semantic_in_progress: 0 },
       { photo_in_progress: 0, face_in_progress: 0, semantic_in_progress: 0 },
     ]);
+  });
+
+  it("marks metadata scan completion for existing and new folder rows", () => {
+    const existing = path.join("C:", "lib", "existing");
+    const created = path.join("C:", "lib", "created");
+    insertStatusRow(existing, { photo: 1 });
+
+    const changed = markFoldersMetadataScanned(
+      [existing, created, created],
+      "2026-04-28T12:00:00.000Z",
+    );
+
+    expect(changed).toBe(2);
+    expect(db.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          folder_path: existing,
+          photo_in_progress: 1,
+          metadata_scanned_at: "2026-04-28T12:00:00.000Z",
+          last_updated_at: "2026-04-28T12:00:00.000Z",
+        }),
+        expect.objectContaining({
+          folder_path: created,
+          metadata_scanned_at: "2026-04-28T12:00:00.000Z",
+        }),
+      ]),
+    );
   });
 
   it("prunes rows under root that are absent from keep set", () => {

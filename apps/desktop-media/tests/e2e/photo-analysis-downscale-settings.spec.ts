@@ -68,6 +68,7 @@ test.describe("AI image analysis LLM downscale settings", () => {
     const sidebar = mainDesktopSidebar(mainWindow);
     const rootRowButton = sidebar.getByRole("button", { name: normalizedRoot, exact: true });
     await rootRowButton.click();
+    const subAFolderButton = sidebar.getByRole("button", { name: "sub-a", exact: true });
 
     await mainWindow.evaluate(async (folderPath) => {
       const { jobId } = await window.desktopApi.scanFolderMetadata({
@@ -83,6 +84,8 @@ test.describe("AI image analysis LLM downscale settings", () => {
         });
       });
     }, fixture.root);
+    await mainWindow.getByRole("button", { name: "Close scan results" }).click();
+    await subAFolderButton.click();
 
     await mainWindow.getByRole("button", { name: "More actions" }).click();
     const menu = mainWindow.locator(".desktop-actions-menu");
@@ -127,7 +130,7 @@ test.describe("AI image analysis LLM downscale settings", () => {
     await expect(downscaleCheckbox).not.toBeChecked();
 
     await mainWindow.getByRole("button", { name: "Folders" }).click();
-    await rootRowButton.click();
+    await subAFolderButton.click();
     await mainWindow.getByRole("button", { name: "More actions" }).click();
     const menu2 = mainWindow.locator(".desktop-actions-menu");
     const row2 = menu2.locator(".photo-ai-row");

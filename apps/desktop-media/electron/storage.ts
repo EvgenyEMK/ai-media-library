@@ -299,6 +299,14 @@ function sanitizeFolderScanningSettings(candidate: unknown): FolderScanningSetti
       typeof value.detectLocationFromGps === "boolean"
         ? value.detectLocationFromGps
         : DEFAULT_FOLDER_SCANNING_SETTINGS.detectLocationFromGps,
+    markFolderScanOutdatedAfterDays: Math.round(
+      clampToRange(
+        asNumber(value.markFolderScanOutdatedAfterDays),
+        1,
+        365,
+        DEFAULT_FOLDER_SCANNING_SETTINGS.markFolderScanOutdatedAfterDays,
+      ),
+    ),
   };
 }
 

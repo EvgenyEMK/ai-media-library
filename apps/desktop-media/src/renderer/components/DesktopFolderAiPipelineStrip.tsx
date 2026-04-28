@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactElement } from "react";
-import { Check, CircleDashed, ImageIcon, Loader2, RefreshCw, Video } from "lucide-react";
+import { BarChart3, Check, CircleDashed, ImageIcon, Loader2, RefreshCw, Video } from "lucide-react";
 import type { FolderAiCoverageReport } from "../../shared/ipc";
 import {
   photoPipelineMiniCardBorderClass,
@@ -61,6 +61,7 @@ interface DesktopFolderAiPipelineStripProps {
   videosCount: number;
   /** Bumps when jobs complete so the strip refetches coverage. */
   refreshKey: string;
+  onOpenFolderAiSummary: (folderPath: string) => void;
 }
 
 export function DesktopFolderAiPipelineStrip({
@@ -68,6 +69,7 @@ export function DesktopFolderAiPipelineStrip({
   imagesCount,
   videosCount,
   refreshKey,
+  onOpenFolderAiSummary,
 }: DesktopFolderAiPipelineStripProps): ReactElement | null {
   const [coverage, setCoverage] = useState<FolderAiCoverageReport | null>(null);
   const [loading, setLoading] = useState(false);
@@ -115,6 +117,7 @@ export function DesktopFolderAiPipelineStrip({
     return null;
   }
 
+  const hasDirectMedia = imagesCount + videosCount > 0;
   const showPipelineCards = imagesCount > 0;
   const semanticBorder =
     loading || !coverage
@@ -167,6 +170,18 @@ export function DesktopFolderAiPipelineStrip({
           <ImageIcon size={28} aria-hidden="true" className="opacity-85" />
           <span className="text-base font-semibold leading-none">{imagesCount}</span>
         </span>
+        {hasDirectMedia ? (
+          <button
+            type="button"
+            className="inline-flex h-12 items-center gap-1.5 rounded-md border border-[#2a3550] bg-[#151d2e] px-2.5 py-1.5 text-xs text-[#e8eefc] transition-colors hover:border-[#3e5378] hover:bg-[#1b273f]"
+            onClick={() => onOpenFolderAiSummary(folderPath)}
+            title={UI_TEXT.folderAiSummaryActionOpen}
+            aria-label={UI_TEXT.folderAiSummaryActionOpen}
+          >
+            <BarChart3 size={18} aria-hidden="true" className="opacity-90" />
+            <span className="text-sm font-semibold leading-none">{UI_TEXT.folderAiSummaryActionShort}</span>
+          </button>
+        ) : null}
         {showPipelineCards ? (
           <>
             <span

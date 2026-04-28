@@ -233,32 +233,35 @@ export function DesktopAppMain({
         </div>
       ) : (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <DesktopMainToolbar
-            store={store}
-            selectedFolderLabel={selectedFolderLabel}
-            quickFiltersActiveCount={quickFiltersActiveCount}
-            mediaItemsLength={mediaItemsLength}
-            mediaImagesCount={mediaImagesCount}
-            mediaVideosCount={mediaVideosCount}
-            filteredMediaItemsLength={filteredMediaItemsLength}
-            semanticModeActive={semanticModeActive}
-            displaySemanticResultsCount={displaySemanticResultsCount}
-            filteredDisplaySemanticResultsCount={filteredDisplaySemanticResultsCount}
-            selectedFolder={selectedFolder}
-            aiPipelineStripRefreshKey={aiPipelineStripRefreshKey}
-            semanticPanelOpen={semanticPanelOpen}
-            quickFiltersMenuOpen={quickFiltersMenuOpen}
-            setQuickFiltersMenuOpen={setQuickFiltersMenuOpen}
-            quickFiltersMenuWrapRef={quickFiltersMenuWrapRef}
-            quickFilters={quickFilters}
-            setQuickFilters={setQuickFilters}
-            viewMode={viewMode}
-            actionsMenuOpen={actionsMenuOpen}
-            setActionsMenuOpen={setActionsMenuOpen}
-            actionsMenuWrapRef={actionsMenuWrapRef}
-            setMainPaneViewMode={setMainPaneViewMode}
-            pipeline={pipeline}
-          />
+          {mainPaneViewMode !== "folderAiSummary" ? (
+            <DesktopMainToolbar
+              store={store}
+              selectedFolderLabel={selectedFolderLabel}
+              quickFiltersActiveCount={quickFiltersActiveCount}
+              mediaItemsLength={mediaItemsLength}
+              mediaImagesCount={mediaImagesCount}
+              mediaVideosCount={mediaVideosCount}
+              filteredMediaItemsLength={filteredMediaItemsLength}
+              semanticModeActive={semanticModeActive}
+              displaySemanticResultsCount={displaySemanticResultsCount}
+              filteredDisplaySemanticResultsCount={filteredDisplaySemanticResultsCount}
+              selectedFolder={selectedFolder}
+              onOpenFolderAiSummary={handleOpenFolderAiSummary}
+              aiPipelineStripRefreshKey={aiPipelineStripRefreshKey}
+              semanticPanelOpen={semanticPanelOpen}
+              quickFiltersMenuOpen={quickFiltersMenuOpen}
+              setQuickFiltersMenuOpen={setQuickFiltersMenuOpen}
+              quickFiltersMenuWrapRef={quickFiltersMenuWrapRef}
+              quickFilters={quickFilters}
+              setQuickFilters={setQuickFilters}
+              viewMode={viewMode}
+              actionsMenuOpen={actionsMenuOpen}
+              setActionsMenuOpen={setActionsMenuOpen}
+              actionsMenuWrapRef={actionsMenuWrapRef}
+              setMainPaneViewMode={setMainPaneViewMode}
+              pipeline={pipeline}
+            />
+          ) : null}
           <DesktopMediaWorkspace
             store={store}
             mainPaneViewMode={mainPaneViewMode}
@@ -299,6 +302,7 @@ export function DesktopAppMain({
         onCancelFaceClustering={pipeline.handleCancelFaceClustering}
         onCancelSimilarUntaggedFaceCounts={pipeline.handleCancelSimilarUntaggedFaceCounts}
         onCancelPathAnalysis={() => void pipeline.handleCancelPathAnalysis()}
+        onCancelImageRotation={() => void pipeline.handleCancelImageRotation()}
         descEmbedBackfill={descEmbedBackfill}
         onCancelDescEmbedBackfill={() => void pipeline.handleCancelDescEmbedBackfill()}
         onDismissDescEmbedBackfill={() => setDescEmbedBackfill((prev) => ({ ...prev, panelVisible: false }))}

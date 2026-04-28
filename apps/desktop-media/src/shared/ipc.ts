@@ -163,10 +163,14 @@ export const IPC_CHANNELS = {
   refreshPersonSuggestions: "media:refresh-person-suggestions",
   purgeDeletedMediaItems: "media:purge-deleted-media-items",
   purgeSoftDeletedMediaItemsByIds: "media:purge-soft-deleted-media-items-by-ids",
+  getFolderAiSummaryOverview: "media:get-folder-ai-summary-overview",
   getFolderAiSummaryReport: "media:get-folder-ai-summary-report",
   getFolderAiFailedFiles: "media:get-folder-ai-failed-files",
   getFolderAiCoverage: "media:get-folder-ai-coverage",
   getFolderAiRollupsBatch: "media:get-folder-ai-rollups-batch",
+  detectFolderImageRotation: "media:detect-folder-image-rotation",
+  cancelImageRotationDetection: "media:cancel-image-rotation-detection",
+  imageRotationProgress: "media:image-rotation-progress",
   faceModelDownloadProgress: "media:face-model-download-progress",
   ensureDetectorModel: "media:ensure-detector-model",
   /**
@@ -465,6 +469,8 @@ export interface FolderScanningSettings {
    * Default off — first enable triggers a ~2 GB GeoNames data download.
    */
   detectLocationFromGps: boolean;
+  /** Mark folder scan freshness as outdated when the oldest scan in the tree is older than this many days. */
+  markFolderScanOutdatedAfterDays: number;
 }
 
 export interface AiImageSearchSettings {
@@ -549,6 +555,7 @@ export const DEFAULT_FOLDER_SCANNING_SETTINGS: FolderScanningSettings = {
   autoMetadataScanOnSelectMaxFiles: 100,
   writeEmbeddedMetadataOnUserEdit: false,
   detectLocationFromGps: false,
+  markFolderScanOutdatedAfterDays: 7,
 };
 
 export const DEFAULT_AI_IMAGE_SEARCH_SETTINGS: AiImageSearchSettings = {
@@ -684,6 +691,11 @@ export type FolderMediaProgressEvent =
 
 export type FolderMediaProgressListener = (event: FolderMediaProgressEvent) => void;
 
+export interface FolderStreamRequest {
+  folderPath: string;
+  suppressAutoMetadataScan?: boolean;
+}
+
 export type DesktopPhotoTakenPrecision = "year" | "month" | "day" | "instant";
 
 export interface DesktopMediaItemMetadata {
@@ -762,6 +774,7 @@ export interface FolderAnalysisStatus {
   photoAnalyzedAt: string | null;
   faceAnalyzedAt: string | null;
   semanticIndexedAt: string | null;
+  metadataScannedAt: string | null;
   lastUpdatedAt: string | null;
 }
 
@@ -781,6 +794,26 @@ export interface FolderAiPipelineCounts {
   failedCount: number;
   totalImages: number;
   label: FolderAiPipelineLabel;
+  issueCount?: number;
+}
+
+export interface FolderGeoMediaCoverage {
+  total: number;
+  withGpsCount: number;
+  withoutGpsCount: number;
+  locationDetailsDoneCount: number;
+}
+
+export interface FolderGeoLocationDetailsCoverage {
+  doneCount: number;
+  totalWithGps: number;
+  label: FolderAiPipelineLabel;
+}
+
+export interface FolderGeoCoverageReport {
+  images: FolderGeoMediaCoverage;
+  videos: FolderGeoMediaCoverage;
+  locationDetails: FolderGeoLocationDetailsCoverage;
 }
 
 export interface FolderAiCoverageReport {
@@ -790,6 +823,8 @@ export interface FolderAiCoverageReport {
   photo: FolderAiPipelineCounts;
   face: FolderAiPipelineCounts;
   semantic: FolderAiPipelineCounts;
+  rotation: FolderAiPipelineCounts;
+  geo: FolderGeoCoverageReport;
 }
 
 export interface FolderAiSummaryReport {
@@ -801,6 +836,85 @@ export interface FolderAiSummaryReport {
     coverage: FolderAiCoverageReport;
   }>;
 }
+
+export interface FolderScanFreshness {
+  lastMetadataScanCompletedAt: string | null;
+  oldestFolderScanCompletedAt: string | null;
+  oldestMetadataExtractedAt: string | null;
+  lastMetadataExtractedAt: string | null;
+  scannedCount: number;
+  unscannedCount: number;
+  totalMedia: number;
+  notFullyScannedDirectSubfolderCount: number;
+}
+
+export interface FolderAiSummaryOverview {
+  folderPath: string;
+  recursive: boolean;
+  totalImages: number;
+  totalVideos: number;
+  scanFreshness: FolderScanFreshness;
+}
+
+export interface FolderAiSummaryOverviewReport {
+  selectedWithSubfolders: FolderAiSummaryOverview;
+  selectedDirectOnly: FolderAiSummaryOverview;
+  subfolders: Array<{
+    folderPath: string;
+    name: string;
+    overview: FolderAiSummaryOverview;
+  }>;
+}
+
+export interface FolderAiSummaryOverviewRequestOptions {
+  includeSubfolders?: boolean;
+}
+
+export type ImageRotationProgressEvent =
+  | {
+      type: "job-started";
+      jobId: string;
+      folderPath: string;
+      total: number;
+    }
+  | {
+      type: "progress";
+      jobId: string;
+      folderPath: string;
+      processed: number;
+      total: number;
+      wronglyRotated: number;
+      skipped: number;
+      failed: number;
+    }
+  | {
+      type: "job-completed";
+      jobId: string;
+      folderPath: string;
+      processed: number;
+      total: number;
+      wronglyRotated: number;
+      skipped: number;
+      failed: number;
+    }
+  | {
+      type: "job-cancelled";
+      jobId: string;
+      folderPath: string;
+      processed: number;
+      total: number;
+      wronglyRotated: number;
+      skipped: number;
+      failed: number;
+    }
+  | {
+      type: "job-failed";
+      jobId: string;
+      folderPath: string;
+      error: string;
+    };
+
+export type ImageRotationProgressListener = (event: ImageRotationProgressEvent) => void;
 
 export type FolderAiPipelineKind = "photo" | "face" | "semantic";
 
@@ -1506,6 +1620,7 @@ export interface ActiveJobStatuses {
   semanticIndex: ActiveJobSummary | null;
   metadataScan: ActiveJobSummary | null;
   pathAnalysis: ActiveJobSummary | null;
+  imageRotation: ActiveJobSummary | null;
 }
 
 export interface SimilarFaceSearchResult {
@@ -1620,16 +1735,20 @@ export interface DesktopApi {
   ) => Promise<{ removed: number }>;
   revealItemInFolder: (filePath: string) => Promise<{ success: boolean; error?: string }>;
   listFolderImages: (folderPath: string) => Promise<MediaImageItem[]>;
-  startFolderImagesStream: (folderPath: string) => Promise<{ requestId: string }>;
+  startFolderImagesStream: (request: string | FolderStreamRequest) => Promise<{ requestId: string }>;
   onFolderImagesProgress: (listener: FolderImagesProgressListener) => () => void;
   listFolderMedia: (folderPath: string) => Promise<MediaLibraryItem[]>;
-  startFolderMediaStream: (folderPath: string) => Promise<{ requestId: string }>;
+  startFolderMediaStream: (request: string | FolderStreamRequest) => Promise<{ requestId: string }>;
   onFolderMediaProgress: (listener: FolderMediaProgressListener) => () => void;
   getSettings: () => Promise<AppSettings>;
   getDatabaseLocation: () => Promise<DatabaseLocationInfo>;
   getAiInferenceGpuOptions: () => Promise<AiInferenceGpuOption[]>;
   saveSettings: (settings: AppSettings) => Promise<void>;
   getFolderAnalysisStatuses: () => Promise<Record<string, FolderAnalysisStatus>>;
+  getFolderAiSummaryOverview: (
+    folderPath: string,
+    options?: FolderAiSummaryOverviewRequestOptions,
+  ) => Promise<FolderAiSummaryOverviewReport>;
   getFolderAiSummaryReport: (folderPath: string) => Promise<FolderAiSummaryReport>;
   getFolderAiFailedFiles: (
     folderPath: string,
@@ -1638,6 +1757,13 @@ export interface DesktopApi {
   ) => Promise<FolderAiFailedFileItem[]>;
   getFolderAiCoverage: (folderPath: string, recursive: boolean) => Promise<FolderAiCoverageReport>;
   getFolderAiRollupsBatch: (folderPaths: string[]) => Promise<Record<string, FolderAiSidebarRollup>>;
+  detectFolderImageRotation: (request: {
+    folderPath: string;
+    recursive?: boolean;
+    mode?: "missing" | "all";
+  }) => Promise<{ jobId: string; total: number }>;
+  cancelImageRotationDetection: (jobId: string) => Promise<boolean>;
+  onImageRotationProgress: (listener: ImageRotationProgressListener) => () => void;
   analyzeFolderPhotos: (
     request: AnalyzeFolderPhotosRequest,
   ) => Promise<AnalyzeFolderPhotosResult>;

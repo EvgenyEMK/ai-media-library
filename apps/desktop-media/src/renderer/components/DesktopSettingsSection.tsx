@@ -481,6 +481,24 @@ export function DesktopSettingsSection({
               }
             />
           ) : null}
+          {showAdvancedSettings ? (
+            <SettingsNumberField
+              title="Mark folder scan as outdated after"
+              description="In the Folder AI summary, highlight the folder scan card in amber when the oldest folder scan in the tree is older than this many days."
+              value={folderScanningSettings.markFolderScanOutdatedAfterDays}
+              min={1}
+              max={365}
+              step={1}
+              advanced
+              surfaceVariant="accent-stripe"
+              onChange={(nextValue) =>
+                onFolderScanningSettingChange(
+                  "markFolderScanOutdatedAfterDays",
+                  Math.max(1, Math.round(nextValue)),
+                )
+              }
+            />
+          ) : null}
           <SettingsCheckboxField
             title="Update file metadata on change of Rating, Title, Description"
             description={`XMP and EXIF are standard metadata blocks inside many image and video files; other apps (Lightroom, Windows) read them for star ratings and titles. When this option is on, after your change is saved in the database the app runs ExifTool to mirror rating into the file. When off, edits stay in the database only—original files on disk are not modified (recommended).`}
@@ -604,6 +622,8 @@ export function DesktopSettingsSection({
                   DEFAULT_FOLDER_SCANNING_SETTINGS.writeEmbeddedMetadataOnUserEdit &&
                 folderScanningSettings.detectLocationFromGps ===
                   DEFAULT_FOLDER_SCANNING_SETTINGS.detectLocationFromGps &&
+                folderScanningSettings.markFolderScanOutdatedAfterDays ===
+                  DEFAULT_FOLDER_SCANNING_SETTINGS.markFolderScanOutdatedAfterDays &&
                 pathExtractionSettings.extractDates === DEFAULT_PATH_EXTRACTION_SETTINGS.extractDates &&
                 pathExtractionSettings.useLlm === DEFAULT_PATH_EXTRACTION_SETTINGS.useLlm &&
                 pathExtractionSettings.llmModelPrimary === DEFAULT_PATH_EXTRACTION_SETTINGS.llmModelPrimary &&

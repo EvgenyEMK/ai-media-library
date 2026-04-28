@@ -1,56 +1,28 @@
 import { useCallback, useEffect, useState, type ReactElement } from "react";
-import { Check, CircleDashed, Loader2, Play, RefreshCw, X } from "lucide-react";
+import { RefreshCw, X } from "lucide-react";
 import type {
-  ActiveJobStatuses,
+  DesktopMediaItemMetadata,
+  FolderAiCoverageReport,
   FolderAiFailedFileItem,
   FolderAiPipelineKind,
-  FolderAiCoverageReport,
-  FolderAiPipelineCounts,
+  FolderAiSummaryOverviewReport,
   FolderAiSummaryReport,
-  DesktopMediaItemMetadata,
 } from "../../shared/ipc";
+import { useFolderAiSummaryPipelineActions } from "../hooks/use-folder-ai-summary-pipeline-actions";
 import { cn } from "../lib/cn";
+import { shouldRefreshFolderAiSummaryAfterScan } from "../lib/folder-ai-summary-scan-refresh";
+import { isPathWithinParent } from "../lib/is-path-within-parent";
 import { UI_TEXT } from "../lib/ui-text";
-import { useDesktopStoreApi } from "../stores/desktop-store";
-import { toFileUrl } from "./face-cluster-utils";
+import type { FailedListContext, SummaryPipelineKind } from "../types/folder-ai-summary-types";
+import { DesktopFolderAiFailedList } from "./DesktopFolderAiFailedList";
+import { DesktopFolderAiSummaryDashboard } from "./DesktopFolderAiSummaryDashboard";
+import { DesktopFolderAiSummaryTable } from "./DesktopFolderAiSummaryTable";
+import { DesktopFolderGeoSummaryTable } from "./DesktopFolderGeoSummaryTable";
+import { PendingSpinner } from "./folder-ai-summary/SummaryStatusGlyph";
+import { PipelineBlockedDialog } from "./PipelineBlockedDialog";
+import { useDesktopStore } from "../stores/desktop-store";
 
-type SummaryPipelineKind = "semantic" | "face" | "photo";
-interface FailedListContext {
-  folderPath: string;
-  pipeline: FolderAiPipelineKind;
-  recursive: boolean;
-  folderLabel: string;
-}
-
-function formatResolution(meta: DesktopMediaItemMetadata | undefined): string | null {
-  if (!meta || !meta.width || !meta.height) return null;
-  return `Resolution: ${meta.width} x ${meta.height}`;
-}
-
-/** Last path segment for display (Windows or POSIX). */
-function folderDisplayNameFromPath(folderPath: string): string {
-  const trimmed = folderPath.replace(/[/\\]+$/, "");
-  const parts = trimmed.split(/[/\\]/);
-  const last = parts[parts.length - 1]?.trim();
-  return last || trimmed || folderPath;
-}
-
-/** Integer with space as thousands separator (e.g. 23 000). */
-function formatGroupedInt(value: number): string {
-  return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 })
-    .format(value)
-    .replace(/\u202f|\u00a0/g, " ");
-}
-
-/** Partial %: integer when ≥1%; one decimal when floored value is 0 but progress > 0. */
-function formatPartialPercent(doneCount: number, totalImages: number): string {
-  const raw = (doneCount / totalImages) * 100;
-  const floored = Math.floor(raw);
-  if (floored === 0 && raw > 0) {
-    return `${raw.toFixed(1)}%`;
-  }
-  return `${floored}%`;
-}
+type SummaryTab = "summary" | "ai" | "geo";
 
 interface DesktopFolderAiSummaryViewProps {
   folderPath: string;
@@ -62,249 +34,46 @@ interface DesktopFolderAiSummaryViewProps {
   onOpenFolderSummary?: (folderPath: string) => void;
 }
 
-function FailedLine({
-  failedCount,
-  totalImages,
-  onOpenFailedList,
+function SummaryTabs({
+  activeTab,
+  onTabChange,
 }: {
-  failedCount: number;
-  totalImages: number;
-  onOpenFailedList?: () => void;
-}): ReactElement | null {
-  if (failedCount <= 0 || totalImages <= 0) return null;
-  if (onOpenFailedList) {
-    return (
-      <button
-        type="button"
-        className="m-0 block cursor-pointer border-0 bg-transparent p-0 text-[11px] leading-snug text-destructive shadow-none"
-        title={UI_TEXT.folderAiSummaryFailedListOpen}
-        aria-label={`${UI_TEXT.folderAiSummaryFailedListOpen}: ${formatGroupedInt(failedCount)}`}
-        onClick={onOpenFailedList}
-      >
-        {UI_TEXT.folderAiSummaryStatusFailed}: {formatGroupedInt(failedCount)}
-      </button>
-    );
-  }
+  activeTab: SummaryTab;
+  onTabChange: (tab: SummaryTab) => void;
+}): ReactElement {
+  const tabs: Array<{ id: SummaryTab; label: string }> = [
+    { id: "summary", label: UI_TEXT.folderAiSummaryTabSummary },
+    { id: "ai", label: UI_TEXT.folderAiSummaryTabAiPipelines },
+    { id: "geo", label: UI_TEXT.folderAiSummaryTabGeoLocation },
+  ];
   return (
-    <span
-      className="block text-[11px] leading-snug text-destructive"
-      title={UI_TEXT.folderAiSummaryStatusFailedCorrupt}
-    >
-      {UI_TEXT.folderAiSummaryStatusFailed}: {formatGroupedInt(failedCount)}
-    </span>
+    <div className="inline-flex w-fit flex-wrap gap-2 border-b border-border" role="tablist">
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          role="tab"
+          aria-selected={activeTab === tab.id}
+          className={cn(
+            "m-0 rounded-none border-0 border-b-2 bg-transparent px-3 py-2 text-xl font-semibold shadow-none",
+            activeTab === tab.id
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground",
+          )}
+          onClick={() => onTabChange(tab.id)}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
-interface PipelineStatusCellProps {
-  pipeline: FolderAiPipelineCounts;
-  actionPipeline?: SummaryPipelineKind;
-  onRunPipeline?: (pipeline: SummaryPipelineKind) => void;
-  actionPending?: boolean;
-  onOpenFailedList?: () => void;
-}
-
-function PipelineStatusCell({
-  pipeline,
-  actionPipeline,
-  onRunPipeline,
-  actionPending = false,
-  onOpenFailedList,
-}: PipelineStatusCellProps): ReactElement {
-  const failedLine = (
-    <FailedLine
-      failedCount={pipeline.failedCount}
-      totalImages={pipeline.totalImages}
-      onOpenFailedList={onOpenFailedList}
-    />
-  );
-  const total = pipeline.totalImages;
-  const noPendingWork =
-    total > 0 && pipeline.doneCount + pipeline.failedCount === total;
-  const canRunPipelineAction =
-    Boolean(actionPipeline && onRunPipeline) &&
-    total > 0 &&
-    (pipeline.label === "partial" || pipeline.label === "not_done") &&
-    !noPendingWork;
-  const pipelineActionLabel =
-    actionPipeline === "semantic"
-      ? "Run AI search index for this folder and sub-folders"
-      : actionPipeline === "face"
-        ? "Run face detection for this folder and sub-folders"
-        : "Run AI image analysis for this folder and sub-folders";
-  const actionButton = canRunPipelineAction ? (
-    <button
-      type="button"
-      className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-border bg-transparent p-0 text-muted-foreground shadow-none transition-colors duration-150 hover:border-indigo-500 hover:bg-[#1e2a40] disabled:cursor-not-allowed disabled:opacity-50"
-      onClick={() => onRunPipeline?.(actionPipeline as SummaryPipelineKind)}
-      disabled={actionPending}
-      title={pipelineActionLabel}
-      aria-label={pipelineActionLabel}
-    >
-      {actionPending ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <Play size={14} aria-hidden="true" />}
-    </button>
-  ) : null;
-
-  if ((pipeline.label === "done" || (pipeline.label === "partial" && noPendingWork)) && total > 0) {
-    return (
-      <span className="inline-flex flex-col items-start gap-0.5 text-[hsl(var(--success))]" title={UI_TEXT.folderAiSummaryStatusDone}>
-        <Check size={24} aria-hidden="true" />
-        {failedLine}
-      </span>
-    );
-  }
-
-  if (pipeline.label === "partial" && total > 0) {
-    const percentLabel = formatPartialPercent(pipeline.doneCount, total);
-    return (
-      <span className="inline-flex flex-col items-start gap-0.5 text-foreground" title={UI_TEXT.folderAiSummaryStatusPartial}>
-        <span className="inline-flex min-h-6 items-center gap-1.5 text-amber-400">
-          <CircleDashed size={16} aria-hidden="true" className="shrink-0 opacity-[0.85]" />
-          <span className="inline-flex items-baseline gap-[0.35em] whitespace-nowrap">
-            <span className="text-base font-semibold leading-none">{percentLabel}</span>
-            <span className="text-[11px] opacity-90">({formatGroupedInt(pipeline.doneCount)})</span>
-          </span>
-          {actionButton}
-        </span>
-        {failedLine}
-      </span>
-    );
-  }
-
-  if (pipeline.label === "not_done" && pipeline.totalImages > 0) {
-    return (
-      <span className="inline-flex min-h-6 items-center gap-1.5 text-[15px] tracking-wide text-destructive" title={UI_TEXT.folderAiSummaryStatusNotDone}>
-        <span>—</span>
-        {actionButton}
-        {failedLine}
-      </span>
-    );
-  }
-
+function DetailsLoadingSpinner(): ReactElement {
   return (
-    <span className="text-[15px] tracking-wide text-muted-foreground" title={UI_TEXT.folderAiSummaryStatusNotDone}>
-      —
-    </span>
-  );
-}
-
-interface SummaryRowProps {
-  label: string;
-  coverage: FolderAiCoverageReport;
-  highlighted?: boolean;
-  noBottomBorder?: boolean;
-  showPipelineActions?: boolean;
-  onRunPipeline?: (pipeline: SummaryPipelineKind) => void;
-  actionPendingPipeline?: SummaryPipelineKind | null;
-  /** When set with `onSubfolderClick`, the folder name is a control that opens that folder's summary. */
-  subfolderPath?: string;
-  onSubfolderClick?: (folderPath: string) => void;
-  onOpenFailedList?: (
-    folderPath: string,
-    pipeline: FolderAiPipelineKind,
-    recursive: boolean,
-    folderLabel: string,
-  ) => void;
-}
-
-function SummaryRow({
-  label,
-  coverage,
-  highlighted = false,
-  noBottomBorder = false,
-  showPipelineActions = false,
-  onRunPipeline,
-  actionPendingPipeline,
-  subfolderPath,
-  onSubfolderClick,
-  onOpenFailedList,
-}: SummaryRowProps): ReactElement {
-  const folderCell =
-    subfolderPath && onSubfolderClick ? (
-      <button
-        type="button"
-        className="m-0 cursor-pointer border-0 bg-transparent p-0 text-left font-inherit font-medium text-primary underline decoration-primary/45 underline-offset-2 shadow-none hover:decoration-primary focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))]"
-        onClick={() => onSubfolderClick(subfolderPath)}
-        title={UI_TEXT.folderAiAnalysisSummary}
-        aria-label={`${UI_TEXT.folderAiAnalysisSummary}: ${label}`}
-      >
-        {label}
-      </button>
-    ) : (
-      label
-    );
-
-  return (
-    <tr className={highlighted ? "bg-primary/12" : undefined}>
-      <td
-        className={cn(
-          "border-b border-border px-3 py-2.5 text-left align-top font-medium",
-          noBottomBorder && "border-b-0",
-          highlighted && "text-sm font-semibold",
-        )}
-      >
-        {folderCell}
-      </td>
-      <td className={cn("border-b border-border px-3 py-2.5 text-left align-top", noBottomBorder && "border-b-0")}>
-        <span className="font-semibold text-foreground">{formatGroupedInt(coverage.totalImages)}</span>
-      </td>
-      <td className={cn("border-b border-border px-3 py-2.5 text-left align-top", noBottomBorder && "border-b-0")}>
-        <PipelineStatusCell
-          pipeline={coverage.semantic}
-          actionPipeline={showPipelineActions ? "semantic" : undefined}
-          onRunPipeline={onRunPipeline}
-          actionPending={actionPendingPipeline === "semantic"}
-          onOpenFailedList={
-            coverage.semantic.failedCount > 0 && onOpenFailedList
-              ? () =>
-                  onOpenFailedList(
-                    coverage.folderPath,
-                    "semantic",
-                    coverage.recursive,
-                    label,
-                  )
-              : undefined
-          }
-        />
-      </td>
-      <td className={cn("border-b border-border px-3 py-2.5 text-left align-top", noBottomBorder && "border-b-0")}>
-        <PipelineStatusCell
-          pipeline={coverage.face}
-          actionPipeline={showPipelineActions ? "face" : undefined}
-          onRunPipeline={onRunPipeline}
-          actionPending={actionPendingPipeline === "face"}
-          onOpenFailedList={
-            coverage.face.failedCount > 0 && onOpenFailedList
-              ? () =>
-                  onOpenFailedList(
-                    coverage.folderPath,
-                    "face",
-                    coverage.recursive,
-                    label,
-                  )
-              : undefined
-          }
-        />
-      </td>
-      <td className={cn("border-b border-border px-3 py-2.5 text-left align-top", noBottomBorder && "border-b-0")}>
-        <PipelineStatusCell
-          pipeline={coverage.photo}
-          actionPipeline={showPipelineActions ? "photo" : undefined}
-          onRunPipeline={onRunPipeline}
-          actionPending={actionPendingPipeline === "photo"}
-          onOpenFailedList={
-            coverage.photo.failedCount > 0 && onOpenFailedList
-              ? () =>
-                  onOpenFailedList(
-                    coverage.folderPath,
-                    "photo",
-                    coverage.recursive,
-                    label,
-                  )
-              : undefined
-          }
-        />
-      </td>
-    </tr>
+    <div className="flex min-h-[220px] items-center justify-center" aria-label={UI_TEXT.folderAiSummaryLoading}>
+      <PendingSpinner className="h-14 w-14" />
+    </div>
   );
 }
 
@@ -316,29 +85,58 @@ export function DesktopFolderAiSummaryView({
   onRunPhotoPipeline,
   onOpenFolderSummary,
 }: DesktopFolderAiSummaryViewProps): ReactElement {
-  const store = useDesktopStoreApi();
+  const lastMetadataScanCompletion = useDesktopStore((state) => state.lastMetadataScanCompletion);
+  const lastAiPipelineCompletion = useDesktopStore((state) => state.lastAiPipelineCompletion);
+  const selectedFolderChildrenCount = useDesktopStore((state) => state.childrenByPath[folderPath]?.length ?? 0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showPipelineBlockedDialog, setShowPipelineBlockedDialog] = useState(false);
-  const [actionPendingPipeline, setActionPendingPipeline] = useState<SummaryPipelineKind | null>(null);
   const [selectedWithSubfolders, setSelectedWithSubfolders] = useState<FolderAiCoverageReport | null>(null);
   const [selectedDirectOnly, setSelectedDirectOnly] = useState<FolderAiCoverageReport | null>(null);
+  const [overviewReport, setOverviewReport] = useState<FolderAiSummaryOverviewReport | null>(null);
   const [subfolders, setSubfolders] = useState<FolderAiSummaryReport["subfolders"]>([]);
+  const [activeTab, setActiveTab] = useState<SummaryTab>("summary");
+  const [detailsLoaded, setDetailsLoaded] = useState(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
   const [failedListContext, setFailedListContext] = useState<FailedListContext | null>(null);
   const [failedListLoading, setFailedListLoading] = useState(false);
   const [failedListError, setFailedListError] = useState<string | null>(null);
   const [failedListItems, setFailedListItems] = useState<FolderAiFailedFileItem[]>([]);
   const [failedListMetaByPath, setFailedListMetaByPath] = useState<Record<string, DesktopMediaItemMetadata>>({});
+  const [folderScanPending, setFolderScanPending] = useState(false);
+  const {
+    actionPendingPipeline,
+    showPipelineBlockedDialog,
+    setShowPipelineBlockedDialog,
+    runPipelineForFolderWithSubfolders,
+  } = useFolderAiSummaryPipelineActions({
+    folderPath,
+    onRunSemanticPipeline,
+    onRunFacePipeline,
+    onRunPhotoPipeline,
+  });
 
   const load = useCallback(async () => {
     if (!folderPath) return;
     setLoading(true);
     setError(null);
+    setDetailsError(null);
+    setDetailsLoaded(false);
+    setOverviewReport(null);
+    const overviewPromise = window.desktopApi
+      .getFolderAiSummaryOverview(folderPath)
+      .then((overview) => setOverviewReport(overview))
+      .catch(() => undefined);
     try {
-      const report = await window.desktopApi.getFolderAiSummaryReport(folderPath);
-      setSelectedWithSubfolders(report.selectedWithSubfolders);
-      setSelectedDirectOnly(report.selectedDirectOnly);
-      setSubfolders(report.subfolders);
+      const [withSubfolders, directOnly] = await Promise.all([
+        window.desktopApi.getFolderAiCoverage(folderPath, true),
+        window.desktopApi.getFolderAiCoverage(folderPath, false),
+      ]);
+      setSelectedWithSubfolders(withSubfolders);
+      setSelectedDirectOnly(directOnly);
+      setSubfolders([]);
+      setActiveTab("summary");
+      void overviewPromise;
     } catch {
       setError(UI_TEXT.folderAiSummaryError);
       setSelectedWithSubfolders(null);
@@ -349,9 +147,49 @@ export function DesktopFolderAiSummaryView({
     }
   }, [folderPath]);
 
+  const loadDetails = useCallback(async (): Promise<void> => {
+    if (!folderPath || detailsLoaded || detailsLoading) return;
+    setDetailsLoading(true);
+    setDetailsError(null);
+    try {
+      const report = await window.desktopApi.getFolderAiSummaryReport(folderPath);
+      setSelectedWithSubfolders(report.selectedWithSubfolders);
+      setSelectedDirectOnly(report.selectedDirectOnly);
+      setSubfolders(report.subfolders);
+      setDetailsLoaded(true);
+    } catch {
+      setDetailsError(UI_TEXT.folderAiSummaryError);
+    } finally {
+      setDetailsLoading(false);
+    }
+  }, [detailsLoaded, detailsLoading, folderPath]);
+
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (shouldRefreshFolderAiSummaryAfterScan(folderPath, lastMetadataScanCompletion)) {
+      void load();
+    }
+  }, [folderPath, lastMetadataScanCompletion, load]);
+
+  useEffect(() => {
+    if (!lastAiPipelineCompletion) return;
+    if (
+      lastAiPipelineCompletion.folderPath === folderPath ||
+      isPathWithinParent(lastAiPipelineCompletion.folderPath, folderPath) ||
+      isPathWithinParent(folderPath, lastAiPipelineCompletion.folderPath)
+    ) {
+      void load();
+    }
+  }, [folderPath, lastAiPipelineCompletion, load]);
+
+  useEffect(() => {
+    if (activeTab === "ai" || activeTab === "geo") {
+      void loadDetails();
+    }
+  }, [activeTab, loadDetails]);
 
   useEffect(() => {
     if (failedListItems.length === 0) {
@@ -361,15 +199,10 @@ export function DesktopFolderAiSummaryView({
     let cancelled = false;
     const loadMeta = async (): Promise<void> => {
       try {
-        const paths = failedListItems.map((item) => item.path);
-        const byPath = await window.desktopApi.getMediaItemsByPaths(paths);
-        if (!cancelled) {
-          setFailedListMetaByPath(byPath);
-        }
+        const byPath = await window.desktopApi.getMediaItemsByPaths(failedListItems.map((item) => item.path));
+        if (!cancelled) setFailedListMetaByPath(byPath);
       } catch {
-        if (!cancelled) {
-          setFailedListMetaByPath({});
-        }
+        if (!cancelled) setFailedListMetaByPath({});
       }
     };
     void loadMeta();
@@ -378,218 +211,87 @@ export function DesktopFolderAiSummaryView({
     };
   }, [failedListItems]);
 
-  const loadFailedList = useCallback(
-    async (context: FailedListContext): Promise<void> => {
-      setFailedListLoading(true);
-      setFailedListError(null);
-      try {
-        const items = await window.desktopApi.getFolderAiFailedFiles(
-          context.folderPath,
-          context.pipeline,
-          context.recursive,
-        );
-        setFailedListItems(items);
-      } catch {
-        setFailedListItems([]);
-        setFailedListError(UI_TEXT.folderAiSummaryFailedListError);
-      } finally {
-        setFailedListLoading(false);
-      }
-    },
-    [],
-  );
+  const loadFailedList = useCallback(async (context: FailedListContext): Promise<void> => {
+    setFailedListLoading(true);
+    setFailedListError(null);
+    try {
+      const items = await window.desktopApi.getFolderAiFailedFiles(
+        context.folderPath,
+        context.pipeline,
+        context.recursive,
+      );
+      setFailedListItems(items);
+    } catch {
+      setFailedListItems([]);
+      setFailedListError(UI_TEXT.folderAiSummaryFailedListError);
+    } finally {
+      setFailedListLoading(false);
+    }
+  }, []);
 
   const openFailedList = useCallback(
     (targetFolderPath: string, pipeline: FolderAiPipelineKind, recursive: boolean, folderLabel: string): void => {
-      const context: FailedListContext = {
-        folderPath: targetFolderPath,
-        pipeline,
-        recursive,
-        folderLabel,
-      };
+      const context: FailedListContext = { folderPath: targetFolderPath, pipeline, recursive, folderLabel };
       setFailedListContext(context);
       void loadFailedList(context);
     },
     [loadFailedList],
   );
 
-  const hasAnyActiveAiPipeline = (active: ActiveJobStatuses): boolean =>
-    Boolean(active.photoAnalysis || active.faceDetection || active.semanticIndex);
+  const runFolderScanWithSubfolders = useCallback(async (): Promise<void> => {
+    if (!folderPath || folderScanPending) return;
+    setFolderScanPending(true);
+    try {
+      await window.desktopApi.scanFolderMetadata({ folderPath, recursive: true });
+      await load();
+    } finally {
+      setFolderScanPending(false);
+    }
+  }, [folderPath, folderScanPending, load]);
 
-  const markPipelineStartingInUi = (pipeline: SummaryPipelineKind): void => {
-    if (pipeline === "semantic") {
-      store.setState((s) => {
-        s.semanticIndexError = null;
-        s.semanticIndexStatus = "running";
-        s.semanticIndexPanelVisible = true;
-        s.semanticIndexJobId = null;
-        s.semanticIndexItemOrder = [];
-        s.semanticIndexItemsByKey = {};
-        s.semanticIndexAverageSecondsPerFile = null;
-        s.semanticIndexCurrentFolderPath = null;
-        s.semanticIndexPhase = null;
-      });
-      return;
-    }
-    if (pipeline === "face") {
-      store.setState((s) => {
-        s.faceError = null;
-        s.faceStatus = "running";
-        s.facePanelVisible = true;
-        s.faceJobId = null;
-        s.faceItemOrder = [];
-        s.faceItemsByKey = {};
-        s.faceAverageSecondsPerFile = null;
-        s.faceCurrentFolderPath = null;
-      });
-      return;
-    }
-    store.setState((s) => {
-      s.aiError = null;
-      s.aiStatus = "running";
-      s.aiPanelVisible = true;
-      s.aiJobId = null;
-      s.aiItemOrder = [];
-      s.aiItemsByKey = {};
-      s.aiAverageSecondsPerFile = null;
-      s.aiCurrentFolderPath = null;
-      s.aiPhase = null;
-    });
-  };
-
-  const markPipelineStartFailedInUi = (pipeline: SummaryPipelineKind, message: string): void => {
-    if (pipeline === "semantic") {
-      store.setState((s) => {
-        s.semanticIndexError = message;
-        s.semanticIndexStatus = "failed";
-        s.semanticIndexPhase = null;
-      });
-      return;
-    }
-    if (pipeline === "face") {
-      store.setState((s) => {
-        s.faceError = message;
-        s.faceStatus = "failed";
-      });
-      return;
-    }
-    store.setState((s) => {
-      s.aiError = message;
-      s.aiStatus = "failed";
-      s.aiPhase = null;
-    });
-  };
-
-  const runPipelineForFolderWithSubfolders = useCallback(
+  const runDashboardPipeline = useCallback(
     async (pipeline: SummaryPipelineKind): Promise<void> => {
-      if (!folderPath || actionPendingPipeline) return;
-      const liveState = store.getState();
-      const hasRunningPipelineInStoreNow =
-        liveState.aiStatus === "running" ||
-        liveState.faceStatus === "running" ||
-        liveState.semanticIndexStatus === "running";
-      if (hasRunningPipelineInStoreNow) {
-        setShowPipelineBlockedDialog(true);
-        return;
-      }
-      try {
-        const activeJobs = await window.desktopApi.getActiveJobStatuses();
-        if (hasAnyActiveAiPipeline(activeJobs)) {
-          setShowPipelineBlockedDialog(true);
-          return;
-        }
-      } catch {
-        // Keep running even if active-job check fails; store guard already protects common cases.
-      }
-      setActionPendingPipeline(pipeline);
-      try {
-        if (pipeline === "semantic") {
-          if (onRunSemanticPipeline) {
-            await onRunSemanticPipeline(folderPath, true, false);
-          } else {
-            markPipelineStartingInUi("semantic");
-            const result = await window.desktopApi.indexFolderSemanticEmbeddings({
-              folderPath,
-              recursive: true,
-              mode: "missing",
-            });
-            store.setState((s) => {
-              s.semanticIndexJobId = result.jobId;
-            });
-          }
-        } else if (pipeline === "face") {
-          if (onRunFacePipeline) {
-            await onRunFacePipeline(folderPath, true, false);
-          } else {
-            markPipelineStartingInUi("face");
-            const result = await window.desktopApi.detectFolderFaces({
-              folderPath,
-              recursive: true,
-              mode: "missing",
-            });
-            store.setState((s) => {
-              s.faceJobId = result.jobId;
-            });
-          }
-        } else {
-          if (onRunPhotoPipeline) {
-            await onRunPhotoPipeline(folderPath, true, false);
-          } else {
-            markPipelineStartingInUi("photo");
-            const result = await window.desktopApi.analyzeFolderPhotos({
-              folderPath,
-              recursive: true,
-              mode: "missing",
-            });
-            store.setState((s) => {
-              s.aiJobId = result.jobId;
-            });
-          }
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Could not start pipeline.";
-        markPipelineStartFailedInUi(pipeline, message);
-      } finally {
-        setActionPendingPipeline(null);
+      await runPipelineForFolderWithSubfolders(pipeline);
+      if (pipeline === "rotation") {
+        await load();
       }
     },
-    [
-      actionPendingPipeline,
-      folderPath,
-      onRunFacePipeline,
-      onRunPhotoPipeline,
-      onRunSemanticPipeline,
-      store,
-    ],
+    [load, runPipelineForFolderWithSubfolders],
   );
 
   const iconBtnClass =
     "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-input bg-secondary p-0 shadow-none";
+  const isFailedListView = failedListContext !== null;
+  const hasSubfolders =
+    selectedFolderChildrenCount > 0 ||
+    (overviewReport ? overviewReport.subfolders.length > 0 : subfolders.length > 0);
+  const summaryTitle = hasSubfolders ? UI_TEXT.folderAiSummaryTreeTitle : UI_TEXT.folderAiSummaryFolderTitle;
+  const dashboardCoverage = hasSubfolders ? selectedWithSubfolders : selectedDirectOnly;
+  const dashboardOverview = hasSubfolders ? overviewReport?.selectedWithSubfolders : overviewReport?.selectedDirectOnly;
   const failedListPipelineLabel =
     failedListContext?.pipeline === "photo"
       ? UI_TEXT.folderAiSummaryColumnPhoto
       : failedListContext?.pipeline === "face"
         ? UI_TEXT.folderAiSummaryColumnFace
         : UI_TEXT.folderAiSummaryColumnSemantic;
-  const isFailedListView = failedListContext !== null;
 
   return (
-    <div className="relative flex max-w-[960px] flex-col gap-3 px-5 py-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="m-0 min-w-0 flex-1 text-lg">
-          {isFailedListView ? UI_TEXT.folderAiSummaryFailedListTitle : UI_TEXT.folderAiSummaryTitle}
-        </h2>
+    <div className="relative flex w-full max-w-screen-2xl flex-col gap-4 px-5 py-4">
+      <div className="sticky top-0 z-20 flex flex-wrap items-start justify-between gap-3 border-b border-border bg-background/95 pb-3 pt-1 backdrop-blur">
+        <div className="min-w-0 flex-1">
+          <h2 className="m-0 text-lg">
+            {isFailedListView ? UI_TEXT.folderAiSummaryFailedListTitle : summaryTitle}
+          </h2>
+          <p className="m-0 mt-1 break-all text-sm text-muted-foreground">{folderPath}</p>
+        </div>
         <div className="inline-flex shrink-0 items-center gap-2">
           {!loading ? (
             <button
               type="button"
               className={iconBtnClass}
               onClick={() => {
-                if (failedListContext) {
-                  void loadFailedList(failedListContext);
-                } else {
-                  void load();
-                }
+                if (failedListContext) void loadFailedList(failedListContext);
+                else void load();
               }}
               aria-label={UI_TEXT.folderAiSummaryRefresh}
               title={UI_TEXT.folderAiSummaryRefresh}
@@ -608,6 +310,7 @@ export function DesktopFolderAiSummaryView({
           </button>
         </div>
       </div>
+
       {isFailedListView ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <button
@@ -625,159 +328,69 @@ export function DesktopFolderAiSummaryView({
         <p className="m-0 text-sm text-muted-foreground">{UI_TEXT.folderAiSummaryNote}</p>
       )}
 
-      {loading ? (
-        <div className="flex items-center justify-center py-8" aria-label={UI_TEXT.folderAiSummaryLoading}>
-          <RefreshCw size={48} aria-hidden="true" className="animate-spin text-muted-foreground" />
-        </div>
-      ) : null}
       {error ? <p className="m-0 text-red-400">{error}</p> : null}
+      {detailsError ? <p className="m-0 text-red-400">{detailsError}</p> : null}
 
-      {!loading && !error && selectedWithSubfolders && selectedDirectOnly && !isFailedListView ? (
-        <div className="overflow-hidden rounded-[10px] border border-border bg-card">
-          <table className="w-full border-collapse text-[13px]">
-            <thead>
-              <tr>
-                <th className="sticky top-0 z-[2] border-b border-border bg-[#151d2e] px-3 py-2.5 text-left text-xs font-semibold tracking-wide text-foreground shadow-[0_1px_0_#2a3040]">
-                  {UI_TEXT.folderAiSummaryColumnFolder}
-                </th>
-                <th className="sticky top-0 z-[2] border-b border-border bg-[#151d2e] px-3 py-2.5 text-left text-xs font-semibold tracking-wide text-foreground shadow-[0_1px_0_#2a3040]">
-                  {UI_TEXT.folderAiSummaryColumnImages}
-                </th>
-                <th className="sticky top-0 z-[2] border-b border-border bg-[#151d2e] px-3 py-2.5 text-left text-xs font-semibold tracking-wide text-foreground shadow-[0_1px_0_#2a3040]">
-                  {UI_TEXT.folderAiSummaryColumnSemantic}
-                </th>
-                <th className="sticky top-0 z-[2] border-b border-border bg-[#151d2e] px-3 py-2.5 text-left text-xs font-semibold tracking-wide text-foreground shadow-[0_1px_0_#2a3040]">
-                  {UI_TEXT.folderAiSummaryColumnFace}
-                </th>
-                <th className="sticky top-0 z-[2] border-b border-border bg-[#151d2e] px-3 py-2.5 text-left text-xs font-semibold tracking-wide text-foreground shadow-[0_1px_0_#2a3040]">
-                  {UI_TEXT.folderAiSummaryColumnPhoto}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {subfolders.length > 0 ? (
-                <>
-                  <SummaryRow
-                    label={UI_TEXT.folderAiSummaryThisFolder}
-                    coverage={selectedWithSubfolders}
-                    highlighted
-                    showPipelineActions
-                    onRunPipeline={(pipeline) => void runPipelineForFolderWithSubfolders(pipeline)}
-                    actionPendingPipeline={actionPendingPipeline}
-                    onOpenFailedList={openFailedList}
-                  />
-                  <SummaryRow
-                    label={UI_TEXT.folderAiSummaryThisFolderDirectOnly}
-                    coverage={selectedDirectOnly}
-                    showPipelineActions
-                    onRunPipeline={(pipeline) => void runPipelineForFolderWithSubfolders(pipeline)}
-                    actionPendingPipeline={actionPendingPipeline}
-                    onOpenFailedList={openFailedList}
-                  />
-                  <tr>
-                    <td className="h-6 border-0 border-x-0 border-y-0 bg-transparent p-0" colSpan={5} aria-hidden="true" />
-                  </tr>
-                  <tr>
-                    <td
-                      className="border-b border-border bg-[#151d2e] px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground"
-                      colSpan={5}
-                    >
-                      {UI_TEXT.folderAiSummarySubfolders}
-                    </td>
-                  </tr>
-                  {subfolders.map((row) => (
-                    <SummaryRow
-                      key={row.folderPath}
-                      label={row.name}
-                      coverage={row.coverage}
-                      noBottomBorder={row.folderPath === subfolders[subfolders.length - 1]?.folderPath}
-                      subfolderPath={row.folderPath}
-                      onSubfolderClick={onOpenFolderSummary}
-                      onOpenFailedList={openFailedList}
-                    />
-                  ))}
-                </>
-              ) : (
-                <SummaryRow
-                  label={folderDisplayNameFromPath(folderPath)}
-                  coverage={selectedDirectOnly}
-                  highlighted
-                  noBottomBorder
-                  onOpenFailedList={openFailedList}
-                />
-              )}
-            </tbody>
-          </table>
-        </div>
+      {loading && !error && !isFailedListView ? (
+        <DesktopFolderAiSummaryDashboard overview={dashboardOverview} hasSubfolders={hasSubfolders} loading />
+      ) : null}
+
+      {!loading && !error && !isFailedListView && selectedWithSubfolders && selectedDirectOnly && dashboardCoverage ? (
+        <>
+          <SummaryTabs activeTab={activeTab} onTabChange={setActiveTab} />
+          {activeTab === "summary" ? (
+            <DesktopFolderAiSummaryDashboard
+              coverage={dashboardCoverage}
+              overview={dashboardOverview}
+              hasSubfolders={hasSubfolders}
+              actionPendingPipeline={actionPendingPipeline}
+              onRunPipeline={(pipeline) => void runDashboardPipeline(pipeline)}
+              actionPendingFolderScan={folderScanPending}
+              onRunFolderScan={() => void runFolderScanWithSubfolders()}
+            />
+          ) : null}
+          {activeTab === "ai" ? (
+            !detailsLoaded ? (
+              <DetailsLoadingSpinner />
+            ) : (
+              <DesktopFolderAiSummaryTable
+                folderPath={folderPath}
+                selectedWithSubfolders={selectedWithSubfolders}
+                selectedDirectOnly={selectedDirectOnly}
+                subfolders={subfolders}
+                onRunPipeline={(pipeline) => void runPipelineForFolderWithSubfolders(pipeline)}
+                actionPendingPipeline={actionPendingPipeline}
+                onOpenFolderSummary={onOpenFolderSummary}
+                onOpenFailedList={openFailedList}
+              />
+            )
+          ) : null}
+          {activeTab === "geo" ? (
+            !detailsLoaded ? (
+              <DetailsLoadingSpinner />
+            ) : (
+              <DesktopFolderGeoSummaryTable
+                selectedWithSubfolders={selectedWithSubfolders}
+                selectedDirectOnly={selectedDirectOnly}
+                subfolders={subfolders}
+                onOpenFolderSummary={onOpenFolderSummary}
+              />
+            )
+          ) : null}
+        </>
       ) : null}
 
       {isFailedListView ? (
-        <div className="overflow-hidden rounded-[10px] border border-border bg-card">
-          {failedListLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 size={24} className="animate-spin text-muted-foreground" aria-hidden="true" />
-            </div>
-          ) : failedListError ? (
-            <p className="m-0 px-4 py-4 text-sm text-destructive">{failedListError}</p>
-          ) : failedListItems.length === 0 ? (
-            <p className="m-0 px-4 py-4 text-sm text-muted-foreground">{UI_TEXT.folderAiSummaryFailedListEmpty}</p>
-          ) : (
-            <div className="max-h-[65vh] overflow-auto">
-              {failedListItems.map((item) => (
-                <div key={`${item.path}-${item.failedAt ?? ""}`} className="border-b border-border px-4 py-2.5 last:border-b-0">
-                  <div className="flex items-start gap-3">
-                    <img
-                      src={toFileUrl(item.path)}
-                      alt={item.name}
-                      className="h-32 w-32 shrink-0 rounded object-cover"
-                      loading="lazy"
-                      decoding="async"
-                      onError={(event) => {
-                        event.currentTarget.style.display = "none";
-                      }}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="m-0 break-all pb-1 text-sm text-foreground">{item.name}</p>
-                      <p className="m-0 break-all pb-1 text-xs text-muted-foreground">{item.path}</p>
-                      <p className="m-0 break-all pb-1 text-xs text-muted-foreground">
-                        {formatResolution(failedListMetaByPath[item.path]) ?? "Resolution: -"}
-                      </p>
-                      {item.error ? (
-                        <p className="m-0 break-all text-xs text-destructive">{item.error}</p>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <DesktopFolderAiFailedList
+          loading={failedListLoading}
+          error={failedListError}
+          items={failedListItems}
+          metaByPath={failedListMetaByPath}
+        />
       ) : null}
 
       {showPipelineBlockedDialog ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Pipeline already running"
-        >
-          <div className="w-full max-w-[520px] rounded-lg border border-border bg-card p-4 shadow-xl">
-            <p className="m-0 text-sm text-foreground">
-              Please cancel currently running process or wait until it finishes
-            </p>
-            <div className="mt-3 flex justify-end">
-              <button
-                type="button"
-                className="inline-flex h-8 items-center justify-center rounded-md border border-input bg-secondary px-3 text-sm shadow-none"
-                onClick={() => setShowPipelineBlockedDialog(false)}
-                aria-label="Close dialog"
-                title="Close"
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        </div>
+        <PipelineBlockedDialog onClose={() => setShowPipelineBlockedDialog(false)} />
       ) : null}
     </div>
   );

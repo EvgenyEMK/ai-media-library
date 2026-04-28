@@ -39,7 +39,14 @@ export function getAlreadyAnalyzedPhotoPaths(
 
   const db = getDesktopDatabase();
   const analyzed = new Set<string>();
-  const sqlPrefix = `SELECT source_path, ai_metadata FROM media_items WHERE library_id = ? AND photo_analysis_processed_at IS NOT NULL AND source_path IN (`;
+  const sqlPrefix = `SELECT source_path, ai_metadata FROM media_items
+    WHERE library_id = ?
+      AND photo_analysis_processed_at IS NOT NULL
+      AND (
+        photo_analysis_failed_at IS NULL
+        OR photo_analysis_processed_at > photo_analysis_failed_at
+      )
+      AND source_path IN (`;
   const sqlSuffix = `)`;
 
   for (let i = 0; i < photoPaths.length; i += IN_CHUNK_SIZE) {
@@ -68,7 +75,14 @@ export function getAlreadyFaceDetectedPhotoPaths(
 
   const db = getDesktopDatabase();
   const result = new Set<string>();
-  const sqlPrefix = `SELECT source_path FROM media_items WHERE library_id = ? AND face_detection_processed_at IS NOT NULL AND source_path IN (`;
+  const sqlPrefix = `SELECT source_path FROM media_items
+    WHERE library_id = ?
+      AND face_detection_processed_at IS NOT NULL
+      AND (
+        face_detection_failed_at IS NULL
+        OR face_detection_processed_at > face_detection_failed_at
+      )
+      AND source_path IN (`;
   const sqlSuffix = `)`;
 
   for (let i = 0; i < photoPaths.length; i += IN_CHUNK_SIZE) {
@@ -792,8 +806,46 @@ export function upsertOrientationDetectionResult(
       model: input.model ?? null,
       processed_at: now,
     };
+    delete merged.orientation_detection_error;
     merged.edit_suggestions = stripRotateEditSuggestions(merged.edit_suggestions);
   }
+
+  db.prepare(
+    `UPDATE media_items SET ai_metadata = ?, updated_at = ? WHERE id = ?`,
+  ).run(JSON.stringify(merged), now, mediaItem.id);
+  return mediaItem.id;
+}
+
+export function upsertOrientationDetectionFailure(
+  photoPath: string,
+  error: string,
+  libraryId = DEFAULT_LIBRARY_ID,
+): string | null {
+  const db = getDesktopDatabase();
+  const now = new Date().toISOString();
+  const filename = path.basename(photoPath);
+  db.prepare(
+    `INSERT INTO media_items (
+      id, library_id, source_path, filename, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(library_id, source_path) DO UPDATE SET
+      filename = excluded.filename,
+      updated_at = excluded.updated_at`,
+  ).run(randomUUID(), libraryId, photoPath, filename, now, now);
+
+  const mediaItem = db
+    .prepare(`SELECT id, ai_metadata FROM media_items WHERE library_id = ? AND source_path = ? LIMIT 1`)
+    .get(libraryId, photoPath) as { id: string; ai_metadata: string | null } | undefined;
+  if (!mediaItem) return null;
+
+  const merged = mergeMetadataV2(parseJson(mediaItem.ai_metadata), {
+    schema_version: "2.0",
+  }) as Record<string, unknown>;
+
+  merged.orientation_detection_error = {
+    message: error,
+    failed_at: now,
+  };
 
   db.prepare(
     `UPDATE media_items SET ai_metadata = ?, updated_at = ? WHERE id = ?`,

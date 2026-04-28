@@ -20,6 +20,7 @@ export function getFolderAnalysisStatuses(
          photo_analyzed_at,
          face_analyzed_at,
          semantic_indexed_at,
+         metadata_scanned_at,
          last_updated_at
        FROM folder_analysis_status
        WHERE library_id = ?`,
@@ -32,6 +33,7 @@ export function getFolderAnalysisStatuses(
     photo_analyzed_at: string | null;
     face_analyzed_at: string | null;
     semantic_indexed_at: string | null;
+    metadata_scanned_at: string | null;
     last_updated_at: string;
   }>;
 
@@ -46,10 +48,54 @@ export function getFolderAnalysisStatuses(
       photoAnalyzedAt: row.photo_analyzed_at,
       faceAnalyzedAt: row.face_analyzed_at,
       semanticIndexedAt: row.semantic_indexed_at,
+      metadataScannedAt: row.metadata_scanned_at,
       lastUpdatedAt: row.last_updated_at,
     };
     return acc;
   }, {});
+}
+
+export function markFoldersMetadataScanned(
+  folderPaths: Iterable<string>,
+  scannedAt = new Date().toISOString(),
+  libraryId = DEFAULT_LIBRARY_ID,
+): number {
+  const normalizedPaths = Array.from(
+    new Set(
+      Array.from(folderPaths)
+        .map(normalizeFolderPath)
+        .filter((folderPath): folderPath is string => folderPath.length > 0),
+    ),
+  );
+  if (normalizedPaths.length === 0) return 0;
+
+  const db = getDesktopDatabase();
+  const stmt = db.prepare(
+    `INSERT INTO folder_analysis_status (
+      library_id,
+      folder_path,
+      photo_in_progress,
+      face_in_progress,
+      semantic_in_progress,
+      photo_analyzed_at,
+      face_analyzed_at,
+      semantic_indexed_at,
+      metadata_scanned_at,
+      last_updated_at
+    ) VALUES (?, ?, 0, 0, 0, NULL, NULL, NULL, ?, ?)
+    ON CONFLICT(library_id, folder_path) DO UPDATE SET
+      metadata_scanned_at = excluded.metadata_scanned_at,
+      last_updated_at = excluded.last_updated_at`,
+  );
+
+  let updated = 0;
+  const tx = db.transaction(() => {
+    for (const folderPath of normalizedPaths) {
+      updated += stmt.run(libraryId, folderPath, scannedAt, scannedAt).changes;
+    }
+  });
+  tx();
+  return updated;
 }
 
 export function setFolderAnalysisInProgress(

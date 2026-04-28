@@ -17,6 +17,12 @@ function report(partial: Partial<FolderAiCoverageReport> & Pick<FolderAiCoverage
     photo: partial.photo ?? done(t),
     face: partial.face ?? done(t),
     semantic: partial.semantic ?? done(t),
+    rotation: partial.rotation ?? done(t),
+    geo: partial.geo ?? {
+      images: { total: t, withGpsCount: 0, withoutGpsCount: t, locationDetailsDoneCount: 0 },
+      videos: { total: 0, withGpsCount: 0, withoutGpsCount: 0, locationDetailsDoneCount: 0 },
+      locationDetails: { doneCount: 0, totalWithGps: 0, label: "empty" },
+    },
   };
 }
 

@@ -22,6 +22,7 @@ interface DesktopProgressDockProps {
   onCancelFaceClustering: () => void;
   onCancelSimilarUntaggedFaceCounts: () => void;
   onCancelPathAnalysis: () => void;
+  onCancelImageRotation: () => void;
   descEmbedBackfill?: DescEmbedBackfillState;
   onCancelDescEmbedBackfill?: () => void;
   onDismissDescEmbedBackfill?: () => void;
@@ -41,6 +42,7 @@ export function DesktopProgressDock({
   onCancelFaceClustering,
   onCancelSimilarUntaggedFaceCounts,
   onCancelPathAnalysis,
+  onCancelImageRotation,
   descEmbedBackfill,
   onCancelDescEmbedBackfill,
   onDismissDescEmbedBackfill,
@@ -67,6 +69,7 @@ export function DesktopProgressDock({
       dock.faceClusteringPanelVisible ||
       dock.similarUntaggedCountsPanelVisible ||
       dock.pathAnalysisPanelVisible ||
+      dock.imageRotationPanelVisible ||
       dock.geocoderInitPanelVisible;
     if (!anyVisible) return;
     store.setState((s) => {
@@ -77,6 +80,7 @@ export function DesktopProgressDock({
       s.faceClusteringPanelVisible = false;
       s.similarUntaggedCountsPanelVisible = false;
       s.pathAnalysisPanelVisible = false;
+      s.imageRotationPanelVisible = false;
       s.geocoderInitPanelVisible = false;
     });
   }, [
@@ -89,6 +93,7 @@ export function DesktopProgressDock({
     dock.faceClusteringPanelVisible,
     dock.similarUntaggedCountsPanelVisible,
     dock.pathAnalysisPanelVisible,
+    dock.imageRotationPanelVisible,
     dock.geocoderInitPanelVisible,
     store,
   ]);
@@ -121,6 +126,7 @@ export function DesktopProgressDock({
             onCancelFaceClustering={onCancelFaceClustering}
             onCancelSimilarUntaggedFaceCounts={onCancelSimilarUntaggedFaceCounts}
             onCancelPathAnalysis={onCancelPathAnalysis}
+            onCancelImageRotation={onCancelImageRotation}
             descEmbedBackfill={descEmbedBackfill}
             onCancelDescEmbedBackfill={onCancelDescEmbedBackfill}
             onDismissDescEmbedBackfill={onDismissDescEmbedBackfill}

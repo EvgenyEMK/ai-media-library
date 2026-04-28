@@ -8,6 +8,7 @@ import type {
 import { IMAGE_EXTENSIONS } from "../../src/shared/ipc";
 import { getDesktopDatabase } from "./client";
 import { DEFAULT_LIBRARY_ID } from "./folder-analysis-status";
+import { getFolderGeoCoverage } from "./folder-geo-coverage";
 import { MULTIMODAL_EMBED_MODEL } from "../semantic-embeddings";
 
 export type { FolderAiCoverageReport } from "../../src/shared/ipc";
@@ -31,12 +32,13 @@ function pipelineLabel(done: number, total: number): FolderAiPipelineLabel {
   return "partial";
 }
 
-function toPipelineCounts(done: number, failed: number, total: number): FolderAiPipelineCounts {
+function toPipelineCounts(done: number, failed: number, total: number, issueCount?: number): FolderAiPipelineCounts {
   return {
     doneCount: done,
     failedCount: failed,
     totalImages: total,
     label: pipelineLabel(done, total),
+    ...(typeof issueCount === "number" ? { issueCount } : {}),
   };
 }
 
@@ -71,11 +73,14 @@ export function getFolderAiCoverage(params: {
   const sql = `
     SELECT
       COUNT(*) AS total,
-      SUM(CASE WHEN mi.photo_analysis_processed_at IS NOT NULL THEN 1 ELSE 0 END) AS photo_done,
-      SUM(CASE WHEN mi.face_detection_processed_at IS NOT NULL THEN 1 ELSE 0 END) AS face_done,
+      SUM(CASE WHEN mi.photo_analysis_processed_at IS NOT NULL AND (mi.photo_analysis_failed_at IS NULL OR mi.photo_analysis_processed_at > mi.photo_analysis_failed_at) THEN 1 ELSE 0 END) AS photo_done,
+      SUM(CASE WHEN mi.face_detection_processed_at IS NOT NULL AND (mi.face_detection_failed_at IS NULL OR mi.face_detection_processed_at > mi.face_detection_failed_at) THEN 1 ELSE 0 END) AS face_done,
       SUM(CASE WHEN me_img.embedding_status = 'ready' THEN 1 ELSE 0 END) AS semantic_done,
-      SUM(CASE WHEN mi.photo_analysis_failed_at IS NOT NULL AND mi.photo_analysis_processed_at IS NULL THEN 1 ELSE 0 END) AS photo_failed,
-      SUM(CASE WHEN mi.face_detection_failed_at IS NOT NULL AND mi.face_detection_processed_at IS NULL THEN 1 ELSE 0 END) AS face_failed,
+      SUM(CASE WHEN json_extract(mi.ai_metadata, '$.orientation_detection') IS NOT NULL THEN 1 ELSE 0 END) AS rotation_done,
+      SUM(CASE WHEN CAST(json_extract(mi.ai_metadata, '$.orientation_detection.correction_angle_clockwise') AS INTEGER) IN (90, 180, 270) THEN 1 ELSE 0 END) AS rotation_wrong,
+      SUM(CASE WHEN json_extract(mi.ai_metadata, '$.orientation_detection_error') IS NOT NULL AND json_extract(mi.ai_metadata, '$.orientation_detection') IS NULL THEN 1 ELSE 0 END) AS rotation_failed,
+      SUM(CASE WHEN mi.photo_analysis_failed_at IS NOT NULL AND (mi.photo_analysis_processed_at IS NULL OR mi.photo_analysis_failed_at >= mi.photo_analysis_processed_at) THEN 1 ELSE 0 END) AS photo_failed,
+      SUM(CASE WHEN mi.face_detection_failed_at IS NOT NULL AND (mi.face_detection_processed_at IS NULL OR mi.face_detection_failed_at >= mi.face_detection_processed_at) THEN 1 ELSE 0 END) AS face_failed,
       SUM(CASE WHEN me_img.embedding_status = 'failed' THEN 1 ELSE 0 END) AS semantic_failed
     FROM media_items mi
     LEFT JOIN media_embeddings me_img
@@ -102,6 +107,9 @@ export function getFolderAiCoverage(params: {
     photo_done: number | null;
     face_done: number | null;
     semantic_done: number | null;
+    rotation_done: number | null;
+    rotation_wrong: number | null;
+    rotation_failed: number | null;
     photo_failed: number | null;
     face_failed: number | null;
     semantic_failed: number | null;
@@ -111,6 +119,9 @@ export function getFolderAiCoverage(params: {
   const photoDone = Number(row?.photo_done ?? 0);
   const faceDone = Number(row?.face_done ?? 0);
   const semanticDone = Number(row?.semantic_done ?? 0);
+  const rotationDone = Number(row?.rotation_done ?? 0);
+  const rotationWrong = Number(row?.rotation_wrong ?? 0);
+  const rotationFailed = Number(row?.rotation_failed ?? 0);
   const photoFailed = Number(row?.photo_failed ?? 0);
   const faceFailed = Number(row?.face_failed ?? 0);
   const semanticFailed = Number(row?.semantic_failed ?? 0);
@@ -122,6 +133,12 @@ export function getFolderAiCoverage(params: {
     photo: toPipelineCounts(photoDone, photoFailed, total),
     face: toPipelineCounts(faceDone, faceFailed, total),
     semantic: toPipelineCounts(semanticDone, semanticFailed, total),
+    rotation: toPipelineCounts(rotationDone, rotationFailed, total, rotationWrong),
+    geo: getFolderGeoCoverage({
+      folderPath,
+      recursive: params.recursive,
+      libraryId,
+    }),
   };
 }
 
@@ -133,6 +150,12 @@ function emptyReport(folderPath: string, recursive: boolean): FolderAiCoverageRe
     photo: toPipelineCounts(0, 0, 0),
     face: toPipelineCounts(0, 0, 0),
     semantic: toPipelineCounts(0, 0, 0),
+    rotation: toPipelineCounts(0, 0, 0),
+    geo: {
+      images: { total: 0, withGpsCount: 0, withoutGpsCount: 0, locationDetailsDoneCount: 0 },
+      videos: { total: 0, withGpsCount: 0, withoutGpsCount: 0, locationDetailsDoneCount: 0 },
+      locationDetails: { doneCount: 0, totalWithGps: 0, label: "empty" },
+    },
   };
 }
 
@@ -232,6 +255,12 @@ export function getFolderAiRollupsForPaths(
       photo: toPipelineCounts(photoDone, 0, total),
       face: toPipelineCounts(faceDone, 0, total),
       semantic: toPipelineCounts(semanticDone, 0, total),
+      rotation: toPipelineCounts(0, 0, total),
+      geo: {
+        images: { total, withGpsCount: 0, withoutGpsCount: total, locationDetailsDoneCount: 0 },
+        videos: { total: 0, withGpsCount: 0, withoutGpsCount: 0, locationDetailsDoneCount: 0 },
+        locationDetails: { doneCount: 0, totalWithGps: 0, label: "empty" },
+      },
     };
     out[trimmedPaths[i]] = folderCoverageToSidebarRollup(cov);
   }

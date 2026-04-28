@@ -1,6 +1,7 @@
 import type { BrowserWindow } from "electron";
 
 export interface RunningAnalysisJob {
+  kind: "photo" | "face-detection" | "face-embedding";
   cancelled: boolean;
   controllers: Set<AbortController>;
   powerSaveToken?: string;
@@ -59,4 +60,9 @@ export interface RunningPathAnalysisJob {
   cancelled: boolean;
   powerSaveToken?: string;
   folderPath?: string;
+}
+
+export interface RunningImageRotationJob {
+  cancelled: boolean;
+  folderPath: string;
 }

@@ -128,6 +128,7 @@ export function registerPhotoAnalysisHandlers(): void {
 
       const jobId = randomUUID();
       const job: RunningAnalysisJob = {
+        kind: "photo",
         cancelled: false,
         controllers: new Set<AbortController>(),
       };
