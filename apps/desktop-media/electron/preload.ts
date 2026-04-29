@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { IPC_CHANNELS, type DesktopApi } from "../src/shared/ipc";
+import { PIPELINE_IPC_CHANNELS } from "../src/shared/pipeline-ipc";
 
 const api: DesktopApi = {
   selectLibraryFolder: () => ipcRenderer.invoke(IPC_CHANNELS.selectLibraryFolder),
@@ -337,7 +338,6 @@ const api: DesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.purgeDeletedMediaItems),
   purgeSoftDeletedMediaItemsByIds: (mediaItemIds: string[]) =>
     ipcRenderer.invoke(IPC_CHANNELS.purgeSoftDeletedMediaItemsByIds, mediaItemIds),
-  getActiveJobStatuses: () => ipcRenderer.invoke(IPC_CHANNELS.getActiveJobStatuses),
   analyzeFolderPathMetadata: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.analyzeFolderPathMetadata, request),
   cancelPathAnalysis: (jobId) => ipcRenderer.invoke(IPC_CHANNELS.cancelPathAnalysis, jobId),
@@ -383,6 +383,50 @@ const api: DesktopApi = {
     return () => {
       ipcRenderer.removeListener(IPC_CHANNELS.descEmbedBackfillProgress, wrapped);
     };
+  },
+  pipelines: {
+    enqueueBundle: (request) => ipcRenderer.invoke(PIPELINE_IPC_CHANNELS.enqueueBundle, request),
+    cancelBundle: (bundleId) => ipcRenderer.invoke(PIPELINE_IPC_CHANNELS.cancelBundle, bundleId),
+    cancelJob: (jobId) => ipcRenderer.invoke(PIPELINE_IPC_CHANNELS.cancelJob, jobId),
+    removeQueued: (bundleId) => ipcRenderer.invoke(PIPELINE_IPC_CHANNELS.removeQueued, bundleId),
+    clearQueue: () => ipcRenderer.invoke(PIPELINE_IPC_CHANNELS.clearQueue),
+    getSnapshot: () => ipcRenderer.invoke(PIPELINE_IPC_CHANNELS.getSnapshot),
+    onQueueChanged: (listener) => {
+      const wrapped = (
+        _event: Electron.IpcRendererEvent,
+        payload: Parameters<typeof listener>[0],
+      ) => {
+        listener(payload);
+      };
+      ipcRenderer.on(PIPELINE_IPC_CHANNELS.queueChanged, wrapped);
+      return () => {
+        ipcRenderer.removeListener(PIPELINE_IPC_CHANNELS.queueChanged, wrapped);
+      };
+    },
+    onJobProgress: (listener) => {
+      const wrapped = (
+        _event: Electron.IpcRendererEvent,
+        payload: Parameters<typeof listener>[0],
+      ) => {
+        listener(payload);
+      };
+      ipcRenderer.on(PIPELINE_IPC_CHANNELS.jobProgress, wrapped);
+      return () => {
+        ipcRenderer.removeListener(PIPELINE_IPC_CHANNELS.jobProgress, wrapped);
+      };
+    },
+    onLifecycle: (listener) => {
+      const wrapped = (
+        _event: Electron.IpcRendererEvent,
+        payload: Parameters<typeof listener>[0],
+      ) => {
+        listener(payload);
+      };
+      ipcRenderer.on(PIPELINE_IPC_CHANNELS.lifecycle, wrapped);
+      return () => {
+        ipcRenderer.removeListener(PIPELINE_IPC_CHANNELS.lifecycle, wrapped);
+      };
+    },
   },
   _logToMain: (msg: string) => ipcRenderer.send("renderer:log", msg),
 };

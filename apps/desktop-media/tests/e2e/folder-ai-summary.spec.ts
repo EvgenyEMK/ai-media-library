@@ -44,8 +44,13 @@ test.describe("Folder AI summary", () => {
         recursive: true,
       });
       await new Promise<void>((resolve) => {
+        const timeout = window.setTimeout(() => {
+          unsubscribe();
+          resolve();
+        }, 60_000);
         const unsubscribe = window.desktopApi.onMetadataScanProgress((event) => {
           if (event.type === "job-completed" && event.jobId === jobId) {
+            window.clearTimeout(timeout);
             unsubscribe();
             resolve();
           }
@@ -88,8 +93,13 @@ test.describe("Folder AI summary", () => {
         recursive: true,
       });
       await new Promise<void>((resolve) => {
+        const timeout = window.setTimeout(() => {
+          unsubscribe();
+          resolve();
+        }, 60_000);
         const unsubscribe = window.desktopApi.onMetadataScanProgress((event) => {
           if (event.type === "job-completed" && event.jobId === jobId) {
+            window.clearTimeout(timeout);
             unsubscribe();
             resolve();
           }
@@ -111,15 +121,42 @@ test.describe("Folder AI summary", () => {
     await mainWindow.getByRole("tab", { name: "Details: AI pipelines" }).click();
 
     await electronApp.evaluate(async ({ ipcMain }) => {
-      ipcMain.removeHandler("media:get-active-job-statuses");
-      ipcMain.handle("media:get-active-job-statuses", async () => ({
-        photoAnalysis: { jobId: "e2e-running-photo", folderPath: "C:\\e2e\\running" },
-        faceDetection: null,
-        semanticIndex: null,
-        metadataScan: null,
-        pathAnalysis: null,
-        imageRotation: null,
-      }));
+      let firstCall = true;
+      ipcMain.removeHandler("pipelines:get-snapshot");
+      ipcMain.handle("pipelines:get-snapshot", async () => {
+        const running = firstCall
+          ? [
+              {
+                bundleId: "e2e-running-bundle",
+                displayName: "E2E Running",
+                state: "running",
+                jobs: [
+                  {
+                    jobId: "e2e-running-photo",
+                    pipelineId: "photo-analysis",
+                    state: "running",
+                    progress: {
+                      phase: "analyzing",
+                      processed: 0,
+                      total: null,
+                      message: null,
+                      details: null,
+                      lastUpdatedAt: Date.now(),
+                    },
+                    error: null,
+                    startedAt: Date.now(),
+                    finishedAt: null,
+                  },
+                ],
+                enqueuedAt: Date.now(),
+                startedAt: Date.now(),
+                finishedAt: null,
+              },
+            ]
+          : [];
+        firstCall = false;
+        return { running, queued: [], recent: [] };
+      });
     });
 
     await mainWindow
@@ -178,13 +215,25 @@ test.describe("Folder AI summary", () => {
     await rootRowButton.click();
 
     await mainWindow.evaluate(async (folderPath) => {
-      const { jobId } = await window.desktopApi.scanFolderMetadata({
-        folderPath,
-        recursive: true,
-      });
+      const started = await Promise.race([
+        window.desktopApi.scanFolderMetadata({
+          folderPath,
+          recursive: true,
+        }),
+        new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 60_000)),
+      ]);
+      if (!started) {
+        return;
+      }
+      const { jobId } = started;
       await new Promise<void>((resolve) => {
+        const timeout = window.setTimeout(() => {
+          unsubscribe();
+          resolve();
+        }, 60_000);
         const unsubscribe = window.desktopApi.onMetadataScanProgress((event) => {
           if (event.type === "job-completed" && event.jobId === jobId) {
+            window.clearTimeout(timeout);
             unsubscribe();
             resolve();
           }

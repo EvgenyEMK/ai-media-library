@@ -108,7 +108,7 @@ function deriveOriginalDimensions(
   return { originalImageWidth: rotatedSize.width, originalImageHeight: rotatedSize.height };
 }
 
-interface OrientedFaceDetectionResult {
+export interface OrientedFaceDetectionResult {
   faces: FaceDetectionOutput;
   embeddingOverride?: {
     imagePath: string;
@@ -117,7 +117,7 @@ interface OrientedFaceDetectionResult {
   };
 }
 
-async function detectFacesUsingOrientationState(params: {
+export async function detectFacesUsingOrientationState(params: {
   imagePath: string;
   signal?: AbortSignal;
   settings?: AppSettings["faceDetection"];
@@ -156,34 +156,39 @@ async function detectFacesUsingOrientationState(params: {
       };
   const baseResult = baseDetection.faces;
 
-  // Safety net: if detected landmarks still indicate non-upright orientation,
-  // run one corrective pass to align by landmarks-based correction.
-  const landmarkCorrection = hasKnownOrientation ? null : inferLandmarkCorrection(baseResult);
-  if (landmarkCorrection !== null) {
-    const currentAppliedAngle = hasKnownOrientation ? orientationAngleClockwise : 0;
-    const combined = (currentAppliedAngle + landmarkCorrection) % 360;
-    if (combined === 0) {
-      return {
-        faces: (await detectFacesInPhotoWithOrientation({ imagePath, signal, settings })).faces,
-      };
+  // Optional expensive orientation correction pass. Keep this behind
+  // `enableRotationFallback` so standard detection (especially manual folder
+  // "Detect faces") stays single-pass and predictable.
+  if (enableRotationFallback) {
+    // Safety net: if detected landmarks still indicate non-upright orientation,
+    // run one corrective pass to align by landmarks-based correction.
+    const landmarkCorrection = hasKnownOrientation ? null : inferLandmarkCorrection(baseResult);
+    if (landmarkCorrection !== null) {
+      const currentAppliedAngle = hasKnownOrientation ? orientationAngleClockwise : 0;
+      const combined = (currentAppliedAngle + landmarkCorrection) % 360;
+      if (combined === 0) {
+        return {
+          faces: (await detectFacesInPhotoWithOrientation({ imagePath, signal, settings })).faces,
+        };
+      }
+      if (combined === 90 || combined === 180 || combined === 270) {
+        return detectOnRotatedCopy(combined);
+      }
     }
-    if (combined === 90 || combined === 180 || combined === 270) {
-      return detectOnRotatedCopy(combined);
-    }
-  }
 
-  // If orientation is still unknown and landmarks are ambiguous, probe quarter turns
-  // and pick the most upright high-confidence candidate.
-  if (!hasKnownOrientation && baseResult.faceCount > 0) {
-    const best = await chooseBestUprightRotationByLandmarks({
-      imagePath,
-      signal,
-      settings,
-      baseResult,
-      detectOnRotatedCopy,
-    });
-    if (best) {
-      return best;
+    // If orientation is still unknown and landmarks are ambiguous, probe
+    // quarter turns and pick the most upright high-confidence candidate.
+    if (!hasKnownOrientation && baseResult.faceCount > 0) {
+      const best = await chooseBestUprightRotationByLandmarks({
+        imagePath,
+        signal,
+        settings,
+        baseResult,
+        detectOnRotatedCopy,
+      });
+      if (best) {
+        return best;
+      }
     }
   }
 
@@ -587,6 +592,9 @@ export function registerFaceDetectionHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.detectFacesForMediaItem,
     async (_event, sourcePath: string, faceDetectionSettings?: AppSettings["faceDetection"]) => {
+      const perfLog = process.env.EMK_FACE_PERF_LOG === "1";
+      const skipAutoEmbed = process.env.EMK_FACE_SKIP_AUTO_EMBED === "1";
+      const perfStarted = perfLog ? performance.now() : 0;
       const imagePath = sourcePath?.trim();
       if (!imagePath) {
         throw new Error("Image path is required for local face detection");
@@ -601,18 +609,22 @@ export function registerFaceDetectionHandlers(): void {
         appSettings.wrongImageRotationDetection.enabled,
       );
 
+      const precheckStarted = perfLog ? performance.now() : 0;
       await runWrongImageRotationPrecheck({
         imagePath,
         settings: appSettings,
       });
+      const precheckMs = perfLog ? performance.now() - precheckStarted : 0;
       const orientationState = getOrientationDetectionStateByPath(imagePath);
 
+      const detectStarted = perfLog ? performance.now() : 0;
       const detection = await detectFacesUsingOrientationState({
         imagePath,
         settings: resolvedSettings,
         orientationAngleClockwise: orientationState?.correctionAngleClockwise,
         enableRotationFallback: false,
       });
+      const detectMs = perfLog ? performance.now() - detectStarted : 0;
       const result = detection.faces;
       const mediaId = upsertFaceDetectionResult(
         imagePath,
@@ -628,7 +640,8 @@ export function registerFaceDetectionHandlers(): void {
           : null,
       );
 
-      if (mediaId && result.faceCount > 0) {
+      const embedStarted = perfLog ? performance.now() : 0;
+      if (mediaId && result.faceCount > 0 && !skipAutoEmbed) {
         await autoChainEmbeddings(
           mediaId,
           imagePath,
@@ -638,8 +651,29 @@ export function registerFaceDetectionHandlers(): void {
           detection.embeddingOverride,
         );
       }
+      const embedMs = perfLog ? performance.now() - embedStarted : 0;
 
-      return { success: true, faceCount: result.faceCount };
+      const debugTimings = perfLog
+        ? {
+            totalMs: Math.round(performance.now() - perfStarted),
+            precheckMs: Math.round(precheckMs),
+            detectMs: Math.round(detectMs),
+            embedMs: Math.round(embedMs),
+          }
+        : undefined;
+
+      if (perfLog && debugTimings) {
+        const totalMs = performance.now() - perfStarted;
+        console.log(
+          `[face-perf] file=${imagePath} faces=${result.faceCount} totalMs=${totalMs.toFixed(0)} precheckMs=${precheckMs.toFixed(0)} detectMs=${detectMs.toFixed(0)} embedMs=${embedMs.toFixed(0)}`,
+        );
+      }
+
+      return {
+        success: true,
+        faceCount: result.faceCount,
+        ...(debugTimings ? { debugTimings } : {}),
+      };
     },
   );
 
@@ -851,6 +885,7 @@ async function runFaceDetectionJob(
   appSettings: AppSettings,
   faceJobContext: RunningFaceDetectionJobContext,
 ): Promise<void> {
+  const skipAutoEmbed = process.env.EMK_FACE_SKIP_AUTO_EMBED === "1";
   const job = runningJobs.get(jobId);
   if (!job) {
     return;
@@ -967,7 +1002,7 @@ async function runFaceDetectionJob(
             },
           });
 
-          if (result.faceCount > 0 && !job.cancelled) {
+          if (result.faceCount > 0 && !job.cancelled && !skipAutoEmbed) {
             await autoChainEmbeddings(
               mediaId,
               photo.path,

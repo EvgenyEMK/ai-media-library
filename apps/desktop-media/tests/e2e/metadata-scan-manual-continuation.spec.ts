@@ -5,7 +5,6 @@ import { test, expect } from "./fixtures/app-fixture";
 import { clickSidebarLibraryRoot } from "./fixtures/desktop-sidebar";
 import { mockFolderDialog } from "./fixtures/mock-dialog";
 import { E2E_JPEG_VARIANTS_BASE64 } from "./fixtures/test-images";
-import type { ActiveJobStatuses } from "../../src/shared/ipc";
 
 function createLibrary(rootPrefix: string, fileCount: number): string {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), rootPrefix));
@@ -54,10 +53,13 @@ async function startManualMetadataScanFromRootMenu(
   await mainWindow.locator('[title="Start metadata scan"]').first().click();
 }
 
-async function getActiveJobs(
+async function getTrackedMetadataScanJobId(
   mainWindow: import("@playwright/test").Page,
-): Promise<ActiveJobStatuses> {
-  return mainWindow.evaluate(async () => window.desktopApi.getActiveJobStatuses());
+): Promise<string | null> {
+  return mainWindow.evaluate(() => {
+    const state = globalThis as { __e2eMetadataScanJobId?: string | null };
+    return state.__e2eMetadataScanJobId ?? null;
+  });
 }
 
 test("manual metadata scan keeps running across folder selection; auto-scan is skipped", async ({
@@ -68,6 +70,31 @@ test("manual metadata scan keeps running across folder selection; auto-scan is s
   const secondRoot = createLibrary("emk-second-select-", 4);
 
   try {
+    await mainWindow.evaluate(() => {
+      const state = globalThis as {
+        __e2eMetadataScanTrackerInstalled?: boolean;
+        __e2eMetadataScanJobId?: string | null;
+      };
+      if (state.__e2eMetadataScanTrackerInstalled) {
+        return;
+      }
+      state.__e2eMetadataScanTrackerInstalled = true;
+      state.__e2eMetadataScanJobId = null;
+      window.desktopApi.onMetadataScanProgress((event) => {
+        if (event.type === "job-started") {
+          state.__e2eMetadataScanJobId = event.jobId;
+          return;
+        }
+        if (
+          event.type === "job-completed" ||
+          event.type === "job-cancelled" ||
+          event.type === "job-failed"
+        ) {
+          state.__e2eMetadataScanJobId = null;
+        }
+      });
+    });
+
     await addLibrary(electronApp, mainWindow, manualRoot);
     await addLibrary(electronApp, mainWindow, secondRoot);
 
@@ -77,8 +104,7 @@ test("manual metadata scan keeps running across folder selection; auto-scan is s
     await expect
       .poll(
         async () => {
-          const jobs = await getActiveJobs(mainWindow);
-          return jobs.metadataScan?.jobId ?? null;
+          return getTrackedMetadataScanJobId(mainWindow);
         },
         { timeout: 30_000 },
       )
@@ -87,20 +113,19 @@ test("manual metadata scan keeps running across folder selection; auto-scan is s
     await clickSidebarLibraryRoot(mainWindow, secondRoot);
     await mainWindow.waitForTimeout(2_000);
 
-    const jobsAfterSelection = await getActiveJobs(mainWindow);
-    expect(jobsAfterSelection.metadataScan?.jobId ?? null).not.toBe(null);
+    const metadataJobId = await getTrackedMetadataScanJobId(mainWindow);
+    expect(metadataJobId).not.toBe(null);
 
-    if (jobsAfterSelection.metadataScan?.jobId) {
+    if (metadataJobId) {
       await mainWindow.evaluate(async (jobId) => {
-        await window.desktopApi.cancelMetadataScan(jobId);
-      }, jobsAfterSelection.metadataScan.jobId);
+        await window.desktopApi.pipelines.cancelJob(jobId);
+      }, metadataJobId);
     }
 
     await expect
       .poll(
         async () => {
-          const jobs = await getActiveJobs(mainWindow);
-          return jobs.metadataScan?.jobId ?? null;
+          return getTrackedMetadataScanJobId(mainWindow);
         },
         { timeout: 30_000 },
       )

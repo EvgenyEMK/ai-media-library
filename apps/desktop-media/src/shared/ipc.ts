@@ -15,6 +15,9 @@ import type {
   SmartAlbumYearsResult,
 } from "@emk/shared-contracts";
 import type { SemanticSearchSignalMode } from "@emk/media-store";
+import type { PipelineDesktopApi } from "./pipeline-ipc";
+import type { PipelineConcurrencyConfig } from "./pipeline-types";
+import { DEFAULT_PIPELINE_CONCURRENCY } from "./pipeline-types";
 
 export const IMAGE_EXTENSIONS = new Set([
   ".jpg",
@@ -181,7 +184,6 @@ export const IPC_CHANNELS = {
    * on the shared `faceModelDownloadProgress` channel.
    */
   ensureAuxModel: "media:ensure-aux-model",
-  getActiveJobStatuses: "media:get-active-job-statuses",
   analyzeFolderPathMetadata: "media:analyze-folder-path-metadata",
   cancelPathAnalysis: "media:cancel-path-analysis",
   pathAnalysisProgress: "media:path-analysis-progress",
@@ -210,6 +212,12 @@ export interface AppSettings {
   mediaViewer: MediaViewerSettings;
   pathExtraction: PathExtractionSettings;
   aiInferencePreferredGpuId: string | null;
+  /**
+   * Per-group concurrency limits used by the pipeline scheduler. Defaults
+   * preserve today's behaviour (heavy AI pipelines stay strictly serial).
+   * Advanced users may relax these to allow more parallelism.
+   */
+  pipelineConcurrency: PipelineConcurrencyConfig;
   clientId: string;
 }
 
@@ -609,6 +617,7 @@ export const DEFAULT_APP_SETTINGS: Omit<AppSettings, "clientId"> = {
   mediaViewer: DEFAULT_MEDIA_VIEWER_SETTINGS,
   pathExtraction: DEFAULT_PATH_EXTRACTION_SETTINGS,
   aiInferencePreferredGpuId: null,
+  pipelineConcurrency: DEFAULT_PIPELINE_CONCURRENCY,
 };
 
 export interface FolderNode {
@@ -1677,20 +1686,6 @@ export type FaceModelDownloadProgressListener = (
   event: FaceModelDownloadProgressEvent,
 ) => void;
 
-export interface ActiveJobSummary {
-  jobId: string;
-  folderPath: string;
-}
-
-export interface ActiveJobStatuses {
-  photoAnalysis: ActiveJobSummary | null;
-  faceDetection: ActiveJobSummary | null;
-  semanticIndex: ActiveJobSummary | null;
-  metadataScan: ActiveJobSummary | null;
-  pathAnalysis: ActiveJobSummary | null;
-  imageRotation: ActiveJobSummary | null;
-}
-
 export interface SimilarFaceSearchResult {
   faceInstanceId: string;
   mediaItemId: string;
@@ -2105,7 +2100,6 @@ export interface DesktopApi {
     purgedFsObjects: number;
     purgedSources: number;
   }>;
-  getActiveJobStatuses: () => Promise<ActiveJobStatuses>;
   analyzeFolderPathMetadata: (request: {
     folderPath: string;
     recursive?: boolean;
@@ -2123,5 +2117,11 @@ export interface DesktopApi {
   }) => Promise<{ jobId: string }>;
   cancelDescEmbedBackfill: (jobId: string) => Promise<boolean>;
   onDescEmbedBackfillProgress: (listener: DescEmbedBackfillProgressListener) => () => void;
+  /**
+   * Central pipeline orchestration surface. See `pipeline-ipc.ts` for the
+   * type details. Phase 1 onwards: enqueue / cancel / observe bundled and
+   * standalone pipelines through a single FIFO scheduler.
+   */
+  pipelines: PipelineDesktopApi;
   _logToMain: (msg: string) => void;
 }

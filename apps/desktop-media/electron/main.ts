@@ -5,12 +5,6 @@ import { clearAllInProgressFlags } from "./db/folder-analysis-status";
 import { probeMultimodalEmbeddingSupport } from "./semantic-embeddings";
 import { createMainWindow } from "./window";
 import {
-  runningJobs,
-  runningFaceDetectionJobs,
-  runningImageRotationJobs,
-  runningMetadataScanJobs,
-  runningPathAnalysisJobs,
-  semanticIndexJobRef,
   semanticEmbeddingStatusRef,
 } from "./ipc/state";
 import { registerFsHandlers } from "./ipc/fs-handlers";
@@ -25,6 +19,9 @@ import { registerFolderAiSummaryHandlers } from "./ipc/folder-ai-summary-handler
 import { registerMediaItemMutationHandlers } from "./ipc/media-item-mutation-handlers";
 import { registerGeocoderHandlers } from "./ipc/geocoder-handlers";
 import { registerAlbumHandlers } from "./ipc/album-handlers";
+import { registerPipelineOrchestrationHandlers } from "./ipc/pipeline-orchestration-handlers";
+import { registerAllPipelineDefinitions } from "./pipelines/definitions";
+import { setPipelineConcurrencyConfig } from "./pipelines/concurrency-config";
 import { releaseAllPowerSave } from "./ipc/power-save-manager";
 import {
   ensureActiveModels,
@@ -34,7 +31,6 @@ import { readSettings } from "./storage";
 import { DEFAULT_FACE_DETECTION_SETTINGS } from "../src/shared/ipc";
 import {
   IPC_CHANNELS,
-  type ActiveJobStatuses,
   type FaceModelDownloadProgressEvent,
 } from "../src/shared/ipc";
 import { exiftool } from "exiftool-vendored";
@@ -53,6 +49,7 @@ if (configuredUserDataPath) {
 app.setPath("sessionData", resolveSessionDataPath(app));
 
 function registerAllIpcHandlers(): void {
+  registerAllPipelineDefinitions();
   registerFsHandlers();
   registerPhotoAnalysisHandlers();
   registerFaceDetectionHandlers();
@@ -65,56 +62,8 @@ function registerAllIpcHandlers(): void {
   registerMediaItemMutationHandlers();
   registerGeocoderHandlers();
   registerAlbumHandlers();
+  registerPipelineOrchestrationHandlers();
 
-  ipcMain.handle(IPC_CHANNELS.getActiveJobStatuses, (): ActiveJobStatuses => {
-    let photoAnalysis: ActiveJobStatuses["photoAnalysis"] = null;
-    for (const [jobId, job] of runningJobs) {
-      if (job.kind === "photo" && !job.cancelled) {
-        photoAnalysis = { jobId, folderPath: job.rootFolderPath ?? "" };
-        break;
-      }
-    }
-
-    let faceDetection: ActiveJobStatuses["faceDetection"] = null;
-    for (const [jobId, ctx] of runningFaceDetectionJobs) {
-      if (!ctx.finalized) {
-        faceDetection = { jobId, folderPath: ctx.rootFolderPath };
-        break;
-      }
-    }
-
-    const semJob = semanticIndexJobRef.current;
-    const semanticIndex: ActiveJobStatuses["semanticIndex"] =
-      semJob && !semJob.cancelled && !semJob.finalized
-        ? { jobId: semJob.jobId, folderPath: semJob.folderPath }
-        : null;
-
-    let pathAnalysis: ActiveJobStatuses["pathAnalysis"] = null;
-    for (const [jobId, job] of runningPathAnalysisJobs) {
-      if (!job.cancelled) {
-        pathAnalysis = { jobId, folderPath: job.folderPath ?? "" };
-        break;
-      }
-    }
-
-    let metadataScan: ActiveJobStatuses["metadataScan"] = null;
-    for (const [jobId, job] of runningMetadataScanJobs) {
-      if (!job.cancelled) {
-        metadataScan = { jobId, folderPath: "" };
-        break;
-      }
-    }
-
-    let imageRotation: ActiveJobStatuses["imageRotation"] = null;
-    for (const [jobId, job] of runningImageRotationJobs) {
-      if (!job.cancelled) {
-        imageRotation = { jobId, folderPath: job.folderPath };
-        break;
-      }
-    }
-
-    return { photoAnalysis, faceDetection, semanticIndex, metadataScan, pathAnalysis, imageRotation };
-  });
 }
 
 function emitFaceModelDownloadProgress(event: FaceModelDownloadProgressEvent): void {
@@ -153,6 +102,8 @@ app.whenReady().then(async () => {
       const s = await readSettings(app.getPath("userData"));
       const gpuOptions = await detectAiInferenceGpuOptions();
       applyAiInferenceGpuPreference(s.aiInferencePreferredGpuId, gpuOptions);
+      // Hydrate the scheduler's concurrency config from saved settings.
+      setPipelineConcurrencyConfig(s.pipelineConcurrency);
       return s.faceDetection.detectorModel;
     } catch {
       return DEFAULT_FACE_DETECTION_SETTINGS.detectorModel;

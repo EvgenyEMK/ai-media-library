@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { ActiveJobStatuses } from "../../shared/ipc";
+import type { PipelineQueueSnapshot } from "../../shared/pipeline-types";
 import { useDesktopStoreApi } from "../stores/desktop-store";
 import type { SummaryPipelineKind } from "../types/folder-ai-summary-types";
 
@@ -17,8 +17,14 @@ interface UseFolderAiSummaryPipelineActionsResult {
   runPipelineForFolderWithSubfolders: (pipeline: SummaryPipelineKind) => Promise<void>;
 }
 
-function hasAnyActiveAiPipeline(active: ActiveJobStatuses): boolean {
-  return Boolean(active.photoAnalysis || active.faceDetection || active.semanticIndex);
+function hasAnyActiveAiPipeline(snapshot: PipelineQueueSnapshot): boolean {
+  return snapshot.running.some((bundle) =>
+    bundle.jobs.some((job) =>
+      job.pipelineId === "photo-analysis" ||
+      job.pipelineId === "face-detection" ||
+      job.pipelineId === "semantic-index",
+    ),
+  );
 }
 
 export function useFolderAiSummaryPipelineActions({
@@ -120,8 +126,8 @@ export function useFolderAiSummaryPipelineActions({
         return;
       }
       try {
-        const activeJobs = await window.desktopApi.getActiveJobStatuses();
-        if (hasAnyActiveAiPipeline(activeJobs)) {
+        const snapshot = await window.desktopApi.pipelines.getSnapshot();
+        if (hasAnyActiveAiPipeline(snapshot)) {
           setShowPipelineBlockedDialog(true);
           return;
         }

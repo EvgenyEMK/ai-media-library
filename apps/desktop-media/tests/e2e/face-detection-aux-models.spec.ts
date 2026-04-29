@@ -139,16 +139,22 @@ test.describe("Face detection — Phase 1 auxiliary models (orientation, landmar
 
     const result = await mainWindow.evaluate(async ({ rotatedPath, e2ePhotosDir }) => {
       const settings = await window.desktopApi.getSettings();
+      const faceDetection = {
+        ...settings.faceDetection,
+        detectorModel: "yolov12s-face" as const,
+      };
       await window.desktopApi.saveSettings({
         ...settings,
+        faceDetection,
         wrongImageRotationDetection: {
           ...settings.wrongImageRotationDetection,
           enabled: true,
           useFaceLandmarkFeaturesFallback: true,
         },
       });
+      await window.desktopApi.ensureDetectorModel("yolov12s-face");
 
-      const firstRun = await window.desktopApi.detectFacesForMediaItem(rotatedPath);
+      const firstRun = await window.desktopApi.detectFacesForMediaItem(rotatedPath, faceDetection);
       if (!firstRun.success) {
         return { ok: false as const, error: "face detection failed" };
       }
@@ -167,8 +173,11 @@ test.describe("Face detection — Phase 1 auxiliary models (orientation, landmar
 
       const start = Date.now();
       while (Date.now() - start < 120_000) {
-        const statuses = await window.desktopApi.getActiveJobStatuses();
-        if (!statuses.semanticIndex) break;
+        const snapshot = await window.desktopApi.pipelines.getSnapshot();
+        const runningSemantic = snapshot.running.some((bundle) =>
+          bundle.jobs.some((job) => job.pipelineId === "semantic-index" && job.state === "running"),
+        );
+        if (!runningSemantic) break;
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
 

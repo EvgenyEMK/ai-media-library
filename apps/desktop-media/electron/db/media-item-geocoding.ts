@@ -104,3 +104,66 @@ export function getMediaItemsNeedingGpsGeocoding(
 
   return rows;
 }
+
+/**
+ * Variant of {@link getMediaItemsNeedingGpsGeocoding} for standalone runs of
+ * the `gps-geocode` pipeline: returns items library-wide (when `folderPath`
+ * is undefined) or restricted to a folder subtree (when `folderPath` is
+ * provided and `recursive` is true) / a single folder (otherwise).
+ *
+ * Same row predicate as the ID-based variant: items with GPS coordinates
+ * whose GPS-derived location is missing or incomplete.
+ */
+export function getAllMediaItemsNeedingGpsGeocoding(
+  options: { folderPath?: string; recursive?: boolean } = {},
+  libraryId: string = DEFAULT_LIBRARY_ID,
+): GpsMediaItemRow[] {
+  const db = getDesktopDatabase();
+  const baseWhere = `library_id = ?
+    AND latitude IS NOT NULL
+    AND longitude IS NOT NULL
+    AND (
+      (location_source IS NULL OR location_source <> 'gps')
+      OR (
+        location_source = 'gps'
+        AND (
+          country IS NULL
+          OR location_area IS NULL
+          OR city IS NULL
+        )
+      )
+    )`;
+
+  if (!options.folderPath) {
+    return db
+      .prepare(
+        `SELECT id, source_path, latitude, longitude
+         FROM media_items
+         WHERE ${baseWhere}`,
+      )
+      .all(libraryId) as GpsMediaItemRow[];
+  }
+
+  // The `media_items` schema stores the full `source_path` only; folder is
+  // derived. We filter via `source_path` prefix, then narrow non-recursive
+  // requests to direct children of the folder in JS.
+  const prefix = options.folderPath.replace(/[\\/]+$/, "");
+  const candidates = db
+    .prepare(
+      `SELECT id, source_path, latitude, longitude
+       FROM media_items
+       WHERE ${baseWhere}
+         AND (source_path = ? OR source_path LIKE ? || '%' OR source_path LIKE ? || '%')`,
+    )
+    .all(libraryId, prefix, prefix + "/", prefix + "\\") as GpsMediaItemRow[];
+
+  if (options.recursive) return candidates;
+
+  const directOnly: GpsMediaItemRow[] = [];
+  for (const row of candidates) {
+    const rest = row.source_path.slice(prefix.length).replace(/^[\\/]+/, "");
+    // Direct child means no further separator in the remainder.
+    if (!/[\\/]/.test(rest)) directOnly.push(row);
+  }
+  return directOnly;
+}

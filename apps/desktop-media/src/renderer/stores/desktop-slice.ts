@@ -23,6 +23,10 @@ import {
   type MetadataManualScanResultPayload,
   type WrongImageRotationDetectionSettings,
 } from "../../shared/ipc";
+import {
+  DEFAULT_PIPELINE_CONCURRENCY,
+  type PipelineConcurrencyConfig,
+} from "../../shared/pipeline-types";
 
 export interface MetadataScanCompletionSignal {
   jobId: string;
@@ -72,6 +76,8 @@ export interface DesktopSlice {
   mediaViewerSettings: MediaViewerSettings;
   pathExtractionSettings: PathExtractionSettings;
   aiInferencePreferredGpuId: string | null;
+  /** Per-group concurrency limits for the new pipeline scheduler. */
+  pipelineConcurrencySettings: PipelineConcurrencyConfig;
   aiInferenceGpuOptions: AiInferenceGpuOption[];
   faceModelDownload: {
     visible: boolean;
@@ -220,6 +226,10 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   mediaViewerSettings: { ...DEFAULT_MEDIA_VIEWER_SETTINGS },
   pathExtractionSettings: { ...DEFAULT_PATH_EXTRACTION_SETTINGS },
   aiInferencePreferredGpuId: null,
+  pipelineConcurrencySettings: {
+    groupLimits: { ...DEFAULT_PIPELINE_CONCURRENCY.groupLimits },
+    perPipelineGroupOverride: DEFAULT_PIPELINE_CONCURRENCY.perPipelineGroupOverride,
+  },
   aiInferenceGpuOptions: [],
   faceModelDownload: {
     visible: false,

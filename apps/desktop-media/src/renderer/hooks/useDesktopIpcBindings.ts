@@ -125,6 +125,7 @@ export function useDesktopInitialization(): void {
           s.mediaViewerSettings = settings.mediaViewer;
           s.pathExtractionSettings = settings.pathExtraction;
           s.aiInferencePreferredGpuId = settings.aiInferencePreferredGpuId;
+          s.pipelineConcurrencySettings = settings.pipelineConcurrency;
         });
         // Initial refreshFolderAnalysisStatuses runs before libraryRoots are loaded from settings,
         // so rollup batch was empty and sidebar icons stayed on the loading spinner until interaction.
@@ -149,32 +150,36 @@ export function useDesktopInitialization(): void {
         ]);
       });
 
-    void window.desktopApi
-      .getActiveJobStatuses()
-      .then((jobs) => {
+    void window.desktopApi.pipelines
+      .getSnapshot()
+      .then((snapshot) => {
+        const hasRunning = (pipelineId: string): boolean =>
+          snapshot.running.some((bundle) =>
+            bundle.jobs.some((job) => job.pipelineId === pipelineId && job.state === "running"),
+          );
         store.setState((s) => {
-          if (jobs.photoAnalysis && !s.aiJobId) {
-            s.aiJobId = jobs.photoAnalysis.jobId;
+          if (hasRunning("photo-analysis") && !s.aiJobId) {
+            s.aiJobId = "running";
             s.aiStatus = "running";
             s.aiPhase = "analyzing";
             s.aiPanelVisible = true;
           }
-          if (jobs.faceDetection && !s.faceJobId) {
-            s.faceJobId = jobs.faceDetection.jobId;
+          if (hasRunning("face-detection") && !s.faceJobId) {
+            s.faceJobId = "running";
             s.faceStatus = "running";
             s.facePanelVisible = true;
           }
-          if (jobs.semanticIndex && !s.semanticIndexJobId) {
-            s.semanticIndexJobId = jobs.semanticIndex.jobId;
+          if (hasRunning("semantic-index") && !s.semanticIndexJobId) {
+            s.semanticIndexJobId = "running";
             s.semanticIndexStatus = "running";
             s.semanticIndexPanelVisible = true;
             s.semanticIndexPhase = "indexing";
           }
-          if (jobs.pathAnalysis && !s.pathAnalysisJobId) {
-            s.pathAnalysisJobId = jobs.pathAnalysis.jobId;
+          if (hasRunning("path-llm-analysis") && !s.pathAnalysisJobId) {
+            s.pathAnalysisJobId = "running";
             s.pathAnalysisStatus = "running";
             s.pathAnalysisPanelVisible = true;
-            s.pathAnalysisFolderPath = jobs.pathAnalysis.folderPath || null;
+            s.pathAnalysisFolderPath = s.pathAnalysisFolderPath || null;
           }
         });
       })
@@ -345,7 +350,11 @@ export function useDesktopSettingsPersistence(): void {
             prev.pathExtractionSettings.llmModelPrimary ||
           state.pathExtractionSettings.llmModelFallback !==
             prev.pathExtractionSettings.llmModelFallback ||
-          state.aiInferencePreferredGpuId !== prev.aiInferencePreferredGpuId
+          state.aiInferencePreferredGpuId !== prev.aiInferencePreferredGpuId ||
+          pipelineConcurrencyChanged(
+            state.pipelineConcurrencySettings,
+            prev.pipelineConcurrencySettings,
+          )
         ) {
           void window.desktopApi.saveSettings({
             clientId: state.clientId,
@@ -361,11 +370,36 @@ export function useDesktopSettingsPersistence(): void {
             mediaViewer: state.mediaViewerSettings,
             pathExtraction: state.pathExtractionSettings,
             aiInferencePreferredGpuId: state.aiInferencePreferredGpuId,
+            pipelineConcurrency: state.pipelineConcurrencySettings,
           });
         }
       },
     );
   }, [store]);
+}
+
+function pipelineConcurrencyChanged(
+  next: import("../../shared/pipeline-types").PipelineConcurrencyConfig,
+  prev: import("../../shared/pipeline-types").PipelineConcurrencyConfig,
+): boolean {
+  if (
+    next.groupLimits.gpu !== prev.groupLimits.gpu ||
+    next.groupLimits.ollama !== prev.groupLimits.ollama ||
+    next.groupLimits.cpu !== prev.groupLimits.cpu ||
+    next.groupLimits.io !== prev.groupLimits.io
+  ) {
+    return true;
+  }
+  // Override map equality (shallow). Both undefined → unchanged.
+  const a = next.perPipelineGroupOverride ?? {};
+  const b = prev.perPipelineGroupOverride ?? {};
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return true;
+  for (const k of aKeys) {
+    if ((a as Record<string, string>)[k] !== (b as Record<string, string>)[k]) return true;
+  }
+  return false;
 }
 
 export { refreshFolderAnalysisStatuses, refreshMetadataForItems } from "./ipc-binding-helpers";
