@@ -15,6 +15,9 @@ import type {
   SmartAlbumYearsResult,
 } from "@emk/shared-contracts";
 import type { SemanticSearchSignalMode } from "@emk/media-store";
+import type { PipelineDesktopApi } from "./pipeline-ipc";
+import type { PipelineConcurrencyConfig } from "./pipeline-types";
+import { DEFAULT_PIPELINE_CONCURRENCY } from "./pipeline-types";
 
 export const IMAGE_EXTENSIONS = new Set([
   ".jpg",
@@ -210,6 +213,12 @@ export interface AppSettings {
   mediaViewer: MediaViewerSettings;
   pathExtraction: PathExtractionSettings;
   aiInferencePreferredGpuId: string | null;
+  /**
+   * Per-group concurrency limits used by the pipeline scheduler. Defaults
+   * preserve today's behaviour (heavy AI pipelines stay strictly serial).
+   * Advanced users may relax these to allow more parallelism.
+   */
+  pipelineConcurrency: PipelineConcurrencyConfig;
   clientId: string;
 }
 
@@ -609,6 +618,7 @@ export const DEFAULT_APP_SETTINGS: Omit<AppSettings, "clientId"> = {
   mediaViewer: DEFAULT_MEDIA_VIEWER_SETTINGS,
   pathExtraction: DEFAULT_PATH_EXTRACTION_SETTINGS,
   aiInferencePreferredGpuId: null,
+  pipelineConcurrency: DEFAULT_PIPELINE_CONCURRENCY,
 };
 
 export interface FolderNode {
@@ -2123,5 +2133,11 @@ export interface DesktopApi {
   }) => Promise<{ jobId: string }>;
   cancelDescEmbedBackfill: (jobId: string) => Promise<boolean>;
   onDescEmbedBackfillProgress: (listener: DescEmbedBackfillProgressListener) => () => void;
+  /**
+   * Central pipeline orchestration surface. See `pipeline-ipc.ts` for the
+   * type details. Phase 1 onwards: enqueue / cancel / observe bundled and
+   * standalone pipelines through a single FIFO scheduler.
+   */
+  pipelines: PipelineDesktopApi;
   _logToMain: (msg: string) => void;
 }

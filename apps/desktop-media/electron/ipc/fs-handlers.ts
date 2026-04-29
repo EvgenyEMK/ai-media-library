@@ -32,6 +32,7 @@ import { getMediaEmbeddingsCompatStatus } from "../db/client";
 import { getSemanticIndexDebugLogPath } from "../semantic-index-debug-log";
 import { releasePowerSave } from "./power-save-manager";
 import { shouldRunAutoMetadataScan } from "./auto-metadata-scan-policy";
+import { setPipelineConcurrencyConfig } from "../pipelines/concurrency-config";
 import {
   resetAgeGenderEstimator,
   resetLandmarkRefiner,
@@ -266,6 +267,9 @@ export function registerFsHandlers(): void {
     resetLandmarkRefiner("pfld-ghostone");
     resetAgeGenderEstimator("onnx-age-gender-v1");
     await writeSettings(app.getPath("userData"), settings);
+    // Push the latest pipeline-concurrency limits into the scheduler so the
+    // next scheduling pass picks them up without an app restart.
+    setPipelineConcurrencyConfig(settings.pipelineConcurrency);
   });
 
   ipcMain.handle(

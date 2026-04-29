@@ -25,6 +25,9 @@ import { registerFolderAiSummaryHandlers } from "./ipc/folder-ai-summary-handler
 import { registerMediaItemMutationHandlers } from "./ipc/media-item-mutation-handlers";
 import { registerGeocoderHandlers } from "./ipc/geocoder-handlers";
 import { registerAlbumHandlers } from "./ipc/album-handlers";
+import { registerPipelineOrchestrationHandlers } from "./ipc/pipeline-orchestration-handlers";
+import { registerAllPipelineDefinitions } from "./pipelines/definitions";
+import { setPipelineConcurrencyConfig } from "./pipelines/concurrency-config";
 import { releaseAllPowerSave } from "./ipc/power-save-manager";
 import {
   ensureActiveModels,
@@ -53,6 +56,7 @@ if (configuredUserDataPath) {
 app.setPath("sessionData", resolveSessionDataPath(app));
 
 function registerAllIpcHandlers(): void {
+  registerAllPipelineDefinitions();
   registerFsHandlers();
   registerPhotoAnalysisHandlers();
   registerFaceDetectionHandlers();
@@ -65,6 +69,7 @@ function registerAllIpcHandlers(): void {
   registerMediaItemMutationHandlers();
   registerGeocoderHandlers();
   registerAlbumHandlers();
+  registerPipelineOrchestrationHandlers();
 
   ipcMain.handle(IPC_CHANNELS.getActiveJobStatuses, (): ActiveJobStatuses => {
     let photoAnalysis: ActiveJobStatuses["photoAnalysis"] = null;
@@ -153,6 +158,8 @@ app.whenReady().then(async () => {
       const s = await readSettings(app.getPath("userData"));
       const gpuOptions = await detectAiInferenceGpuOptions();
       applyAiInferenceGpuPreference(s.aiInferencePreferredGpuId, gpuOptions);
+      // Hydrate the scheduler's concurrency config from saved settings.
+      setPipelineConcurrencyConfig(s.pipelineConcurrency);
       return s.faceDetection.detectorModel;
     } catch {
       return DEFAULT_FACE_DETECTION_SETTINGS.detectorModel;

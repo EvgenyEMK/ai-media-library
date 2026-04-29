@@ -38,6 +38,7 @@ import {
   type WrongImageRotationDetectionSettings,
 } from "../../shared/ipc";
 import { cn } from "../lib/cn";
+import { PipelineConcurrencySettings } from "./PipelineConcurrencySettings";
 import { photoPendingTintToSquareClass } from "../lib/photo-pending-folder-tint";
 import {
   INVOICE_DATA_EXTRACTION_PROMPT,
@@ -1475,6 +1476,8 @@ export function DesktopSettingsSection({
         </details>
         ) : null}
       </SettingsSectionCard>
+
+      <PipelineConcurrencySettings />
 
       <SettingsSectionCard
         title={UI_TEXT.databaseLocation}

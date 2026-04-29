@@ -24,6 +24,7 @@ import {
   useDesktopIpcBindings,
   useDesktopSettingsPersistence,
 } from "./hooks/useDesktopIpcBindings";
+import { usePipelineQueueBinding } from "./hooks/use-pipeline-queue-binding";
 import { useFilteredMediaItems } from "./hooks/use-filtered-media-items";
 import { lookupMediaMetadataByItemId } from "./lib/media-metadata-lookup";
 import { useAnalysisEta, useFaceDetectionEta, useMetadataProgress, useSemanticIndexEta } from "./hooks/use-eta-tracking";
@@ -42,6 +43,7 @@ export function App(): ReactElement {
   useDesktopInitialization();
   useDesktopFaceServicePolling();
   useDesktopSettingsPersistence();
+  usePipelineQueueBinding();
 
   const libraryRoots = useDesktopStore((s) => s.libraryRoots);
   const sidebarCollapsed = useDesktopStore((s) => s.sidebarCollapsed);

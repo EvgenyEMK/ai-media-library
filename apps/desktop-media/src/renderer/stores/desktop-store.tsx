@@ -34,6 +34,7 @@ import {
 } from "@emk/media-store";
 
 import { createDesktopSlice, type DesktopSlice } from "./desktop-slice";
+import { createPipelineQueueSlice, type PipelineQueueSlice } from "./pipeline-queue-slice";
 
 // Desktop slice uses Set (expandedFolders), so enable Map/Set drafting in Immer.
 enableMapSet();
@@ -50,6 +51,7 @@ export type DesktopStoreState = SidebarSlice &
   FaceDetectionSlice &
   FaceClusteringSlice &
   SemanticSearchSlice &
+  PipelineQueueSlice &
   DesktopSlice;
 
 export function createDesktopStore(initialState?: Partial<DesktopStoreState>) {
@@ -67,6 +69,7 @@ export function createDesktopStore(initialState?: Partial<DesktopStoreState>) {
       ...createFaceDetectionSlice(...(a as Parameters<typeof createFaceDetectionSlice>)),
       ...createFaceClusteringSlice(...(a as Parameters<typeof createFaceClusteringSlice>)),
       ...createSemanticSearchSlice(...(a as Parameters<typeof createSemanticSearchSlice>)),
+      ...createPipelineQueueSlice(...(a as Parameters<typeof createPipelineQueueSlice>)),
       ...createDesktopSlice(...(a as Parameters<typeof createDesktopSlice>)),
       ...initialState,
     })),

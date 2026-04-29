@@ -30,6 +30,12 @@ import {
   type SmartAlbumSettings,
   type WrongImageRotationDetectionSettings,
 } from "../src/shared/ipc";
+import {
+  DEFAULT_PIPELINE_CONCURRENCY,
+  type PipelineConcurrencyConfig,
+  type PipelineConcurrencyGroup,
+  type PipelineId,
+} from "../src/shared/pipeline-types";
 
 const DEFAULT_SETTINGS: Omit<AppSettings, "clientId"> = DEFAULT_APP_SETTINGS;
 
@@ -72,6 +78,7 @@ export async function readSettings(userDataPath: string): Promise<AppSettings> {
     mediaViewer: sanitizeMediaViewerSettings(parsed.mediaViewer),
     pathExtraction: sanitizePathExtractionSettings(parsed.pathExtraction),
     aiInferencePreferredGpuId: sanitizeAiInferencePreferredGpuId(parsed.aiInferencePreferredGpuId),
+    pipelineConcurrency: sanitizePipelineConcurrency(parsed.pipelineConcurrency),
     clientId,
   };
 
@@ -472,4 +479,38 @@ function clampToRange(value: number | null, min: number, max: number, fallback: 
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+const VALID_CONCURRENCY_GROUPS: ReadonlyArray<PipelineConcurrencyGroup> = ["gpu", "ollama", "cpu", "io"];
+
+function sanitizePipelineConcurrency(candidate: unknown): PipelineConcurrencyConfig {
+  const value = isRecord(candidate) ? candidate : {};
+  const groupLimitsCandidate = isRecord(value.groupLimits) ? value.groupLimits : {};
+  const groupLimits: PipelineConcurrencyConfig["groupLimits"] = {
+    ...DEFAULT_PIPELINE_CONCURRENCY.groupLimits,
+  };
+  for (const group of VALID_CONCURRENCY_GROUPS) {
+    const supplied = groupLimitsCandidate[group];
+    if (typeof supplied === "number" && Number.isFinite(supplied)) {
+      groupLimits[group] = Math.max(1, Math.min(8, Math.floor(supplied)));
+    }
+  }
+
+  let perPipelineGroupOverride: PipelineConcurrencyConfig["perPipelineGroupOverride"];
+  if (isRecord(value.perPipelineGroupOverride)) {
+    const overrides: NonNullable<PipelineConcurrencyConfig["perPipelineGroupOverride"]> = {};
+    for (const [key, raw] of Object.entries(value.perPipelineGroupOverride)) {
+      if (
+        typeof raw === "string" &&
+        VALID_CONCURRENCY_GROUPS.includes(raw as PipelineConcurrencyGroup)
+      ) {
+        overrides[key as PipelineId] = raw as PipelineConcurrencyGroup;
+      }
+    }
+    if (Object.keys(overrides).length > 0) {
+      perPipelineGroupOverride = overrides;
+    }
+  }
+
+  return { groupLimits, perPipelineGroupOverride };
 }

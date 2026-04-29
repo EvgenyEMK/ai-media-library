@@ -125,6 +125,7 @@ export function useDesktopInitialization(): void {
           s.mediaViewerSettings = settings.mediaViewer;
           s.pathExtractionSettings = settings.pathExtraction;
           s.aiInferencePreferredGpuId = settings.aiInferencePreferredGpuId;
+          s.pipelineConcurrencySettings = settings.pipelineConcurrency;
         });
         // Initial refreshFolderAnalysisStatuses runs before libraryRoots are loaded from settings,
         // so rollup batch was empty and sidebar icons stayed on the loading spinner until interaction.
@@ -345,7 +346,11 @@ export function useDesktopSettingsPersistence(): void {
             prev.pathExtractionSettings.llmModelPrimary ||
           state.pathExtractionSettings.llmModelFallback !==
             prev.pathExtractionSettings.llmModelFallback ||
-          state.aiInferencePreferredGpuId !== prev.aiInferencePreferredGpuId
+          state.aiInferencePreferredGpuId !== prev.aiInferencePreferredGpuId ||
+          pipelineConcurrencyChanged(
+            state.pipelineConcurrencySettings,
+            prev.pipelineConcurrencySettings,
+          )
         ) {
           void window.desktopApi.saveSettings({
             clientId: state.clientId,
@@ -361,11 +366,36 @@ export function useDesktopSettingsPersistence(): void {
             mediaViewer: state.mediaViewerSettings,
             pathExtraction: state.pathExtractionSettings,
             aiInferencePreferredGpuId: state.aiInferencePreferredGpuId,
+            pipelineConcurrency: state.pipelineConcurrencySettings,
           });
         }
       },
     );
   }, [store]);
+}
+
+function pipelineConcurrencyChanged(
+  next: import("../../shared/pipeline-types").PipelineConcurrencyConfig,
+  prev: import("../../shared/pipeline-types").PipelineConcurrencyConfig,
+): boolean {
+  if (
+    next.groupLimits.gpu !== prev.groupLimits.gpu ||
+    next.groupLimits.ollama !== prev.groupLimits.ollama ||
+    next.groupLimits.cpu !== prev.groupLimits.cpu ||
+    next.groupLimits.io !== prev.groupLimits.io
+  ) {
+    return true;
+  }
+  // Override map equality (shallow). Both undefined → unchanged.
+  const a = next.perPipelineGroupOverride ?? {};
+  const b = prev.perPipelineGroupOverride ?? {};
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return true;
+  for (const k of aKeys) {
+    if ((a as Record<string, string>)[k] !== (b as Record<string, string>)[k]) return true;
+  }
+  return false;
 }
 
 export { refreshFolderAnalysisStatuses, refreshMetadataForItems } from "./ipc-binding-helpers";

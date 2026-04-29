@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2, ListPlus } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { UI_TEXT } from "../../lib/ui-text";
 import type { ReactElement } from "react";
@@ -7,12 +7,18 @@ interface ProgressDockHeaderProps {
   collapsed: boolean;
   hasAnyRunningOperation: boolean;
   onToggleCollapsed: (collapsed: boolean) => void;
+  /**
+   * Called when the user clicks the "Run pipelines…" button. Optional so the
+   * dock can render without the new affordance during early migration / tests.
+   */
+  onOpenRunPipelinesSheet?: () => void;
 }
 
 export function ProgressDockHeader({
   collapsed,
   hasAnyRunningOperation,
   onToggleCollapsed,
+  onOpenRunPipelinesSheet,
 }: ProgressDockHeaderProps): ReactElement {
   return (
     <div
@@ -28,6 +34,18 @@ export function ProgressDockHeader({
           ) : null}
           {UI_TEXT.progressPanelTitle}
         </span>
+        {onOpenRunPipelinesSheet ? (
+          <button
+            type="button"
+            className="inline-flex h-[18px] items-center gap-1 rounded border border-[#3d4a63] bg-[#1a2333] px-1.5 text-[10px] font-medium tracking-wide text-[#a8b8d8] shadow-none transition-colors hover:border-[#556380] hover:bg-[#232d42] hover:text-[#d4dff5]"
+            title="Run pipelines"
+            aria-label="Run pipelines"
+            onClick={onOpenRunPipelinesSheet}
+          >
+            <ListPlus size={12} aria-hidden="true" />
+            Run pipelines
+          </button>
+        ) : null}
         <button
           type="button"
           className="inline-flex h-[18px] w-11 min-w-11 shrink-0 items-center justify-center rounded border border-[#3d4a63] bg-[#1a2333] p-0 text-[#a8b8d8] shadow-none transition-colors hover:border-[#556380] hover:bg-[#232d42] hover:text-[#d4dff5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#79d7a4]"
