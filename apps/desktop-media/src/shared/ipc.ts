@@ -2115,6 +2115,15 @@ export interface DesktopApi {
     purgedFsObjects: number;
     purgedSources: number;
   }>;
+  /**
+   * @deprecated Aggregated status of every legacy per-pipeline job map. New
+   * code should subscribe to `window.desktopApi.pipelines.getSnapshot()` /
+   * `onQueueChanged` instead, which returns a single typed snapshot from
+   * the central scheduler. This entry will be removed once every stub
+   * pipeline has been migrated; see
+   * `docs/ROADMAP/pipeline-orchestration-followups.md` for the migration
+   * order.
+   */
   getActiveJobStatuses: () => Promise<ActiveJobStatuses>;
   analyzeFolderPathMetadata: (request: {
     folderPath: string;

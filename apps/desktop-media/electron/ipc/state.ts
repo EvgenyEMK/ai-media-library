@@ -12,6 +12,18 @@ import { MULTIMODAL_EMBED_MODEL } from "../semantic-embeddings";
 export const DEFAULT_CONCURRENCY = 2;
 export const MAX_CONCURRENCY = 4;
 
+/**
+ * @deprecated Legacy per-pipeline running-job maps. These are read/written
+ * by the original IPC handlers (face-detection, photo-analysis, semantic-
+ * index, …) which have not yet been migrated to the central
+ * {@link import("../pipelines/pipeline-scheduler").PipelineScheduler}.
+ *
+ * Once each remaining stub `PipelineDefinition` has a real implementation
+ * (see `docs/ROADMAP/pipeline-orchestration-followups.md`), the
+ * corresponding entries here should be deleted along with their
+ * facade IPC channels and `bind*Progress` files. Until then they remain
+ * the source of truth for the still-legacy runners.
+ */
 export const runningJobs = new Map<string, RunningAnalysisJob>();
 
 /** Face grouping ("Find groups") job cancellation flags. */

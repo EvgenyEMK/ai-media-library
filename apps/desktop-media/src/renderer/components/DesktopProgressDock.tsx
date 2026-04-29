@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactElement } from "react";
+import { ListPlus } from "lucide-react";
 import { UI_TEXT } from "../lib/ui-text";
 import { ProgressDockCards } from "./progress-dock/ProgressDockCards";
 import { ProgressDockHeader } from "./progress-dock/ProgressDockHeader";
@@ -127,13 +128,46 @@ export function DesktopProgressDock({
   };
 
   if (!shouldShow) {
-    return sheetOpen ? (
-      <RunPipelinesSheet
-        defaultFolderPath={selectedFolder}
-        isAnyPipelineRunning={isAnyPipelineRunning}
-        onClose={() => setSheetOpen(false)}
-      />
-    ) : null;
+    // Idle state: render a slim, low-profile strip with just the
+    // "Run pipelines…" affordance. The dock is primarily a progress
+    // surface; the idle bar exists only so users can launch a bundle from
+    // a cold app state without hunting in folder context menus. Hidden
+    // entirely while the photo viewer is open to preserve immersive view.
+    if (viewerOpen) {
+      return sheetOpen ? (
+        <RunPipelinesSheet
+          defaultFolderPath={selectedFolder}
+          isAnyPipelineRunning={isAnyPipelineRunning}
+          onClose={() => setSheetOpen(false)}
+        />
+      ) : null;
+    }
+    return (
+      <>
+        <section
+          className="absolute bottom-0 left-0 right-0 z-30 flex h-[22px] items-center justify-end border-t border-border bg-[#101623]/85 px-2"
+          aria-label="Background operations idle"
+        >
+          <button
+            type="button"
+            className="inline-flex h-[18px] items-center gap-1 rounded border border-[#3d4a63] bg-[#1a2333] px-1.5 text-[10px] font-medium tracking-wide text-[#a8b8d8] shadow-none transition-colors hover:border-[#556380] hover:bg-[#232d42] hover:text-[#d4dff5] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#79d7a4]"
+            title="Run pipelines"
+            aria-label="Run pipelines"
+            onClick={handleOpenSheet}
+          >
+            <ListPlus size={12} aria-hidden="true" />
+            Run pipelines
+          </button>
+        </section>
+        {sheetOpen ? (
+          <RunPipelinesSheet
+            defaultFolderPath={selectedFolder}
+            isAnyPipelineRunning={isAnyPipelineRunning}
+            onClose={() => setSheetOpen(false)}
+          />
+        ) : null}
+      </>
+    );
   }
 
   return (

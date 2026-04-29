@@ -106,6 +106,21 @@ test.describe("Pipeline orchestration — central scheduler", () => {
     }
   });
 
+  test("idle dock shows a slim Run pipelines button that opens the sheet", async ({
+    mainWindow,
+  }) => {
+    const idleBar = mainWindow.getByLabel("Background operations idle");
+    await expect(idleBar).toBeVisible();
+    const runPipelinesButton = idleBar.getByRole("button", { name: "Run pipelines" });
+    await expect(runPipelinesButton).toBeVisible();
+    await runPipelinesButton.click();
+
+    const dialog = mainWindow.getByRole("dialog", { name: "Run pipelines" });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+  });
+
   test("an unknown preset id is rejected without enqueuing anything", async ({ mainWindow }) => {
     const result = await mainWindow.evaluate(async () => {
       return window.desktopApi.pipelines.enqueueBundle({
