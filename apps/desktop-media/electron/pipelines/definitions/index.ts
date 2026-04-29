@@ -23,6 +23,8 @@ import { faceClusteringDefinition } from "./face-clustering";
 import { similarUntaggedCountsDefinition } from "./similar-untagged-counts";
 import { photoAnalysisDefinition } from "./photo-analysis";
 import { descriptionEmbeddingDefinition } from "./description-embedding";
+import { semanticIndexDefinition } from "./semantic-index";
+import { descEmbeddingBackfillDefinition } from "./desc-embedding-backfill";
 import { registerAllPresets } from "../presets";
 
 /**
@@ -68,6 +70,8 @@ export function registerAllPipelineDefinitions(): void {
   pipelineRegistry.register(similarUntaggedCountsDefinition);
   pipelineRegistry.register(photoAnalysisDefinition);
   pipelineRegistry.register(descriptionEmbeddingDefinition);
+  pipelineRegistry.register(semanticIndexDefinition);
+  pipelineRegistry.register(descEmbeddingBackfillDefinition);
 
   // -------------------------------------------------------------------------
   // Stubs — legacy runners still reachable through their existing IPC channels
@@ -81,16 +85,6 @@ export function registerAllPipelineDefinitions(): void {
       id: "path-llm-analysis",
       displayName: "Extract context from folder paths (LLM)",
       concurrencyGroup: "ollama",
-    },
-    {
-      id: "semantic-index",
-      displayName: "Build semantic search index",
-      concurrencyGroup: "gpu",
-    },
-    {
-      id: "desc-embedding-backfill",
-      displayName: "Backfill description embeddings",
-      concurrencyGroup: "gpu",
     },
   ];
   for (const stub of stubs) {

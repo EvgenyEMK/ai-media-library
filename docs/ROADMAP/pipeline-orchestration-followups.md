@@ -114,8 +114,8 @@ implementation. Today only 3 of 11 are real:
 | `photo-analysis` | real ✅ | `media:analyze-folder` (legacy trigger path still active) |
 | `description-embedding` | real ✅ | inline + `desc-embed-backfill-*` |
 | `path-llm-analysis` | stub | `path-llm-*` |
-| `semantic-index` | stub | `semantic:rebuild-*` |
-| `desc-embedding-backfill` | stub | `desc-embed-backfill-*` |
+| `semantic-index` | real ✅ | `semantic:rebuild-*` |
+| `desc-embedding-backfill` | real ✅ | `desc-embed-backfill-*` |
 
 Deleting any legacy channel before its pipeline is wrapped would
 break the corresponding feature.
@@ -161,9 +161,7 @@ as the canonical reference. For each stub:
 Each step is independently shippable. Items earlier in the list
 unblock later ones (input bindings, presets):
 
-1. **`semantic-index` + `desc-embedding-backfill`** — semantic-index
-   transitively depends on description-embedding being complete.
-2. **`path-llm-analysis`** — standalone, can land any time.
+1. **`path-llm-analysis`** — standalone, can land any time.
 
 After step 7, the actual Phase 7 deletions become safe:
 
