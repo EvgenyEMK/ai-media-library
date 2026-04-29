@@ -15,6 +15,7 @@ import type { PipelineConcurrencyGroup, PipelineId } from "../pipeline-types";
 import { geocoderInitDefinition } from "./geocoder-init";
 import { gpsGeocodeDefinition } from "./gps-geocode";
 import { pathRuleExtractionDefinition } from "./path-rule-extraction";
+import { metadataScanDefinition } from "./metadata-scan";
 import { registerAllPresets } from "../presets";
 
 /**
@@ -52,6 +53,7 @@ export function registerAllPipelineDefinitions(): void {
   pipelineRegistry.register(geocoderInitDefinition);
   pipelineRegistry.register(gpsGeocodeDefinition);
   pipelineRegistry.register(pathRuleExtractionDefinition);
+  pipelineRegistry.register(metadataScanDefinition);
 
   // -------------------------------------------------------------------------
   // Stubs — legacy runners still reachable through their existing IPC channels
@@ -61,7 +63,6 @@ export function registerAllPipelineDefinitions(): void {
     displayName: string;
     concurrencyGroup: PipelineConcurrencyGroup;
   }> = [
-    { id: "metadata-scan", displayName: "Scan folder metadata", concurrencyGroup: "io" },
     {
       id: "image-rotation-precheck",
       displayName: "Detect wrongly rotated images",

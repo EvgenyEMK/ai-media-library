@@ -105,7 +105,7 @@ implementation. Today only 3 of 11 are real:
 | `geocoder-init` | real ✅ | `geocoder:init` (also still used) |
 | `gps-geocode` | real ✅ | inline call inside `metadata-scan` (legacy) |
 | `path-rule-extraction` | real ✅ | inline call inside `metadata-scan` (legacy) |
-| `metadata-scan` | stub | `media:scan-folder-metadata` |
+| `metadata-scan` | real ✅ | `media:scan-folder-metadata` (still legacy-triggered UI path) |
 | `image-rotation-precheck` | stub | inline in face / photo-analysis / semantic handlers |
 | `face-detection` | stub | `media:detect-folder-faces` |
 | `face-embedding` | stub | inline `autoChainEmbeddings` |
@@ -161,19 +161,17 @@ as the canonical reference. For each stub:
 Each step is independently shippable. Items earlier in the list
 unblock later ones (input bindings, presets):
 
-1. **`metadata-scan`** — entry point for new folders, also unblocks
-   the `full-folder-index` preset.
-2. **`image-rotation-precheck`** — used inline by 3 pipelines; pulling
+1. **`image-rotation-precheck`** — used inline by 3 pipelines; pulling
    it out lets bundles run rotation once per item, not 3×.
-3. **`face-detection` + `face-embedding`** — wrap together; their
+2. **`face-detection` + `face-embedding`** — wrap together; their
    `Output → Params` chain is exactly what `inputBinding` is for.
-4. **`face-clustering` + `similar-untagged-counts`** — CPU-only,
+3. **`face-clustering` + `similar-untagged-counts`** — CPU-only,
    minimal refactor.
-5. **`photo-analysis` + `description-embedding`** — same shape as
+4. **`photo-analysis` + `description-embedding`** — same shape as
    face-detection + face-embedding, in the `ollama` group.
-6. **`semantic-index` + `desc-embedding-backfill`** — semantic-index
+5. **`semantic-index` + `desc-embedding-backfill`** — semantic-index
    transitively depends on description-embedding being complete.
-7. **`path-llm-analysis`** — standalone, can land any time.
+6. **`path-llm-analysis`** — standalone, can land any time.
 
 After step 7, the actual Phase 7 deletions become safe:
 

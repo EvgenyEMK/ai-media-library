@@ -3,6 +3,7 @@ import { app, ipcMain } from "electron";
 import {
   IPC_CHANNELS,
   type MetadataScanItemState,
+  type MetadataScanProgressEvent,
   type MetadataScanTriggerSource,
 } from "../../src/shared/ipc";
 import {
@@ -44,6 +45,19 @@ import { getMediaItemsNeedingGpsGeocoding, updateMediaItemLocationFromGps } from
 import { resolveGeonamesPath } from "../app-paths";
 
 const FOLDER_SCAN_TIMESTAMP_BATCH_SIZE = 25;
+
+export interface MetadataScanRunResult {
+  jobId: string;
+  total: number;
+  created: number;
+  updated: number;
+  unchanged: number;
+  failed: number;
+  cancelled: number;
+  filesWithGps: number;
+  geoDataUpdated: number;
+  filesNeedingAiPipelineFollowUp: number;
+}
 
 export function registerMetadataScanHandlers(): void {
   ipcMain.handle(
@@ -103,12 +117,32 @@ export async function runMetadataScanJob(params: {
   knownCatalogEntries?: Array<{ folderPath: string; path: string; name: string }>;
   /** Menu-driven scan vs folder-selection auto scan; controls detailed result UI on the renderer. */
   triggerSource?: MetadataScanTriggerSource;
-}): Promise<{ jobId: string; total: number }> {
+  /** Optional stable job id (for scheduler-managed runs). */
+  jobId?: string;
+  /** Optional cancellation signal (for scheduler-managed runs). */
+  signal?: AbortSignal;
+  /** Optional mirror hook for metadata progress events. */
+  onProgressEvent?: (event: MetadataScanProgressEvent) => void;
+}): Promise<MetadataScanRunResult> {
   const triggerSource: MetadataScanTriggerSource = params.triggerSource ?? "auto";
-  const jobId = randomUUID();
+  const jobId = params.jobId ?? randomUUID();
   const job: RunningMetadataScanJob = { cancelled: false, triggerSource };
   job.powerSaveToken = acquirePowerSave(`metadata-scan:${params.folderPath}`);
   runningMetadataScanJobs.set(jobId, job);
+  const emitProgress = (event: MetadataScanProgressEvent): void => {
+    emitMetadataScanProgress(event);
+    params.onProgressEvent?.(event);
+  };
+  const abortListener = () => {
+    job.cancelled = true;
+  };
+  if (params.signal) {
+    if (params.signal.aborted) {
+      job.cancelled = true;
+    } else {
+      params.signal.addEventListener("abort", abortListener, { once: true });
+    }
+  }
 
   let scanEntries: Array<{ folderPath: string; path: string; name: string }>;
   let scanFolders: string[];
@@ -132,7 +166,7 @@ export async function runMetadataScanJob(params: {
     status: "pending",
   }));
 
-  emitMetadataScanProgress({
+  emitProgress({
     type: "job-started",
     jobId,
     folderPath: params.folderPath,
@@ -146,7 +180,7 @@ export async function runMetadataScanJob(params: {
   const scanTs = () => `${new Date().toISOString()} +${Date.now() - scanT0}ms`;
   console.log(`[metadata-scan][${scanTs()}] job-started jobId=${jobId} total=${scanEntries.length}`);
 
-  emitMetadataScanProgress({
+  emitProgress({
     type: "phase-updated",
     jobId,
     phase: "preparing",
@@ -182,7 +216,7 @@ export async function runMetadataScanJob(params: {
         const current = preparingProcessed + folderProcessed;
         if (current - lastEmittedPreparing >= PHASE_THROTTLE || current === preparingTotal) {
           lastEmittedPreparing = current;
-          emitMetadataScanProgress({
+          emitProgress({
             type: "phase-updated",
             jobId,
             phase: "preparing",
@@ -274,7 +308,7 @@ export async function runMetadataScanJob(params: {
       flushCompletedFolderScanBatch();
 
       console.log(`[metadata-scan][${scanTs()}] scanning phase START total=${scanEntries.length}`);
-      emitMetadataScanProgress({
+      emitProgress({
         type: "phase-updated",
         jobId,
         phase: "scanning",
@@ -355,7 +389,7 @@ export async function runMetadataScanJob(params: {
         }
 
         if (upsert.status !== "unchanged") {
-          emitMetadataScanProgress({
+          emitProgress({
             type: "item-updated",
             jobId,
             currentFolderPath: entry.folderPath,
@@ -378,7 +412,7 @@ export async function runMetadataScanJob(params: {
         }
 
         if (scanningProcessed % PHASE_THROTTLE === 0 || scanningProcessed === scanEntries.length) {
-          emitMetadataScanProgress({
+          emitProgress({
             type: "phase-updated",
             jobId,
             phase: "scanning",
@@ -411,7 +445,7 @@ export async function runMetadataScanJob(params: {
       try {
         const GPS_BATCH_SIZE = 500;
         const itemsToGeocode = getMediaItemsNeedingGpsGeocoding(scannedMediaItemIds);
-        emitMetadataScanProgress({
+        emitProgress({
           type: "phase-updated",
           jobId,
           phase: "geocoding",
@@ -439,7 +473,7 @@ export async function runMetadataScanJob(params: {
                   geoDataUpdated += changed;
                 }
               }
-              emitMetadataScanProgress({
+              emitProgress({
                 type: "phase-updated",
                 jobId,
                 phase: "geocoding",
@@ -451,7 +485,7 @@ export async function runMetadataScanJob(params: {
             console.log(`[metadata-scan][${scanTs()}] geocoding complete geoDataUpdated=${geoDataUpdated}`);
           } else {
             console.log(`[metadata-scan][${scanTs()}] geocoding skipped no items needing GPS location update`);
-            emitMetadataScanProgress({
+            emitProgress({
               type: "phase-updated",
               jobId,
               phase: "geocoding",
@@ -517,7 +551,7 @@ export async function runMetadataScanJob(params: {
       }))
       .sort((a, b) => a.folderPath.localeCompare(b.folderPath));
 
-    emitMetadataScanProgress({
+    emitProgress({
       type: "job-completed",
       jobId,
       folderPath: params.folderPath,
@@ -541,7 +575,21 @@ export async function runMetadataScanJob(params: {
       foldersTouched,
     });
     runningMetadataScanJobs.delete(jobId);
+    if (params.signal) {
+      params.signal.removeEventListener("abort", abortListener);
+    }
   }
 
-  return { jobId, total: scanEntries.length };
+  return {
+    jobId,
+    total: scanEntries.length,
+    created,
+    updated,
+    unchanged,
+    failed,
+    cancelled,
+    filesWithGps,
+    geoDataUpdated,
+    filesNeedingAiPipelineFollowUp,
+  };
 }
