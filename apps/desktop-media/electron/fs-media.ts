@@ -29,6 +29,17 @@ export async function readFolderChildren(folderPath: string): Promise<FolderNode
   return nodes.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+export async function readDirectFolderChildren(folderPath: string): Promise<Array<{ path: string; name: string }>> {
+  const entries = await fs.readdir(folderPath, { withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => ({
+      path: path.join(folderPath, entry.name),
+      name: entry.name,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export async function listFolderImages(
   folderPath: string,
 ): Promise<MediaImageItem[]> {

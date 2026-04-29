@@ -27,7 +27,7 @@ import { emitFolderImagesProgress, emitFolderMediaProgress } from "./progress-em
 import { runMetadataScanJob } from "./metadata-scan-handlers";
 import { runningMetadataScanJobs } from "./state";
 import { getModelsDirectory } from "../native-face/model-manager";
-import { resolveCacheRoot } from "../app-paths";
+import { resolveCacheRoot, resolveGeonamesPath } from "../app-paths";
 import { getMediaEmbeddingsCompatStatus } from "../db/client";
 import { getSemanticIndexDebugLogPath } from "../semantic-index-debug-log";
 import { releasePowerSave } from "./power-save-manager";
@@ -241,6 +241,7 @@ export function registerFsHandlers(): void {
       dbFileName: "desktop-media.db",
       dbPath: path.join(userDataPath, "desktop-media.db"),
       modelsPath: modelsPath ?? path.join(appDataPath, "EMK Desktop Media", "ai-models"),
+      geonamesPath: resolveGeonamesPath(app),
       cachePath: cachePath ?? path.join(appDataPath, "EMK Desktop Media", "cache"),
       mediaEmbeddingsCompatStatus: getMediaEmbeddingsCompatStatus(),
       semanticDebugLogPath: getSemanticIndexDebugLogPath(),

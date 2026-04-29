@@ -18,6 +18,7 @@ vi.mock("electron", () => ({
 }));
 
 vi.mock("../fs-media", () => ({
+  readDirectFolderChildren: vi.fn(async () => mocks.children),
   readFolderChildren: vi.fn(async () => mocks.children),
 }));
 
@@ -108,5 +109,24 @@ describe("registerFolderAiSummaryHandlers", () => {
 
     expect(report.selectedWithSubfolders.scanFreshness.notFullyScannedDirectSubfolderCount).toBe(0);
     expect(report.subfolders).toEqual([]);
+  });
+
+  it("returns lightweight folder tree scan summary", async () => {
+    mocks.children = [
+      { path: "C:\\photos\\scanned", name: "scanned" },
+      { path: "C:\\photos\\missing-row", name: "missing-row" },
+    ];
+    mocks.scanCompletedAtByPath = {
+      "C:\\photos\\scanned": "2026-04-28T08:00:00.000Z",
+    };
+
+    registerFolderAiSummaryHandlers();
+    const handler = mocks.handlers.get(IPC_CHANNELS.getFolderTreeScanSummary);
+    const summary = await handler?.(null, "C:\\photos");
+
+    expect(summary).toEqual({
+      hasDirectSubfolders: true,
+      notFullyScannedDirectSubfolderCount: 1,
+    });
   });
 });

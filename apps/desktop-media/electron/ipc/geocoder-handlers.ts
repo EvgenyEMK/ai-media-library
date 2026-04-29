@@ -5,6 +5,7 @@ import {
   initGeocoder,
   onGeocoderStatusChange,
 } from "../geocoder/reverse-geocoder";
+import { resolveGeonamesPath } from "../app-paths";
 import { emitGeocoderInitProgress } from "./progress-emitters";
 import type { GeocoderStatus } from "../geocoder/geocoder-types";
 
@@ -14,10 +15,10 @@ export function registerGeocoderHandlers(): void {
   });
 
   ipcMain.handle(IPC_CHANNELS.getGeocoderCacheStatus, async () => {
-    return { hasLocalCopy: hasCachedGeocoderData(app.getPath("userData")) };
+    return { hasLocalCopy: hasCachedGeocoderData(resolveGeonamesPath(app)) };
   });
 
   ipcMain.handle(IPC_CHANNELS.initGeocoder, async (_event, options?: { forceRefresh?: boolean }) => {
-    await initGeocoder(app.getPath("userData"), { forceRefresh: options?.forceRefresh === true });
+    await initGeocoder(resolveGeonamesPath(app), { forceRefresh: options?.forceRefresh === true });
   });
 }

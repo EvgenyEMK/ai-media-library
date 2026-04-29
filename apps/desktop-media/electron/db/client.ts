@@ -650,6 +650,15 @@ const MIGRATIONS: Array<{ id: string; sql: string }> = [
         ON folder_analysis_status (library_id, metadata_scanned_at)
     `,
   },
+  {
+    id: "024_media_items_location_area2",
+    sql: `
+      ALTER TABLE media_items ADD COLUMN location_area2 TEXT;
+      DROP INDEX IF EXISTS idx_media_items_location;
+      CREATE INDEX IF NOT EXISTS idx_media_items_location_v2
+        ON media_items (library_id, country, location_area, location_area2, city);
+    `,
+  },
 ];
 
 let db: SQLiteDatabase | null = null;

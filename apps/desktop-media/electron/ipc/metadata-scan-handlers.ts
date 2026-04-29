@@ -41,6 +41,7 @@ import {
   reverseGeocodeBatch,
 } from "../geocoder/reverse-geocoder";
 import { getMediaItemsNeedingGpsGeocoding, updateMediaItemLocationFromGps } from "../db/media-item-geocoding";
+import { resolveGeonamesPath } from "../app-paths";
 
 const FOLDER_SCAN_TIMESTAMP_BATCH_SIZE = 25;
 
@@ -223,6 +224,7 @@ export async function runMetadataScanJob(params: {
   let scanningProcessed = 0;
   let filesNeedingAiPipelineFollowUp = 0;
   let geoDataUpdated = 0;
+  let filesWithGps = 0;
   const observedFolders = new Set<string>([params.folderPath]);
   const folderTouchMap = new Map<
     string,
@@ -252,8 +254,10 @@ export async function runMetadataScanJob(params: {
 
   let pathExtractionEnabled = true;
   let gpsGeocodingEnabled = false;
+  const userDataPath = app.getPath("userData");
+  const geonamesPath = resolveGeonamesPath(app);
   try {
-    const appSettings = await readSettings(app.getPath("userData"));
+    const appSettings = await readSettings(userDataPath);
     pathExtractionEnabled = appSettings.pathExtraction.extractDates;
     gpsGeocodingEnabled = appSettings.folderScanning.detectLocationFromGps;
   } catch {
@@ -391,42 +395,38 @@ export async function runMetadataScanJob(params: {
       cancelled = scanEntries.length;
       console.log(`[metadata-scan][${scanTs()}] scanning phase SKIPPED (cancelled) jobId=${jobId} total=${scanEntries.length}`);
     }
+    let scannedMediaItemIds: string[] = [];
+    if (!job.cancelled && scanEntries.length > 0) {
+      const scannedPaths = scanEntries.map((entry) => entry.path);
+      const metaByPath = getMediaItemMetadataByPaths(scannedPaths);
+      const scannedRows = Object.values(metaByPath);
+      scannedMediaItemIds = scannedRows.map((row) => row.id);
+      filesWithGps = scannedRows.filter((row) => row.latitude != null && row.longitude != null).length;
+    }
+
     // --- GPS reverse geocoding phase ---
     // Include every cataloged item in the scanned paths, not only created/updated rows,
     // so turning on "detect location from GPS" after an earlier scan still backfills country/city.
-    if (!job.cancelled && gpsGeocodingEnabled && scanEntries.length > 0) {
+    if (!job.cancelled && gpsGeocodingEnabled && scannedMediaItemIds.length > 0) {
       try {
+        const GPS_BATCH_SIZE = 500;
+        const itemsToGeocode = getMediaItemsNeedingGpsGeocoding(scannedMediaItemIds);
         emitMetadataScanProgress({
           type: "phase-updated",
           jobId,
           phase: "geocoding",
           processed: 0,
-          total: scanEntries.length,
+          total: itemsToGeocode.length,
           geoDataUpdated,
         });
         if (!isGeocoderReady()) {
-          const userDataPath = app.getPath("userData");
-          const cacheState = hasCachedGeocoderData(userDataPath) ? "cache" : "download-or-refresh";
+          const cacheState = hasCachedGeocoderData(geonamesPath) ? "cache" : "download-or-refresh";
           console.log(`[metadata-scan][${scanTs()}] geocoder not ready, initializing source=${cacheState}`);
-          await initGeocoder(userDataPath);
+          await initGeocoder(geonamesPath);
         }
         if (isGeocoderReady()) {
-          const GPS_BATCH_SIZE = 500;
-          const scannedPaths = scanEntries.map((e) => e.path);
-          const metaByPath = getMediaItemMetadataByPaths(scannedPaths);
-          const scannedMediaItemIds = Object.values(metaByPath).map((m) => m.id);
-          const itemsToGeocode = getMediaItemsNeedingGpsGeocoding(scannedMediaItemIds);
           if (itemsToGeocode.length > 0) {
             console.log(`[metadata-scan][${scanTs()}] geocoding ${itemsToGeocode.length} items with GPS coordinates`);
-            emitMetadataScanProgress({
-              type: "phase-updated",
-              jobId,
-              phase: "geocoding",
-              processed: 0,
-              total: itemsToGeocode.length,
-              geoDataUpdated,
-            });
-
             for (let i = 0; i < itemsToGeocode.length; i += GPS_BATCH_SIZE) {
               if (job.cancelled) break;
               const batch = itemsToGeocode.slice(i, i + GPS_BATCH_SIZE);
@@ -435,17 +435,8 @@ export async function runMetadataScanJob(params: {
               for (let j = 0; j < batch.length; j++) {
                 const loc = results[j];
                 if (loc) {
-                  geoDataUpdated += updateMediaItemLocationFromGps(batch[j].id, loc);
-                  // Per-file geocode debug (re-enable when needed) — use return value (>0 rows updated):
-                  // const changed = updateMediaItemLocationFromGps(batch[j].id, loc);
-                  // if (changed > 0) {
-                  //   const geoParts = [loc.countryName, loc.admin1Name, loc.cityName].filter(
-                  //     (s): s is string => typeof s === "string" && s.trim().length > 0,
-                  //   );
-                  //   console.log(
-                  //     `[metadata-scan][geocode-updated] ${geoParts.join(" | ")} | ${batch[j].source_path}`,
-                  //   );
-                  // }
+                  const changed = updateMediaItemLocationFromGps(batch[j].id, loc);
+                  geoDataUpdated += changed;
                 }
               }
               emitMetadataScanProgress({
@@ -515,7 +506,7 @@ export async function runMetadataScanJob(params: {
       job.powerSaveToken = undefined;
     }
     console.log(
-      `[metadata-scan][${scanTs()}] job-completed jobId=${jobId} created=${created} updated=${updated} unchanged=${unchanged} failed=${failed} cancelled=${cancelled} geoDataUpdated=${geoDataUpdated} needsAiFollowUp=${filesNeedingAiPipelineFollowUp}`,
+      `[metadata-scan][${scanTs()}] job-completed jobId=${jobId} created=${created} updated=${updated} unchanged=${unchanged} failed=${failed} cancelled=${cancelled} filesWithGPS=${filesWithGps} geoDataUpdated=${geoDataUpdated} needsAiFollowUp=${filesNeedingAiPipelineFollowUp}`,
     );
     const foldersTouched = Array.from(folderTouchMap.entries())
       .map(([folderPath, counts]) => ({

@@ -21,19 +21,36 @@ export function updateMediaItemLocationFromGps(
      SET country = ?,
          city = ?,
          location_area = ?,
+         location_area2 = ?,
          location_source = 'gps',
          updated_at = ?
      WHERE id = ? AND library_id = ?
-       AND (location_source IS NULL
-            OR location_source NOT IN ('gps'))`,
+       AND (
+         location_source IS NULL
+         OR location_source NOT IN ('gps')
+         OR (
+           location_source = 'gps'
+           AND (
+             country IS NOT ?
+             OR city IS NOT ?
+             OR location_area IS NOT ?
+             OR location_area2 IS NOT ?
+           )
+         )
+       )`,
     )
     .run(
       location.countryName,
       location.cityName,
       location.admin1Name,
+      location.admin2Name,
       new Date().toISOString(),
       mediaItemId,
       libraryId,
+      location.countryName,
+      location.cityName,
+      location.admin1Name,
+      location.admin2Name,
     );
   return result.changes;
 }
@@ -46,7 +63,8 @@ export interface GpsMediaItemRow {
 }
 
 /**
- * Query media items that have GPS coordinates but no GPS-sourced location yet.
+ * Query media items that have GPS coordinates and need geocoding: no GPS catalog row yet,
+ * or GPS row missing country/state/city. GeoNames admin2/county is optional for many locations.
  * Used during the metadata scan geocoding phase.
  */
 export function getMediaItemsNeedingGpsGeocoding(
@@ -68,7 +86,17 @@ export function getMediaItemsNeedingGpsGeocoding(
            AND id IN (${placeholders})
            AND latitude IS NOT NULL
            AND longitude IS NOT NULL
-           AND (location_source IS NULL OR location_source != 'gps')`,
+           AND (
+             (location_source IS NULL OR location_source <> 'gps')
+             OR (
+               location_source = 'gps'
+               AND (
+                 country IS NULL
+                 OR location_area IS NULL
+                 OR city IS NULL
+               )
+             )
+           )`,
       )
       .all(libraryId, ...chunk) as GpsMediaItemRow[];
     rows.push(...found);

@@ -51,6 +51,9 @@ interface DesktopFolderAiSummaryDashboardProps {
   coverage?: FolderAiCoverageReport;
   overview?: FolderAiSummaryOverview;
   loading?: boolean;
+  overviewLoading?: boolean;
+  folderScanLoading?: boolean;
+  coverageLoading?: boolean;
   hasSubfolders?: boolean;
   actionPendingPipeline?: SummaryPipelineKind | null;
   onRunPipeline?: (pipeline: SummaryPipelineKind) => void;
@@ -63,6 +66,9 @@ export function DesktopFolderAiSummaryDashboard({
   coverage = pendingCoverage,
   overview = pendingOverview,
   loading = false,
+  overviewLoading = loading && overview === pendingOverview,
+  folderScanLoading = overviewLoading,
+  coverageLoading = loading,
   hasSubfolders = false,
   actionPendingPipeline = null,
   onRunPipeline,
@@ -70,7 +76,6 @@ export function DesktopFolderAiSummaryDashboard({
   onRunFolderScan,
   cardVisibility,
 }: DesktopFolderAiSummaryDashboardProps): ReactElement {
-  const overviewLoading = loading && overview === pendingOverview;
   const outdatedAfterDays = useDesktopStore(
     (state) => state.folderScanningSettings.markFolderScanOutdatedAfterDays,
   );
@@ -99,7 +104,7 @@ export function DesktopFolderAiSummaryDashboard({
           <LastDataScanCard
             scanFreshness={overview.scanFreshness}
             hasSubfolders={hasSubfolders}
-            loading={overviewLoading}
+            loading={folderScanLoading}
             actionPending={actionPendingFolderScan}
             outdatedAfterDays={outdatedAfterDays}
             onRunFolderScan={onRunFolderScan}
@@ -119,7 +124,7 @@ export function DesktopFolderAiSummaryDashboard({
                 title={UI_TEXT.folderAiSummaryColumnSemantic}
                 pipeline={coverage.semantic}
                 actionPipeline="semantic"
-                loading={loading}
+                loading={coverageLoading}
                 actionPending={actionPendingPipeline === "semantic"}
                 onRunPipeline={onRunPipeline}
               />
@@ -130,7 +135,7 @@ export function DesktopFolderAiSummaryDashboard({
                 title={UI_TEXT.folderAiSummaryColumnFace}
                 pipeline={coverage.face}
                 actionPipeline="face"
-                loading={loading}
+                loading={coverageLoading}
                 actionPending={actionPendingPipeline === "face"}
                 onRunPipeline={onRunPipeline}
               />
@@ -141,7 +146,7 @@ export function DesktopFolderAiSummaryDashboard({
                 title={UI_TEXT.folderAiSummaryColumnPhoto}
                 pipeline={coverage.photo}
                 actionPipeline="photo"
-                loading={loading}
+                loading={coverageLoading}
                 actionPending={actionPendingPipeline === "photo"}
                 onRunPipeline={onRunPipeline}
               />
@@ -152,7 +157,7 @@ export function DesktopFolderAiSummaryDashboard({
                 title={UI_TEXT.folderAiSummaryColumnRotation}
                 pipeline={coverage.rotation}
                 actionPipeline="rotation"
-                loading={loading}
+                loading={coverageLoading}
                 actionPending={actionPendingPipeline === "rotation"}
                 onRunPipeline={onRunPipeline}
                 completedLabel="analyzed"
@@ -167,7 +172,7 @@ export function DesktopFolderAiSummaryDashboard({
         <section className="flex flex-col gap-3" aria-label={UI_TEXT.folderAiSummaryDashboardPrototypeVariants}>
           <h3 className="m-0 text-sm font-semibold text-muted-foreground">{UI_TEXT.folderAiSummaryGeoLocation}</h3>
           <div className="flex flex-wrap gap-3">
-            <SummaryGeoLocationCard coverage={coverage} loading={loading} />
+            <SummaryGeoLocationCard coverage={coverage} loading={coverageLoading} />
           </div>
         </section>
       ) : null}

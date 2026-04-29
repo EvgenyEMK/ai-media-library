@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
 import { RefreshCw, X } from "lucide-react";
 import type {
   DesktopMediaItemMetadata,
@@ -23,6 +23,13 @@ import { PipelineBlockedDialog } from "./PipelineBlockedDialog";
 import { useDesktopStore } from "../stores/desktop-store";
 
 type SummaryTab = "summary" | "ai" | "geo";
+
+const DEBUG_FOLDER_AI_SUMMARY = true;
+
+function debugFolderAiSummary(message: string, details?: Record<string, unknown>): void {
+  if (!DEBUG_FOLDER_AI_SUMMARY) return;
+  console.log("[debug][folder-ai-summary]", message, details ?? {});
+}
 
 interface DesktopFolderAiSummaryViewProps {
   folderPath: string;
@@ -88,7 +95,10 @@ export function DesktopFolderAiSummaryView({
   const lastMetadataScanCompletion = useDesktopStore((state) => state.lastMetadataScanCompletion);
   const lastAiPipelineCompletion = useDesktopStore((state) => state.lastAiPipelineCompletion);
   const selectedFolderChildrenCount = useDesktopStore((state) => state.childrenByPath[folderPath]?.length ?? 0);
-  const [loading, setLoading] = useState(true);
+  const loadSequenceRef = useRef(0);
+  const [overviewLoading, setOverviewLoading] = useState(true);
+  const [folderScanLoading, setFolderScanLoading] = useState(true);
+  const [coverageLoading, setCoverageLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedWithSubfolders, setSelectedWithSubfolders] = useState<FolderAiCoverageReport | null>(null);
   const [selectedDirectOnly, setSelectedDirectOnly] = useState<FolderAiCoverageReport | null>(null);
@@ -118,32 +128,120 @@ export function DesktopFolderAiSummaryView({
 
   const load = useCallback(async () => {
     if (!folderPath) return;
-    setLoading(true);
+    const loadSequence = loadSequenceRef.current + 1;
+    loadSequenceRef.current = loadSequence;
+    const loadStartedAt = performance.now();
+    debugFolderAiSummary("renderer:load-start", { folderPath, loadSequence });
+    setOverviewLoading(true);
+    setFolderScanLoading(true);
+    setCoverageLoading(true);
     setError(null);
     setDetailsError(null);
     setDetailsLoaded(false);
     setOverviewReport(null);
-    const overviewPromise = window.desktopApi
-      .getFolderAiSummaryOverview(folderPath)
-      .then((overview) => setOverviewReport(overview))
-      .catch(() => undefined);
+    setSelectedWithSubfolders(null);
+    setSelectedDirectOnly(null);
+    setSubfolders([]);
     try {
-      const [withSubfolders, directOnly] = await Promise.all([
+      const overviewStartedAt = performance.now();
+      const overviewPromise = window.desktopApi.getFolderAiSummaryOverview(folderPath, { includeSubfolders: false });
+      const folderScanStartedAt = performance.now();
+      const folderScanPromise = window.desktopApi.getFolderTreeScanSummary(folderPath);
+      const coverageStartedAt = performance.now();
+      const coveragePromise = Promise.all([
         window.desktopApi.getFolderAiCoverage(folderPath, true),
         window.desktopApi.getFolderAiCoverage(folderPath, false),
       ]);
-      setSelectedWithSubfolders(withSubfolders);
-      setSelectedDirectOnly(directOnly);
-      setSubfolders([]);
-      setActiveTab("summary");
-      void overviewPromise;
+
+      const overviewUpdate = overviewPromise
+        .then((overview) => {
+          if (loadSequenceRef.current !== loadSequence) return;
+          setOverviewReport(overview);
+          setOverviewLoading(false);
+          debugFolderAiSummary("renderer:overview-received", {
+            folderPath,
+            loadSequence,
+            elapsedMs: Math.round(performance.now() - overviewStartedAt),
+            totalImages: overview.selectedWithSubfolders.totalImages,
+            totalVideos: overview.selectedWithSubfolders.totalVideos,
+          });
+        })
+        .catch(() => {
+          if (loadSequenceRef.current !== loadSequence) return;
+          setError(UI_TEXT.folderAiSummaryError);
+          setOverviewLoading(false);
+        });
+
+      const folderScanUpdate = folderScanPromise
+        .then((scanSummary) => {
+          if (loadSequenceRef.current !== loadSequence) return;
+          setOverviewReport((current) => {
+            if (!current) return current;
+            return {
+              ...current,
+              hasDirectSubfolders: scanSummary.hasDirectSubfolders,
+              selectedWithSubfolders: {
+                ...current.selectedWithSubfolders,
+                scanFreshness: {
+                  ...current.selectedWithSubfolders.scanFreshness,
+                  notFullyScannedDirectSubfolderCount: scanSummary.notFullyScannedDirectSubfolderCount,
+                },
+              },
+            };
+          });
+          setFolderScanLoading(false);
+          debugFolderAiSummary("renderer:tree-scan-received", {
+            folderPath,
+            loadSequence,
+            elapsedMs: Math.round(performance.now() - folderScanStartedAt),
+            hasDirectSubfolders: scanSummary.hasDirectSubfolders,
+            notFullyScannedDirectSubfolderCount: scanSummary.notFullyScannedDirectSubfolderCount,
+          });
+        })
+        .catch(() => {
+          if (loadSequenceRef.current !== loadSequence) return;
+          setError(UI_TEXT.folderAiSummaryError);
+          setFolderScanLoading(false);
+        });
+
+      const coverageUpdate = coveragePromise
+        .then(([withSubfolders, directOnly]) => {
+          if (loadSequenceRef.current !== loadSequence) return;
+          setSelectedWithSubfolders(withSubfolders);
+          setSelectedDirectOnly(directOnly);
+          setCoverageLoading(false);
+          setActiveTab("summary");
+          debugFolderAiSummary("renderer:coverage-received", {
+            folderPath,
+            loadSequence,
+            elapsedMs: Math.round(performance.now() - coverageStartedAt),
+            totalImages: withSubfolders.totalImages,
+          });
+        })
+        .catch(() => {
+          if (loadSequenceRef.current !== loadSequence) return;
+          setError(UI_TEXT.folderAiSummaryError);
+          setCoverageLoading(false);
+        });
+
+      await Promise.allSettled([overviewUpdate, folderScanUpdate, coverageUpdate]);
     } catch {
+      if (loadSequenceRef.current !== loadSequence) return;
       setError(UI_TEXT.folderAiSummaryError);
       setSelectedWithSubfolders(null);
       setSelectedDirectOnly(null);
       setSubfolders([]);
     } finally {
-      setLoading(false);
+      if (loadSequenceRef.current === loadSequence) {
+        setOverviewLoading(false);
+        setFolderScanLoading(false);
+        setCoverageLoading(false);
+        debugFolderAiSummary("renderer:load-complete", {
+          folderPath,
+          loadSequence,
+          elapsedMs: Math.round(performance.now() - loadStartedAt),
+        });
+      }
     }
   }, [folderPath]);
 
@@ -262,9 +360,10 @@ export function DesktopFolderAiSummaryView({
   const iconBtnClass =
     "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-input bg-secondary p-0 shadow-none";
   const isFailedListView = failedListContext !== null;
+  const loading = overviewLoading || folderScanLoading || coverageLoading;
   const hasSubfolders =
     selectedFolderChildrenCount > 0 ||
-    (overviewReport ? overviewReport.subfolders.length > 0 : subfolders.length > 0);
+    (overviewReport ? overviewReport.hasDirectSubfolders || overviewReport.subfolders.length > 0 : subfolders.length > 0);
   const summaryTitle = hasSubfolders ? UI_TEXT.folderAiSummaryTreeTitle : UI_TEXT.folderAiSummaryFolderTitle;
   const dashboardCoverage = hasSubfolders ? selectedWithSubfolders : selectedDirectOnly;
   const dashboardOverview = hasSubfolders ? overviewReport?.selectedWithSubfolders : overviewReport?.selectedDirectOnly;
@@ -331,8 +430,15 @@ export function DesktopFolderAiSummaryView({
       {error ? <p className="m-0 text-red-400">{error}</p> : null}
       {detailsError ? <p className="m-0 text-red-400">{detailsError}</p> : null}
 
-      {loading && !error && !isFailedListView ? (
-        <DesktopFolderAiSummaryDashboard overview={dashboardOverview} hasSubfolders={hasSubfolders} loading />
+      {!error && !isFailedListView && (loading || !selectedWithSubfolders || !selectedDirectOnly || !dashboardCoverage) ? (
+        <DesktopFolderAiSummaryDashboard
+          coverage={dashboardCoverage ?? undefined}
+          overview={dashboardOverview}
+          hasSubfolders={hasSubfolders}
+          overviewLoading={overviewLoading || !dashboardOverview}
+          folderScanLoading={folderScanLoading || !dashboardOverview}
+          coverageLoading={coverageLoading || !dashboardCoverage}
+        />
       ) : null}
 
       {!loading && !error && !isFailedListView && selectedWithSubfolders && selectedDirectOnly && dashboardCoverage ? (
@@ -343,6 +449,9 @@ export function DesktopFolderAiSummaryView({
               coverage={dashboardCoverage}
               overview={dashboardOverview}
               hasSubfolders={hasSubfolders}
+              overviewLoading={overviewLoading || !dashboardOverview}
+              folderScanLoading={folderScanLoading || !dashboardOverview}
+              coverageLoading={coverageLoading}
               actionPendingPipeline={actionPendingPipeline}
               onRunPipeline={(pipeline) => void runDashboardPipeline(pipeline)}
               actionPendingFolderScan={folderScanPending}

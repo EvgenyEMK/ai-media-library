@@ -42,6 +42,7 @@ function renderGrid({
             country: "Croatia",
             city: "Split",
             locationArea: null,
+            locationArea2: null,
             locationPlace: null,
             locationName: null,
             mediaKind: "image",

@@ -27,7 +27,7 @@ test.describe("GPS location database download flow", () => {
       await mainWindow.getByRole("navigation").getByText("Settings", { exact: true }).click();
 
       // Settings sections are `<details>` accordions (closed by default).
-      await mainWindow.getByText("Folder scanning & file metadata", { exact: true }).click();
+      await mainWindow.getByText("Folder scanning, file metadata and Geo-location", { exact: true }).click();
 
       const gpsCheckbox = mainWindow.getByRole("checkbox", {
         name: /Detect Country \/ City from GPS coordinates/i,
@@ -84,7 +84,7 @@ test.describe("GPS location database local-copy flow", () => {
     mainWindow,
   }) => {
     await mainWindow.getByRole("navigation").getByText("Settings", { exact: true }).click();
-    await mainWindow.getByText("Folder scanning & file metadata", { exact: true }).click();
+    await mainWindow.getByText("Folder scanning, file metadata and Geo-location", { exact: true }).click();
 
     const gpsCheckbox = mainWindow.getByRole("checkbox", {
       name: /Detect Country \/ City from GPS coordinates/i,

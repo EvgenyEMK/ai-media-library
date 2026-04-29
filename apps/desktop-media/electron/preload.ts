@@ -53,6 +53,8 @@ const api: DesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.getFolderAnalysisStatuses),
   getFolderAiSummaryOverview: (folderPath, options) =>
     ipcRenderer.invoke(IPC_CHANNELS.getFolderAiSummaryOverview, folderPath, options),
+  getFolderTreeScanSummary: (folderPath) =>
+    ipcRenderer.invoke(IPC_CHANNELS.getFolderTreeScanSummary, folderPath),
   getFolderAiSummaryReport: (folderPath) =>
     ipcRenderer.invoke(IPC_CHANNELS.getFolderAiSummaryReport, folderPath),
   getFolderAiFailedFiles: (folderPath, pipeline, recursive) =>

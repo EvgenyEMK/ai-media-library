@@ -7,6 +7,7 @@ import {
 import type {
   AlbumMediaItem,
   SmartAlbumFilters,
+  SmartAlbumPlaceEntry,
   SmartAlbumPlacesRequest,
   SmartAlbumRootKind,
 } from "@emk/shared-contracts";
@@ -27,6 +28,30 @@ import { SmartAlbumsWorkspace } from "./SmartAlbumsWorkspace";
 import { EMPTY_SMART_ALBUM_FILTERS, smartAlbumSettingsToFilters, useSmartAlbums } from "./useSmartAlbums";
 
 const ALBUM_PAGE_SIZE = 24;
+
+function formatSmartAlbumPlaceAreaSegment(entry: Pick<SmartAlbumPlaceEntry, "group" | "groupParent">): string {
+  return entry.groupParent ? `${entry.groupParent} - ${entry.group}` : entry.group;
+}
+
+function formatActiveSmartPlacePath(entry: SmartAlbumPlaceEntry): string {
+  const parts = [entry.country];
+  const area1 = entry.area1 ?? entry.groupParent ?? null;
+  const area2 = entry.area2 ?? entry.group ?? null;
+  const leafLevel = entry.leafLevel ?? "city";
+  if (area1) {
+    parts.push(area1);
+  }
+  if (leafLevel !== "area1" && area2 && (area2 !== area1 || leafLevel === "area2")) {
+    parts.push(area2);
+  }
+  if (leafLevel === "city" && entry.city) {
+    parts.push(entry.city);
+  }
+  if (parts.length === 1) {
+    parts.push(formatSmartAlbumPlaceAreaSegment(entry), entry.label);
+  }
+  return parts.join(" > ");
+}
 
 function countActiveSmartAlbumFilters(filters: SmartAlbumFilters): number {
   let count = 0;
@@ -105,6 +130,8 @@ export function DesktopAlbumsWorkspace({
     randomRefreshKey,
     refreshRandomOrder,
     randomCandidateLimit,
+    smartPlaceHierarchyLevels,
+    setSmartPlaceHierarchyLevels,
   } = smartAlbums;
   const [newTitle, setNewTitle] = useState("");
   const [albumQuickFilters, setAlbumQuickFilters] = useState<ThumbnailQuickFilterState>(
@@ -210,7 +237,10 @@ export function DesktopAlbumsWorkspace({
     setErrorMessage(null);
     try {
       if (smartPlaceRequest) {
-        const result = await actions.loadSmartAlbumPlaces(smartPlaceRequest);
+        const result = await actions.loadSmartAlbumPlaces({
+          ...smartPlaceRequest,
+          filters: smartAlbumFilters,
+        });
         setSmartPlaceCountries(result.countries);
       } else {
         const result = await actions.loadSmartAlbumYears({ filters: smartAlbumFilters });
@@ -236,10 +266,14 @@ export function DesktopAlbumsWorkspace({
         ? await actions.loadSmartAlbumItems({
             kind: "place",
             country: activeSmartAlbum.entry.country,
-            city: activeSmartAlbum.entry.city,
+            city: activeSmartAlbum.entry.leafLevel === "city" ? activeSmartAlbum.entry.city : null,
             group: activeSmartAlbum.entry.group,
             grouping: smartPlaceRequest?.grouping ?? "year-city",
             source: smartPlaceRequest?.source ?? "gps",
+            leafLevel: activeSmartAlbum.entry.leafLevel ?? "city",
+            area1: activeSmartAlbum.entry.area1 ?? activeSmartAlbum.entry.groupParent ?? null,
+            area2: activeSmartAlbum.entry.area2 ?? activeSmartAlbum.entry.group ?? null,
+            filters: smartAlbumFilters,
             offset: smartItemsPage * ALBUM_ITEMS_PAGE_SIZE,
             limit: ALBUM_ITEMS_PAGE_SIZE,
           })
@@ -326,7 +360,7 @@ export function DesktopAlbumsWorkspace({
   }, [loadSmartAlbumItems, showingSmart]);
 
   useEffect(() => {
-    if (!showingSmart || smartPlaceRequest || activeSmartAlbum) {
+    if (!showingSmart || activeSmartAlbum) {
       return;
     }
     void loadSmartRoots();
@@ -422,7 +456,7 @@ export function DesktopAlbumsWorkspace({
 
   const smartRootTitle = smartAlbumRootKind === "best-of-year" ? "Best of Year" : smartPlaceRootTitle;
   const activeSmartTitle = activeSmartAlbum?.kind === "place"
-    ? `${activeSmartAlbum.entry.country} > ${activeSmartAlbum.entry.group} > ${activeSmartAlbum.entry.label}`
+    ? formatActiveSmartPlacePath(activeSmartAlbum.entry)
     : activeSmartAlbum?.kind === "best-of-year"
       ? `Best of ${activeSmartAlbum.year}`
       : smartRootTitle;
@@ -522,7 +556,7 @@ export function DesktopAlbumsWorkspace({
             ) : null}
           </>
         ) : null}
-        {showingSmart && smartAlbumRootKind === "best-of-year" && showSmartFilterPanel ? (
+        {showingSmart && (smartAlbumRootKind === "best-of-year" || smartAlbumRootKind === "country-area-city") && showSmartFilterPanel ? (
           <BestOfYearFiltersPanel
             filters={smartAlbumFilters}
             personTags={personTags}
@@ -551,11 +585,13 @@ export function DesktopAlbumsWorkspace({
           smartItems={smartItems}
           smartItemsPage={smartItemsPage}
           smartItemsTotal={smartItemsTotal}
+          smartPlaceHierarchyLevels={smartPlaceHierarchyLevels}
           quickFilters={albumQuickFilters}
           viewMode={viewMode}
           store={store}
           onToggleCountry={toggleSmartCountry}
           onToggleGroup={toggleSmartGroup}
+          onSmartPlaceHierarchyLevelsChange={setSmartPlaceHierarchyLevels}
           onActiveSmartAlbumChange={setActiveSmartAlbum}
           onSmartItemsPageChange={setSmartItemsPage}
         />

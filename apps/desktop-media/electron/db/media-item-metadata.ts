@@ -376,6 +376,7 @@ type MediaItemMetadataRow = {
   country: string | null;
   city: string | null;
   location_area: string | null;
+  location_area2: string | null;
   location_place: string | null;
   location_name: string | null;
   location_source: string | null;
@@ -429,6 +430,7 @@ export function getMediaItemMetadataByPaths(
            mi.country,
            mi.city,
            mi.location_area,
+           mi.location_area2,
            mi.location_place,
            mi.location_name,
            mi.location_source,
@@ -524,6 +526,7 @@ export function getMediaItemMetadataByPaths(
       country: row.country,
       city: row.city,
       locationArea: row.location_area,
+      locationArea2: row.location_area2,
       locationPlace: row.location_place,
       locationName: row.location_name,
       locationSource: row.location_source,
