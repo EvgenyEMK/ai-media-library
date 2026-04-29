@@ -16,6 +16,7 @@ import { geocoderInitDefinition } from "./geocoder-init";
 import { gpsGeocodeDefinition } from "./gps-geocode";
 import { pathRuleExtractionDefinition } from "./path-rule-extraction";
 import { metadataScanDefinition } from "./metadata-scan";
+import { imageRotationPrecheckDefinition } from "./image-rotation-precheck";
 import { registerAllPresets } from "../presets";
 
 /**
@@ -54,6 +55,7 @@ export function registerAllPipelineDefinitions(): void {
   pipelineRegistry.register(gpsGeocodeDefinition);
   pipelineRegistry.register(pathRuleExtractionDefinition);
   pipelineRegistry.register(metadataScanDefinition);
+  pipelineRegistry.register(imageRotationPrecheckDefinition);
 
   // -------------------------------------------------------------------------
   // Stubs — legacy runners still reachable through their existing IPC channels
@@ -63,11 +65,6 @@ export function registerAllPipelineDefinitions(): void {
     displayName: string;
     concurrencyGroup: PipelineConcurrencyGroup;
   }> = [
-    {
-      id: "image-rotation-precheck",
-      displayName: "Detect wrongly rotated images",
-      concurrencyGroup: "gpu",
-    },
     { id: "face-detection", displayName: "Detect faces", concurrencyGroup: "gpu" },
     { id: "face-embedding", displayName: "Compute face embeddings", concurrencyGroup: "gpu" },
     { id: "face-clustering", displayName: "Group faces by similarity", concurrencyGroup: "cpu" },
