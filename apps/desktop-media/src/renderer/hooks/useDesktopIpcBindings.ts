@@ -150,32 +150,36 @@ export function useDesktopInitialization(): void {
         ]);
       });
 
-    void window.desktopApi
-      .getActiveJobStatuses()
-      .then((jobs) => {
+    void window.desktopApi.pipelines
+      .getSnapshot()
+      .then((snapshot) => {
+        const hasRunning = (pipelineId: string): boolean =>
+          snapshot.running.some((bundle) =>
+            bundle.jobs.some((job) => job.pipelineId === pipelineId && job.state === "running"),
+          );
         store.setState((s) => {
-          if (jobs.photoAnalysis && !s.aiJobId) {
-            s.aiJobId = jobs.photoAnalysis.jobId;
+          if (hasRunning("photo-analysis") && !s.aiJobId) {
+            s.aiJobId = "running";
             s.aiStatus = "running";
             s.aiPhase = "analyzing";
             s.aiPanelVisible = true;
           }
-          if (jobs.faceDetection && !s.faceJobId) {
-            s.faceJobId = jobs.faceDetection.jobId;
+          if (hasRunning("face-detection") && !s.faceJobId) {
+            s.faceJobId = "running";
             s.faceStatus = "running";
             s.facePanelVisible = true;
           }
-          if (jobs.semanticIndex && !s.semanticIndexJobId) {
-            s.semanticIndexJobId = jobs.semanticIndex.jobId;
+          if (hasRunning("semantic-index") && !s.semanticIndexJobId) {
+            s.semanticIndexJobId = "running";
             s.semanticIndexStatus = "running";
             s.semanticIndexPanelVisible = true;
             s.semanticIndexPhase = "indexing";
           }
-          if (jobs.pathAnalysis && !s.pathAnalysisJobId) {
-            s.pathAnalysisJobId = jobs.pathAnalysis.jobId;
+          if (hasRunning("path-llm-analysis") && !s.pathAnalysisJobId) {
+            s.pathAnalysisJobId = "running";
             s.pathAnalysisStatus = "running";
             s.pathAnalysisPanelVisible = true;
-            s.pathAnalysisFolderPath = jobs.pathAnalysis.folderPath || null;
+            s.pathAnalysisFolderPath = s.pathAnalysisFolderPath || null;
           }
         });
       })
