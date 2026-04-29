@@ -166,6 +166,7 @@ export const IPC_CHANNELS = {
   getFolderAiSummaryOverview: "media:get-folder-ai-summary-overview",
   getFolderTreeScanSummary: "media:get-folder-tree-scan-summary",
   getFolderAiSummaryReport: "media:get-folder-ai-summary-report",
+  getFolderFaceSummaryReport: "media:get-folder-face-summary-report",
   getFolderAiFailedFiles: "media:get-folder-ai-failed-files",
   getFolderAiCoverage: "media:get-folder-ai-coverage",
   getFolderAiRollupsBatch: "media:get-folder-ai-rollups-batch",
@@ -838,6 +839,62 @@ export interface FolderAiSummaryReport {
     folderPath: string;
     name: string;
     coverage: FolderAiCoverageReport;
+  }>;
+}
+
+export interface FolderFaceTopPersonTag {
+  tagId: string;
+  label: string;
+  taggedFaceCount: number;
+  similarFaceCount: number;
+}
+
+export interface FolderFaceCountHistogram {
+  oneFace: number;
+  twoFaces: number;
+  threeFaces: number;
+  fourFaces: number;
+  fiveOrMoreFaces: number;
+}
+
+export interface FolderFaceMainSubjectHistogram {
+  oneMainSubject: number;
+  twoMainSubjects: number;
+  threeMainSubjects: number;
+  fourMainSubjects: number;
+  fiveOrMoreMainSubjects: number;
+}
+
+export interface FolderFaceSummary {
+  folderPath: string;
+  recursive: boolean;
+  totalImages: number;
+  faceAnalyzedImages: number;
+  faceFailedImages: number;
+  imagesWithFaces: number;
+  detectedFaces: number;
+  confirmedTaggedFaces: number;
+  suggestedUntaggedFaces: number;
+  taggedFaces: number;
+  untaggedFaces: number;
+  imagesWithDirectPersonTag: number;
+  facesWithAgeGender: number;
+  facesMissingAgeGender: number;
+  childFaces: number;
+  adultFaces: number;
+  oneMainSubjectWithBackgroundFaces: number;
+  faceCountHistogram: FolderFaceCountHistogram;
+  mainSubjectHistogram: FolderFaceMainSubjectHistogram;
+  topPersonTags: FolderFaceTopPersonTag[];
+}
+
+export interface FolderFaceSummaryReport {
+  selectedWithSubfolders: FolderFaceSummary;
+  selectedDirectOnly: FolderFaceSummary;
+  subfolders: Array<{
+    folderPath: string;
+    name: string;
+    summary: FolderFaceSummary;
   }>;
 }
 
@@ -1762,6 +1819,7 @@ export interface DesktopApi {
   ) => Promise<FolderAiSummaryOverviewReport>;
   getFolderTreeScanSummary: (folderPath: string) => Promise<FolderTreeScanSummary>;
   getFolderAiSummaryReport: (folderPath: string) => Promise<FolderAiSummaryReport>;
+  getFolderFaceSummaryReport: (folderPath: string) => Promise<FolderFaceSummaryReport>;
   getFolderAiFailedFiles: (
     folderPath: string,
     pipeline: FolderAiPipelineKind,

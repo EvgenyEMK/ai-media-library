@@ -13,6 +13,7 @@ import {
 } from "../../src/shared/ipc";
 import { getDesktopDatabase } from "../db/client";
 import { getFolderAiCoverage, getFolderAiRollupsForPaths } from "../db/folder-ai-coverage";
+import { getFolderFaceSummaryReport } from "../db/folder-face-summary";
 import {
   getFolderMetadataScanCompletedAtByPath,
   getFolderSummaryOverview,
@@ -174,6 +175,24 @@ export function registerFolderAiSummaryHandlers(): void {
       }));
 
       return { selectedWithSubfolders, selectedDirectOnly, subfolders };
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.getFolderFaceSummaryReport,
+    async (_event, folderPath: string) => {
+      const normalized = folderPath?.trim();
+      if (!normalized) {
+        return getFolderFaceSummaryReport({
+          folderPath: "",
+          subfolderPaths: [],
+        });
+      }
+      const children = await readFolderChildren(normalized);
+      return getFolderFaceSummaryReport({
+        folderPath: normalized,
+        subfolderPaths: children.map((node) => ({ folderPath: node.path, name: node.name })),
+      });
     },
   );
 
