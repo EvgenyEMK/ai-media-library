@@ -25,6 +25,7 @@ import { photoAnalysisDefinition } from "./photo-analysis";
 import { descriptionEmbeddingDefinition } from "./description-embedding";
 import { semanticIndexDefinition } from "./semantic-index";
 import { descEmbeddingBackfillDefinition } from "./desc-embedding-backfill";
+import { pathLlmAnalysisDefinition } from "./path-llm-analysis";
 import { registerAllPresets } from "../presets";
 
 /**
@@ -72,6 +73,7 @@ export function registerAllPipelineDefinitions(): void {
   pipelineRegistry.register(descriptionEmbeddingDefinition);
   pipelineRegistry.register(semanticIndexDefinition);
   pipelineRegistry.register(descEmbeddingBackfillDefinition);
+  pipelineRegistry.register(pathLlmAnalysisDefinition);
 
   // -------------------------------------------------------------------------
   // Stubs — legacy runners still reachable through their existing IPC channels
@@ -81,11 +83,6 @@ export function registerAllPipelineDefinitions(): void {
     displayName: string;
     concurrencyGroup: PipelineConcurrencyGroup;
   }> = [
-    {
-      id: "path-llm-analysis",
-      displayName: "Extract context from folder paths (LLM)",
-      concurrencyGroup: "ollama",
-    },
   ];
   for (const stub of stubs) {
     pipelineRegistry.register(stubDefinition(stub));

@@ -113,7 +113,7 @@ implementation. Today only 3 of 11 are real:
 | `similar-untagged-counts` | real ✅ | `face:similar-untagged-counts-*` |
 | `photo-analysis` | real ✅ | `media:analyze-folder` (legacy trigger path still active) |
 | `description-embedding` | real ✅ | inline + `desc-embed-backfill-*` |
-| `path-llm-analysis` | stub | `path-llm-*` |
+| `path-llm-analysis` | real ✅ | `path-llm-*` |
 | `semantic-index` | real ✅ | `semantic:rebuild-*` |
 | `desc-embedding-backfill` | real ✅ | `desc-embed-backfill-*` |
 
@@ -158,10 +158,7 @@ as the canonical reference. For each stub:
 
 ### Suggested order of work
 
-Each step is independently shippable. Items earlier in the list
-unblock later ones (input bindings, presets):
-
-1. **`path-llm-analysis`** — standalone, can land any time.
+All planned pipeline definitions in this migration tracker are now real.
 
 After step 7, the actual Phase 7 deletions become safe:
 

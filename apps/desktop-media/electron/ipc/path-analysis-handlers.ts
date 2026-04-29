@@ -33,7 +33,7 @@ import { getOllamaBaseUrlForModelResolve, resolveOllamaTextChatModel } from "../
 import { readSettings } from "../storage";
 
 /** Deduped, normalized paths (order preserved) for stable catalog + LLM batches. */
-function normalizePathList(imagePaths: string[]): string[] {
+export function normalizePathList(imagePaths: string[]): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
   for (const p of imagePaths) {
@@ -46,7 +46,7 @@ function normalizePathList(imagePaths: string[]): string[] {
   return out;
 }
 
-function getUniqueParentFolders(paths: string[]): string[] {
+export function getUniqueParentFolders(paths: string[]): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
   for (const filePath of paths) {
@@ -59,7 +59,7 @@ function getUniqueParentFolders(paths: string[]): string[] {
   return out;
 }
 
-function splitPathsForLlm(paths: string[]): {
+export function splitPathsForLlm(paths: string[]): {
   pathsForFileLlm: string[];
   skippedCameraPrefixPaths: string[];
 } {
@@ -76,7 +76,7 @@ function splitPathsForLlm(paths: string[]): {
   return { pathsForFileLlm, skippedCameraPrefixPaths };
 }
 
-function folderContextFromResult(result: LlmPathResult): FolderLlmContext {
+export function folderContextFromResult(result: LlmPathResult): FolderLlmContext {
   return {
     date: result.date
       ? {
@@ -99,7 +99,7 @@ function folderContextFromResult(result: LlmPathResult): FolderLlmContext {
   };
 }
 
-function mergeResultWithFolderContext(
+export function mergeResultWithFolderContext(
   result: LlmPathResult,
   context: FolderLlmContext | undefined,
 ): LlmPathResult {
@@ -467,7 +467,7 @@ async function runPathAnalysisBackground(
   }
 }
 
-function persistLlmPathResult(filePath: string, result: LlmPathResult, model: string): void {
+export function persistLlmPathResult(filePath: string, result: LlmPathResult, model: string): void {
   const db = getDesktopDatabase();
   const libraryId = DEFAULT_LIBRARY_ID;
   const now = new Date().toISOString();
