@@ -10,8 +10,6 @@
  */
 
 import { pipelineRegistry } from "../pipeline-registry";
-import type { PipelineDefinition } from "../pipeline-registry";
-import type { PipelineConcurrencyGroup, PipelineId } from "../pipeline-types";
 import { geocoderInitDefinition } from "./geocoder-init";
 import { gpsGeocodeDefinition } from "./gps-geocode";
 import { pathRuleExtractionDefinition } from "./path-rule-extraction";
@@ -27,30 +25,6 @@ import { semanticIndexDefinition } from "./semantic-index";
 import { descEmbeddingBackfillDefinition } from "./desc-embedding-backfill";
 import { pathLlmAnalysisDefinition } from "./path-llm-analysis";
 import { registerAllPresets } from "../presets";
-
-/**
- * Build a stub definition that throws when invoked. Used for pipelines whose
- * legacy runners have not yet been wrapped (e.g. metadata-scan, face-detection,
- * photo-analysis, semantic-index). These can still be reached through their
- * legacy IPC channels — the scheduler simply cannot execute them yet.
- */
-function stubDefinition(opts: {
-  id: PipelineId;
-  displayName: string;
-  concurrencyGroup: PipelineConcurrencyGroup;
-}): PipelineDefinition<unknown, never> {
-  return {
-    id: opts.id,
-    displayName: opts.displayName,
-    concurrencyGroup: opts.concurrencyGroup,
-    run: () => {
-      throw new Error(
-        `[pipelines] Pipeline "${opts.id}" is registered but not yet implemented through the scheduler. ` +
-          `Use the legacy IPC channel until the runner is migrated.`,
-      );
-    },
-  };
-}
 
 /**
  * Register every known pipeline. Idempotent — re-registering replaces the
@@ -74,19 +48,6 @@ export function registerAllPipelineDefinitions(): void {
   pipelineRegistry.register(semanticIndexDefinition);
   pipelineRegistry.register(descEmbeddingBackfillDefinition);
   pipelineRegistry.register(pathLlmAnalysisDefinition);
-
-  // -------------------------------------------------------------------------
-  // Stubs — legacy runners still reachable through their existing IPC channels
-  // -------------------------------------------------------------------------
-  const stubs: Array<{
-    id: PipelineId;
-    displayName: string;
-    concurrencyGroup: PipelineConcurrencyGroup;
-  }> = [
-  ];
-  for (const stub of stubs) {
-    pipelineRegistry.register(stubDefinition(stub));
-  }
 
   // Presets are registered alongside definitions so callers see a populated
   // preset registry by the time the IPC handler accepts requests.

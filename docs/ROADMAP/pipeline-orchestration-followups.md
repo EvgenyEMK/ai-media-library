@@ -93,12 +93,12 @@ orchestration UX will inherit the perf regression.
 
 ---
 
-## 2. Phase 7 cleanup pre-requisites
+## 2. Phase 7 cleanup status
 
 The plan's Phase 7 ("delete legacy IPC channels, `runningXxxJobs`
-maps, `bind*Progress` files, `getActiveJobStatuses`") cannot be done
-until each remaining stub `PipelineDefinition` has a real
-implementation. Today only 3 of 11 are real:
+maps, `bind*Progress` files, `getActiveJobStatuses`") required all
+pipeline definitions to be migrated first. That pre-requisite is now
+complete:
 
 | Pipeline id | Status | Legacy IPC channel still in use |
 |---|---|---|
@@ -117,13 +117,15 @@ implementation. Today only 3 of 11 are real:
 | `semantic-index` | real ✅ | `semantic:rebuild-*` |
 | `desc-embedding-backfill` | real ✅ | `desc-embed-backfill-*` |
 
-Deleting any legacy channel before its pipeline is wrapped would
-break the corresponding feature.
+The remaining work is the facade-removal pass: existing renderer entry
+points still call many legacy IPC channels that internally run their old
+job orchestration path.
 
 ### Migration recipe (per pipeline)
 
 Use `apps/desktop-media/electron/pipelines/definitions/gps-geocode.ts`
-as the canonical reference. For each stub:
+as the canonical reference for shape; apply this recipe per *legacy IPC
+facade*:
 
 1. **Move runner body.** Move the body of the legacy `run*Job` function
    into a `PipelineDefinition.run`. Replace the per-feature progress
@@ -138,19 +140,16 @@ as the canonical reference. For each stub:
    Inputs that are easy to chain (e.g. `mediaItemIds`) belong in
    `Params`; everything else in `Output` so downstream jobs can read
    it via `inputBinding.mapper`.
-4. **Register.** Add the definition in
-   `apps/desktop-media/electron/pipelines/definitions/index.ts`
-   (replace the stub entry).
-5. **Facade the IPC channel.** Convert the legacy IPC handler into
+4. **Facade the IPC channel.** Convert the legacy IPC handler into
    a thin facade: build a single-job `BundleSpec`, call
    `pipelineScheduler.enqueueBundle(...)`, and forward the bundle id
    as the legacy job id. This keeps existing renderer hooks working
    while the slice migration happens.
-6. **Migrate renderer state.** Update the renderer's per-feature
+5. **Migrate renderer state.** Update the renderer's per-feature
    slice (`packages/media-store/src/slices/`) to subscribe to
    `pipelineQueueSlice` instead of the legacy `bind*Progress` events.
    Keep both paths until step 7.
-7. **Delete the legacy facade.** Once the renderer no longer
+6. **Delete the legacy facade.** Once the renderer no longer
    subscribes to the legacy progress events, delete the facade IPC
    handler, the corresponding `IPC_CHANNELS.*` entries, and the
    `runningXxxJobs` map in
@@ -158,7 +157,8 @@ as the canonical reference. For each stub:
 
 ### Suggested order of work
 
-All planned pipeline definitions in this migration tracker are now real.
+All planned pipeline definitions in this migration tracker are now real,
+and the registry no longer uses stub definitions.
 
 After step 7, the actual Phase 7 deletions become safe:
 
