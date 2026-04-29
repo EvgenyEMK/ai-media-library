@@ -41,6 +41,16 @@ export function smartAlbumSettingsToFilters(settings: SmartAlbumSettings): Smart
 }
 
 export const BEST_OF_YEAR_RANDOM_CANDIDATE_LIMIT = 1000;
+export interface SmartPlaceHierarchyLevels {
+  area1: boolean;
+  area2: boolean;
+  city: boolean;
+}
+export const DEFAULT_SMART_PLACE_HIERARCHY_LEVELS: SmartPlaceHierarchyLevels = {
+  area1: true,
+  area2: true,
+  city: true,
+};
 
 export type ActiveSmartAlbum =
   | {
@@ -77,6 +87,8 @@ export function useSmartAlbums(defaultFilters = DEFAULT_SMART_ALBUM_FILTERS): {
   randomRefreshKey: number;
   refreshRandomOrder: () => void;
   randomCandidateLimit: number;
+  smartPlaceHierarchyLevels: SmartPlaceHierarchyLevels;
+  setSmartPlaceHierarchyLevels: Dispatch<SetStateAction<SmartPlaceHierarchyLevels>>;
 } {
   const [smartPlaceCountries, setSmartPlaceCountries] = useState<SmartAlbumPlaceCountry[]>([]);
   const [smartYears, setSmartYears] = useState<SmartAlbumYearSummary[]>([]);
@@ -89,6 +101,9 @@ export function useSmartAlbums(defaultFilters = DEFAULT_SMART_ALBUM_FILTERS): {
   const [smartAlbumFilters, setSmartAlbumFilters] = useState<SmartAlbumFilters>(defaultFilters);
   const [randomizeEnabled, setRandomizeEnabled] = useState(true);
   const [randomRefreshKey, setRandomRefreshKey] = useState(0);
+  const [smartPlaceHierarchyLevels, setSmartPlaceHierarchyLevels] = useState<SmartPlaceHierarchyLevels>(
+    DEFAULT_SMART_PLACE_HIERARCHY_LEVELS,
+  );
 
   return {
     smartPlaceCountries,
@@ -114,5 +129,7 @@ export function useSmartAlbums(defaultFilters = DEFAULT_SMART_ALBUM_FILTERS): {
     randomRefreshKey,
     refreshRandomOrder: () => setRandomRefreshKey((current) => current + 1),
     randomCandidateLimit: BEST_OF_YEAR_RANDOM_CANDIDATE_LIMIT,
+    smartPlaceHierarchyLevels,
+    setSmartPlaceHierarchyLevels,
   };
 }

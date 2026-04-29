@@ -37,9 +37,9 @@ function hasVisibleFieldValue(value: string | number | null | undefined): boolea
   return true;
 }
 
-/** Catalog country, state/province (`locationArea`), and city — pipe-separated, missing parts omitted. */
+/** Catalog country, state/province (`locationArea`), admin2 (`locationArea2`), and city — pipe-separated. */
 function formatCatalogLocationLine(metadata: DesktopMediaItemMetadata): string | null {
-  const parts = [metadata.country, metadata.locationArea, metadata.city].filter(
+  const parts = [metadata.country, metadata.locationArea, metadata.locationArea2, metadata.city].filter(
     (part): part is string => typeof part === "string" && hasVisibleFieldValue(part),
   );
   if (parts.length === 0) {

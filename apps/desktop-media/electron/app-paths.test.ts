@@ -1,7 +1,8 @@
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   resolveCacheRoot,
+  resolveGeonamesPath,
   resolveModelsPath,
   resolveRuntimeRoot,
   resolveSessionDataPath,
@@ -21,6 +22,10 @@ function createAppMock(appDataPath: string): MinimalApp {
 }
 
 describe("app-paths", () => {
+  afterEach(() => {
+    delete process.env.EMK_DESKTOP_RUNTIME_ROOT_PATH;
+  });
+
   it("places runtime folders under appData/EMK Desktop Media", () => {
     const appData = "C:/Users/test/AppData/Roaming";
     const app = createAppMock(appData) as never;
@@ -29,5 +34,15 @@ describe("app-paths", () => {
     expect(resolveCacheRoot(app)).toBe(path.join(runtimeRoot, "cache"));
     expect(resolveSessionDataPath(app)).toBe(path.join(runtimeRoot, "cache", "session-data"));
     expect(resolveModelsPath(app)).toBe(path.join(runtimeRoot, "ai-models"));
+    expect(resolveGeonamesPath(app)).toBe(path.join(runtimeRoot, "geonames"));
+  });
+
+  it("uses the runtime root override when provided", () => {
+    process.env.EMK_DESKTOP_RUNTIME_ROOT_PATH = "D:/EMK/runtime";
+    const app = createAppMock("C:/Users/test/AppData/Roaming") as never;
+
+    expect(resolveRuntimeRoot(app)).toBe("D:/EMK/runtime");
+    expect(resolveModelsPath(app)).toBe(path.join("D:/EMK/runtime", "ai-models"));
+    expect(resolveGeonamesPath(app)).toBe(path.join("D:/EMK/runtime", "geonames"));
   });
 });

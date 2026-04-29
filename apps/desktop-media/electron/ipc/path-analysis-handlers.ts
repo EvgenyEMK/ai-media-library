@@ -231,7 +231,7 @@ export function registerPathAnalysisHandlers(): void {
       if (!ollamaModel) {
         throw new Error(
           `No suitable Ollama text model found at ${getOllamaBaseUrlForModelResolve()}. ` +
-            `Pull the models set under Folder scanning & file metadata → Detect location from file paths using AI (LLM), ` +
+            `Pull the models set under Folder scanning, file metadata and Geo-location -> Detect location and dates from file paths using AI (LLM), ` +
             `or enter ids that match ollama list.`,
         );
       }

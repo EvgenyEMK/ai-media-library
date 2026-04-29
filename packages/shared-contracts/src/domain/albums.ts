@@ -99,12 +99,22 @@ export interface SmartAlbumPlaceEntry {
   country: string;
   city: string;
   group: string;
+  /** When grouping is area-city and admin2 is present: admin1 (state/province) for display as "Admin2 (Admin1)". */
+  groupParent?: string | null;
+  /** Canonical area1 (admin1) for area-city trees. */
+  area1?: string | null;
+  /** Canonical area2 (admin2 or fallback to area1) for area-city trees. */
+  area2?: string | null;
+  /** Which hierarchy level this entry represents when opened as an album leaf. */
+  leafLevel?: "area1" | "area2" | "city";
   label: string;
   mediaCount: number;
 }
 
 export interface SmartAlbumPlaceGroup {
   group: string;
+  /** Same as entry.groupParent when grouping is area-city (admin1 alongside admin2 group key). */
+  groupParent?: string | null;
   mediaCount: number;
   entries: SmartAlbumPlaceEntry[];
 }
@@ -140,10 +150,16 @@ export type SmartAlbumItemsRequest =
   | {
       kind: "place";
       country: string;
-      city: string;
+      city: string | null;
       group: string;
       grouping: SmartAlbumPlaceGrouping;
       source: SmartAlbumPlaceSource;
+      /** Optional for area-city dynamic hierarchy leaves. */
+      leafLevel?: "area1" | "area2" | "city";
+      /** Optional for area-city dynamic hierarchy leaves. */
+      area1?: string | null;
+      /** Optional for area-city dynamic hierarchy leaves. */
+      area2?: string | null;
       filters?: SmartAlbumFilters;
       offset?: number;
       limit?: number;

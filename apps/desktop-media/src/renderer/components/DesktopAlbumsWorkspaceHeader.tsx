@@ -90,7 +90,7 @@ export function DesktopAlbumsWorkspaceHeader({
                 : "Smart albums generated from dates, places, ratings, and AI metadata."}
             </p>
           </div>
-          {smartAlbumRootKind === "best-of-year" ? (
+          {smartAlbumRootKind === "best-of-year" || smartAlbumRootKind === "country-area-city" ? (
             <div className="flex items-center gap-2">
               <ToolbarIconButton
                 title={smartFiltersOpen ? "Hide filters" : "Show filters"}
@@ -102,7 +102,7 @@ export function DesktopAlbumsWorkspaceHeader({
               >
                 <Filter size={16} aria-hidden="true" />
               </ToolbarIconButton>
-              {activeSmartAlbumKind === "best-of-year" ? (
+              {smartAlbumRootKind === "best-of-year" && activeSmartAlbumKind === "best-of-year" ? (
                 <>
                   <button
                     type="button"

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { performance } from "node:perf_hooks";
 import { ipcMain } from "electron";
 import {
   IPC_CHANNELS,
@@ -8,6 +9,7 @@ import {
   type FolderAiSummaryOverviewRequestOptions,
   type FolderAiSummaryOverviewReport,
   type FolderAiSummaryReport,
+  type FolderTreeScanSummary,
 } from "../../src/shared/ipc";
 import { getDesktopDatabase } from "../db/client";
 import { getFolderAiCoverage, getFolderAiRollupsForPaths } from "../db/folder-ai-coverage";
@@ -15,8 +17,19 @@ import {
   getFolderMetadataScanCompletedAtByPath,
   getFolderSummaryOverview,
 } from "../db/folder-summary-overview";
-import { readFolderChildren } from "../fs-media";
+import { readDirectFolderChildren, readFolderChildren } from "../fs-media";
 import { MULTIMODAL_EMBED_MODEL } from "../semantic-embeddings";
+
+const DEBUG_FOLDER_AI_SUMMARY = true;
+
+function debugFolderAiSummary(message: string, details?: Record<string, unknown>): void {
+  if (!DEBUG_FOLDER_AI_SUMMARY) return;
+  console.log("[debug][folder-ai-summary]", message, details ?? {});
+}
+
+function elapsedSince(startedAt: number): string {
+  return `${Math.round(performance.now() - startedAt)}ms`;
+}
 
 export function registerFolderAiSummaryHandlers(): void {
   ipcMain.handle(
@@ -31,32 +44,110 @@ export function registerFolderAiSummaryHandlers(): void {
         return {
           selectedWithSubfolders: getFolderSummaryOverview({ folderPath: "", recursive: true }),
           selectedDirectOnly: getFolderSummaryOverview({ folderPath: "", recursive: false }),
+          hasDirectSubfolders: false,
           subfolders: [],
         };
       }
 
+      const startedAt = performance.now();
       const includeSubfolders = options?.includeSubfolders !== false;
-      const children = includeSubfolders ? await readFolderChildren(normalized) : [];
-      const subfolders = includeSubfolders
+      const includeSubfolderOverviews = options?.includeSubfolderOverviews === true;
+      debugFolderAiSummary("overview:start", { folderPath: normalized, includeSubfolders, includeSubfolderOverviews });
+
+      const selectedStartedAt = performance.now();
+      const selectedWithSubfolders = getFolderSummaryOverview({ folderPath: normalized, recursive: true });
+      const selectedDirectOnly = getFolderSummaryOverview({ folderPath: normalized, recursive: false });
+      debugFolderAiSummary("overview:selected-complete", {
+        folderPath: normalized,
+        elapsed: elapsedSince(selectedStartedAt),
+        totalImages: selectedWithSubfolders.totalImages,
+        totalVideos: selectedWithSubfolders.totalVideos,
+      });
+
+      const childrenStartedAt = performance.now();
+      const children = includeSubfolders ? await readDirectFolderChildren(normalized) : [];
+      debugFolderAiSummary("overview:children-complete", {
+        folderPath: normalized,
+        elapsed: elapsedSince(childrenStartedAt),
+        directSubfolders: children.length,
+      });
+
+      const subfolders = includeSubfolders && includeSubfolderOverviews
         ? children.map((node) => ({
             folderPath: node.path,
             name: node.name,
             overview: getFolderSummaryOverview({ folderPath: node.path, recursive: true }),
           }))
         : [];
+      if (includeSubfolders && includeSubfolderOverviews) {
+        debugFolderAiSummary("overview:subfolder-overviews-complete", {
+          folderPath: normalized,
+          elapsed: elapsedSince(childrenStartedAt),
+          directSubfolders: subfolders.length,
+        });
+      }
+
+      const directScanStartedAt = performance.now();
       const directSubfolderScanCompletedAtByPath = getFolderMetadataScanCompletedAtByPath(
         children.map((node) => node.path),
       );
       const notFullyScannedDirectSubfolderCount = children.filter(
         (node) => directSubfolderScanCompletedAtByPath[node.path] == null,
       ).length;
-      const selectedWithSubfolders = getFolderSummaryOverview({ folderPath: normalized, recursive: true });
       selectedWithSubfolders.scanFreshness.notFullyScannedDirectSubfolderCount =
         notFullyScannedDirectSubfolderCount;
+      debugFolderAiSummary("overview:direct-scan-complete", {
+        folderPath: normalized,
+        elapsed: elapsedSince(directScanStartedAt),
+        notFullyScannedDirectSubfolderCount,
+      });
+      debugFolderAiSummary("overview:complete", { folderPath: normalized, elapsed: elapsedSince(startedAt) });
+
       return {
         selectedWithSubfolders,
-        selectedDirectOnly: getFolderSummaryOverview({ folderPath: normalized, recursive: false }),
+        selectedDirectOnly,
+        hasDirectSubfolders: children.length > 0,
         subfolders,
+      };
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.getFolderTreeScanSummary,
+    async (_event, folderPath: string): Promise<FolderTreeScanSummary> => {
+      const normalized = folderPath?.trim();
+      if (!normalized) {
+        return { hasDirectSubfolders: false, notFullyScannedDirectSubfolderCount: 0 };
+      }
+
+      const startedAt = performance.now();
+      debugFolderAiSummary("tree-scan:start", { folderPath: normalized });
+      const childrenStartedAt = performance.now();
+      const children = await readDirectFolderChildren(normalized);
+      debugFolderAiSummary("tree-scan:children-complete", {
+        folderPath: normalized,
+        elapsed: elapsedSince(childrenStartedAt),
+        directSubfolders: children.length,
+      });
+
+      const directScanStartedAt = performance.now();
+      const directSubfolderScanCompletedAtByPath = getFolderMetadataScanCompletedAtByPath(
+        children.map((node) => node.path),
+      );
+      const notFullyScannedDirectSubfolderCount = children.filter(
+        (node) => directSubfolderScanCompletedAtByPath[node.path] == null,
+      ).length;
+      debugFolderAiSummary("tree-scan:complete", {
+        folderPath: normalized,
+        elapsed: elapsedSince(startedAt),
+        directScanElapsed: elapsedSince(directScanStartedAt),
+        directSubfolders: children.length,
+        notFullyScannedDirectSubfolderCount,
+      });
+
+      return {
+        hasDirectSubfolders: children.length > 0,
+        notFullyScannedDirectSubfolderCount,
       };
     },
   );

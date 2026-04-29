@@ -36,6 +36,7 @@ function insertMediaItem(args: {
   city?: string | null;
   country?: string | null;
   locationArea?: string | null;
+  locationArea2?: string | null;
   locationSource?: "gps" | "ai_vision" | "path_script" | null;
   photoTakenAt?: string | null;
 }): void {
@@ -45,8 +46,8 @@ function insertMediaItem(args: {
     .prepare(
       `INSERT INTO media_items (
         id, library_id, source_path, filename, star_rating, ai_metadata,
-        city, country, location_area, location_source, photo_taken_at, media_kind, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'image', ?, ?)`,
+        city, country, location_area, location_area2, location_source, photo_taken_at, media_kind, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'image', ?, ?)`,
     )
     .run(
       args.id,
@@ -65,6 +66,7 @@ function insertMediaItem(args: {
       args.city ?? null,
       args.country ?? null,
       args.locationArea ?? null,
+      args.locationArea2 ?? null,
       args.locationSource ?? "gps",
       args.photoTakenAt ?? null,
       now,
@@ -331,6 +333,49 @@ describe.skipIf(!HAS_SQLITE)("media albums DB", () => {
 
     const aiCountries = albums.listSmartAlbumPlaces({ grouping: "year-city", source: "non-gps" });
     expect(aiCountries.countries.map((country) => country.country)).toEqual(["Spain"]);
+  });
+
+  it("area-city GPS groups by admin2 (location_area2) with admin1 as groupParent", () => {
+    insertMediaItem({
+      id: "sf-chinatown",
+      sourcePath: "C:/photos/sf.jpg",
+      starRating: null,
+      aiQuality: null,
+      city: "Chinatown",
+      country: "United States",
+      locationArea: "California",
+      locationArea2: "San Francisco County",
+      photoTakenAt: "2024-01-01",
+    });
+    insertMediaItem({
+      id: "la-only",
+      sourcePath: "C:/photos/la.jpg",
+      starRating: null,
+      aiQuality: null,
+      city: "Los Angeles",
+      country: "United States",
+      locationArea: "California",
+      photoTakenAt: "2024-01-01",
+    });
+
+    const result = albums.listSmartAlbumPlaces({ grouping: "area-city", source: "gps" });
+    const us = result.countries.find((c) => c.country === "United States");
+    const countyGroup = us?.groups.find((g) => g.group === "San Francisco County");
+    expect(countyGroup?.groupParent).toBe("California");
+    const stateFallbackGroup = us?.groups.find((g) => g.group === "California");
+    expect(stateFallbackGroup).toBeDefined();
+    expect(stateFallbackGroup?.groupParent ?? null).toBeNull();
+
+    expect(
+      albums.listSmartAlbumItems({
+        kind: "place",
+        country: "United States",
+        city: "Chinatown",
+        group: "San Francisco County",
+        grouping: "area-city",
+        source: "gps",
+      }).rows.map((item) => item.id),
+    ).toEqual(["sf-chinatown"]);
   });
 
   it("generates country smart album entries grouped as month > area", () => {

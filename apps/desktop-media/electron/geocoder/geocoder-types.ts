@@ -2,6 +2,8 @@ export interface GeocodedLocation {
   countryCode: string;
   countryName: string;
   admin1Name: string | null;
+  /** GeoNames admin2 (e.g. county / district), null when not loaded or unknown */
+  admin2Name: string | null;
   cityName: string;
   distance: number;
 }

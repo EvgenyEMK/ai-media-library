@@ -9,6 +9,17 @@ import type {
 import type { GeocodedLocation, GeocoderStatus } from "./geocoder-types";
 import { isoCountryName } from "./country-codes";
 
+function mapGeoNameHitToLocation(hit: GeoNameRecord): GeocodedLocation {
+  return {
+    countryCode: hit.countryCode,
+    countryName: isoCountryName(hit.countryCode),
+    admin1Name: hit.admin1Code?.name ?? null,
+    admin2Name: hit.admin2Code?.name ?? null,
+    cityName: hit.name,
+    distance: hit.distance,
+  };
+}
+
 const requireGeocoder = createRequire(import.meta.url);
 
 export type LocalReverseGeocoderModule = {
@@ -60,6 +71,7 @@ let statusListener: ((status: GeocoderStatus, error?: string) => void) | null = 
 const GEOCODER_CACHE_DATASETS = [
   { dirName: "cities1000", baseName: "cities1000" },
   { dirName: "admin1_codes", baseName: "admin1CodesASCII" },
+  { dirName: "admin2_codes", baseName: "admin2CodesASCII" },
 ];
 
 function emitStatus(status: GeocoderStatus, error?: string): void {
@@ -83,10 +95,6 @@ export function isGeocoderReady(): boolean {
 
 export function getGeocoderError(): string | null {
   return geocoderError;
-}
-
-function getGeocoderDumpDir(userDataPath: string): string {
-  return path.join(userDataPath, "geonames");
 }
 
 function getCachedDatasetPath(datasetDir: string, baseName: string): string | null {
@@ -129,9 +137,9 @@ function stabilizeCachedGeocoderData(dumpDir: string): boolean {
   return allRequiredDataCached;
 }
 
-export function hasCachedGeocoderData(userDataPath: string): boolean {
+export function hasCachedGeocoderData(geonamesPath: string): boolean {
   return GEOCODER_CACHE_DATASETS.every(({ dirName, baseName }) =>
-    getCachedDatasetPath(path.join(getGeocoderDumpDir(userDataPath), dirName), baseName) !== null,
+    getCachedDatasetPath(path.join(geonamesPath, dirName), baseName) !== null,
   );
 }
 
@@ -150,15 +158,40 @@ function shouldUseE2eGeocoderStub(): boolean {
   return process.env.EMK_E2E_GEOCODER_STUB === "1";
 }
 
+function createE2eStubLocation(
+  latitude: number,
+  longitude: number,
+): GeocodedLocation {
+  if (latitude > 45 && longitude > 5 && longitude < 7) {
+    return {
+      countryCode: "CH",
+      countryName: "Switzerland",
+      admin1Name: "Geneva",
+      admin2Name: null,
+      cityName: "Geneva",
+      distance: 0,
+    };
+  }
+
+  return {
+    countryCode: "ME",
+    countryName: "Montenegro",
+    admin1Name: "Kotor",
+    admin2Name: null,
+    cityName: "Kotor",
+    distance: 0,
+  };
+}
+
 /**
  * Lazily initialize the geocoder. Downloads ~2 GB of GeoNames data on first
  * run, then builds an in-memory k-d tree. Subsequent starts reuse cached files.
  *
- * We only load cities1000 + admin1 codes (no admin2/3/4, no alternate names)
- * to keep memory and download size reasonable.
+ * We load cities1000 + admin1 + admin2 codes (no admin3/4, no alternate names)
+ * for county/district (admin2) alongside state/province (admin1).
  */
 export async function initGeocoder(
-  userDataPath: string,
+  geonamesPath: string,
   options: { forceRefresh?: boolean } = {},
 ): Promise<void> {
   if ((geocoderReady && options.forceRefresh !== true) || geocoderInitializing) return;
@@ -168,7 +201,7 @@ export async function initGeocoder(
   /** Playwright E2E only: same IPC/progress events without fetching GeoNames. */
   if (shouldUseE2eGeocoderStub()) {
     try {
-      emitStatus(hasCachedGeocoderData(userDataPath) ? "loading-cache" : "downloading");
+      emitStatus(hasCachedGeocoderData(geonamesPath) ? "loading-cache" : "downloading");
       emitStatus("parsing");
       await new Promise<void>((resolve) => {
         setTimeout(resolve, 50);
@@ -190,19 +223,18 @@ export async function initGeocoder(
   }
 
   try {
-    const dumpDir = getGeocoderDumpDir(userDataPath);
     if (options.forceRefresh === true) {
-      clearCachedGeocoderData(dumpDir);
+      clearCachedGeocoderData(geonamesPath);
     }
-    const usingCachedData = options.forceRefresh === true ? false : stabilizeCachedGeocoderData(dumpDir);
+    const usingCachedData = options.forceRefresh === true ? false : stabilizeCachedGeocoderData(geonamesPath);
     emitStatus(usingCachedData ? "loading-cache" : "downloading");
     const geocoder = getGeocoder();
 
     const initOptions: InitOptions = {
-      dumpDirectory: dumpDir,
+      dumpDirectory: geonamesPath,
       load: {
         admin1: true,
-        admin2: false,
+        admin2: true,
         admin3: false,
         admin4: false,
         alternateNames: false,
@@ -247,6 +279,7 @@ export async function reverseGeocode(
   longitude: number,
 ): Promise<GeocodedLocation | null> {
   if (!geocoderReady) return null;
+  if (shouldUseE2eGeocoderStub()) return createE2eStubLocation(latitude, longitude);
 
   const geocoder = getGeocoder();
   const point: LookUpPoint = { latitude, longitude };
@@ -258,13 +291,7 @@ export async function reverseGeocode(
         return;
       }
       const hit = results[0][0];
-      resolve({
-        countryCode: hit.countryCode,
-        countryName: isoCountryName(hit.countryCode),
-        admin1Name: hit.admin1Code?.name ?? null,
-        cityName: hit.name,
-        distance: hit.distance,
-      });
+      resolve(mapGeoNameHitToLocation(hit));
     });
   });
 }
@@ -279,6 +306,9 @@ export async function reverseGeocodeBatch(
   if (!geocoderReady || points.length === 0) {
     return points.map(() => null);
   }
+  if (shouldUseE2eGeocoderStub()) {
+    return points.map((point) => createE2eStubLocation(point.latitude, point.longitude));
+  }
 
   const geocoder = getGeocoder();
 
@@ -291,13 +321,7 @@ export async function reverseGeocodeBatch(
       const out = points.map((_, i) => {
         const hit = results[i]?.[0];
         if (!hit) return null;
-        return {
-          countryCode: hit.countryCode,
-          countryName: isoCountryName(hit.countryCode),
-          admin1Name: hit.admin1Code?.name ?? null,
-          cityName: hit.name,
-          distance: hit.distance,
-        };
+        return mapGeoNameHitToLocation(hit);
       });
       resolve(out);
     });

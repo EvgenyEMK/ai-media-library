@@ -107,8 +107,8 @@ const UI_TEXT = {
   title: "Settings",
   hideAdvancedSettingsTitle: "Hide advanced settings",
   scanForFileChanges: "Scan for file changes",
-  /** Shorter than “folder change scanning and file metadata management”; covers scan policy + embedded writes + path helpers. */
-  fileMetadataManagement: "Folder scanning & file metadata",
+  /** Covers scan policy, embedded metadata writes, path helpers, and GPS reverse geocoding. */
+  fileMetadataManagement: "Folder scanning, file metadata and Geo-location",
   smartAlbums: "Smart albums",
   defaultRatingTitle: "Default Rating",
   defaultAiRatingTitle: "Default AI rating",
@@ -128,6 +128,7 @@ const UI_TEXT = {
   databaseFolder: "Database folder",
   databaseFile: "Database file",
   modelsPath: "AI models folder",
+  geonamesPath: "Geo-location database folder (GPS coordinates decoding to country, area, city)",
   cachePath: "Disposable cache folder",
   notAvailable: "Not available",
   faceDetection: "Face detection",
@@ -292,6 +293,7 @@ export function DesktopSettingsSection({
     dbFileName: string;
     dbPath: string;
     modelsPath: string;
+    geonamesPath: string;
     cachePath: string;
   } | null>(null);
 
@@ -454,6 +456,107 @@ export function DesktopSettingsSection({
       <SettingsSectionCard title={UI_TEXT.fileMetadataManagement}>
         <div className="space-y-3">
           <SettingsCheckboxField
+            title={UI_TEXT.pathExtractDatesTitle}
+            description={UI_TEXT.pathExtractDatesDescription}
+            checked={pathExtractionSettings.extractDates}
+            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+            surfaceVariant="accent-stripe"
+            onChange={(next) => onPathExtractionSettingChange("extractDates", next)}
+          />
+          <SettingsCheckboxField
+            title={UI_TEXT.gpsLocationDetectionTitle}
+            description={UI_TEXT.gpsLocationDetectionDescription}
+            checked={folderScanningSettings.detectLocationFromGps}
+            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+            surfaceVariant="accent-stripe"
+            onChange={handleGpsToggle}
+          />
+          {showGpsConfirm ? (
+            <div className="rounded-md border border-amber-700/60 border-l-4 border-l-primary/70 bg-amber-950/40 p-3">
+              <p className="m-0 text-sm font-medium text-amber-200">
+                {gpsConfirmHasLocalCopy
+                  ? UI_TEXT.gpsLocationDetectionLocalCopyTitle
+                  : UI_TEXT.gpsLocationDetectionConfirmTitle}
+              </p>
+              <p className="m-0 mt-1 text-sm text-amber-200/80">
+                {gpsConfirmHasLocalCopy
+                  ? UI_TEXT.gpsLocationDetectionLocalCopyMessage
+                  : UI_TEXT.gpsLocationDetectionConfirmMessage}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="inline-flex h-8 items-center rounded-md bg-amber-700 px-3 text-sm text-white hover:bg-amber-600"
+                  onClick={() => enableGpsLocationDetection({ forceRefresh: false })}
+                  autoFocus={gpsConfirmHasLocalCopy}
+                >
+                  {gpsConfirmHasLocalCopy
+                    ? UI_TEXT.gpsLocationDetectionUseLocalCopy
+                    : UI_TEXT.gpsLocationDetectionConfirmOk}
+                </button>
+                {gpsConfirmHasLocalCopy ? (
+                  <button
+                    type="button"
+                    className="inline-flex h-8 items-center rounded-md border border-amber-700/70 px-3 text-sm text-amber-100 hover:bg-amber-900/40"
+                    onClick={() => enableGpsLocationDetection({ forceRefresh: true })}
+                  >
+                    {UI_TEXT.gpsLocationDetectionDownloadAgain}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm"
+                  onClick={cancelGpsEnable}
+                >
+                  {UI_TEXT.gpsLocationDetectionConfirmCancel}
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {showAdvancedSettings ? (
+            <SettingsCheckboxField
+              title={UI_TEXT.pathUseLlmTitle}
+              description={UI_TEXT.pathUseLlmDescription}
+              checked={pathExtractionSettings.useLlm}
+              checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+              advanced
+              surfaceVariant="accent-stripe"
+              onChange={(next) => onPathExtractionSettingChange("useLlm", next)}
+            />
+          ) : null}
+          {showAdvancedSettings && pathExtractionSettings.useLlm ? (
+            <div
+              className={cn(
+                settingsCustomOptionSurfaceClass("accent-stripe"),
+                "border-l-primary/70",
+              )}
+            >
+              <div className="flex flex-col gap-3">
+                <p className="m-0 text-sm text-muted-foreground">{UI_TEXT.pathLlmModelDescription}</p>
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-foreground">{UI_TEXT.pathLlmModelPrimaryLabel}</span>
+                  <input
+                    type="text"
+                    value={pathExtractionSettings.llmModelPrimary}
+                    onChange={(e) => onPathExtractionSettingChange("llmModelPrimary", e.target.value)}
+                    className="h-9 w-full max-w-md rounded-md border border-border bg-background px-2 text-base"
+                    autoComplete="off"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-foreground">{UI_TEXT.pathLlmModelFallbackLabel}</span>
+                  <input
+                    type="text"
+                    value={pathExtractionSettings.llmModelFallback}
+                    onChange={(e) => onPathExtractionSettingChange("llmModelFallback", e.target.value)}
+                    className="h-9 w-full max-w-md rounded-md border border-border bg-background px-2 text-base"
+                    autoComplete="off"
+                  />
+                </label>
+              </div>
+            </div>
+          ) : null}
+          <SettingsCheckboxField
             title={UI_TEXT.emptyFolderAiSummaryTitle}
             description={UI_TEXT.emptyFolderAiSummaryDescription}
             checked={folderScanningSettings.showFolderAiSummaryWhenSelectingEmptyFolder}
@@ -507,107 +610,6 @@ export function DesktopSettingsSection({
             surfaceVariant="accent-stripe"
             onChange={(next) => onFolderScanningSettingChange("writeEmbeddedMetadataOnUserEdit", next)}
           />
-          <SettingsCheckboxField
-            title={UI_TEXT.gpsLocationDetectionTitle}
-            description={UI_TEXT.gpsLocationDetectionDescription}
-            checked={folderScanningSettings.detectLocationFromGps}
-            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
-            surfaceVariant="accent-stripe"
-            onChange={handleGpsToggle}
-          />
-          {showGpsConfirm ? (
-            <div className="rounded-md border border-amber-700/60 border-l-4 border-l-primary/70 bg-amber-950/40 p-3">
-              <p className="m-0 text-sm font-medium text-amber-200">
-                {gpsConfirmHasLocalCopy
-                  ? UI_TEXT.gpsLocationDetectionLocalCopyTitle
-                  : UI_TEXT.gpsLocationDetectionConfirmTitle}
-              </p>
-              <p className="m-0 mt-1 text-sm text-amber-200/80">
-                {gpsConfirmHasLocalCopy
-                  ? UI_TEXT.gpsLocationDetectionLocalCopyMessage
-                  : UI_TEXT.gpsLocationDetectionConfirmMessage}
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="inline-flex h-8 items-center rounded-md bg-amber-700 px-3 text-sm text-white hover:bg-amber-600"
-                  onClick={() => enableGpsLocationDetection({ forceRefresh: false })}
-                  autoFocus={gpsConfirmHasLocalCopy}
-                >
-                  {gpsConfirmHasLocalCopy
-                    ? UI_TEXT.gpsLocationDetectionUseLocalCopy
-                    : UI_TEXT.gpsLocationDetectionConfirmOk}
-                </button>
-                {gpsConfirmHasLocalCopy ? (
-                  <button
-                    type="button"
-                    className="inline-flex h-8 items-center rounded-md border border-amber-700/70 px-3 text-sm text-amber-100 hover:bg-amber-900/40"
-                    onClick={() => enableGpsLocationDetection({ forceRefresh: true })}
-                  >
-                    {UI_TEXT.gpsLocationDetectionDownloadAgain}
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  className="inline-flex h-8 items-center rounded-md border border-border px-3 text-sm"
-                  onClick={cancelGpsEnable}
-                >
-                  {UI_TEXT.gpsLocationDetectionConfirmCancel}
-                </button>
-              </div>
-            </div>
-          ) : null}
-          <SettingsCheckboxField
-            title={UI_TEXT.pathExtractDatesTitle}
-            description={UI_TEXT.pathExtractDatesDescription}
-            checked={pathExtractionSettings.extractDates}
-            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
-            surfaceVariant="accent-stripe"
-            onChange={(next) => onPathExtractionSettingChange("extractDates", next)}
-          />
-          {showAdvancedSettings ? (
-            <SettingsCheckboxField
-              title={UI_TEXT.pathUseLlmTitle}
-              description={UI_TEXT.pathUseLlmDescription}
-              checked={pathExtractionSettings.useLlm}
-              checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
-              advanced
-              surfaceVariant="accent-stripe"
-              onChange={(next) => onPathExtractionSettingChange("useLlm", next)}
-            />
-          ) : null}
-          {showAdvancedSettings && pathExtractionSettings.useLlm ? (
-            <div
-              className={cn(
-                settingsCustomOptionSurfaceClass("accent-stripe"),
-                "border-l-primary/70",
-              )}
-            >
-              <div className="flex flex-col gap-3">
-                <p className="m-0 text-sm text-muted-foreground">{UI_TEXT.pathLlmModelDescription}</p>
-                <label className="flex flex-col gap-1">
-                  <span className="text-sm font-medium text-foreground">{UI_TEXT.pathLlmModelPrimaryLabel}</span>
-                  <input
-                    type="text"
-                    value={pathExtractionSettings.llmModelPrimary}
-                    onChange={(e) => onPathExtractionSettingChange("llmModelPrimary", e.target.value)}
-                    className="h-9 w-full max-w-md rounded-md border border-border bg-background px-2 text-base"
-                    autoComplete="off"
-                  />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-sm font-medium text-foreground">{UI_TEXT.pathLlmModelFallbackLabel}</span>
-                  <input
-                    type="text"
-                    value={pathExtractionSettings.llmModelFallback}
-                    onChange={(e) => onPathExtractionSettingChange("llmModelFallback", e.target.value)}
-                    className="h-9 w-full max-w-md rounded-md border border-border bg-background px-2 text-base"
-                    autoComplete="off"
-                  />
-                </label>
-              </div>
-            </div>
-          ) : null}
           <div className="pt-1">
             <button
               type="button"
@@ -1511,6 +1513,17 @@ export function DesktopSettingsSection({
             <p className="m-0 text-sm text-muted-foreground">{UI_TEXT.modelsPath}</p>
             <p className="mt-1 break-all font-mono text-sm text-foreground">
               {databaseLocation?.modelsPath ?? UI_TEXT.notAvailable}
+            </p>
+          </div>
+          <div
+            className={cn(
+              settingsCustomOptionSurfaceClass("accent-stripe"),
+              "border-l-primary/70",
+            )}
+          >
+            <p className="m-0 text-sm text-muted-foreground">{UI_TEXT.geonamesPath}</p>
+            <p className="mt-1 break-all font-mono text-sm text-foreground">
+              {databaseLocation?.geonamesPath ?? UI_TEXT.notAvailable}
             </p>
           </div>
           <div

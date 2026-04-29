@@ -59,6 +59,7 @@ interface SmartAlbumPlaceRow {
   country: string;
   place_label: string;
   group_label: string;
+  group_parent_label: string | null;
   media_count: number;
 }
 
@@ -631,10 +632,14 @@ export function listSmartAlbumPlaces(
         : "COALESCE(NULLIF(TRIM(location_area), ''), 'Unknown area')";
   const groupExpression =
     normalizedRequest.grouping === "area-city"
-      ? "COALESCE(NULLIF(TRIM(location_area), ''), 'Unknown area')"
+      ? "COALESCE(NULLIF(TRIM(location_area2), ''), NULLIF(TRIM(location_area), ''), 'Unknown area')"
       : normalizedRequest.grouping === "month-area"
         ? "SUBSTR(COALESCE(photo_taken_at, file_created_at), 1, 7)"
         : "SUBSTR(COALESCE(photo_taken_at, file_created_at), 1, 4)";
+  const groupParentSelect =
+    normalizedRequest.grouping === "area-city"
+      ? "CASE WHEN NULLIF(TRIM(location_area2), '') IS NOT NULL THEN NULLIF(TRIM(location_area), '') ELSE NULL END AS group_parent_label"
+      : "NULL AS group_parent_label";
   const groupPredicate =
     normalizedRequest.grouping === "year-city"
       ? "group_label GLOB '[0-9][0-9][0-9][0-9]'"
@@ -665,17 +670,18 @@ export function listSmartAlbumPlaces(
          SELECT
            TRIM(country) AS country,
            ${placeExpression} AS place_label,
-           ${groupExpression} AS group_label
+           ${groupExpression} AS group_label,
+           ${groupParentSelect}
          FROM media_items
          WHERE ${placeWhere.join("\n           AND ")}
        ),
        place_counts AS (
-         SELECT country, place_label, group_label, COUNT(*) AS media_count
+         SELECT country, place_label, group_label, group_parent_label, COUNT(*) AS media_count
          FROM place_items
          WHERE ${groupPredicate}
-         GROUP BY country, place_label, group_label
+         GROUP BY country, place_label, group_label, group_parent_label
        )
-       SELECT pc.country, pc.place_label, pc.group_label, pc.media_count
+       SELECT pc.country, pc.place_label, pc.group_label, pc.group_parent_label, pc.media_count
        FROM place_counts pc
        ORDER BY pc.country COLLATE NOCASE ASC, pc.group_label DESC, pc.place_label COLLATE NOCASE ASC`,
     )
@@ -689,10 +695,14 @@ export function listSmartAlbumPlaces(
       groups: [],
     };
     existing.mediaCount += row.media_count;
-    let group = existing.groups.find((item) => item.group === row.group_label);
+    const parentKey = row.group_parent_label ?? "";
+    let group = existing.groups.find(
+      (item) => item.group === row.group_label && (item.groupParent ?? "") === parentKey,
+    );
     if (!group) {
       group = {
         group: row.group_label,
+        groupParent: row.group_parent_label ?? null,
         mediaCount: 0,
         entries: [],
       };
@@ -700,10 +710,11 @@ export function listSmartAlbumPlaces(
     }
     group.mediaCount += row.media_count;
     group.entries.push({
-      id: `place:${normalizedRequest.source}:${normalizedRequest.grouping}:${row.country}:${row.group_label}:${row.place_label}`,
+      id: `place:${normalizedRequest.source}:${normalizedRequest.grouping}:${row.country}:${row.group_label}:${parentKey}:${row.place_label}`,
       country: row.country,
       city: row.place_label,
       group: row.group_label,
+      groupParent: row.group_parent_label ?? null,
       label: row.place_label,
       mediaCount: row.media_count,
     });
@@ -746,6 +757,7 @@ function consolidateMonthAreaCountryToYearArea(
         country: country.country,
         group_label: year,
         place_label: entry.label,
+        group_parent_label: null,
         media_count: 0,
       };
       current.media_count += entry.mediaCount;
@@ -840,9 +852,15 @@ export function listSmartAlbumItems(
     const sourcePredicate = request.source === "gps"
       ? "mi.location_source = 'gps'"
       : "(mi.location_source IS NULL OR mi.location_source <> 'gps')";
+    const leafLevel = request.grouping === "area-city" ? (request.leafLevel ?? "city") : "city";
+    const cityUsesArea1 = request.grouping === "area-city" && leafLevel === "city" && !request.area2 && !!request.area1;
     const groupPredicate =
       request.grouping === "area-city"
-        ? "COALESCE(NULLIF(TRIM(mi.location_area), ''), 'Unknown area') = ?"
+        ? leafLevel === "area1"
+          ? "COALESCE(NULLIF(TRIM(mi.location_area), ''), 'Unknown area') = ?"
+          : cityUsesArea1
+            ? "COALESCE(NULLIF(TRIM(mi.location_area), ''), 'Unknown area') = ?"
+          : "COALESCE(NULLIF(TRIM(mi.location_area2), ''), NULLIF(TRIM(mi.location_area), ''), 'Unknown area') = ?"
         : request.grouping === "month-area"
           ? request.group.length === 4
             ? "SUBSTR(COALESCE(mi.photo_taken_at, mi.file_created_at), 1, 4) = ?"
@@ -850,10 +868,16 @@ export function listSmartAlbumItems(
         : "SUBSTR(COALESCE(mi.photo_taken_at, mi.file_created_at), 1, 4) = ?";
     const placePredicate =
       request.grouping === "area-city"
-        ? "TRIM(mi.city) = ?"
+        ? leafLevel === "city"
+          ? "TRIM(mi.city) = ?"
+          : "1 = 1"
         : request.grouping === "month-area"
           ? "COALESCE(NULLIF(TRIM(mi.location_area), ''), 'Unknown area') = ?"
           : "COALESCE(NULLIF(TRIM(mi.location_area), ''), 'Unknown area') = ?";
+    const area1Predicate =
+      request.grouping === "area-city" && leafLevel === "area2" && request.area1?.trim()
+        ? "AND COALESCE(NULLIF(TRIM(mi.location_area), ''), 'Unknown area') = ?"
+        : "";
     const categoryExclusion = `NOT ${SMART_ALBUM_EXCLUDED_CATEGORY_SQL.replaceAll(
       "ai_metadata",
       "mi.ai_metadata",
@@ -861,6 +885,22 @@ export function listSmartAlbumItems(
     const commonWhere: string[] = [categoryExclusion];
     const commonArgs: unknown[] = [];
     appendSmartAlbumCommonFilters(commonWhere, commonArgs, "mi", libraryId, request.filters);
+    const placeArgs: unknown[] = [libraryId, request.country.trim()];
+    if (request.grouping === "area-city") {
+      if (leafLevel === "city") {
+        placeArgs.push((request.city ?? "").trim());
+      }
+      if (leafLevel === "area1" || cityUsesArea1) {
+        placeArgs.push((request.area1 ?? request.group).trim());
+      } else {
+        placeArgs.push((request.area2 ?? request.group).trim());
+      }
+      if (area1Predicate) {
+        placeArgs.push((request.area1 ?? "Unknown area").trim());
+      }
+    } else {
+      placeArgs.push((request.city ?? "").trim(), request.group.trim());
+    }
     const total = db
       .prepare(
         `SELECT COUNT(*) AS cnt
@@ -871,9 +911,10 @@ export function listSmartAlbumItems(
            AND TRIM(mi.country) = ?
            AND ${placePredicate}
            AND ${groupPredicate}
+           ${area1Predicate}
            AND ${commonWhere.join("\n           AND ")}`,
       )
-      .get(libraryId, request.country.trim(), request.city.trim(), request.group.trim(), ...commonArgs) as
+      .get(...placeArgs, ...commonArgs) as
       | { cnt: number }
       | undefined;
     const rows = db
@@ -886,19 +927,12 @@ export function listSmartAlbumItems(
            AND TRIM(mi.country) = ?
            AND ${placePredicate}
            AND ${groupPredicate}
+           ${area1Predicate}
            AND ${commonWhere.join("\n           AND ")}
          ORDER BY COALESCE(mi.photo_taken_at, mi.file_created_at) DESC, mi.source_path COLLATE NOCASE ASC
          LIMIT ? OFFSET ?`,
       )
-      .all(
-        libraryId,
-        request.country.trim(),
-        request.city.trim(),
-        request.group.trim(),
-        ...commonArgs,
-        limit,
-        offset,
-      ) as AlbumItemRow[];
+      .all(...placeArgs, ...commonArgs, limit, offset) as AlbumItemRow[];
     return { rows: mapAlbumItemRows(rows), totalCount: total?.cnt ?? 0 };
   }
 

@@ -164,6 +164,7 @@ export const IPC_CHANNELS = {
   purgeDeletedMediaItems: "media:purge-deleted-media-items",
   purgeSoftDeletedMediaItemsByIds: "media:purge-soft-deleted-media-items-by-ids",
   getFolderAiSummaryOverview: "media:get-folder-ai-summary-overview",
+  getFolderTreeScanSummary: "media:get-folder-tree-scan-summary",
   getFolderAiSummaryReport: "media:get-folder-ai-summary-report",
   getFolderAiFailedFiles: "media:get-folder-ai-failed-files",
   getFolderAiCoverage: "media:get-folder-ai-coverage",
@@ -224,6 +225,7 @@ export interface DatabaseLocationInfo {
   dbFileName: string;
   dbPath: string;
   modelsPath: string;
+  geonamesPath: string;
   cachePath: string;
   /** Temporary troubleshooting signal for packaged legacy DB compatibility checks. */
   mediaEmbeddingsCompatStatus?: string;
@@ -729,6 +731,8 @@ export interface DesktopMediaItemMetadata {
   country: string | null;
   city: string | null;
   locationArea: string | null;
+  /** GeoNames admin2 (e.g. county) when from GPS; null otherwise. */
+  locationArea2: string | null;
   locationPlace: string | null;
   locationName: string | null;
   /** Catalog location provenance (`gps`, `path_llm`, `path_script`, `ai_vision`, ...). */
@@ -859,6 +863,7 @@ export interface FolderAiSummaryOverview {
 export interface FolderAiSummaryOverviewReport {
   selectedWithSubfolders: FolderAiSummaryOverview;
   selectedDirectOnly: FolderAiSummaryOverview;
+  hasDirectSubfolders: boolean;
   subfolders: Array<{
     folderPath: string;
     name: string;
@@ -868,6 +873,12 @@ export interface FolderAiSummaryOverviewReport {
 
 export interface FolderAiSummaryOverviewRequestOptions {
   includeSubfolders?: boolean;
+  includeSubfolderOverviews?: boolean;
+}
+
+export interface FolderTreeScanSummary {
+  hasDirectSubfolders: boolean;
+  notFullyScannedDirectSubfolderCount: number;
 }
 
 export type ImageRotationProgressEvent =
@@ -1749,6 +1760,7 @@ export interface DesktopApi {
     folderPath: string,
     options?: FolderAiSummaryOverviewRequestOptions,
   ) => Promise<FolderAiSummaryOverviewReport>;
+  getFolderTreeScanSummary: (folderPath: string) => Promise<FolderTreeScanSummary>;
   getFolderAiSummaryReport: (folderPath: string) => Promise<FolderAiSummaryReport>;
   getFolderAiFailedFiles: (
     folderPath: string,
