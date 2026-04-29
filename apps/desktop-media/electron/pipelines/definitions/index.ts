@@ -21,6 +21,8 @@ import { faceDetectionDefinition } from "./face-detection";
 import { faceEmbeddingDefinition } from "./face-embedding";
 import { faceClusteringDefinition } from "./face-clustering";
 import { similarUntaggedCountsDefinition } from "./similar-untagged-counts";
+import { photoAnalysisDefinition } from "./photo-analysis";
+import { descriptionEmbeddingDefinition } from "./description-embedding";
 import { registerAllPresets } from "../presets";
 
 /**
@@ -64,6 +66,8 @@ export function registerAllPipelineDefinitions(): void {
   pipelineRegistry.register(faceEmbeddingDefinition);
   pipelineRegistry.register(faceClusteringDefinition);
   pipelineRegistry.register(similarUntaggedCountsDefinition);
+  pipelineRegistry.register(photoAnalysisDefinition);
+  pipelineRegistry.register(descriptionEmbeddingDefinition);
 
   // -------------------------------------------------------------------------
   // Stubs — legacy runners still reachable through their existing IPC channels
@@ -73,12 +77,6 @@ export function registerAllPipelineDefinitions(): void {
     displayName: string;
     concurrencyGroup: PipelineConcurrencyGroup;
   }> = [
-    { id: "photo-analysis", displayName: "Analyze photos with AI", concurrencyGroup: "ollama" },
-    {
-      id: "description-embedding",
-      displayName: "Embed AI photo descriptions",
-      concurrencyGroup: "gpu",
-    },
     {
       id: "path-llm-analysis",
       displayName: "Extract context from folder paths (LLM)",

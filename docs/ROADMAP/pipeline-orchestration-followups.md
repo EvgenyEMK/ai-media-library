@@ -111,8 +111,8 @@ implementation. Today only 3 of 11 are real:
 | `face-embedding` | real ✅ | inline `autoChainEmbeddings` + `media:embed-folder-faces` |
 | `face-clustering` | real ✅ | `face:cluster-*` |
 | `similar-untagged-counts` | real ✅ | `face:similar-untagged-counts-*` |
-| `photo-analysis` | stub | `media:analyze-folder` |
-| `description-embedding` | stub | inline + `desc-embed-backfill-*` |
+| `photo-analysis` | real ✅ | `media:analyze-folder` (legacy trigger path still active) |
+| `description-embedding` | real ✅ | inline + `desc-embed-backfill-*` |
 | `path-llm-analysis` | stub | `path-llm-*` |
 | `semantic-index` | stub | `semantic:rebuild-*` |
 | `desc-embedding-backfill` | stub | `desc-embed-backfill-*` |
@@ -161,11 +161,9 @@ as the canonical reference. For each stub:
 Each step is independently shippable. Items earlier in the list
 unblock later ones (input bindings, presets):
 
-1. **`photo-analysis` + `description-embedding`** — same shape as
-   face-detection + face-embedding, in the `ollama` group.
-2. **`semantic-index` + `desc-embedding-backfill`** — semantic-index
+1. **`semantic-index` + `desc-embedding-backfill`** — semantic-index
    transitively depends on description-embedding being complete.
-3. **`path-llm-analysis`** — standalone, can land any time.
+2. **`path-llm-analysis`** — standalone, can land any time.
 
 After step 7, the actual Phase 7 deletions become safe:
 
