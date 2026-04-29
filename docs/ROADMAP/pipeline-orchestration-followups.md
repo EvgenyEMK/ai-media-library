@@ -107,10 +107,10 @@ implementation. Today only 3 of 11 are real:
 | `path-rule-extraction` | real ✅ | inline call inside `metadata-scan` (legacy) |
 | `metadata-scan` | real ✅ | `media:scan-folder-metadata` (still legacy-triggered UI path) |
 | `image-rotation-precheck` | real ✅ | inline in face / photo-analysis / semantic handlers (facade migration pending) |
-| `face-detection` | stub | `media:detect-folder-faces` |
-| `face-embedding` | stub | inline `autoChainEmbeddings` |
-| `face-clustering` | stub | `face:cluster-*` |
-| `similar-untagged-counts` | stub | `face:similar-untagged-counts-*` |
+| `face-detection` | real ✅ | `media:detect-folder-faces` (legacy trigger path still active) |
+| `face-embedding` | real ✅ | inline `autoChainEmbeddings` + `media:embed-folder-faces` |
+| `face-clustering` | real ✅ | `face:cluster-*` |
+| `similar-untagged-counts` | real ✅ | `face:similar-untagged-counts-*` |
 | `photo-analysis` | stub | `media:analyze-folder` |
 | `description-embedding` | stub | inline + `desc-embed-backfill-*` |
 | `path-llm-analysis` | stub | `path-llm-*` |
@@ -161,15 +161,11 @@ as the canonical reference. For each stub:
 Each step is independently shippable. Items earlier in the list
 unblock later ones (input bindings, presets):
 
-1. **`face-detection` + `face-embedding`** — wrap together; their
-   `Output → Params` chain is exactly what `inputBinding` is for.
-2. **`face-clustering` + `similar-untagged-counts`** — CPU-only,
-   minimal refactor.
-3. **`photo-analysis` + `description-embedding`** — same shape as
+1. **`photo-analysis` + `description-embedding`** — same shape as
    face-detection + face-embedding, in the `ollama` group.
-4. **`semantic-index` + `desc-embedding-backfill`** — semantic-index
+2. **`semantic-index` + `desc-embedding-backfill`** — semantic-index
    transitively depends on description-embedding being complete.
-5. **`path-llm-analysis`** — standalone, can land any time.
+3. **`path-llm-analysis`** — standalone, can land any time.
 
 After step 7, the actual Phase 7 deletions become safe:
 

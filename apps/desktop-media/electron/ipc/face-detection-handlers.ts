@@ -108,7 +108,7 @@ function deriveOriginalDimensions(
   return { originalImageWidth: rotatedSize.width, originalImageHeight: rotatedSize.height };
 }
 
-interface OrientedFaceDetectionResult {
+export interface OrientedFaceDetectionResult {
   faces: FaceDetectionOutput;
   embeddingOverride?: {
     imagePath: string;
@@ -117,7 +117,7 @@ interface OrientedFaceDetectionResult {
   };
 }
 
-async function detectFacesUsingOrientationState(params: {
+export async function detectFacesUsingOrientationState(params: {
   imagePath: string;
   signal?: AbortSignal;
   settings?: AppSettings["faceDetection"];

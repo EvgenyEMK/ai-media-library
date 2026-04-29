@@ -17,6 +17,10 @@ import { gpsGeocodeDefinition } from "./gps-geocode";
 import { pathRuleExtractionDefinition } from "./path-rule-extraction";
 import { metadataScanDefinition } from "./metadata-scan";
 import { imageRotationPrecheckDefinition } from "./image-rotation-precheck";
+import { faceDetectionDefinition } from "./face-detection";
+import { faceEmbeddingDefinition } from "./face-embedding";
+import { faceClusteringDefinition } from "./face-clustering";
+import { similarUntaggedCountsDefinition } from "./similar-untagged-counts";
 import { registerAllPresets } from "../presets";
 
 /**
@@ -56,6 +60,10 @@ export function registerAllPipelineDefinitions(): void {
   pipelineRegistry.register(pathRuleExtractionDefinition);
   pipelineRegistry.register(metadataScanDefinition);
   pipelineRegistry.register(imageRotationPrecheckDefinition);
+  pipelineRegistry.register(faceDetectionDefinition);
+  pipelineRegistry.register(faceEmbeddingDefinition);
+  pipelineRegistry.register(faceClusteringDefinition);
+  pipelineRegistry.register(similarUntaggedCountsDefinition);
 
   // -------------------------------------------------------------------------
   // Stubs — legacy runners still reachable through their existing IPC channels
@@ -65,14 +73,6 @@ export function registerAllPipelineDefinitions(): void {
     displayName: string;
     concurrencyGroup: PipelineConcurrencyGroup;
   }> = [
-    { id: "face-detection", displayName: "Detect faces", concurrencyGroup: "gpu" },
-    { id: "face-embedding", displayName: "Compute face embeddings", concurrencyGroup: "gpu" },
-    { id: "face-clustering", displayName: "Group faces by similarity", concurrencyGroup: "cpu" },
-    {
-      id: "similar-untagged-counts",
-      displayName: "Count similar untagged faces",
-      concurrencyGroup: "cpu",
-    },
     { id: "photo-analysis", displayName: "Analyze photos with AI", concurrencyGroup: "ollama" },
     {
       id: "description-embedding",
