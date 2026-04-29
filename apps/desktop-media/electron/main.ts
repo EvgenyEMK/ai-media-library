@@ -22,7 +22,6 @@ import { registerAlbumHandlers } from "./ipc/album-handlers";
 import { registerPipelineOrchestrationHandlers } from "./ipc/pipeline-orchestration-handlers";
 import { registerAllPipelineDefinitions } from "./pipelines/definitions";
 import { setPipelineConcurrencyConfig } from "./pipelines/concurrency-config";
-import { pipelineScheduler } from "./pipelines/pipeline-scheduler";
 import { releaseAllPowerSave } from "./ipc/power-save-manager";
 import {
   ensureActiveModels,
@@ -32,7 +31,6 @@ import { readSettings } from "./storage";
 import { DEFAULT_FACE_DETECTION_SETTINGS } from "../src/shared/ipc";
 import {
   IPC_CHANNELS,
-  type ActiveJobStatuses,
   type FaceModelDownloadProgressEvent,
 } from "../src/shared/ipc";
 import { exiftool } from "exiftool-vendored";
@@ -66,22 +64,6 @@ function registerAllIpcHandlers(): void {
   registerAlbumHandlers();
   registerPipelineOrchestrationHandlers();
 
-  ipcMain.handle(IPC_CHANNELS.getActiveJobStatuses, (): ActiveJobStatuses => {
-    const snapshot = pipelineScheduler.getSnapshot();
-    const runningJobs = snapshot.running.flatMap((bundle) => bundle.jobs);
-    const firstRunningJob = (pipelineId: string): { jobId: string; folderPath: string } | null => {
-      const match = runningJobs.find((job) => job.pipelineId === pipelineId && job.state === "running");
-      return match ? { jobId: match.jobId, folderPath: "" } : null;
-    };
-    return {
-      photoAnalysis: firstRunningJob("photo-analysis"),
-      faceDetection: firstRunningJob("face-detection"),
-      semanticIndex: firstRunningJob("semantic-index"),
-      metadataScan: firstRunningJob("metadata-scan"),
-      pathAnalysis: firstRunningJob("path-llm-analysis"),
-      imageRotation: firstRunningJob("image-rotation-precheck"),
-    };
-  });
 }
 
 function emitFaceModelDownloadProgress(event: FaceModelDownloadProgressEvent): void {

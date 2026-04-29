@@ -5,7 +5,7 @@ import { test, expect } from "./fixtures/app-fixture";
 import { clickSidebarLibraryRoot } from "./fixtures/desktop-sidebar";
 import { mockFolderDialog } from "./fixtures/mock-dialog";
 import { E2E_JPEG_VARIANTS_BASE64 } from "./fixtures/test-images";
-import type { ActiveJobStatuses } from "../../src/shared/ipc";
+import type { PipelineQueueSnapshot } from "../../src/shared/pipeline-types";
 
 function createLibrary(rootPrefix: string, fileCount: number): string {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), rootPrefix));
@@ -56,8 +56,19 @@ async function startManualMetadataScanFromRootMenu(
 
 async function getActiveJobs(
   mainWindow: import("@playwright/test").Page,
-): Promise<ActiveJobStatuses> {
-  return mainWindow.evaluate(async () => window.desktopApi.getActiveJobStatuses());
+): Promise<PipelineQueueSnapshot> {
+  return mainWindow.evaluate(async () => window.desktopApi.pipelines.getSnapshot());
+}
+
+function getRunningJobId(snapshot: PipelineQueueSnapshot, pipelineId: string): string | null {
+  for (const bundle of snapshot.running) {
+    for (const job of bundle.jobs) {
+      if (job.pipelineId === pipelineId && job.state === "running") {
+        return job.jobId;
+      }
+    }
+  }
+  return null;
 }
 
 test("manual metadata scan keeps running across folder selection; auto-scan is skipped", async ({
@@ -78,7 +89,7 @@ test("manual metadata scan keeps running across folder selection; auto-scan is s
       .poll(
         async () => {
           const jobs = await getActiveJobs(mainWindow);
-          return jobs.metadataScan?.jobId ?? null;
+          return getRunningJobId(jobs, "metadata-scan");
         },
         { timeout: 30_000 },
       )
@@ -88,19 +99,20 @@ test("manual metadata scan keeps running across folder selection; auto-scan is s
     await mainWindow.waitForTimeout(2_000);
 
     const jobsAfterSelection = await getActiveJobs(mainWindow);
-    expect(jobsAfterSelection.metadataScan?.jobId ?? null).not.toBe(null);
+    const metadataJobId = getRunningJobId(jobsAfterSelection, "metadata-scan");
+    expect(metadataJobId).not.toBe(null);
 
-    if (jobsAfterSelection.metadataScan?.jobId) {
+    if (metadataJobId) {
       await mainWindow.evaluate(async (jobId) => {
-        await window.desktopApi.cancelMetadataScan(jobId);
-      }, jobsAfterSelection.metadataScan.jobId);
+        await window.desktopApi.pipelines.cancelJob(jobId);
+      }, metadataJobId);
     }
 
     await expect
       .poll(
         async () => {
           const jobs = await getActiveJobs(mainWindow);
-          return jobs.metadataScan?.jobId ?? null;
+          return getRunningJobId(jobs, "metadata-scan");
         },
         { timeout: 30_000 },
       )

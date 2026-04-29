@@ -167,8 +167,11 @@ test.describe("Face detection — Phase 1 auxiliary models (orientation, landmar
 
       const start = Date.now();
       while (Date.now() - start < 120_000) {
-        const statuses = await window.desktopApi.getActiveJobStatuses();
-        if (!statuses.semanticIndex) break;
+        const snapshot = await window.desktopApi.pipelines.getSnapshot();
+        const runningSemantic = snapshot.running.some((bundle) =>
+          bundle.jobs.some((job) => job.pipelineId === "semantic-index" && job.state === "running"),
+        );
+        if (!runningSemantic) break;
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
 

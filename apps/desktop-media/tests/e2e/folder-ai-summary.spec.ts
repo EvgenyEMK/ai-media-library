@@ -111,14 +111,38 @@ test.describe("Folder AI summary", () => {
     await mainWindow.getByRole("tab", { name: "Details: AI pipelines" }).click();
 
     await electronApp.evaluate(async ({ ipcMain }) => {
-      ipcMain.removeHandler("media:get-active-job-statuses");
-      ipcMain.handle("media:get-active-job-statuses", async () => ({
-        photoAnalysis: { jobId: "e2e-running-photo", folderPath: "C:\\e2e\\running" },
-        faceDetection: null,
-        semanticIndex: null,
-        metadataScan: null,
-        pathAnalysis: null,
-        imageRotation: null,
+      ipcMain.removeHandler("pipelines:get-snapshot");
+      ipcMain.handle("pipelines:get-snapshot", async () => ({
+        running: [
+          {
+            bundleId: "e2e-running-bundle",
+            displayName: "E2E Running",
+            state: "running",
+            jobs: [
+              {
+                jobId: "e2e-running-photo",
+                pipelineId: "photo-analysis",
+                state: "running",
+                progress: {
+                  phase: "analyzing",
+                  processed: 0,
+                  total: null,
+                  message: null,
+                  details: null,
+                  lastUpdatedAt: Date.now(),
+                },
+                error: null,
+                startedAt: Date.now(),
+                finishedAt: null,
+              },
+            ],
+            enqueuedAt: Date.now(),
+            startedAt: Date.now(),
+            finishedAt: null,
+          },
+        ],
+        queued: [],
+        recent: [],
       }));
     });
 

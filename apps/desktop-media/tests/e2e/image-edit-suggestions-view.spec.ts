@@ -77,8 +77,11 @@ test.describe("Image edit suggestions metadata", () => {
       });
       const start = Date.now();
       while (Date.now() - start < 240_000) {
-        const statuses = await window.desktopApi.getActiveJobStatuses();
-        if (!statuses.photoAnalysis) {
+        const snapshot = await window.desktopApi.pipelines.getSnapshot();
+        const runningPhoto = snapshot.running.some((bundle) =>
+          bundle.jobs.some((job) => job.pipelineId === "photo-analysis" && job.state === "running"),
+        );
+        if (!runningPhoto) {
           break;
         }
         await new Promise((resolve) => setTimeout(resolve, 500));

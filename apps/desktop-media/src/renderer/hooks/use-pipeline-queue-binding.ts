@@ -7,8 +7,7 @@ import { useDesktopStoreApi } from "../stores/desktop-store";
  * single hook from `App.tsx` (sibling to the legacy `useDesktopIpcBindings`).
  *
  * On mount, also primes the store with a one-shot `getSnapshot()` call so the
- * dock has data before the next push event arrives (same pattern that
- * `useDesktopIpcBindings` uses for `getActiveJobStatuses`).
+ * dock has data before the next push event arrives.
  */
 export function usePipelineQueueBinding(): void {
   const store = useDesktopStoreApi();

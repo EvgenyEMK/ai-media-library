@@ -184,7 +184,6 @@ export const IPC_CHANNELS = {
    * on the shared `faceModelDownloadProgress` channel.
    */
   ensureAuxModel: "media:ensure-aux-model",
-  getActiveJobStatuses: "media:get-active-job-statuses",
   analyzeFolderPathMetadata: "media:analyze-folder-path-metadata",
   cancelPathAnalysis: "media:cancel-path-analysis",
   pathAnalysisProgress: "media:path-analysis-progress",
@@ -1687,20 +1686,6 @@ export type FaceModelDownloadProgressListener = (
   event: FaceModelDownloadProgressEvent,
 ) => void;
 
-export interface ActiveJobSummary {
-  jobId: string;
-  folderPath: string;
-}
-
-export interface ActiveJobStatuses {
-  photoAnalysis: ActiveJobSummary | null;
-  faceDetection: ActiveJobSummary | null;
-  semanticIndex: ActiveJobSummary | null;
-  metadataScan: ActiveJobSummary | null;
-  pathAnalysis: ActiveJobSummary | null;
-  imageRotation: ActiveJobSummary | null;
-}
-
 export interface SimilarFaceSearchResult {
   faceInstanceId: string;
   mediaItemId: string;
@@ -2115,16 +2100,6 @@ export interface DesktopApi {
     purgedFsObjects: number;
     purgedSources: number;
   }>;
-  /**
-   * @deprecated Aggregated status of every legacy per-pipeline job map. New
-   * code should subscribe to `window.desktopApi.pipelines.getSnapshot()` /
-   * `onQueueChanged` instead, which returns a single typed snapshot from
-   * the central scheduler. This entry will be removed once every stub
-   * pipeline has been migrated; see
-   * `docs/ROADMAP/pipeline-orchestration-followups.md` for the migration
-   * order.
-   */
-  getActiveJobStatuses: () => Promise<ActiveJobStatuses>;
   analyzeFolderPathMetadata: (request: {
     folderPath: string;
     recursive?: boolean;
