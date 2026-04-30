@@ -72,28 +72,34 @@ export const imageRotationPrecheckDefinition: PipelineDefinition<
       },
     };
 
+    const selectedImages = params.force === true
+      ? images
+      : images.filter((image) => getOrientationDetectionStateByPath(image.path) === null);
+    const selectedImagePaths = selectedImages.map((image) => image.path);
     let processed = 0;
-    let skipped = 0;
+    const skipped = imagePaths.length - selectedImagePaths.length;
     let failed = 0;
     let disabled = 0;
     let wronglyRotated = 0;
 
     ctx.report({
       type: "started",
-      total: imagePaths.length,
-      message: `Checking orientation for ${imagePaths.length} images`,
+      total: selectedImagePaths.length,
+      message: `Checking orientation for ${selectedImagePaths.length} images`,
+      details: { skipped },
     });
     ctx.report({
       type: "phase-changed",
       phase: "orientation-precheck",
       processed: 0,
-      total: imagePaths.length,
+      total: selectedImagePaths.length,
+      details: { skipped },
     });
 
-    for (let i = 0; i < imagePaths.length; i++) {
+    for (let i = 0; i < selectedImagePaths.length; i++) {
       if (ctx.signal.aborted) break;
-      const imagePath = imagePaths[i]!;
-      const image = images[i]!;
+      const imagePath = selectedImagePaths[i]!;
+      const image = selectedImages[i]!;
       let result: "processed" | "skipped" | "failed" | "disabled";
       try {
         result = await runWrongImageRotationPrecheck({
@@ -107,7 +113,7 @@ export const imageRotationPrecheckDefinition: PipelineDefinition<
       }
 
       if (result === "processed") processed += 1;
-      else if (result === "skipped") skipped += 1;
+      else if (result === "skipped") processed += 1;
       else if (result === "disabled") disabled += 1;
       else failed += 1;
 
@@ -118,19 +124,22 @@ export const imageRotationPrecheckDefinition: PipelineDefinition<
 
       ctx.report({
         type: "item-updated",
-        processed: i + 1,
-        total: imagePaths.length,
+        processed: processed + failed + disabled,
+        total: selectedImagePaths.length,
         message: `${result}: ${image.name}`,
         details: {
           imagePath,
           result,
           correctionAngleClockwise: state?.correctionAngleClockwise ?? null,
+          wronglyRotated,
+          skipped,
+          failed,
         },
       });
     }
 
     return {
-      total: imagePaths.length,
+      total: selectedImagePaths.length,
       processed,
       skipped,
       failed,

@@ -73,12 +73,14 @@ export const faceDetectionDefinition: PipelineDefinition<
       : [params.folderPath];
     const pendingCandidates: PipelineImageItem[] = [];
     const globallyFailedPaths = new Set<string>();
+    let skippedExisting = 0;
 
     for (const folder of folders) {
       const images = await listFolderImages(folder);
       const imagePaths = images.map((image) => image.path);
       if ((params.mode ?? "missing") === "missing") {
         const persistedDetected = getAlreadyFaceDetectedPhotoPaths(folder, imagePaths);
+        skippedExisting += persistedDetected.size;
         const previouslyFailed = getFaceDetectionFailedPaths(imagePaths);
         for (const failedPath of previouslyFailed) {
           globallyFailedPaths.add(failedPath);
@@ -118,12 +120,14 @@ export const faceDetectionDefinition: PipelineDefinition<
       type: "started",
       total: selectedImages.length,
       message: `Face detection over ${selectedImages.length} images`,
+      details: { skipped: skippedExisting },
     });
     ctx.report({
       type: "phase-changed",
       phase: "detecting",
       processed: 0,
       total: selectedImages.length,
+      details: { skipped: skippedExisting },
     });
 
     for (let i = 0; i < selectedImages.length; i++) {
@@ -186,6 +190,8 @@ export const faceDetectionDefinition: PipelineDefinition<
           details: {
             path: image.path,
             faceCount: result.faceCount,
+            totalFacesDetected,
+            skipped: skippedExisting,
             mediaId: mediaId ?? null,
           },
         });
@@ -198,7 +204,7 @@ export const faceDetectionDefinition: PipelineDefinition<
           processed: i + 1,
           total: selectedImages.length,
           message: `Failed: ${image.name}`,
-          details: { path: image.path, error: message },
+          details: { path: image.path, error: message, totalFacesDetected, skipped: skippedExisting },
         });
       }
     }

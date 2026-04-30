@@ -41,6 +41,14 @@ export interface PhotoAnalysisOutputSummary {
   mediaItemIds: string[];
 }
 
+interface PhotoAnalysisProgressDetails {
+  model: string;
+  skipped: number;
+  path?: string;
+  mediaId?: string | null;
+  error?: string;
+}
+
 function validateParams(params: unknown):
   | { ok: true; value: PhotoAnalysisParams }
   | { ok: false; issues: string } {
@@ -89,6 +97,7 @@ export const photoAnalysisDefinition: PipelineDefinition<PhotoAnalysisParams, Ph
 
     const pendingCandidates: PipelineImageItem[] = [];
     const globallyFailedPaths = new Set<string>();
+    let skippedExisting = 0;
     for (const folder of folders) {
       const images = await listFolderImages(folder);
       const imagePaths = images.map((img) => img.path);
@@ -97,6 +106,7 @@ export const photoAnalysisDefinition: PipelineDefinition<PhotoAnalysisParams, Ph
 
       if ((params.mode ?? "missing") === "missing") {
         const persistedAnalyzed = getAlreadyAnalyzedPhotoPaths(folder, imagePaths);
+        skippedExisting += persistedAnalyzed.size;
         for (const image of images) {
           if (persistedAnalyzed.has(image.path)) continue;
           pendingCandidates.push({ path: image.path, name: image.name, folderPath: folder });
@@ -126,14 +136,22 @@ export const photoAnalysisDefinition: PipelineDefinition<PhotoAnalysisParams, Ph
         ? params.downscaleBeforeLlm
         : appSettings.photoAnalysis.downscaleBeforeLlm;
     const downscaleLongestSidePx = params.downscaleLongestSidePx ?? appSettings.photoAnalysis.downscaleLongestSidePx;
+    const baseProgressDetails: PhotoAnalysisProgressDetails = { model, skipped: skippedExisting };
 
     ctx.report({
       type: "started",
       total: selected.length,
       message: `Preparing photo analysis for ${selected.length} images`,
+      details: baseProgressDetails,
     });
     await warmupOllamaVisionModel({ model, timeoutMs: 90_000, signal: ctx.signal });
-    ctx.report({ type: "phase-changed", phase: "analyzing", processed: 0, total: selected.length });
+    ctx.report({
+      type: "phase-changed",
+      phase: "analyzing",
+      processed: 0,
+      total: selected.length,
+      details: baseProgressDetails,
+    });
 
     let completed = 0;
     let failed = 0;
@@ -193,7 +211,7 @@ export const photoAnalysisDefinition: PipelineDefinition<PhotoAnalysisParams, Ph
           processed: i + 1,
           total: selected.length,
           message: `Analyzed: ${image.name}`,
-          details: { path: image.path, mediaId: mediaId ?? null },
+          details: { ...baseProgressDetails, path: image.path, mediaId: mediaId ?? null },
         });
       } catch (error) {
         failed += 1;
@@ -204,7 +222,7 @@ export const photoAnalysisDefinition: PipelineDefinition<PhotoAnalysisParams, Ph
           processed: i + 1,
           total: selected.length,
           message: `Failed: ${image.name}`,
-          details: { path: image.path, error: reason },
+          details: { ...baseProgressDetails, path: image.path, error: reason },
         });
       }
     }

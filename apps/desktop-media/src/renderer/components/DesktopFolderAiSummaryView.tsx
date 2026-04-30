@@ -20,7 +20,6 @@ import { DesktopFolderAiSummaryDashboard } from "./DesktopFolderAiSummaryDashboa
 import { DesktopFolderAiSummaryTable } from "./DesktopFolderAiSummaryTable";
 import { DesktopFolderGeoSummaryTable } from "./DesktopFolderGeoSummaryTable";
 import { PendingSpinner } from "./folder-ai-summary/SummaryStatusGlyph";
-import { PipelineBlockedDialog } from "./PipelineBlockedDialog";
 import { useDesktopStore } from "../stores/desktop-store";
 import { DesktopFolderFaceSummaryDashboard } from "./folder-ai-summary/DesktopFolderFaceSummaryDashboard";
 
@@ -120,8 +119,6 @@ export function DesktopFolderAiSummaryView({
   const [folderScanPending, setFolderScanPending] = useState(false);
   const {
     actionPendingPipeline,
-    showPipelineBlockedDialog,
-    setShowPipelineBlockedDialog,
     runPipelineForFolderWithSubfolders,
   } = useFolderAiSummaryPipelineActions({
     folderPath,
@@ -526,10 +523,6 @@ export function DesktopFolderAiSummaryView({
           items={failedListItems}
           metaByPath={failedListMetaByPath}
         />
-      ) : null}
-
-      {showPipelineBlockedDialog ? (
-        <PipelineBlockedDialog onClose={() => setShowPipelineBlockedDialog(false)} />
       ) : null}
     </div>
   );

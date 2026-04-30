@@ -41,6 +41,7 @@ export type PipelineProgressEvent =
       type: "started";
       total?: number;
       message?: string;
+      details?: unknown;
     }
   | {
       type: "phase-changed";
@@ -48,6 +49,7 @@ export type PipelineProgressEvent =
       processed?: number;
       total?: number;
       message?: string;
+      details?: unknown;
     }
   | {
       type: "item-updated";

@@ -1,6 +1,7 @@
 import { Brain, Image as ImageIcon, RotateCw, Search, Users, Video } from "lucide-react";
 import type { ReactElement } from "react";
 import type { FolderAiCoverageReport, FolderAiSummaryOverview } from "../../../shared/ipc";
+import { getFolderAiPipelineQueueStatus } from "../../lib/folder-ai-pipeline-queue-status";
 import { UI_TEXT } from "../../lib/ui-text";
 import { useDesktopStore } from "../../stores/desktop-store";
 import type { SummaryPipelineKind } from "../../types/folder-ai-summary-types";
@@ -79,8 +80,17 @@ export function DesktopFolderAiSummaryDashboard({
   const outdatedAfterDays = useDesktopStore(
     (state) => state.folderScanningSettings.markFolderScanOutdatedAfterDays,
   );
+  const pipelineRunning = useDesktopStore((state) => state.pipelineRunning);
+  const pipelineQueued = useDesktopStore((state) => state.pipelineQueued);
   const visible = { ...DEFAULT_FOLDER_AI_SUMMARY_CARD_VISIBILITY, ...cardVisibility };
   const showImagePipelineSection = visible.semantic || visible.face || visible.photo || visible.rotation;
+  const queueStatusFor = (pipeline: SummaryPipelineKind) =>
+    getFolderAiPipelineQueueStatus({
+      running: pipelineRunning,
+      queued: pipelineQueued,
+      pipeline,
+      folderPath: coverage.folderPath,
+    });
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap gap-3">
@@ -126,6 +136,7 @@ export function DesktopFolderAiSummaryDashboard({
                 actionPipeline="semantic"
                 loading={coverageLoading}
                 actionPending={actionPendingPipeline === "semantic"}
+                queueStatus={queueStatusFor("semantic")}
                 onRunPipeline={onRunPipeline}
               />
             ) : null}
@@ -137,6 +148,7 @@ export function DesktopFolderAiSummaryDashboard({
                 actionPipeline="face"
                 loading={coverageLoading}
                 actionPending={actionPendingPipeline === "face"}
+                queueStatus={queueStatusFor("face")}
                 onRunPipeline={onRunPipeline}
               />
             ) : null}
@@ -148,6 +160,7 @@ export function DesktopFolderAiSummaryDashboard({
                 actionPipeline="photo"
                 loading={coverageLoading}
                 actionPending={actionPendingPipeline === "photo"}
+                queueStatus={queueStatusFor("photo")}
                 onRunPipeline={onRunPipeline}
               />
             ) : null}
@@ -159,6 +172,7 @@ export function DesktopFolderAiSummaryDashboard({
                 actionPipeline="rotation"
                 loading={coverageLoading}
                 actionPending={actionPendingPipeline === "rotation"}
+                queueStatus={queueStatusFor("rotation")}
                 onRunPipeline={onRunPipeline}
                 completedLabel="analyzed"
                 issueLabel="wrongly rotated"

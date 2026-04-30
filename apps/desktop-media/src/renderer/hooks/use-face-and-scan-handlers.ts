@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { UI_TEXT } from "../lib/ui-text";
+import { enqueueFolderAiPipeline } from "../lib/enqueue-folder-ai-pipeline";
 import type { DesktopStore, DesktopStoreState } from "../stores/desktop-store";
 
 export function useFaceAndScanHandlers(opts: {
@@ -45,26 +46,16 @@ export function useFaceAndScanHandlers(opts: {
       if (!folderPath) return;
       store.setState((s) => {
         s.faceError = null;
-        s.faceStatus = "running";
-        s.facePanelVisible = true;
-        s.faceJobId = null;
-        s.faceItemOrder = [];
-        s.faceItemsByKey = {};
-        s.faceAverageSecondsPerFile = null;
-        s.faceCurrentFolderPath = null;
       });
-      setProgressPanelCollapsed(false);
       try {
-        const result = await window.desktopApi.detectFolderFaces({
+        await enqueueFolderAiPipeline({
           folderPath,
-          mode: overrideExisting ? "all" : "missing",
+          pipeline: "face",
           recursive,
-          concurrency: 2,
+          overrideExisting,
           faceDetectionSettings,
         });
-        store.setState((s) => {
-          s.faceJobId = result.jobId;
-        });
+        setProgressPanelCollapsed(false);
       } catch (error) {
         const message = error instanceof Error ? error.message : UI_TEXT.faceDetectionFailed;
         store.setState((s) => {

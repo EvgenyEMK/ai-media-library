@@ -1,4 +1,4 @@
-import { Play } from "lucide-react";
+import { Hourglass, Loader2, Play } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ReactElement } from "react";
 import type { FolderAiPipelineCounts } from "../../../shared/ipc";
@@ -8,16 +8,19 @@ import { SummaryStatusGlyph, PendingSpinner } from "./SummaryStatusGlyph";
 import { SummaryStatusLines } from "./SummaryStatusLines";
 import { statusTone, toneBorder, toneText } from "./summary-card-formatters";
 import type { SummaryStatusTone } from "./summary-card-types";
+import type { FolderAiPipelineQueueStatus } from "../../lib/folder-ai-pipeline-queue-status";
 
 function PlayButton({
   title,
   tone,
   disabled,
+  queueStatus,
   onClick,
 }: {
   title: string;
   tone: SummaryStatusTone;
   disabled?: boolean;
+  queueStatus?: FolderAiPipelineQueueStatus;
   onClick: () => void;
 }): ReactElement {
   const color =
@@ -35,12 +38,18 @@ function PlayButton({
         "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-transparent p-0 shadow-none hover:border-current disabled:cursor-not-allowed disabled:opacity-50",
         color,
       )}
-      title="Run"
-      aria-label={`Run ${title}`}
+      title={queueStatus === "running" ? `${title} is running` : queueStatus === "queued" ? `${title} is waiting in queue` : "Run"}
+      aria-label={queueStatus === "running" ? `${title} is running` : queueStatus === "queued" ? `${title} is waiting in queue` : `Run ${title}`}
       disabled={disabled}
       onClick={onClick}
     >
-      <Play size={16} aria-hidden="true" />
+      {queueStatus === "running" ? (
+        <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+      ) : queueStatus === "queued" ? (
+        <Hourglass size={16} aria-hidden="true" />
+      ) : (
+        <Play size={16} aria-hidden="true" />
+      )}
     </button>
   );
 }
@@ -52,6 +61,7 @@ export function SummaryPipelineCard({
   actionPipeline,
   loading = false,
   actionPending = false,
+  queueStatus = null,
   onRunPipeline,
   completedLabel,
   issueLabel,
@@ -62,6 +72,7 @@ export function SummaryPipelineCard({
   actionPipeline?: SummaryPipelineKind;
   loading?: boolean;
   actionPending?: boolean;
+  queueStatus?: FolderAiPipelineQueueStatus;
   onRunPipeline?: (pipeline: SummaryPipelineKind) => void;
   completedLabel?: string;
   issueLabel?: string;
@@ -91,7 +102,8 @@ export function SummaryPipelineCard({
               <PlayButton
                 title={title}
                 tone={tone}
-                disabled={actionPending}
+                disabled={actionPending || queueStatus !== null}
+                queueStatus={actionPending ? "running" : queueStatus}
                 onClick={() => onRunPipeline(actionPipeline)}
               />
             ) : null}

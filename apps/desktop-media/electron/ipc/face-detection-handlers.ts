@@ -508,9 +508,15 @@ export function registerFaceDetectionHandlers(): void {
         ? await collectFoldersRecursivelyWithProgress(folderPath)
         : [folderPath];
       const imagesByFolder = await Promise.all(folders.map((folder) => listFolderImages(folder)));
-      const imagePaths = imagesByFolder.flat().map((image) => image.path);
+      const images = imagesByFolder.flat();
+      const imagePaths = images.map((image) => image.path);
+      const force = request.mode === "all";
+      const selectedImagePaths = force
+        ? imagePaths
+        : imagePaths.filter((imagePath) => getOrientationDetectionStateByPath(imagePath) === null);
+      const skippedExisting = imagePaths.length - selectedImagePaths.length;
       runningImageRotationJobs.set(jobId, { cancelled: false, folderPath });
-      emit({ type: "job-started", jobId, folderPath, total: imagePaths.length });
+      emit({ type: "job-started", jobId, folderPath, total: selectedImagePaths.length });
 
       void (async () => {
         try {
@@ -527,12 +533,11 @@ export function registerFaceDetectionHandlers(): void {
 
           let processed = 0;
           let wronglyRotated = 0;
-          let skipped = 0;
           let failed = 0;
-          const force = request.mode === "all";
-          for (const imagePath of imagePaths) {
+          let skipped = skippedExisting;
+          for (const imagePath of selectedImagePaths) {
             if (runningImageRotationJobs.get(jobId)?.cancelled) {
-              emit({ type: "job-cancelled", jobId, folderPath, processed: processed + skipped + failed, total: imagePaths.length, wronglyRotated, skipped, failed });
+              emit({ type: "job-cancelled", jobId, folderPath, processed: processed + failed, total: selectedImagePaths.length, wronglyRotated, skipped, failed });
               return;
             }
             let result: "processed" | "skipped" | "failed" | "disabled";
@@ -546,12 +551,12 @@ export function registerFaceDetectionHandlers(): void {
               );
             }
             if (runningImageRotationJobs.get(jobId)?.cancelled) {
-              emit({ type: "job-cancelled", jobId, folderPath, processed: processed + skipped + failed, total: imagePaths.length, wronglyRotated, skipped, failed });
+              emit({ type: "job-cancelled", jobId, folderPath, processed: processed + failed, total: selectedImagePaths.length, wronglyRotated, skipped, failed });
               return;
             }
             const state = getOrientationDetectionStateByPath(imagePath);
             if (result === "skipped") {
-              skipped += 1;
+              processed += 1;
             } else if (result === "processed" && state) {
               processed += 1;
             } else if (result === "failed" || result === "disabled" || !state) {
@@ -561,9 +566,9 @@ export function registerFaceDetectionHandlers(): void {
             if (state && [90, 180, 270].includes(state.correctionAngleClockwise)) {
               wronglyRotated += 1;
             }
-            emit({ type: "progress", jobId, folderPath, processed: processed + skipped + failed, total: imagePaths.length, wronglyRotated, skipped, failed });
+            emit({ type: "progress", jobId, folderPath, processed: processed + failed, total: selectedImagePaths.length, wronglyRotated, skipped, failed });
           }
-          emit({ type: "job-completed", jobId, folderPath, processed: processed + skipped + failed, total: imagePaths.length, wronglyRotated, skipped, failed });
+          emit({ type: "job-completed", jobId, folderPath, processed: processed + failed, total: selectedImagePaths.length, wronglyRotated, skipped, failed });
         } catch (error) {
           emit({
             type: "job-failed",

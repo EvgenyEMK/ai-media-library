@@ -119,6 +119,7 @@ export const gpsGeocodeDefinition: PipelineDefinition<GpsGeocodeParams, GpsGeoco
         processed,
         total: candidates.length,
         message: `Geocoded ${processed}/${candidates.length} (updated ${geoDataUpdated})`,
+        details: { geoDataUpdated },
       });
     }
 

@@ -82,6 +82,8 @@ export interface JobProgressSnapshot {
 export interface JobView {
   jobId: string;
   pipelineId: PipelineId;
+  /** Original serialisable job params, included so renderer UI can match folder-scoped jobs. */
+  params: unknown;
   state: JobState;
   progress: JobProgressSnapshot;
   error: string | null;
@@ -154,4 +156,13 @@ export type PipelineLifecycleEvent =
 export type EnqueueRejection =
   | { kind: "unknown-pipeline"; pipelineId: string }
   | { kind: "invalid-binding"; bundleId: string; jobId: string; reason: string }
-  | { kind: "validation-failed"; jobId: string; pipelineId: PipelineId; issues: string };
+  | { kind: "validation-failed"; jobId: string; pipelineId: PipelineId; issues: string }
+  | {
+      kind: "duplicate-active-job";
+      pipelineId: PipelineId;
+      folderPath: string;
+      existingFolderPath: string;
+      existingBundleId: string;
+      existingJobId: string;
+      reason: string;
+    };

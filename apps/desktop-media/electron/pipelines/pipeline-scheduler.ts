@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
 import type { BrowserWindow } from "electron";
+import { folderIsCoveredByScope, folderScopeFromParams } from "../../src/shared/pipeline-folder-scope";
 import type { PipelineContext } from "./pipeline-context";
 import {
   pipelineRegistry,
@@ -157,6 +158,21 @@ export class PipelineScheduler {
     if (!bundle.ok) {
       return { ok: false, rejection: bundle.rejection };
     }
+    const duplicate = this.findDuplicateActiveFolderJob(bundle.bundle);
+    if (duplicate) {
+      return {
+        ok: false,
+        rejection: {
+          kind: "duplicate-active-job",
+          pipelineId: duplicate.newJob.pipelineId,
+          folderPath: duplicate.newFolderPath,
+          existingFolderPath: duplicate.existingFolderPath,
+          existingBundleId: duplicate.existingBundleId,
+          existingJobId: duplicate.existingJobId,
+          reason: `${duplicate.newJob.pipelineId} is already running or queued for ${duplicate.existingFolderPath}.`,
+        },
+      };
+    }
 
     this.active.push(bundle.bundle);
     if (spec.originatorWindow) {
@@ -172,6 +188,36 @@ export class PipelineScheduler {
     this.tick();
 
     return { ok: true, bundleId: bundle.bundle.bundleId };
+  }
+
+  private findDuplicateActiveFolderJob(bundle: Bundle): {
+    newJob: Job;
+    newFolderPath: string;
+    existingFolderPath: string;
+    existingBundleId: string;
+    existingJobId: string;
+  } | null {
+    for (const newJob of bundle.jobs) {
+      const newScope = folderScopeFromParams(newJob.params);
+      if (!newScope) continue;
+      for (const activeBundle of this.active) {
+        for (const existingJob of activeBundle.jobs) {
+          if (existingJob.pipelineId !== newJob.pipelineId) continue;
+          if (existingJob.state !== "pending" && existingJob.state !== "running") continue;
+          const existingScope = folderScopeFromParams(existingJob.params);
+          if (!existingScope) continue;
+          if (!folderIsCoveredByScope(newScope.folderPath, existingScope)) continue;
+          return {
+            newJob,
+            newFolderPath: newScope.folderPath,
+            existingFolderPath: existingScope.folderPath,
+            existingBundleId: activeBundle.bundleId,
+            existingJobId: existingJob.jobId,
+          };
+        }
+      }
+    }
+    return null;
   }
 
   /**
@@ -604,12 +650,14 @@ export class PipelineScheduler {
       case "started":
         if (event.total !== undefined) snapshot.total = event.total;
         if (event.message !== undefined) snapshot.message = event.message;
+        if (event.details !== undefined) snapshot.details = event.details;
         break;
       case "phase-changed":
         snapshot.phase = event.phase;
         if (event.processed !== undefined) snapshot.processed = event.processed;
         if (event.total !== undefined) snapshot.total = event.total;
         if (event.message !== undefined) snapshot.message = event.message;
+        if (event.details !== undefined) snapshot.details = event.details;
         break;
       case "item-updated":
         if (event.processed !== undefined) snapshot.processed = event.processed;
@@ -762,6 +810,7 @@ function toJobView(job: Job): JobView {
   return {
     jobId: job.jobId,
     pipelineId: job.pipelineId,
+    params: job.params,
     state: job.state,
     progress: { ...job.progress },
     error: job.error,

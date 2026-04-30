@@ -199,6 +199,8 @@ function describeRejection(rejection: { kind: string }): string {
       return "invalid binding between bundle steps";
     case "validation-failed":
       return "params failed validation";
+    case "duplicate-active-job":
+      return "pipeline is already running or queued for this folder";
     default:
       return rejection.kind;
   }

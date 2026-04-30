@@ -5,6 +5,7 @@ import {
   type ThumbnailQuickFilterState,
 } from "@emk/media-metadata-core";
 import { passesAiImageSearchSimilarityGate } from "../lib/ai-search-similarity-gate";
+import { enqueueFolderAiPipeline } from "../lib/enqueue-folder-ai-pipeline";
 import { parentPathWithTrailingSep } from "../lib/path-display";
 import { refreshMetadataForItems } from "./ipc-binding-helpers";
 import type { DesktopStore } from "../stores/desktop-store";
@@ -165,25 +166,15 @@ export function useSemanticHandlers(opts: {
     ): Promise<void> => {
       store.setState((s) => {
         s.semanticIndexError = null;
-        s.semanticIndexStatus = "running";
-        s.semanticIndexPanelVisible = true;
-        s.semanticIndexJobId = null;
-        s.semanticIndexItemOrder = [];
-        s.semanticIndexItemsByKey = {};
-        s.semanticIndexAverageSecondsPerFile = null;
-        s.semanticIndexCurrentFolderPath = null;
-        s.semanticIndexPhase = null;
       });
-      setProgressPanelCollapsed(false);
       try {
-        const result = await window.desktopApi.indexFolderSemanticEmbeddings({
+        await enqueueFolderAiPipeline({
           folderPath,
-          mode: overrideExisting ? "all" : "missing",
+          pipeline: "semantic",
           recursive,
+          overrideExisting,
         });
-        store.setState((s) => {
-          s.semanticIndexJobId = result.jobId;
-        });
+        setProgressPanelCollapsed(false);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Semantic indexing failed.";
         store.setState((s) => {

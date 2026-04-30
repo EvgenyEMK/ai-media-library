@@ -67,6 +67,7 @@ export const semanticIndexDefinition: PipelineDefinition<SemanticIndexParams, Se
     const mode = params.mode === "all" ? "all" : "missing";
     const existing = getIndexedImageMediaIdsByPaths(allImages.map((img) => img.path));
     const previouslyFailed = getFailedImageEmbeddingPaths(allImages.map((img) => img.path));
+    const skippedExisting = mode === "missing" ? existing.size : 0;
     const selectedBase = mode === "missing" ? allImages.filter((img) => !existing.has(img.path)) : allImages;
     const selectedFresh = selectedBase.filter((img) => !previouslyFailed.has(img.path));
     const selectedFailed = selectedBase.filter((img) => previouslyFailed.has(img.path));
@@ -77,6 +78,7 @@ export const semanticIndexDefinition: PipelineDefinition<SemanticIndexParams, Se
       type: "started",
       total: selected.length,
       message: `Semantic indexing ${selected.length} images`,
+      details: { skipped: skippedExisting },
     });
     await warmupVisionPipeline();
     ctx.report({
@@ -84,6 +86,7 @@ export const semanticIndexDefinition: PipelineDefinition<SemanticIndexParams, Se
       phase: "embedding",
       processed: 0,
       total: selected.length,
+      details: { skipped: skippedExisting },
     });
 
     let completed = 0;
@@ -149,7 +152,7 @@ export const semanticIndexDefinition: PipelineDefinition<SemanticIndexParams, Se
         processed: i + 1,
         total: selected.length,
         message: `Indexed ${i + 1}/${selected.length}`,
-        details: { completed, failed, cancelled },
+        details: { completed, failed, cancelled, skipped: skippedExisting },
       });
     }
     return { total: selected.length, completed, failed, cancelled };

@@ -1,6 +1,7 @@
 import { useMemo, useRef } from "react";
 import { supportsThinkingMode } from "../../shared/photo-analysis-prompt";
 import { UI_TEXT } from "../lib/ui-text";
+import { enqueueFolderAiPipeline } from "../lib/enqueue-folder-ai-pipeline";
 import type { DesktopStore, DesktopStoreState } from "../stores/desktop-store";
 import { DEFAULT_PHOTO_ANALYSIS_SETTINGS } from "../../shared/ipc";
 
@@ -49,18 +50,9 @@ export function usePhotoAnalysisHandlers(opts: {
       if (!folderPath) return;
       const resolvedModel = (photoAnalysisSettings.model ?? aiSelectedModel).trim() || DEFAULT_PHOTO_ANALYSIS_SETTINGS.model;
       if (resolvedModel !== store.getState().aiSelectedModel) store.getState().setAiSelectedModel(resolvedModel);
-
       store.setState((s) => {
         s.aiError = null;
-        s.aiStatus = "running";
-        s.aiPanelVisible = true;
-        s.aiJobId = null;
-        s.aiItemOrder = [];
-        s.aiItemsByKey = {};
-        s.aiAverageSecondsPerFile = null;
-        s.aiCurrentFolderPath = null;
       });
-      setProgressPanelCollapsed(false);
       if (DEBUG_PHOTO_AI) {
         console.log(
           `[photo-ai][renderer][${nowIso()}] analyze start folder="${folderPath}" model="${resolvedModel}" recursive=${recursive} mode=${overrideExisting ? "all" : "missing"}`,
@@ -68,34 +60,18 @@ export function usePhotoAnalysisHandlers(opts: {
       }
 
       try {
-        const result = await window.desktopApi.analyzeFolderPhotos({
+        await enqueueFolderAiPipeline({
           folderPath,
-          mode: overrideExisting ? "all" : "missing",
+          pipeline: "photo",
           recursive,
-          model: resolvedModel,
-          think: supportsThinkingMode(resolvedModel) ? aiThinkingEnabled : false,
-          timeoutMsPerImage: Math.max(
-            10_000,
-            Math.round(photoAnalysisSettings.analysisTimeoutPerImageSec * 1000),
-          ),
-          downscaleBeforeLlm: photoAnalysisSettings.downscaleBeforeLlm,
-          downscaleLongestSidePx: photoAnalysisSettings.downscaleLongestSidePx,
-          enableTwoPassRotationConsistency: photoAnalysisSettings.enableTwoPassRotationConsistency,
-          extractInvoiceData: photoAnalysisSettings.extractInvoiceData,
-          concurrency: 2,
+          overrideExisting,
+          photoModel: resolvedModel,
+          photoThinkingEnabled: supportsThinkingMode(resolvedModel) ? aiThinkingEnabled : false,
+          photoSettings: photoAnalysisSettings,
         });
-        store.setState((s) => {
-          s.aiJobId = result.jobId;
-        });
+        setProgressPanelCollapsed(false);
         if (DEBUG_PHOTO_AI) {
-          console.log(`[photo-ai][renderer][${nowIso()}] analyze IPC returned jobId=${result.jobId} total=${result.total}`);
-        }
-        if (pendingAiCancelRef.current) {
-          if (DEBUG_PHOTO_AI) {
-            console.log(`[photo-ai][renderer][${nowIso()}] cancel was queued; sending cancel for jobId=${result.jobId}`);
-          }
-          pendingAiCancelRef.current = false;
-          await window.desktopApi.cancelPhotoAnalysis(result.jobId);
+          console.log(`[photo-ai][renderer][${nowIso()}] analyze enqueued for folder="${folderPath}"`);
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : UI_TEXT.analysisFailed;
