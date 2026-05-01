@@ -116,8 +116,8 @@ test.describe("Folder AI summary", () => {
     await expect(mainWindow.getByRole("heading", { name: "Folder tree analysis summary" })).toBeVisible();
     await expect(mainWindow.getByRole("tab", { name: "Summary" })).toHaveAttribute("aria-selected", "true");
     await expect(mainWindow.getByRole("heading", { name: "Wrongly rotated images" })).toBeVisible();
-    await mainWindow.getByRole("tab", { name: "Details: Geo-location" }).click();
-    await expect(mainWindow.getByRole("columnheader", { name: "Images GPS coverage" })).toBeVisible();
+    await mainWindow.getByRole("tab", { name: "Geo-location" }).click();
+    await expect(mainWindow.getByRole("columnheader", { name: "Images with GPS" })).toBeVisible();
     await mainWindow.getByRole("tab", { name: "Details: AI pipelines" }).click();
 
     await electronApp.evaluate(async ({ ipcMain }) => {

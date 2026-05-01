@@ -26,20 +26,14 @@ function GpsCoverageCell({ coverage }: { coverage: FolderGeoMediaCoverage }): Re
   }
   return (
     <div className="min-w-[190px] text-sm">
-      <div className="mb-1 font-semibold text-warning">
-        {formatCoveragePercent(coverage.withGpsCount, coverage.total)} GPS
+      <div className="mb-1 font-semibold text-muted-foreground">
+        {formatCoveragePercent(coverage.withGpsCount, coverage.total)} ({formatGroupedInt(coverage.withGpsCount)})
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
         <div
-          className="h-full rounded-full bg-warning"
+          className="h-full rounded-full bg-muted-foreground"
           style={{ width: `${Math.min(100, (coverage.withGpsCount / coverage.total) * 100)}%` }}
         />
-      </div>
-      <div className="mt-1 grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-sm text-muted-foreground">
-        <span>{UI_TEXT.folderAiSummaryGpsWith}:</span>
-        <span className="text-left font-medium text-foreground">{formatGroupedInt(coverage.withGpsCount)}</span>
-        <span>{UI_TEXT.folderAiSummaryGpsWithout}:</span>
-        <span className="text-left font-medium text-foreground">{formatGroupedInt(coverage.withoutGpsCount)}</span>
       </div>
     </div>
   );
