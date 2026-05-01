@@ -828,7 +828,13 @@ export interface FolderGeoLocationDetailsCoverage {
 
 export interface FolderGeoPathLlmCoverage {
   doneCount: number;
-  totalWithoutGpsImages: number;
+  totalImages: number;
+  /** Images with non-null path_llm `country` or `country_code` in `ai_metadata.locations_by_source`. */
+  filesWithCountry: number;
+  /** Images with non-null path_llm area in `ai_metadata.locations_by_source`. */
+  filesWithArea: number;
+  /** Images with non-null path_llm city in `ai_metadata.locations_by_source`. */
+  filesWithCity: number;
   label: FolderAiPipelineLabel;
 }
 

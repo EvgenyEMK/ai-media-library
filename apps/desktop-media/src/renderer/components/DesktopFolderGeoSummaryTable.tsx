@@ -1,5 +1,9 @@
 import type { ReactElement } from "react";
-import type { FolderAiCoverageReport, FolderGeoMediaCoverage } from "../../shared/ipc";
+import type {
+  FolderAiCoverageReport,
+  FolderGeoMediaCoverage,
+  FolderGeoPathLlmCoverage,
+} from "../../shared/ipc";
 import { cn } from "../lib/cn";
 import {
   folderDisplayNameFromPath,
@@ -66,27 +70,23 @@ function FileGpsCoverageCell({
   );
 }
 
-function PathLlmCoverageCell({
-  coverage,
-  doneCount,
-}: {
-  coverage: FolderGeoMediaCoverage;
-  doneCount: number;
-}): ReactElement {
-  if (coverage.total === 0) {
+function PathLlmCoverageCell({ detail }: { detail: FolderGeoPathLlmCoverage | undefined }): ReactElement {
+  const totalImages = detail?.totalImages ?? 0;
+  const doneCount = detail?.doneCount ?? 0;
+  if (totalImages === 0) {
     return <span className="text-muted-foreground">—</span>;
-  }
-  const totalWithoutGps = coverage.withoutGpsCount;
-  if (totalWithoutGps <= 0) {
-    return <span className="text-muted-foreground">0% (0)</span>;
   }
   return (
     <div className="min-w-[190px] text-sm">
       <div className="mb-1 font-semibold text-muted-foreground">
-        {formatCoveragePercent(doneCount, totalWithoutGps)} ({formatGroupedInt(doneCount)})
+        {formatCoveragePercent(doneCount, totalImages)} ({formatGroupedInt(doneCount)})
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
-        <div className="h-full rounded-full bg-muted-foreground" style={{ width: `${Math.min(100, (doneCount / totalWithoutGps) * 100)}%` }} />
+        <div className="h-full rounded-full bg-muted-foreground" style={{ width: `${Math.min(100, (doneCount / totalImages) * 100)}%` }} />
+      </div>
+      <div className="mt-1.5 text-xs text-muted-foreground">
+        Files with Country: {formatGroupedInt(detail?.filesWithCountry ?? 0)}, Area: {formatGroupedInt(detail?.filesWithArea ?? 0)}, City:{" "}
+        {formatGroupedInt(detail?.filesWithCity ?? 0)}
       </div>
     </div>
   );
@@ -142,10 +142,7 @@ function GeoRow({
         <FileGpsCoverageCell images={coverage.geo.images} videos={coverage.geo.videos} />
       </td>
       <td className={cn("border-b border-border px-3 py-2.5 text-left align-top", noBottomBorder && "border-b-0")}>
-        <PathLlmCoverageCell
-          coverage={coverage.geo.images}
-          doneCount={coverage.geo.pathLlmLocationDetails?.doneCount ?? 0}
-        />
+        <PathLlmCoverageCell detail={coverage.geo.pathLlmLocationDetails} />
       </td>
     </tr>
   );

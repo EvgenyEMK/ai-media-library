@@ -28,7 +28,7 @@ export function PathAnalysisCard({
   onCancelPathAnalysis,
 }: PathAnalysisCardProps): ReactElement {
   const pathPercent =
-    pathAnalysisTotal > 0 ? Math.min(100, (pathAnalysisProcessed / pathAnalysisTotal) * 100) : 0;
+    pathAnalysisTotal > 0 ? Math.min(100, Math.round((pathAnalysisProcessed / pathAnalysisTotal) * 100)) : 0;
   const pathAnalysisTimeLeftText = useProgressEta({
     running: isPathAnalysisRunning,
     jobId: pathAnalysisJobId,
@@ -65,7 +65,7 @@ export function PathAnalysisCard({
       statsText={`Processed: ${formatCountRatio(pathAnalysisProcessed, pathAnalysisTotal)}`}
       rightText={rightText}
       error={pathAnalysisError}
-      showProgress={isPathAnalysisRunning}
+      showProgress={isPathAnalysisRunning || pathAnalysisTotal > 0}
     />
   );
 }

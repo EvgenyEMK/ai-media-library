@@ -8,6 +8,7 @@ import type {
   SemanticIndexProgressEvent,
   SimilarUntaggedCountsProgressEvent,
 } from "../../shared/ipc";
+import { pathAnalysisRendererDebugLog } from "../lib/path-analysis-renderer-debug";
 import type { DesktopStore } from "../stores/desktop-store";
 import {
   queueMetadataRefresh,
@@ -761,7 +762,8 @@ export function bindSimilarUntaggedCountsProgress(store: DesktopStore): () => vo
 
 export function bindPathAnalysisProgress(store: DesktopStore): () => void {
   const trackFolder = createFolderTransitionTracker(store);
-  return window.desktopApi.onPathAnalysisProgress((event: PathAnalysisProgressEvent) => {
+  const removeListener = window.desktopApi.onPathAnalysisProgress((event: PathAnalysisProgressEvent) => {
+    pathAnalysisRendererDebugLog("[debug][path-analysis][renderer] progress event", event);
     if (event.type === "job-started") {
       store.setState((s) => {
         s.pathAnalysisJobId = event.jobId;
@@ -793,13 +795,19 @@ export function bindPathAnalysisProgress(store: DesktopStore): () => void {
     if (event.type === "job-completed") {
       trackFolder(event.folderPath);
       store.setState((s) => {
-        s.pathAnalysisStatus = "idle";
+        s.pathAnalysisStatus = "completed";
         s.pathAnalysisJobId = null;
         s.pathAnalysisProcessed = event.processed;
         s.pathAnalysisTotal = event.total;
         const partialFail = event.failed > 0;
         s.pathAnalysisError = partialFail ? `${event.failed} file(s) could not be updated` : null;
-        s.pathAnalysisPanelVisible = partialFail;
+        s.pathAnalysisPanelVisible = true;
+        s.lastAiPipelineCompletion = {
+          jobId: event.jobId,
+          folderPath: event.folderPath,
+          kind: "path-llm",
+          completedAt: new Date().toISOString(),
+        };
       });
       void refreshFolderAnalysisStatuses(store);
       const images = store.getState().mediaItems;
@@ -817,6 +825,10 @@ export function bindPathAnalysisProgress(store: DesktopStore): () => void {
       });
     }
   });
+
+  return () => {
+    removeListener();
+  };
 }
 
 export function bindGeocoderInitProgress(store: DesktopStore): () => void {

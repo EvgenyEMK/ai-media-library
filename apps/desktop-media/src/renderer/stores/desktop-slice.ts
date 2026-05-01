@@ -40,7 +40,7 @@ export interface MetadataScanCompletionSignal {
 export interface AiPipelineCompletionSignal {
   jobId: string;
   folderPath: string;
-  kind: "photo" | "face" | "semantic" | "rotation";
+  kind: "photo" | "face" | "semantic" | "rotation" | "path-llm";
   completedAt: string;
 }
 
@@ -93,7 +93,7 @@ export interface DesktopSlice {
 
   /** LLM path metadata extraction (folder menu). */
   pathAnalysisJobId: string | null;
-  pathAnalysisStatus: "idle" | "running";
+  pathAnalysisStatus: "idle" | "running" | "completed";
   pathAnalysisProcessed: number;
   pathAnalysisTotal: number;
   pathAnalysisFolderPath: string | null;

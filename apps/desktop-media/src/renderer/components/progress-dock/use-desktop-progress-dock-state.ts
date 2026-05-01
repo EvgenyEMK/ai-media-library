@@ -162,7 +162,9 @@ export function useDesktopProgressDockState({
   const isImageRotationRunning = imageRotationStatus === "running";
   const pathAnalysisQualifies =
     pathAnalysisPanelVisible &&
-    (isPathAnalysisRunning || Boolean(pathAnalysisError));
+    (isPathAnalysisRunning ||
+      pathAnalysisStatus === "completed" ||
+      Boolean(pathAnalysisError));
   const imageRotationQualifies =
     imageRotationPanelVisible &&
     (isImageRotationRunning ||

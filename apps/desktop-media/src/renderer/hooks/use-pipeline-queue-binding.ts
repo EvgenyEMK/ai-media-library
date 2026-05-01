@@ -9,6 +9,7 @@ const summaryPipelineKindByPipelineId: Partial<Record<PipelineId, AiPipelineComp
   "face-detection": "face",
   "semantic-index": "semantic",
   "image-rotation-precheck": "rotation",
+  "path-llm-analysis": "path-llm",
 };
 
 function folderPathFromJobParams(params: unknown): string | null {

@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { pathAnalysisRendererDebugLog } from "../lib/path-analysis-renderer-debug";
 import type { DesktopStore } from "../stores/desktop-store";
 
 export type PathAnalysisHandlers = {
@@ -19,13 +20,19 @@ export function usePathAnalysisHandlers(opts: {
         if (!trimmed) return;
 
         setProgressPanelCollapsed(false);
+        pathAnalysisRendererDebugLog("[debug][path-analysis][renderer] start requested", {
+          folderPath: trimmed,
+          recursive,
+        });
         try {
-          await window.desktopApi.analyzeFolderPathMetadata({
+          const result = await window.desktopApi.analyzeFolderPathMetadata({
             folderPath: trimmed,
             recursive,
           });
+          pathAnalysisRendererDebugLog("[debug][path-analysis][renderer] start accepted", result);
         } catch (error) {
           const message = error instanceof Error ? error.message : "Path analysis failed to start";
+          pathAnalysisRendererDebugLog("[debug][path-analysis][renderer] start failed", { message });
           store.setState((s) => {
             s.pathAnalysisStatus = "idle";
             s.pathAnalysisJobId = null;

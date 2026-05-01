@@ -226,7 +226,6 @@ export function DesktopFolderAiSummaryView({
           setSelectedWithSubfolders(withSubfolders);
           setSelectedDirectOnly(directOnly);
           setCoverageLoading(false);
-          setActiveTab("summary");
           debugFolderAiSummary("renderer:coverage-received", {
             folderPath,
             loadSequence,
