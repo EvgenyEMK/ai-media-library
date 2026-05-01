@@ -29,5 +29,13 @@ export function SummaryStatusGlyph({
       </span>
     );
   }
+  if (pipeline.label === "not_done" && pipeline.totalImages > 0) {
+    return (
+      <span className={cn("inline-flex items-center gap-2", toneText(tone))}>
+        <CircleDashed size={28} aria-hidden="true" />
+        <span className="text-2xl font-semibold leading-none">0%</span>
+      </span>
+    );
+  }
   return <span className={cn("text-4xl font-semibold leading-none", toneText(tone))}>—</span>;
 }

@@ -15,6 +15,7 @@ import { getDesktopDatabase } from "../db/client";
 import { getFolderAiCoverage, getFolderAiRollupsForPaths } from "../db/folder-ai-coverage";
 import { getFolderFaceSummaryReport } from "../db/folder-face-summary";
 import {
+  getFolderScanAgeSummary,
   getFolderMetadataScanCompletedAtByPath,
   getFolderSummaryOverview,
 } from "../db/folder-summary-overview";
@@ -115,10 +116,16 @@ export function registerFolderAiSummaryHandlers(): void {
 
   ipcMain.handle(
     IPC_CHANNELS.getFolderTreeScanSummary,
-    async (_event, folderPath: string): Promise<FolderTreeScanSummary> => {
+    async (_event, folderPath: string, outdatedAfterDays = 7): Promise<FolderTreeScanSummary> => {
       const normalized = folderPath?.trim();
       if (!normalized) {
-        return { hasDirectSubfolders: false, notFullyScannedDirectSubfolderCount: 0 };
+        return {
+          hasDirectSubfolders: false,
+          directSubfolderCount: 0,
+          notFullyScannedDirectSubfolderCount: 0,
+          outdatedScannedFolderCount: 0,
+          scannedFolderCount: 0,
+        };
       }
 
       const startedAt = performance.now();
@@ -138,17 +145,25 @@ export function registerFolderAiSummaryHandlers(): void {
       const notFullyScannedDirectSubfolderCount = children.filter(
         (node) => directSubfolderScanCompletedAtByPath[node.path] == null,
       ).length;
+      const normalizedOutdatedAfterDays = Math.max(1, Math.round(Number(outdatedAfterDays) || 7));
+      const olderThanIso = new Date(Date.now() - normalizedOutdatedAfterDays * 24 * 60 * 60 * 1000).toISOString();
+      const scanAgeSummary = getFolderScanAgeSummary({ folderPath: normalized, olderThanIso });
       debugFolderAiSummary("tree-scan:complete", {
         folderPath: normalized,
         elapsed: elapsedSince(startedAt),
         directScanElapsed: elapsedSince(directScanStartedAt),
         directSubfolders: children.length,
         notFullyScannedDirectSubfolderCount,
+        outdatedScannedFolderCount: scanAgeSummary.outdatedScannedFolderCount,
+        scannedFolderCount: scanAgeSummary.scannedFolderCount,
       });
 
       return {
         hasDirectSubfolders: children.length > 0,
+        directSubfolderCount: children.length,
         notFullyScannedDirectSubfolderCount,
+        outdatedScannedFolderCount: scanAgeSummary.outdatedScannedFolderCount,
+        scannedFolderCount: scanAgeSummary.scannedFolderCount,
       };
     },
   );

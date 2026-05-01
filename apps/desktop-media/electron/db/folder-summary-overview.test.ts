@@ -6,7 +6,7 @@ let nextRow = {
   scanned_count: 0,
   unscanned_count: 0,
   oldest_metadata_extracted_at: null as string | null,
-  last_metadata_extracted_at: null as string | null,
+  last_file_mtime_ms: null as number | null,
   last_metadata_scan_completed_at: null as string | null,
   oldest_folder_scan_completed_at: null as string | null,
 };
@@ -51,7 +51,7 @@ describe("getFolderSummaryOverview", () => {
       scanned_count: 0,
       unscanned_count: 0,
       oldest_metadata_extracted_at: null,
-      last_metadata_extracted_at: null,
+      last_file_mtime_ms: null,
       last_metadata_scan_completed_at: null,
       oldest_folder_scan_completed_at: null,
     };
@@ -64,7 +64,7 @@ describe("getFolderSummaryOverview", () => {
       scanned_count: 10,
       unscanned_count: 5,
       oldest_metadata_extracted_at: "2026-04-01T10:00:00.000Z",
-      last_metadata_extracted_at: "2026-04-27T10:00:00.000Z",
+      last_file_mtime_ms: Date.parse("2026-04-27T10:00:00.000Z"),
       last_metadata_scan_completed_at: "2026-04-28T08:00:00.000Z",
       oldest_folder_scan_completed_at: "2026-04-20T08:00:00.000Z",
     };
@@ -81,7 +81,10 @@ describe("getFolderSummaryOverview", () => {
       scannedCount: 10,
       unscannedCount: 5,
       totalMedia: 15,
+      directSubfolderCount: 0,
       notFullyScannedDirectSubfolderCount: 0,
+      outdatedScannedFolderCount: 0,
+      scannedFolderCount: 0,
     });
     expect(getCalls[0]?.args).toEqual([
       "local-default",

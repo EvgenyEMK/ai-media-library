@@ -70,6 +70,7 @@ export const UI_TEXT = {
   folderAiSummaryFolderScanHelp:
     "Shows how fresh the folder scan data is. Oldest scan is the oldest completed scan timestamp in this folder tree. Last data change is the latest time file metadata was extracted into the catalog. Not scanned counts direct sub-folders whose tree still has missing scan data.",
   folderAiSummaryDashboardImagesSection: "Images:",
+  folderAiSummaryFileScanMetadataSection: "File scan and metadata",
   folderAiSummaryDashboardPrototypeVariants: "Card style variants",
   folderAiSummaryGeoLocation: "Geo-location",
   folderAiSummaryGpsWith: "With GPS",

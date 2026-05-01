@@ -22,6 +22,7 @@ import { DesktopFolderGeoSummaryTable } from "./DesktopFolderGeoSummaryTable";
 import { PendingSpinner } from "./folder-ai-summary/SummaryStatusGlyph";
 import { useDesktopStore } from "../stores/desktop-store";
 import { DesktopFolderFaceSummaryDashboard } from "./folder-ai-summary/DesktopFolderFaceSummaryDashboard";
+import { PipelineOnboardingModal, type PipelineOnboardingSlideId } from "./folder-ai-summary/PipelineOnboardingModal";
 
 type SummaryTab = "summary" | "face" | "ai" | "geo";
 
@@ -97,6 +98,9 @@ export function DesktopFolderAiSummaryView({
   const lastMetadataScanCompletion = useDesktopStore((state) => state.lastMetadataScanCompletion);
   const lastAiPipelineCompletion = useDesktopStore((state) => state.lastAiPipelineCompletion);
   const selectedFolderChildrenCount = useDesktopStore((state) => state.childrenByPath[folderPath]?.length ?? 0);
+  const folderScanOutdatedAfterDays = useDesktopStore(
+    (state) => state.folderScanningSettings.markFolderScanOutdatedAfterDays,
+  );
   const loadSequenceRef = useRef(0);
   const [overviewLoading, setOverviewLoading] = useState(true);
   const [folderScanLoading, setFolderScanLoading] = useState(true);
@@ -117,6 +121,8 @@ export function DesktopFolderAiSummaryView({
   const [failedListItems, setFailedListItems] = useState<FolderAiFailedFileItem[]>([]);
   const [failedListMetaByPath, setFailedListMetaByPath] = useState<Record<string, DesktopMediaItemMetadata>>({});
   const [folderScanPending, setFolderScanPending] = useState(false);
+  const [onboardingSlideId, setOnboardingSlideId] = useState<PipelineOnboardingSlideId>("face");
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
   const {
     actionPendingPipeline,
     runPipelineForFolderWithSubfolders,
@@ -148,7 +154,7 @@ export function DesktopFolderAiSummaryView({
       const overviewStartedAt = performance.now();
       const overviewPromise = window.desktopApi.getFolderAiSummaryOverview(folderPath, { includeSubfolders: false });
       const folderScanStartedAt = performance.now();
-      const folderScanPromise = window.desktopApi.getFolderTreeScanSummary(folderPath);
+      const folderScanPromise = window.desktopApi.getFolderTreeScanSummary(folderPath, folderScanOutdatedAfterDays);
       const coverageStartedAt = performance.now();
       const coveragePromise = Promise.all([
         window.desktopApi.getFolderAiCoverage(folderPath, true),
@@ -186,7 +192,10 @@ export function DesktopFolderAiSummaryView({
                 ...current.selectedWithSubfolders,
                 scanFreshness: {
                   ...current.selectedWithSubfolders.scanFreshness,
+                  directSubfolderCount: scanSummary.directSubfolderCount,
                   notFullyScannedDirectSubfolderCount: scanSummary.notFullyScannedDirectSubfolderCount,
+                  outdatedScannedFolderCount: scanSummary.outdatedScannedFolderCount,
+                  scannedFolderCount: scanSummary.scannedFolderCount,
                 },
               },
             };
@@ -197,7 +206,10 @@ export function DesktopFolderAiSummaryView({
             loadSequence,
             elapsedMs: Math.round(performance.now() - folderScanStartedAt),
             hasDirectSubfolders: scanSummary.hasDirectSubfolders,
+            directSubfolderCount: scanSummary.directSubfolderCount,
             notFullyScannedDirectSubfolderCount: scanSummary.notFullyScannedDirectSubfolderCount,
+            outdatedScannedFolderCount: scanSummary.outdatedScannedFolderCount,
+            scannedFolderCount: scanSummary.scannedFolderCount,
           });
         })
         .catch(() => {
@@ -245,7 +257,7 @@ export function DesktopFolderAiSummaryView({
         });
       }
     }
-  }, [folderPath]);
+  }, [folderPath, folderScanOutdatedAfterDays]);
 
   const loadDetails = useCallback(async (): Promise<void> => {
     if (!folderPath || detailsLoaded || detailsLoading) return;
@@ -375,6 +387,18 @@ export function DesktopFolderAiSummaryView({
     [load, runPipelineForFolderWithSubfolders],
   );
 
+  const openOnboarding = useCallback((pipeline: SummaryPipelineKind | "geo" | "folderScan"): void => {
+    if (pipeline === "face" || pipeline === "rotation") {
+      setOnboardingSlideId(pipeline);
+      setOnboardingOpen(true);
+      return;
+    }
+    if (pipeline === "geo" || pipeline === "folderScan") {
+      setOnboardingSlideId(pipeline);
+      setOnboardingOpen(true);
+    }
+  }, []);
+
   const iconBtnClass =
     "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-input bg-secondary p-0 shadow-none";
   const isFailedListView = failedListContext !== null;
@@ -441,9 +465,7 @@ export function DesktopFolderAiSummaryView({
             {`${failedListPipelineLabel} - ${failedListContext.folderLabel}`}
           </p>
         </div>
-      ) : (
-        <p className="m-0 text-sm text-muted-foreground">{UI_TEXT.folderAiSummaryNote}</p>
-      )}
+      ) : null}
 
       {error ? <p className="m-0 text-red-400">{error}</p> : null}
       {detailsError ? <p className="m-0 text-red-400">{detailsError}</p> : null}
@@ -472,6 +494,10 @@ export function DesktopFolderAiSummaryView({
               coverageLoading={coverageLoading}
               actionPendingPipeline={actionPendingPipeline}
               onRunPipeline={(pipeline) => void runDashboardPipeline(pipeline)}
+              actionPendingGeoLocation={folderScanPending}
+              onRunGeoLocation={() => void runFolderScanWithSubfolders()}
+              onOpenPipelineInfo={openOnboarding}
+              onViewRotationResults={() => setActiveTab("ai")}
               actionPendingFolderScan={folderScanPending}
               onRunFolderScan={() => void runFolderScanWithSubfolders()}
             />
@@ -524,6 +550,12 @@ export function DesktopFolderAiSummaryView({
           metaByPath={failedListMetaByPath}
         />
       ) : null}
+
+      <PipelineOnboardingModal
+        open={onboardingOpen}
+        initialSlideId={onboardingSlideId}
+        onClose={() => setOnboardingOpen(false)}
+      />
     </div>
   );
 }

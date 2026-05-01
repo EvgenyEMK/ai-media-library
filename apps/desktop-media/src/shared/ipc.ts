@@ -915,7 +915,10 @@ export interface FolderScanFreshness {
   scannedCount: number;
   unscannedCount: number;
   totalMedia: number;
+  directSubfolderCount: number;
   notFullyScannedDirectSubfolderCount: number;
+  outdatedScannedFolderCount: number;
+  scannedFolderCount: number;
 }
 
 export interface FolderAiSummaryOverview {
@@ -944,7 +947,10 @@ export interface FolderAiSummaryOverviewRequestOptions {
 
 export interface FolderTreeScanSummary {
   hasDirectSubfolders: boolean;
+  directSubfolderCount: number;
   notFullyScannedDirectSubfolderCount: number;
+  outdatedScannedFolderCount: number;
+  scannedFolderCount: number;
 }
 
 export type ImageRotationProgressEvent =
@@ -1812,7 +1818,7 @@ export interface DesktopApi {
     folderPath: string,
     options?: FolderAiSummaryOverviewRequestOptions,
   ) => Promise<FolderAiSummaryOverviewReport>;
-  getFolderTreeScanSummary: (folderPath: string) => Promise<FolderTreeScanSummary>;
+  getFolderTreeScanSummary: (folderPath: string, outdatedAfterDays?: number) => Promise<FolderTreeScanSummary>;
   getFolderAiSummaryReport: (folderPath: string) => Promise<FolderAiSummaryReport>;
   getFolderFaceSummaryReport: (folderPath: string) => Promise<FolderFaceSummaryReport>;
   getFolderAiFailedFiles: (
