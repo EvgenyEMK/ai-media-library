@@ -4,8 +4,14 @@ import { ensureAuxModel } from "./native-face";
 import { isOrientationClassifierReady, predictOrientation } from "./native-face/orientation-classifier";
 import {
   getOrientationDetectionStateByPath,
+  upsertOrientationDetectionFailure,
   upsertOrientationDetectionResult,
 } from "./db/media-analysis";
+
+function persistOrientationFailure(imagePath: string, message: string, signal?: AbortSignal): void {
+  if (signal?.aborted) return;
+  upsertOrientationDetectionFailure(imagePath, message);
+}
 
 export async function runWrongImageRotationPrecheck(params: {
   imagePath: string;
@@ -46,9 +52,15 @@ export async function runWrongImageRotationPrecheck(params: {
     }
   }
 
-  if (!settings.wrongImageRotationDetection.useFaceLandmarkFeaturesFallback) return "failed";
+  if (!settings.wrongImageRotationDetection.useFaceLandmarkFeaturesFallback) {
+    persistOrientationFailure(imagePath, "Orientation classifier failed and face-landmark fallback is disabled.", signal);
+    return "failed";
+  }
   const fromLandmarks = checkExistingFaceLandmarksForRotation(imagePath);
-  if (!fromLandmarks) return "failed";
+  if (!fromLandmarks) {
+    persistOrientationFailure(imagePath, "Orientation classifier and face-landmark fallback could not determine rotation.", signal);
+    return "failed";
+  }
   upsertOrientationDetectionResult(imagePath, {
     source: "face_landmarks",
     correctionAngleClockwise: fromLandmarks.finalAngle,

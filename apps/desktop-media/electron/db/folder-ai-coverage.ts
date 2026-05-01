@@ -49,7 +49,7 @@ function toPipelineCounts(
     doneCount: done,
     failedCount: failed,
     totalImages: total,
-    label: pipelineLabel(done, total),
+    label: pipelineLabel(Math.min(done + failed, total), total),
     ...(typeof issueCount === "number" ? { issueCount } : {}),
     ...(extras ?? {}),
   };
@@ -89,9 +89,24 @@ export function getFolderAiCoverage(params: {
       SUM(CASE WHEN mi.photo_analysis_processed_at IS NOT NULL AND (mi.photo_analysis_failed_at IS NULL OR mi.photo_analysis_processed_at > mi.photo_analysis_failed_at) THEN 1 ELSE 0 END) AS photo_done,
       SUM(CASE WHEN mi.face_detection_processed_at IS NOT NULL AND (mi.face_detection_failed_at IS NULL OR mi.face_detection_processed_at > mi.face_detection_failed_at) THEN 1 ELSE 0 END) AS face_done,
       SUM(CASE WHEN me_img.embedding_status = 'ready' THEN 1 ELSE 0 END) AS semantic_done,
-      SUM(CASE WHEN json_extract(mi.ai_metadata, '$.orientation_detection') IS NOT NULL THEN 1 ELSE 0 END) AS rotation_done,
-      SUM(CASE WHEN CAST(json_extract(mi.ai_metadata, '$.orientation_detection.correction_angle_clockwise') AS INTEGER) IN (90, 180, 270) THEN 1 ELSE 0 END) AS rotation_wrong,
-      SUM(CASE WHEN json_extract(mi.ai_metadata, '$.orientation_detection_error') IS NOT NULL AND json_extract(mi.ai_metadata, '$.orientation_detection') IS NULL THEN 1 ELSE 0 END) AS rotation_failed,
+      SUM(CASE WHEN json_extract(mi.ai_metadata, '$.orientation_detection') IS NOT NULL
+        AND (
+          json_extract(mi.ai_metadata, '$.orientation_detection_error') IS NULL
+          OR json_extract(mi.ai_metadata, '$.orientation_detection.processed_at') > json_extract(mi.ai_metadata, '$.orientation_detection_error.failed_at')
+        )
+        THEN 1 ELSE 0 END) AS rotation_done,
+      SUM(CASE WHEN CAST(json_extract(mi.ai_metadata, '$.orientation_detection.correction_angle_clockwise') AS INTEGER) IN (90, 180, 270)
+        AND (
+          json_extract(mi.ai_metadata, '$.orientation_detection_error') IS NULL
+          OR json_extract(mi.ai_metadata, '$.orientation_detection.processed_at') > json_extract(mi.ai_metadata, '$.orientation_detection_error.failed_at')
+        )
+        THEN 1 ELSE 0 END) AS rotation_wrong,
+      SUM(CASE WHEN json_extract(mi.ai_metadata, '$.orientation_detection_error') IS NOT NULL
+        AND (
+          json_extract(mi.ai_metadata, '$.orientation_detection') IS NULL
+          OR json_extract(mi.ai_metadata, '$.orientation_detection_error.failed_at') >= json_extract(mi.ai_metadata, '$.orientation_detection.processed_at')
+        )
+        THEN 1 ELSE 0 END) AS rotation_failed,
       SUM(CASE WHEN mi.photo_analysis_failed_at IS NOT NULL AND (mi.photo_analysis_processed_at IS NULL OR mi.photo_analysis_failed_at >= mi.photo_analysis_processed_at) THEN 1 ELSE 0 END) AS photo_failed,
       SUM(CASE WHEN mi.face_detection_failed_at IS NOT NULL AND (mi.face_detection_processed_at IS NULL OR mi.face_detection_failed_at >= mi.face_detection_processed_at) THEN 1 ELSE 0 END) AS face_failed,
       SUM(CASE WHEN me_img.embedding_status = 'failed' THEN 1 ELSE 0 END) AS semantic_failed,

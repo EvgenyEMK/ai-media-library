@@ -21,7 +21,8 @@ export function SummaryStatusLines({
   const hasMedia = pipeline.totalImages > 0;
   const issueCount = pipeline.issueCount ?? 0;
   const done = pipeline.doneCount;
-  const remaining = Math.max(pipeline.totalImages - done, 0);
+  const processed = Math.min(done + pipeline.failedCount, pipeline.totalImages);
+  const remaining = Math.max(pipeline.totalImages - processed, 0);
   const showActionFirst = tone === "amber" || tone === "red";
   const showAnalyzedLine = tone !== "red" && tone !== "amber";
   const actionToneClass = tone === "amber" ? "text-warning" : "text-destructive";

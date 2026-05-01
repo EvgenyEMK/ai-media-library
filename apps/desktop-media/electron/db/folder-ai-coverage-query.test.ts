@@ -71,6 +71,58 @@ describe("getFolderAiCoverage", () => {
     expect(getCalls[0]?.sql).toContain("$.orientation_detection");
     expect(getCalls[0]?.sql).toContain("$.orientation_detection_error");
     expect(getCalls[0]?.sql).toContain("correction_angle_clockwise");
+    expect(getCalls[0]?.sql).toContain("$.orientation_detection.processed_at");
+    expect(getCalls[0]?.sql).toContain("$.orientation_detection_error.failed_at");
+  });
+
+  it("keeps rotation failures separate while allowing progress UI to count them as processed", () => {
+    nextRow = {
+      total: 5,
+      photo_done: 4,
+      face_done: 3,
+      semantic_done: 2,
+      rotation_done: 3,
+      rotation_wrong: 1,
+      rotation_failed: 2,
+      photo_failed: 0,
+      face_failed: 0,
+      semantic_failed: 0,
+    };
+
+    const coverage = getFolderAiCoverage({ folderPath: "C:\\photos", recursive: true });
+
+    expect(coverage.rotation).toEqual({
+      doneCount: 3,
+      failedCount: 2,
+      totalImages: 5,
+      label: "done",
+      issueCount: 1,
+    });
+  });
+
+  it("does not classify a pipeline with failures and no successes as not done", () => {
+    nextRow = {
+      total: 10,
+      photo_done: 4,
+      face_done: 3,
+      semantic_done: 2,
+      rotation_done: 0,
+      rotation_wrong: 0,
+      rotation_failed: 2,
+      photo_failed: 0,
+      face_failed: 0,
+      semantic_failed: 0,
+    };
+
+    const coverage = getFolderAiCoverage({ folderPath: "C:\\photos", recursive: true });
+
+    expect(coverage.rotation).toEqual({
+      doneCount: 0,
+      failedCount: 2,
+      totalImages: 10,
+      label: "partial",
+      issueCount: 0,
+    });
   });
 
   it("counts a later face-detection failure even when an older processed timestamp exists", () => {

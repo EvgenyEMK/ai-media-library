@@ -7,7 +7,10 @@ import {
 import { listFolderImages } from "../../fs-media";
 import { readSettings } from "../../storage";
 import { runWrongImageRotationPrecheck } from "../../orientation-preprocess";
-import { getOrientationDetectionStateByPath } from "../../db/media-analysis";
+import {
+  getOrientationDetectionStateByPath,
+  upsertOrientationDetectionFailure,
+} from "../../db/media-analysis";
 
 export interface ImageRotationPrecheckParams {
   folderPath: string;
@@ -108,7 +111,11 @@ export const imageRotationPrecheckDefinition: PipelineDefinition<
           signal: ctx.signal,
           force: params.force === true,
         });
-      } catch {
+      } catch (error) {
+        upsertOrientationDetectionFailure(
+          imagePath,
+          error instanceof Error ? error.message : "Unexpected image rotation precheck failure.",
+        );
         result = "failed";
       }
 
