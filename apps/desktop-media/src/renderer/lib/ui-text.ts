@@ -49,7 +49,7 @@ export const UI_TEXT = {
   folderAiSummaryTreeTitle: "Folder tree analysis summary",
   folderAiSummaryTabSummary: "Summary",
   folderAiSummaryTabFaceDetection: "Face detection",
-  folderAiSummaryTabAiPipelines: "Details: AI pipelines",
+  folderAiSummaryTabAiPipelines: "Subfolders",
   folderAiSummaryTabGeoLocation: "Geo-location",
   folderAiSummaryActionShort: "Analysis",
   folderAiSummaryActionOpen: "Open folder analysis summary",
@@ -67,6 +67,10 @@ export const UI_TEXT = {
   folderAiSummaryColumnPhoto: "AI Image analysis",
   folderAiSummaryColumnSemantic: "AI search index",
   folderAiSummaryColumnRotation: "Wrongly rotated images",
+  /** Subfolders table header only (dashboard card still uses folderAiSummaryColumnRotation) */
+  folderAiSummaryColumnRotationAnalysis: "Rotation analysis",
+  /** Subfolder table rotation column detail line: shown as "{prefix}: N" when N > 0 */
+  folderAiSummaryWronglyRotatedCountPrefix: "Wrongly rotated",
   folderAiSummaryFolderScanTitle: "Folder scan",
   folderAiSummaryFolderTreeScanTitle: "Folder tree scan",
   folderAiSummaryFolderScanHelp:

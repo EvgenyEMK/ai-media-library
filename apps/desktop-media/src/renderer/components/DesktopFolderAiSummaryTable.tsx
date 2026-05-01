@@ -56,6 +56,8 @@ function SummaryRow({
       ? () => onOpenFailedList(coverage.folderPath, pipeline, coverage.recursive, label)
       : undefined;
 
+  const wronglyRotatedCount = coverage.rotation.issueCount ?? 0;
+
   return (
     <tr className={highlighted ? "bg-primary/12" : undefined}>
       <td className={cn("border-b border-border px-3 py-2.5 text-left align-top font-medium", noBottomBorder && "border-b-0", highlighted && "text-sm font-semibold")}>
@@ -89,6 +91,21 @@ function SummaryRow({
           onRunPipeline={onRunPipeline}
           actionPending={actionPendingPipeline === "photo"}
           onOpenFailedList={coverage.photo.failedCount > 0 ? failedHandler("photo") : undefined}
+        />
+      </td>
+      <td className={cn("border-b border-border px-3 py-2.5 text-left align-top", noBottomBorder && "border-b-0")}>
+        <PipelineStatusCell
+          pipeline={coverage.rotation}
+          actionPipeline={showPipelineActions ? "rotation" : undefined}
+          onRunPipeline={onRunPipeline}
+          actionPending={actionPendingPipeline === "rotation"}
+          betweenStatusAndFailed={
+            wronglyRotatedCount > 0 ? (
+              <span className="block text-[11px] leading-snug text-foreground">
+                {UI_TEXT.folderAiSummaryWronglyRotatedCountPrefix}: {formatGroupedInt(wronglyRotatedCount)}
+              </span>
+            ) : null
+          }
         />
       </td>
     </tr>
@@ -134,6 +151,7 @@ export function DesktopFolderAiSummaryTable({
             <th className={headerClass}>{UI_TEXT.folderAiSummaryColumnSemantic}</th>
             <th className={headerClass}>{UI_TEXT.folderAiSummaryColumnFace}</th>
             <th className={headerClass}>{UI_TEXT.folderAiSummaryColumnPhoto}</th>
+            <th className={headerClass}>{UI_TEXT.folderAiSummaryColumnRotationAnalysis}</th>
           </tr>
         </thead>
         <tbody>
@@ -143,7 +161,6 @@ export function DesktopFolderAiSummaryTable({
                 label={UI_TEXT.folderAiSummaryThisFolder}
                 coverage={selectedWithSubfolders}
                 highlighted
-                showPipelineActions
                 onRunPipeline={onRunPipeline}
                 actionPendingPipeline={actionPendingPipeline}
                 onOpenFailedList={onOpenFailedList}
@@ -157,10 +174,10 @@ export function DesktopFolderAiSummaryTable({
                 onOpenFailedList={onOpenFailedList}
               />
               <tr>
-                <td className="h-6 border-0 border-x-0 border-y-0 bg-transparent p-0" colSpan={5} aria-hidden="true" />
+                <td className="h-6 border-0 border-x-0 border-y-0 bg-transparent p-0" colSpan={6} aria-hidden="true" />
               </tr>
               <tr>
-                <td className="border-b border-border bg-[#151d2e] px-3 py-2.5 text-left text-sm font-semibold uppercase tracking-wide text-foreground" colSpan={5}>
+                <td className="border-b border-border bg-[#151d2e] px-3 py-2.5 text-left text-sm font-semibold uppercase tracking-wide text-foreground" colSpan={6}>
                   {UI_TEXT.folderAiSummarySubfolders}
                 </td>
               </tr>

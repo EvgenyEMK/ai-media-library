@@ -54,8 +54,8 @@ function SummaryTabs({
 }): ReactElement {
   const tabs: Array<{ id: SummaryTab; label: string }> = [
     { id: "summary", label: UI_TEXT.folderAiSummaryTabSummary },
-    { id: "face", label: UI_TEXT.folderAiSummaryTabFaceDetection },
     { id: "ai", label: UI_TEXT.folderAiSummaryTabAiPipelines },
+    { id: "face", label: UI_TEXT.folderAiSummaryTabFaceDetection },
     { id: "geo", label: UI_TEXT.folderAiSummaryTabGeoLocation },
   ];
   return (

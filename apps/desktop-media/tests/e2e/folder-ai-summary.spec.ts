@@ -118,7 +118,7 @@ test.describe("Folder AI summary", () => {
     await expect(mainWindow.getByRole("heading", { name: "Wrongly rotated images" })).toBeVisible();
     await mainWindow.getByRole("tab", { name: "Geo-location" }).click();
     await expect(mainWindow.getByRole("columnheader", { name: "Files with GPS" })).toBeVisible();
-    await mainWindow.getByRole("tab", { name: "Details: AI pipelines" }).click();
+    await mainWindow.getByRole("tab", { name: "Subfolders" }).click();
 
     await electronApp.evaluate(async ({ ipcMain }) => {
       let firstCall = true;
@@ -249,7 +249,7 @@ test.describe("Folder AI summary", () => {
       .getByRole("button", { name: "Folder AI analysis summary", exact: true })
       .click();
     await expect(mainWindow.getByRole("heading", { name: "Folder tree analysis summary" })).toBeVisible();
-    await mainWindow.getByRole("tab", { name: "Details: AI pipelines" }).click();
+    await mainWindow.getByRole("tab", { name: "Subfolders" }).click();
     await mainWindow
       .getByRole("button", { name: "Run AI image analysis for this folder and sub-folders" })
       .first()

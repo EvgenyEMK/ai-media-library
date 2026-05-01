@@ -1,5 +1,5 @@
 import { Check, CircleDashed, Loader2, Play } from "lucide-react";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import type { FolderAiPipelineCounts } from "../../shared/ipc";
 import {
   formatGroupedInt,
@@ -43,6 +43,8 @@ interface PipelineStatusCellProps {
   onRunPipeline?: (pipeline: SummaryPipelineKind) => void;
   actionPending?: boolean;
   onOpenFailedList?: () => void;
+  /** Shown after the status row (check / partial / not done) and before the failed line, if any */
+  betweenStatusAndFailed?: ReactNode;
 }
 
 export function PipelineStatusCell({
@@ -51,6 +53,7 @@ export function PipelineStatusCell({
   onRunPipeline,
   actionPending = false,
   onOpenFailedList,
+  betweenStatusAndFailed,
 }: PipelineStatusCellProps): ReactElement {
   const failedLine = (
     <FailedLine failedCount={pipeline.failedCount} totalImages={pipeline.totalImages} onOpenFailedList={onOpenFailedList} />
@@ -67,7 +70,11 @@ export function PipelineStatusCell({
       ? "Run AI search index for this folder and sub-folders"
       : actionPipeline === "face"
         ? "Run face detection for this folder and sub-folders"
-        : "Run AI image analysis for this folder and sub-folders";
+        : actionPipeline === "photo"
+          ? "Run AI image analysis for this folder and sub-folders"
+          : actionPipeline === "rotation"
+            ? "Analyze image rotation for this folder and sub-folders"
+            : "Run pipeline for this folder and sub-folders";
   const actionButton = canRunPipelineAction ? (
     <button
       type="button"
@@ -85,6 +92,7 @@ export function PipelineStatusCell({
     return (
       <span className="inline-flex flex-col items-start gap-0.5 text-[hsl(var(--success))]" title={UI_TEXT.folderAiSummaryStatusDone}>
         <Check size={24} aria-hidden="true" />
+        {betweenStatusAndFailed}
         {failedLine}
       </span>
     );
@@ -102,6 +110,7 @@ export function PipelineStatusCell({
           </span>
           {actionButton}
         </span>
+        {betweenStatusAndFailed}
         {failedLine}
       </span>
     );
@@ -109,9 +118,12 @@ export function PipelineStatusCell({
 
   if (pipeline.label === "not_done" && pipeline.totalImages > 0) {
     return (
-      <span className="inline-flex min-h-6 items-center gap-1.5 text-[15px] tracking-wide text-destructive" title={UI_TEXT.folderAiSummaryStatusNotDone}>
-        <span>—</span>
-        {actionButton}
+      <span className="inline-flex flex-col items-start gap-0.5 text-[15px] tracking-wide text-destructive" title={UI_TEXT.folderAiSummaryStatusNotDone}>
+        <span className="inline-flex min-h-6 items-center gap-1.5">
+          <span>—</span>
+          {actionButton}
+        </span>
+        {betweenStatusAndFailed}
         {failedLine}
       </span>
     );
