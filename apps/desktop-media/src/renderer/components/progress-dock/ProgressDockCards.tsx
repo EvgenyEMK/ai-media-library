@@ -173,6 +173,8 @@ export function ProgressDockCards({
           isGeocoderInitRunning={d.isGeocoderInitRunning}
           geocoderInitStatus={d.geocoderInitStatus}
           geocoderInitError={d.geocoderInitError}
+          geocoderInitProgressPercent={d.geocoderInitProgressPercent}
+          geocoderInitProgressLabel={d.geocoderInitProgressLabel}
         />
       ) : null}
 

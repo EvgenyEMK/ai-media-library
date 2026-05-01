@@ -87,6 +87,8 @@ export function useDesktopProgressDockState({
   const imageRotationError = useDesktopStore((s) => s.imageRotationError);
   const geocoderInitStatus = useDesktopStore((s) => s.geocoderInitStatus);
   const geocoderInitError = useDesktopStore((s) => s.geocoderInitError);
+  const geocoderInitProgressPercent = useDesktopStore((s) => s.geocoderInitProgressPercent);
+  const geocoderInitProgressLabel = useDesktopStore((s) => s.geocoderInitProgressLabel);
   const geocoderInitPanelVisible = useDesktopStore((s) => s.geocoderInitPanelVisible);
 
   const isAnalyzing = aiStatus === "running";
@@ -289,6 +291,8 @@ export function useDesktopProgressDockState({
     imageRotationError,
     geocoderInitStatus,
     geocoderInitError,
+    geocoderInitProgressPercent,
+    geocoderInitProgressLabel,
   };
 }
 

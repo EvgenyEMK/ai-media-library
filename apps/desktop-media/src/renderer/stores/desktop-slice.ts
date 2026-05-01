@@ -113,6 +113,8 @@ export interface DesktopSlice {
 
   geocoderInitStatus: GeocoderInitStatus;
   geocoderInitError: string | null;
+  geocoderInitProgressPercent: number | null;
+  geocoderInitProgressLabel: string | null;
   geocoderInitPanelVisible: boolean;
 
   /** Background job: live similar-untyped face counts for People list (paginated tags). */
@@ -195,7 +197,12 @@ export interface DesktopSlice {
   setAiInferencePreferredGpuId: (gpuId: string | null) => void;
   setAiInferenceGpuOptions: (options: AiInferenceGpuOption[]) => void;
 
-  setGeocoderInitStatus: (status: GeocoderInitStatus, error?: string) => void;
+  setGeocoderInitStatus: (
+    status: GeocoderInitStatus,
+    error?: string,
+    progressPercent?: number | null,
+    progressLabel?: string | null,
+  ) => void;
   setGeocoderInitPanelVisible: (visible: boolean) => void;
   setImageRotationPanelVisible: (visible: boolean) => void;
 
@@ -264,6 +271,8 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
 
   geocoderInitStatus: "idle",
   geocoderInitError: null,
+  geocoderInitProgressPercent: null,
+  geocoderInitProgressLabel: null,
   geocoderInitPanelVisible: false,
 
   similarUntaggedCountsJobId: null,
@@ -531,10 +540,12 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
       state.similarUntaggedCountsPanelVisible = visible;
     }),
 
-  setGeocoderInitStatus: (status, error) =>
+  setGeocoderInitStatus: (status, error, progressPercent, progressLabel) =>
     set((state) => {
       state.geocoderInitStatus = status;
       state.geocoderInitError = error ?? null;
+      state.geocoderInitProgressPercent = typeof progressPercent === "number" ? progressPercent : null;
+      state.geocoderInitProgressLabel = progressLabel ?? null;
       if (status === "downloading" || status === "loading-cache" || status === "parsing") {
         state.geocoderInitPanelVisible = true;
       }

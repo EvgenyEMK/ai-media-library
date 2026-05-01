@@ -821,6 +821,11 @@ export function bindPathAnalysisProgress(store: DesktopStore): () => void {
 
 export function bindGeocoderInitProgress(store: DesktopStore): () => void {
   return window.desktopApi.onGeocoderInitProgress((event: GeocoderInitProgressEvent) => {
-    store.getState().setGeocoderInitStatus(event.status, event.error);
+    store.getState().setGeocoderInitStatus(
+      event.status,
+      event.error,
+      event.progressPercent ?? null,
+      event.progressLabel ?? null,
+    );
   });
 }

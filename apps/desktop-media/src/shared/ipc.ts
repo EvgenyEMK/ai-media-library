@@ -1451,6 +1451,10 @@ export type GeocoderInitStatus = "idle" | "downloading" | "loading-cache" | "par
 export type GeocoderInitProgressEvent = {
   status: GeocoderInitStatus;
   error?: string;
+  /** Download/indexing progress percent when available. */
+  progressPercent?: number;
+  /** Optional user-facing progress detail (e.g. downloaded datasets). */
+  progressLabel?: string;
 };
 
 export interface GeocoderCacheStatus {
