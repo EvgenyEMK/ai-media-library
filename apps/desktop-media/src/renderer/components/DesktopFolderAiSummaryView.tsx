@@ -43,6 +43,7 @@ interface DesktopFolderAiSummaryViewProps {
   onRunPhotoPipeline?: (folderPath: string, recursive: boolean, overrideExisting: boolean) => Promise<void> | void;
   /** Same as sidebar row menu "Folder AI analysis summary" for the given path. */
   onOpenFolderSummary?: (folderPath: string) => void;
+  onOpenRotationReview?: (folderPath: string, includeSubfolders: boolean) => void;
 }
 
 function SummaryTabs({
@@ -96,6 +97,7 @@ export function DesktopFolderAiSummaryView({
   onRunFacePipeline,
   onRunPhotoPipeline,
   onOpenFolderSummary,
+  onOpenRotationReview,
 }: DesktopFolderAiSummaryViewProps): ReactElement {
   const lastMetadataScanCompletion = useDesktopStore((state) => state.lastMetadataScanCompletion);
   const lastAiPipelineCompletion = useDesktopStore((state) => state.lastAiPipelineCompletion);
@@ -493,7 +495,11 @@ export function DesktopFolderAiSummaryView({
               actionPendingGeoLocation={folderScanPending}
               onRunGeoLocation={() => void runFolderScanWithSubfolders()}
               onOpenPipelineInfo={openOnboarding}
-              onViewRotationResults={() => setActiveTab("ai")}
+              onViewRotationResults={
+                (dashboardCoverage.rotation.issueCount ?? 0) > 0 && onOpenRotationReview
+                  ? () => onOpenRotationReview(folderPath, true)
+                  : undefined
+              }
               actionPendingFolderScan={folderScanPending}
               onRunFolderScan={() => void runFolderScanWithSubfolders()}
             />
@@ -520,6 +526,11 @@ export function DesktopFolderAiSummaryView({
                 actionPendingPipeline={actionPendingPipeline}
                 onOpenFolderSummary={onOpenFolderSummary}
                 onOpenFailedList={openFailedList}
+                onOpenWronglyRotatedImages={
+                  onOpenRotationReview
+                    ? (reviewFolderPath) => onOpenRotationReview(reviewFolderPath, true)
+                    : undefined
+                }
               />
             )
           ) : null}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { MediaSwiperViewer } from "@emk/media-viewer";
 import {
   DEFAULT_THUMBNAIL_QUICK_FILTERS,
@@ -31,7 +31,7 @@ import { useAnalysisEta, useFaceDetectionEta, useMetadataProgress, useSemanticIn
 import { UI_TEXT } from "./lib/ui-text";
 import { cn } from "./lib/cn";
 import { useDesktopStore, useDesktopStoreApi } from "./stores/desktop-store";
-import type { AlbumWorkspaceMode, MainPaneViewMode, SidebarSectionId } from "./types/app-types";
+import type { AlbumWorkspaceMode, MainPaneViewMode, RotationReviewScope, SidebarSectionId } from "./types/app-types";
 import type { DesktopViewerItem } from "./types/viewer-types";
 
 const RECENT_ALBUM_IDS_STORAGE_KEY = "desktop-media.recentAlbumIds.v1";
@@ -111,6 +111,7 @@ export function App(): ReactElement {
   const [activeSidebarSection, setActiveSidebarSection] = useState<SidebarSectionId>("folders");
   const [expandedSidebarSection, setExpandedSidebarSection] = useState<SidebarSectionId | null>("folders");
   const [mainPaneViewMode, setMainPaneViewMode] = useState<MainPaneViewMode>("media");
+  const [rotationReviewScope, setRotationReviewScope] = useState<RotationReviewScope | null>(null);
   const [albumWorkspaceMode, setAlbumWorkspaceMode] = useState<AlbumWorkspaceMode>("list");
   const [albumSearchControlsOpen, setAlbumSearchControlsOpen] = useState(false);
   const [smartAlbumRootKind, setSmartAlbumRootKind] = useState<SmartAlbumRootKind>("country-year-city");
@@ -324,6 +325,16 @@ export function App(): ReactElement {
     setAlbumSearchControlsOpen(false);
   };
 
+  const openImageEditSuggestions = useCallback((): void => {
+    setRotationReviewScope(null);
+    setMainPaneViewMode("imageEditSuggestions");
+  }, []);
+
+  const openRotationReview = useCallback((folderPath: string, includeSubfolders: boolean): void => {
+    setRotationReviewScope({ folderPath, includeSubfolders });
+    setMainPaneViewMode("imageEditSuggestions");
+  }, []);
+
   const isPeopleSectionOpen = activeSidebarSection === "people";
   const isAlbumsSectionOpen = activeSidebarSection === "albums";
   const isSettingsSectionOpen = activeSidebarSection === "settings";
@@ -400,6 +411,10 @@ export function App(): ReactElement {
         actionsMenuWrapRef={actionsMenuWrapRef}
         mainPaneViewMode={mainPaneViewMode}
         setMainPaneViewMode={setMainPaneViewMode}
+        rotationReviewScope={rotationReviewScope}
+        setRotationReviewScope={setRotationReviewScope}
+        onOpenRotationReview={openRotationReview}
+        onOpenImageEditSuggestions={openImageEditSuggestions}
         pipeline={pipeline}
         faceModelDownload={faceModelDownload}
         handleOpenFolderAiSummary={folderTree.handleOpenFolderAiSummary}

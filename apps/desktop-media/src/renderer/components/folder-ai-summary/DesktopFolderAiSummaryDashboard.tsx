@@ -232,8 +232,8 @@ export function DesktopFolderAiSummaryDashboard({
                 completedLabel="Analyzed"
                 issueLabel="Wrongly rotated"
                 onInfoClick={showInfoIcons && onOpenPipelineInfo ? () => onOpenPipelineInfo("rotation") : undefined}
-                onViewClick={onViewRotationResults}
-                viewTitle="View wrongly rotated images (placeholder)"
+                onViewClick={(coverage.rotation.issueCount ?? 0) > 0 ? onViewRotationResults : undefined}
+                viewTitle={UI_TEXT.folderAiSummaryRotationReviewOpen}
               />
             ) : null}
           </SummaryCardGroup>

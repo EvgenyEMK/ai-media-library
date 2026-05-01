@@ -171,6 +171,7 @@ export const IPC_CHANNELS = {
   getFolderAiSummaryReport: "media:get-folder-ai-summary-report",
   getFolderFaceSummaryReport: "media:get-folder-face-summary-report",
   getFolderAiFailedFiles: "media:get-folder-ai-failed-files",
+  getFolderAiWronglyRotatedImages: "media:get-folder-ai-wrongly-rotated-images",
   getFolderAiCoverage: "media:get-folder-ai-coverage",
   getFolderAiRollupsBatch: "media:get-folder-ai-rollups-batch",
   detectFolderImageRotation: "media:detect-folder-image-rotation",
@@ -1024,6 +1025,30 @@ export interface FolderAiFailedFileItem {
   error: string | null;
 }
 
+export interface FolderAiWronglyRotatedImagesPageRequest {
+  folderPath: string;
+  recursive: boolean;
+  page: number;
+  pageSize: number;
+}
+
+export interface FolderAiWronglyRotatedImageItem {
+  id: string;
+  sourcePath: string;
+  name: string;
+  imageUrl: string;
+  folderPathRelative: string | null;
+  rotationAngleClockwise: 90 | 180 | 270;
+  cropRel: RelativeCropBox | null;
+}
+
+export interface FolderAiWronglyRotatedImagesPageResult {
+  items: FolderAiWronglyRotatedImageItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 export interface PhotoAnalysisModelInfo {
   model: string;
   promptVersion: string;
@@ -1845,6 +1870,9 @@ export interface DesktopApi {
     pipeline: FolderAiPipelineKind,
     recursive: boolean,
   ) => Promise<FolderAiFailedFileItem[]>;
+  getFolderAiWronglyRotatedImages: (
+    request: FolderAiWronglyRotatedImagesPageRequest,
+  ) => Promise<FolderAiWronglyRotatedImagesPageResult>;
   getFolderAiCoverage: (folderPath: string, recursive: boolean) => Promise<FolderAiCoverageReport>;
   getFolderAiRollupsBatch: (folderPaths: string[]) => Promise<Record<string, FolderAiSidebarRollup>>;
   detectFolderImageRotation: (request: {

@@ -71,6 +71,7 @@ export const UI_TEXT = {
   folderAiSummaryColumnRotationAnalysis: "Rotation analysis",
   /** Subfolder table rotation column detail line: shown as "{prefix}: N" when N > 0 */
   folderAiSummaryWronglyRotatedCountPrefix: "Wrongly rotated",
+  folderAiSummaryRotationReviewOpen: "View wrongly rotated images",
   folderAiSummaryFolderScanTitle: "Folder scan",
   folderAiSummaryFolderTreeScanTitle: "Folder tree scan",
   folderAiSummaryFolderScanHelp:

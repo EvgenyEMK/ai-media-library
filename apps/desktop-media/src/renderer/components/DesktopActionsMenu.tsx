@@ -7,6 +7,7 @@ import type { MainPaneViewMode } from "../types/app-types";
 
 interface DesktopActionsMenuProps {
   onSetMainPaneViewMode: (mode: MainPaneViewMode) => void;
+  onOpenImageEditSuggestions?: () => void;
   onAnalyzePhotos: (folderPath: string, recursive: boolean, overrideExisting: boolean) => void;
   onCancelAnalysis: () => void;
   onDetectFaces: (folderPath: string, recursive: boolean, overrideExisting: boolean) => void;
@@ -20,6 +21,7 @@ interface DesktopActionsMenuProps {
 
 export function DesktopActionsMenu({
   onSetMainPaneViewMode,
+  onOpenImageEditSuggestions,
   onAnalyzePhotos,
   onCancelAnalysis,
   onDetectFaces,
@@ -44,7 +46,11 @@ export function DesktopActionsMenu({
           className="w-full cursor-pointer border-0 bg-transparent p-0 px-0.5 text-left font-inherit leading-snug text-inherit shadow-none"
           disabled={!selectedFolder}
           onClick={() => {
-            onSetMainPaneViewMode("imageEditSuggestions");
+            if (onOpenImageEditSuggestions) {
+              onOpenImageEditSuggestions();
+            } else {
+              onSetMainPaneViewMode("imageEditSuggestions");
+            }
             onCloseMenu();
           }}
         >

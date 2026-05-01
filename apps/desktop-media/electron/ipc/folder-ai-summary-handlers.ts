@@ -9,10 +9,13 @@ import {
   type FolderAiSummaryOverviewRequestOptions,
   type FolderAiSummaryOverviewReport,
   type FolderAiSummaryReport,
+  type FolderAiWronglyRotatedImagesPageRequest,
+  type FolderAiWronglyRotatedImagesPageResult,
   type FolderTreeScanSummary,
 } from "../../src/shared/ipc";
 import { getDesktopDatabase } from "../db/client";
 import { getFolderAiCoverage, getFolderAiRollupsForPaths } from "../db/folder-ai-coverage";
+import { getWronglyRotatedImagesPage } from "../db/folder-ai-wrongly-rotated-images";
 import { getFolderFaceSummaryReport } from "../db/folder-face-summary";
 import {
   getFolderScanAgeSummary,
@@ -312,6 +315,21 @@ export function registerFolderAiSummaryHandlers(): void {
         failedAt: row.failed_at,
         error: row.error_text,
       }));
+    },
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.getFolderAiWronglyRotatedImages,
+    async (
+      _event,
+      request: FolderAiWronglyRotatedImagesPageRequest,
+    ): Promise<FolderAiWronglyRotatedImagesPageResult> => {
+      return getWronglyRotatedImagesPage({
+        folderPath: request.folderPath,
+        recursive: request.recursive === true,
+        page: request.page,
+        pageSize: request.pageSize,
+      });
     },
   );
 }

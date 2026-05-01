@@ -62,6 +62,8 @@ const api: DesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.getFolderFaceSummaryReport, folderPath),
   getFolderAiFailedFiles: (folderPath, pipeline, recursive) =>
     ipcRenderer.invoke(IPC_CHANNELS.getFolderAiFailedFiles, folderPath, pipeline, recursive),
+  getFolderAiWronglyRotatedImages: (request) =>
+    ipcRenderer.invoke(IPC_CHANNELS.getFolderAiWronglyRotatedImages, request),
   getFolderAiCoverage: (folderPath, recursive) =>
     ipcRenderer.invoke(IPC_CHANNELS.getFolderAiCoverage, folderPath, recursive),
   getFolderAiRollupsBatch: (folderPaths) =>

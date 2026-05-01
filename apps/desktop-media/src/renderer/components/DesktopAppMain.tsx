@@ -23,7 +23,7 @@ import type {
 } from "../hooks/use-eta-tracking";
 import type { DescEmbedBackfillState } from "./DesktopProgressDock";
 import type { DesktopStore, DesktopStoreState } from "../stores/desktop-store";
-import type { AlbumWorkspaceMode, MainPaneViewMode } from "../types/app-types";
+import type { AlbumWorkspaceMode, MainPaneViewMode, RotationReviewScope } from "../types/app-types";
 
 interface DesktopAppMainProps {
   store: DesktopStore;
@@ -75,6 +75,10 @@ interface DesktopAppMainProps {
   actionsMenuWrapRef: RefObject<HTMLDivElement | null>;
   mainPaneViewMode: MainPaneViewMode;
   setMainPaneViewMode: Dispatch<SetStateAction<MainPaneViewMode>>;
+  rotationReviewScope: RotationReviewScope | null;
+  setRotationReviewScope: Dispatch<SetStateAction<RotationReviewScope | null>>;
+  onOpenRotationReview: (folderPath: string, includeSubfolders: boolean) => void;
+  onOpenImageEditSuggestions: () => void;
   pipeline: DesktopPipelineHandlers;
   faceModelDownload: DesktopStoreState["faceModelDownload"];
   handleOpenFolderAiSummary: (folderPath: string) => void;
@@ -142,6 +146,10 @@ export function DesktopAppMain({
   actionsMenuWrapRef,
   mainPaneViewMode,
   setMainPaneViewMode,
+  rotationReviewScope,
+  setRotationReviewScope,
+  onOpenRotationReview,
+  onOpenImageEditSuggestions,
   pipeline,
   faceModelDownload,
   handleOpenFolderAiSummary,
@@ -259,6 +267,7 @@ export function DesktopAppMain({
               setActionsMenuOpen={setActionsMenuOpen}
               actionsMenuWrapRef={actionsMenuWrapRef}
               setMainPaneViewMode={setMainPaneViewMode}
+              onOpenImageEditSuggestions={onOpenImageEditSuggestions}
               pipeline={pipeline}
             />
           ) : null}
@@ -266,6 +275,9 @@ export function DesktopAppMain({
             store={store}
             mainPaneViewMode={mainPaneViewMode}
             setMainPaneViewMode={setMainPaneViewMode}
+            rotationReviewScope={rotationReviewScope}
+            setRotationReviewScope={setRotationReviewScope}
+            onOpenRotationReview={onOpenRotationReview}
             selectedFolder={selectedFolder}
             semanticPanelOpen={semanticPanelOpen}
             faceModelDownload={faceModelDownload}

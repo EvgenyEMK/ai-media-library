@@ -1,4 +1,5 @@
 import type { ReactElement } from "react";
+import { Eye } from "lucide-react";
 import type { FolderAiCoverageReport, FolderAiPipelineKind } from "../../shared/ipc";
 import { cn } from "../lib/cn";
 import { folderDisplayNameFromPath, formatGroupedInt } from "../lib/folder-ai-summary-formatters";
@@ -22,6 +23,7 @@ interface SummaryRowProps {
     recursive: boolean,
     folderLabel: string,
   ) => void;
+  onOpenWronglyRotatedImages?: (folderPath: string) => void;
 }
 
 function SummaryRow({
@@ -35,6 +37,7 @@ function SummaryRow({
   subfolderPath,
   onSubfolderClick,
   onOpenFailedList,
+  onOpenWronglyRotatedImages,
 }: SummaryRowProps): ReactElement {
   const folderCell =
     subfolderPath && onSubfolderClick ? (
@@ -101,8 +104,21 @@ function SummaryRow({
           actionPending={actionPendingPipeline === "rotation"}
           betweenStatusAndFailed={
             wronglyRotatedCount > 0 ? (
-              <span className="block text-[11px] leading-snug text-foreground">
-                {UI_TEXT.folderAiSummaryWronglyRotatedCountPrefix}: {formatGroupedInt(wronglyRotatedCount)}
+              <span className="inline-flex items-center gap-1.5 text-[11px] leading-snug text-foreground">
+                <span>
+                  {UI_TEXT.folderAiSummaryWronglyRotatedCountPrefix}: {formatGroupedInt(wronglyRotatedCount)}
+                </span>
+                {onOpenWronglyRotatedImages ? (
+                  <button
+                    type="button"
+                    className="m-0 inline-flex h-5 w-5 items-center justify-center rounded border border-border bg-transparent p-0 text-muted-foreground shadow-none hover:text-foreground"
+                    title={UI_TEXT.folderAiSummaryRotationReviewOpen}
+                    aria-label={`${UI_TEXT.folderAiSummaryRotationReviewOpen}: ${label}`}
+                    onClick={() => onOpenWronglyRotatedImages(coverage.folderPath)}
+                  >
+                    <Eye size={12} aria-hidden="true" />
+                  </button>
+                ) : null}
               </span>
             ) : null
           }
@@ -126,6 +142,7 @@ interface DesktopFolderAiSummaryTableProps {
     recursive: boolean,
     folderLabel: string,
   ) => void;
+  onOpenWronglyRotatedImages?: (folderPath: string) => void;
 }
 
 const headerClass =
@@ -140,6 +157,7 @@ export function DesktopFolderAiSummaryTable({
   actionPendingPipeline,
   onOpenFolderSummary,
   onOpenFailedList,
+  onOpenWronglyRotatedImages,
 }: DesktopFolderAiSummaryTableProps): ReactElement {
   return (
     <div className="overflow-visible rounded-[10px] border border-border bg-card">
@@ -164,6 +182,7 @@ export function DesktopFolderAiSummaryTable({
                 onRunPipeline={onRunPipeline}
                 actionPendingPipeline={actionPendingPipeline}
                 onOpenFailedList={onOpenFailedList}
+                onOpenWronglyRotatedImages={onOpenWronglyRotatedImages}
               />
               <SummaryRow
                 label={UI_TEXT.folderAiSummaryThisFolderDirectOnly}
@@ -172,6 +191,7 @@ export function DesktopFolderAiSummaryTable({
                 onRunPipeline={onRunPipeline}
                 actionPendingPipeline={actionPendingPipeline}
                 onOpenFailedList={onOpenFailedList}
+                onOpenWronglyRotatedImages={onOpenWronglyRotatedImages}
               />
               <tr>
                 <td className="h-6 border-0 border-x-0 border-y-0 bg-transparent p-0" colSpan={6} aria-hidden="true" />
@@ -190,6 +210,7 @@ export function DesktopFolderAiSummaryTable({
                   subfolderPath={row.folderPath}
                   onSubfolderClick={onOpenFolderSummary}
                   onOpenFailedList={onOpenFailedList}
+                  onOpenWronglyRotatedImages={onOpenWronglyRotatedImages}
                 />
               ))}
             </>
@@ -200,6 +221,7 @@ export function DesktopFolderAiSummaryTable({
               highlighted
               noBottomBorder
               onOpenFailedList={onOpenFailedList}
+              onOpenWronglyRotatedImages={onOpenWronglyRotatedImages}
             />
           )}
         </tbody>

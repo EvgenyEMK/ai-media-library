@@ -36,6 +36,7 @@ interface DesktopMainToolbarProps {
   setActionsMenuOpen: Dispatch<SetStateAction<boolean>>;
   actionsMenuWrapRef: RefObject<HTMLDivElement | null>;
   setMainPaneViewMode: Dispatch<SetStateAction<MainPaneViewMode>>;
+  onOpenImageEditSuggestions?: () => void;
   pipeline: DesktopPipelineHandlers;
 }
 
@@ -64,6 +65,7 @@ export function DesktopMainToolbar({
   setActionsMenuOpen,
   actionsMenuWrapRef,
   setMainPaneViewMode,
+  onOpenImageEditSuggestions,
   pipeline,
 }: DesktopMainToolbarProps): ReactElement {
   return (
@@ -157,6 +159,7 @@ export function DesktopMainToolbar({
           {actionsMenuOpen ? (
             <DesktopActionsMenu
               onSetMainPaneViewMode={setMainPaneViewMode}
+              onOpenImageEditSuggestions={onOpenImageEditSuggestions}
               onAnalyzePhotos={(folderPath, recursive, overrideExisting) =>
                 void pipeline.handleAnalyzePhotos(folderPath, recursive, overrideExisting)
               }
