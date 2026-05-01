@@ -826,10 +826,17 @@ export interface FolderGeoLocationDetailsCoverage {
   label: FolderAiPipelineLabel;
 }
 
+export interface FolderGeoPathLlmCoverage {
+  doneCount: number;
+  totalWithoutGpsImages: number;
+  label: FolderAiPipelineLabel;
+}
+
 export interface FolderGeoCoverageReport {
   images: FolderGeoMediaCoverage;
   videos: FolderGeoMediaCoverage;
   locationDetails: FolderGeoLocationDetailsCoverage;
+  pathLlmLocationDetails?: FolderGeoPathLlmCoverage;
 }
 
 export interface FolderAiCoverageReport {

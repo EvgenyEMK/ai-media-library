@@ -20,20 +20,67 @@ interface DesktopFolderGeoSummaryTableProps {
 const headerClass =
   "sticky top-[88px] z-[2] border-b border-border bg-[#151d2e] px-3 py-2.5 text-left text-sm font-semibold tracking-wide text-foreground shadow-[0_1px_0_#2a3040]";
 
-function GpsCoverageCell({ coverage }: { coverage: FolderGeoMediaCoverage }): ReactElement {
+function CoverageBar({
+  title,
+  doneCount,
+  total,
+}: {
+  title: string;
+  doneCount: number;
+  total: number;
+}): ReactElement {
+  if (total === 0) {
+    return (
+      <div>
+        <div className="mb-1 font-semibold text-muted-foreground">{title} —</div>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <div className="mb-1 font-semibold text-muted-foreground">
+        {title} {formatCoveragePercent(doneCount, total)} ({formatGroupedInt(doneCount)})
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+        <div className="h-full rounded-full bg-muted-foreground" style={{ width: `${Math.min(100, (doneCount / total) * 100)}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function FileGpsCoverageCell({
+  images,
+  videos,
+}: {
+  images: FolderGeoMediaCoverage;
+  videos: FolderGeoMediaCoverage;
+}): ReactElement {
+  if (images.total + videos.total === 0) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+  return (
+    <div className="min-w-[220px] space-y-2 text-sm">
+      <CoverageBar title="Images" doneCount={images.withGpsCount} total={images.total} />
+      <CoverageBar title="Videos" doneCount={videos.withGpsCount} total={videos.total} />
+    </div>
+  );
+}
+
+function PathLlmCoverageCell({ coverage }: { coverage: FolderGeoMediaCoverage; doneCount: number }): ReactElement {
   if (coverage.total === 0) {
     return <span className="text-muted-foreground">—</span>;
+  }
+  const totalWithoutGps = coverage.withoutGpsCount;
+  if (totalWithoutGps <= 0) {
+    return <span className="text-muted-foreground">0% (0)</span>;
   }
   return (
     <div className="min-w-[190px] text-sm">
       <div className="mb-1 font-semibold text-muted-foreground">
-        {formatCoveragePercent(coverage.withGpsCount, coverage.total)} ({formatGroupedInt(coverage.withGpsCount)})
+        {formatCoveragePercent(doneCount, totalWithoutGps)} ({formatGroupedInt(doneCount)})
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
-        <div
-          className="h-full rounded-full bg-muted-foreground"
-          style={{ width: `${Math.min(100, (coverage.withGpsCount / coverage.total) * 100)}%` }}
-        />
+        <div className="h-full rounded-full bg-muted-foreground" style={{ width: `${Math.min(100, (doneCount / totalWithoutGps) * 100)}%` }} />
       </div>
     </div>
   );
@@ -86,10 +133,13 @@ function GeoRow({
         <PipelineStatusCell pipeline={locationDetailsAsPipeline(coverage.geo.locationDetails)} />
       </td>
       <td className={cn("border-b border-border px-3 py-2.5 text-left align-top", noBottomBorder && "border-b-0")}>
-        <GpsCoverageCell coverage={coverage.geo.images} />
+        <FileGpsCoverageCell images={coverage.geo.images} videos={coverage.geo.videos} />
       </td>
       <td className={cn("border-b border-border px-3 py-2.5 text-left align-top", noBottomBorder && "border-b-0")}>
-        <GpsCoverageCell coverage={coverage.geo.videos} />
+        <PathLlmCoverageCell
+          coverage={coverage.geo.images}
+          doneCount={coverage.geo.pathLlmLocationDetails?.doneCount ?? 0}
+        />
       </td>
     </tr>
   );
@@ -109,8 +159,8 @@ export function DesktopFolderGeoSummaryTable({
           <tr>
             <th className={headerClass}>{UI_TEXT.folderAiSummaryColumnFolder}</th>
             <th className={headerClass}>{UI_TEXT.folderAiSummaryColumnLocationDetails}</th>
-            <th className={headerClass}>{UI_TEXT.folderAiSummaryColumnImagesGps}</th>
-            <th className={headerClass}>{UI_TEXT.folderAiSummaryColumnVideosGps}</th>
+            <th className={headerClass}>{UI_TEXT.folderAiSummaryColumnFilesGps}</th>
+            <th className={headerClass}>{UI_TEXT.folderAiSummaryColumnPathLlmLocationDetails}</th>
           </tr>
         </thead>
         <tbody>

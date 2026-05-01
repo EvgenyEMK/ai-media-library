@@ -36,6 +36,7 @@ vi.mock("./folder-geo-coverage", () => ({
     images: { total: 5, withGpsCount: 0, withoutGpsCount: 5, locationDetailsDoneCount: 0 },
     videos: { total: 0, withGpsCount: 0, withoutGpsCount: 0, locationDetailsDoneCount: 0 },
     locationDetails: { doneCount: 0, totalWithGps: 0, label: "empty" },
+    pathLlmLocationDetails: { doneCount: 0, totalWithoutGpsImages: 5, label: "not_done" },
   }),
 }));
 

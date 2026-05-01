@@ -2,6 +2,7 @@ import path from "node:path";
 import type {
   FolderAiPipelineLabel,
   FolderGeoCoverageReport,
+  FolderGeoPathLlmCoverage,
   FolderGeoLocationDetailsCoverage,
   FolderGeoMediaCoverage,
 } from "../../src/shared/ipc";
@@ -64,11 +65,23 @@ export function toLocationDetailsCoverage(
   };
 }
 
+export function toPathLlmCoverage(
+  doneCount: number,
+  totalWithoutGpsImages: number,
+): FolderGeoPathLlmCoverage {
+  return {
+    doneCount,
+    totalWithoutGpsImages,
+    label: statusLabel(doneCount, totalWithoutGpsImages),
+  };
+}
+
 function emptyGeoCoverage(): FolderGeoCoverageReport {
   return {
     images: toMediaCoverage(0, 0, 0),
     videos: toMediaCoverage(0, 0, 0),
     locationDetails: toLocationDetailsCoverage(0, 0),
+    pathLlmLocationDetails: toPathLlmCoverage(0, 0),
   };
 }
 
@@ -97,12 +110,16 @@ export function getFolderGeoCoverage(params: {
   const hasGps = "mi.latitude IS NOT NULL AND mi.longitude IS NOT NULL";
   const hasGpsLocationDetails =
     "mi.location_source = 'gps' AND (NULLIF(TRIM(COALESCE(mi.country, '')), '') IS NOT NULL OR NULLIF(TRIM(COALESCE(mi.city, '')), '') IS NOT NULL OR NULLIF(TRIM(COALESCE(mi.location_area, '')), '') IS NOT NULL OR NULLIF(TRIM(COALESCE(mi.location_place, '')), '') IS NOT NULL OR NULLIF(TRIM(COALESCE(mi.location_name, '')), '') IS NOT NULL)";
+  const hasPathLlmLocationDetails =
+    "mi.location_source = 'path_llm' AND (NULLIF(TRIM(COALESCE(mi.country, '')), '') IS NOT NULL OR NULLIF(TRIM(COALESCE(mi.city, '')), '') IS NOT NULL OR NULLIF(TRIM(COALESCE(mi.location_area, '')), '') IS NOT NULL OR NULLIF(TRIM(COALESCE(mi.location_place, '')), '') IS NOT NULL OR NULLIF(TRIM(COALESCE(mi.location_name, '')), '') IS NOT NULL)";
 
   const sql = `
     SELECT
       SUM(CASE WHEN ${imagePred} THEN 1 ELSE 0 END) AS image_total,
       SUM(CASE WHEN ${imagePred} AND ${hasGps} THEN 1 ELSE 0 END) AS image_with_gps,
       SUM(CASE WHEN ${imagePred} AND ${hasGps} AND ${hasGpsLocationDetails} THEN 1 ELSE 0 END) AS image_location_details_done,
+      SUM(CASE WHEN ${imagePred} AND NOT (${hasGps}) THEN 1 ELSE 0 END) AS image_without_gps,
+      SUM(CASE WHEN ${imagePred} AND NOT (${hasGps}) AND ${hasPathLlmLocationDetails} THEN 1 ELSE 0 END) AS image_path_llm_location_details_done,
       SUM(CASE WHEN ${videoPred} THEN 1 ELSE 0 END) AS video_total,
       SUM(CASE WHEN ${videoPred} AND ${hasGps} THEN 1 ELSE 0 END) AS video_with_gps,
       SUM(CASE WHEN ${videoPred} AND ${hasGps} AND ${hasGpsLocationDetails} THEN 1 ELSE 0 END) AS video_location_details_done,
@@ -124,6 +141,8 @@ export function getFolderGeoCoverage(params: {
     image_total: number | null;
     image_with_gps: number | null;
     image_location_details_done: number | null;
+    image_without_gps: number | null;
+    image_path_llm_location_details_done: number | null;
     video_total: number | null;
     video_with_gps: number | null;
     video_location_details_done: number | null;
@@ -133,6 +152,8 @@ export function getFolderGeoCoverage(params: {
   const imageTotal = Number(row?.image_total ?? 0);
   const imageWithGps = Number(row?.image_with_gps ?? 0);
   const imageLocationDetailsDone = Number(row?.image_location_details_done ?? 0);
+  const imageWithoutGps = Number(row?.image_without_gps ?? 0);
+  const imagePathLlmLocationDetailsDone = Number(row?.image_path_llm_location_details_done ?? 0);
   const videoTotal = Number(row?.video_total ?? 0);
   const videoWithGps = Number(row?.video_with_gps ?? 0);
   const videoLocationDetailsDone = Number(row?.video_location_details_done ?? 0);
@@ -143,5 +164,6 @@ export function getFolderGeoCoverage(params: {
     images: toMediaCoverage(imageTotal, imageWithGps, imageLocationDetailsDone),
     videos: toMediaCoverage(videoTotal, videoWithGps, videoLocationDetailsDone),
     locationDetails: toLocationDetailsCoverage(locationDetailsDone, totalWithGps),
+    pathLlmLocationDetails: toPathLlmCoverage(imagePathLlmLocationDetailsDone, imageWithoutGps),
   };
 }

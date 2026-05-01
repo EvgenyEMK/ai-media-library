@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 let nextRow = {
   image_total: 0,
   image_with_gps: 0,
+  image_without_gps: 0,
+  image_path_llm_location_details_done: 0,
   video_total: 0,
   video_with_gps: 0,
   image_location_details_done: 0,
@@ -36,6 +38,8 @@ describe("folder geo coverage", () => {
     nextRow = {
       image_total: 0,
       image_with_gps: 0,
+      image_without_gps: 0,
+      image_path_llm_location_details_done: 0,
       video_total: 0,
       video_with_gps: 0,
       image_location_details_done: 0,
@@ -48,6 +52,8 @@ describe("folder geo coverage", () => {
     nextRow = {
       image_total: 10,
       image_with_gps: 7,
+      image_without_gps: 3,
+      image_path_llm_location_details_done: 2,
       image_location_details_done: 5,
       video_total: 4,
       video_with_gps: 1,
@@ -70,6 +76,7 @@ describe("folder geo coverage", () => {
       locationDetailsDoneCount: 1,
     });
     expect(coverage.locationDetails).toEqual({ doneCount: 6, totalWithGps: 8, label: "partial" });
+    expect(coverage.pathLlmLocationDetails).toEqual({ doneCount: 2, totalWithoutGpsImages: 3, label: "partial" });
     expect(getCalls[0]?.args).toEqual(["local-default", "C:\\photos\\%"]);
   });
 

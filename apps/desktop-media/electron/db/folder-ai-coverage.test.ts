@@ -22,6 +22,7 @@ function report(partial: Partial<FolderAiCoverageReport> & Pick<FolderAiCoverage
       images: { total: t, withGpsCount: 0, withoutGpsCount: t, locationDetailsDoneCount: 0 },
       videos: { total: 0, withGpsCount: 0, withoutGpsCount: 0, locationDetailsDoneCount: 0 },
       locationDetails: { doneCount: 0, totalWithGps: 0, label: "empty" },
+      pathLlmLocationDetails: { doneCount: 0, totalWithoutGpsImages: t, label: t > 0 ? "not_done" : "empty" },
     },
   };
 }

@@ -202,6 +202,7 @@ function emptyReport(folderPath: string, recursive: boolean): FolderAiCoverageRe
       images: { total: 0, withGpsCount: 0, withoutGpsCount: 0, locationDetailsDoneCount: 0 },
       videos: { total: 0, withGpsCount: 0, withoutGpsCount: 0, locationDetailsDoneCount: 0 },
       locationDetails: { doneCount: 0, totalWithGps: 0, label: "empty" },
+      pathLlmLocationDetails: { doneCount: 0, totalWithoutGpsImages: 0, label: "empty" },
     },
   };
 }
@@ -307,6 +308,7 @@ export function getFolderAiRollupsForPaths(
         images: { total, withGpsCount: 0, withoutGpsCount: total, locationDetailsDoneCount: 0 },
         videos: { total: 0, withGpsCount: 0, withoutGpsCount: 0, locationDetailsDoneCount: 0 },
         locationDetails: { doneCount: 0, totalWithGps: 0, label: "empty" },
+        pathLlmLocationDetails: { doneCount: 0, totalWithoutGpsImages: total, label: "not_done" },
       },
     };
     out[trimmedPaths[i]] = folderCoverageToSidebarRollup(cov);
