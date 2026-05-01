@@ -66,7 +66,13 @@ function FileGpsCoverageCell({
   );
 }
 
-function PathLlmCoverageCell({ coverage }: { coverage: FolderGeoMediaCoverage; doneCount: number }): ReactElement {
+function PathLlmCoverageCell({
+  coverage,
+  doneCount,
+}: {
+  coverage: FolderGeoMediaCoverage;
+  doneCount: number;
+}): ReactElement {
   if (coverage.total === 0) {
     return <span className="text-muted-foreground">—</span>;
   }
