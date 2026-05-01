@@ -30,6 +30,10 @@ vi.mock("../db/folder-summary-overview", () => ({
         .map((folderPath) => [folderPath, mocks.scanCompletedAtByPath[folderPath]]),
     ),
   ),
+  getFolderScanAgeSummary: vi.fn(() => ({
+    outdatedScannedFolderCount: 0,
+    scannedFolderCount: 0,
+  })),
   getFolderSummaryOverview: vi.fn(({ folderPath, recursive }: { folderPath: string; recursive: boolean }) => ({
     folderPath,
     recursive,
@@ -126,7 +130,10 @@ describe("registerFolderAiSummaryHandlers", () => {
 
     expect(summary).toEqual({
       hasDirectSubfolders: true,
+      directSubfolderCount: 2,
       notFullyScannedDirectSubfolderCount: 1,
+      outdatedScannedFolderCount: 0,
+      scannedFolderCount: 0,
     });
   });
 });

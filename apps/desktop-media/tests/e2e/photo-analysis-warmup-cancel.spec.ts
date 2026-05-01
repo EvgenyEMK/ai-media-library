@@ -26,16 +26,14 @@ test("cancel during warmup resets running menu state", async ({ electronApp, mai
   const aiRow = menu.locator(".photo-ai-row").first();
   await aiRow.locator('button.face-detect-play-btn[title="Start image AI analysis"]').click();
 
-  // Warmup should be visible in background operations.
-  await expect(mainWindow.getByText("Loading AI model - it may take 1-2min")).toBeVisible({
+  // Warmup should be visible in background operations (model name is included in copy).
+  await expect(mainWindow.getByText(/Loading AI model .*it may take 1-2min/)).toBeVisible({
     timeout: 10_000,
   });
 
-  // Cancel from background operations panel (X button path used in manual repro).
-  await mainWindow
-    .locator(".desktop-progress-card")
-    .getByRole("button", { name: "Cancel image AI analysis" })
-    .click();
+  const pipelineQueue = mainWindow.getByLabel("Pipeline queue");
+  await expect(pipelineQueue).toBeVisible({ timeout: 10_000 });
+  await pipelineQueue.getByRole("button", { name: /Cancel Photo analysis/ }).click();
 
   // Reopen menu and ensure action is no longer stuck in running mode.
   await actionsButton.click();

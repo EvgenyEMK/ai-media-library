@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { JobView, PipelineId, PipelineQueueSnapshot } from "../../shared/pipeline-types";
+import { queueMetadataRefresh } from "./ipc-binding-helpers";
 import { useDesktopStoreApi } from "../stores/desktop-store";
 import type { AiPipelineCompletionSignal } from "../stores/desktop-slice";
 import type { DesktopStore } from "../stores/desktop-store";
@@ -85,8 +86,18 @@ export function usePipelineQueueBinding(): void {
       store.getState().setPipelineQueueSnapshot(snapshot);
       syncSummaryPipelineCompletionsFromQueueSnapshot(store, snapshot, seenCompletedSummaryJobIds);
     });
-    const offJobProgress = api.onJobProgress(({ bundleId, jobId, progress }) => {
-      store.getState().patchJobProgress(bundleId, jobId, progress);
+    const offJobProgress = api.onJobProgress((event) => {
+      store.getState().patchJobProgress(event.bundleId, event.jobId, event.progress);
+      if (event.pipelineId === "photo-analysis") {
+        const details = event.progress.details;
+        if (details && typeof details === "object") {
+          const rec = details as Record<string, unknown>;
+          const path = rec.path;
+          if (typeof path === "string" && path.length > 0 && rec.error === undefined) {
+            queueMetadataRefresh(store, path);
+          }
+        }
+      }
     });
     const offLifecycle = api.onLifecycle((event) => {
       store.getState().appendPipelineLifecycle(event);
