@@ -11,8 +11,10 @@ import type {
 } from "../../shared/ipc";
 import { useFolderAiSummaryPipelineActions } from "../hooks/use-folder-ai-summary-pipeline-actions";
 import { cn } from "../lib/cn";
-import { shouldRefreshFolderAiSummaryAfterScan } from "../lib/folder-ai-summary-scan-refresh";
-import { isPathWithinParent } from "../lib/is-path-within-parent";
+import {
+  shouldRefreshFolderAiSummaryAfterPipeline,
+  shouldRefreshFolderAiSummaryAfterScan,
+} from "../lib/folder-ai-summary-scan-refresh";
 import { UI_TEXT } from "../lib/ui-text";
 import type { FailedListContext, SummaryPipelineKind } from "../types/folder-ai-summary-types";
 import { DesktopFolderAiFailedList } from "./DesktopFolderAiFailedList";
@@ -297,12 +299,7 @@ export function DesktopFolderAiSummaryView({
   }, [folderPath, lastMetadataScanCompletion, load]);
 
   useEffect(() => {
-    if (!lastAiPipelineCompletion) return;
-    if (
-      lastAiPipelineCompletion.folderPath === folderPath ||
-      isPathWithinParent(lastAiPipelineCompletion.folderPath, folderPath) ||
-      isPathWithinParent(folderPath, lastAiPipelineCompletion.folderPath)
-    ) {
+    if (shouldRefreshFolderAiSummaryAfterPipeline(folderPath, lastAiPipelineCompletion)) {
       void load();
     }
   }, [folderPath, lastAiPipelineCompletion, load]);

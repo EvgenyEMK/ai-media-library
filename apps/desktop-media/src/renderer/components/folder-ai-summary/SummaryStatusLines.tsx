@@ -10,11 +10,13 @@ export function SummaryStatusLines({
   completedLabel = "Analyzed",
   issueLabel,
   tone = "neutral",
+  extraItems = [],
 }: {
   pipeline: FolderAiPipelineCounts;
   completedLabel?: string;
   issueLabel?: string;
   tone?: SummaryStatusTone;
+  extraItems?: SummaryMetricGridItem[];
 }): ReactElement {
   const hasMedia = pipeline.totalImages > 0;
   const issueCount = pipeline.issueCount ?? 0;
@@ -42,6 +44,7 @@ export function SummaryStatusLines({
       valueClassName: issueCount > 0 ? "text-warning" : undefined,
     });
   }
+  items.push(...extraItems);
 
   return (
     <>

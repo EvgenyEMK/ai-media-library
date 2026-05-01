@@ -1,12 +1,14 @@
 import { Brain, Image as ImageIcon, RotateCw, Search, Users, Video } from "lucide-react";
 import type { ReactElement } from "react";
 import type { FolderAiCoverageReport, FolderAiSummaryOverview } from "../../../shared/ipc";
+import { formatCoveragePercent, formatGroupedInt } from "../../lib/folder-ai-summary-formatters";
 import { getFolderAiPipelineQueueStatus } from "../../lib/folder-ai-pipeline-queue-status";
 import { UI_TEXT } from "../../lib/ui-text";
 import { useDesktopStore } from "../../stores/desktop-store";
 import type { SummaryPipelineKind } from "../../types/folder-ai-summary-types";
 import { LastDataScanCard, SummaryMediaCountCard } from "./SummaryMediaCountCard";
 import { SummaryGeoLocationCard } from "./SummaryGeoLocationCard";
+import type { SummaryMetricGridItem } from "./SummaryMetricGrid";
 import { SummaryPipelineCard } from "./SummaryPipelineCard";
 import { SummarySettingsCheckbox } from "./SummarySettingsCheckbox";
 import { pendingGeoCoverage, pendingOverview, pendingPipeline } from "./summary-card-formatters";
@@ -99,6 +101,19 @@ export function DesktopFolderAiSummaryDashboard({
   const pipelineRunning = useDesktopStore((state) => state.pipelineRunning);
   const pipelineQueued = useDesktopStore((state) => state.pipelineQueued);
   const visible = { ...DEFAULT_FOLDER_AI_SUMMARY_CARD_VISIBILITY, ...cardVisibility };
+  const faceExtraItems: SummaryMetricGridItem[] =
+    coverage.face.label === "not_done"
+      ? []
+      : [
+          {
+            label: "Images with faces",
+            value: `${formatCoveragePercent(coverage.face.imagesWithFacesCount ?? 0, Math.max(coverage.totalImages, 1))} (${formatGroupedInt(coverage.face.imagesWithFacesCount ?? 0)})`,
+          },
+          {
+            label: "Images with tagged faces",
+            value: `${formatCoveragePercent(coverage.face.imagesWithTaggedFacesCount ?? 0, Math.max(coverage.totalImages, 1))} (${formatGroupedInt(coverage.face.imagesWithTaggedFacesCount ?? 0)})`,
+          },
+        ];
   const showImagePipelineSection = visible.semantic || visible.face || visible.photo || visible.rotation;
   const showFileScanMetadataSection = visible.lastDataScan || visible.geoLocation;
   const queueStatusFor = (pipeline: SummaryPipelineKind) =>
@@ -188,6 +203,7 @@ export function DesktopFolderAiSummaryDashboard({
                 actionPending={actionPendingPipeline === "face"}
                 queueStatus={queueStatusFor("face")}
                 onRunPipeline={onRunPipeline}
+                extraItems={faceExtraItems}
                 onInfoClick={showInfoIcons && onOpenPipelineInfo ? () => onOpenPipelineInfo("face") : undefined}
               />
             ) : null}

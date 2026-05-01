@@ -809,6 +809,8 @@ export interface FolderAiPipelineCounts {
   totalImages: number;
   label: FolderAiPipelineLabel;
   issueCount?: number;
+  imagesWithFacesCount?: number;
+  imagesWithTaggedFacesCount?: number;
 }
 
 export interface FolderGeoMediaCoverage {

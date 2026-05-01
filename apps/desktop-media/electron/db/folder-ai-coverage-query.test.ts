@@ -94,6 +94,8 @@ describe("getFolderAiCoverage", () => {
       failedCount: 1,
       totalImages: 5,
       label: "partial",
+      imagesWithFacesCount: 0,
+      imagesWithTaggedFacesCount: 0,
     });
     expect(getCalls[0]?.sql).toContain("mi.face_detection_failed_at >= mi.face_detection_processed_at");
     expect(getCalls[0]?.sql).toContain("mi.face_detection_processed_at > mi.face_detection_failed_at");

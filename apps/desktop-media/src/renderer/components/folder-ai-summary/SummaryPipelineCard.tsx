@@ -6,6 +6,7 @@ import { cn } from "../../lib/cn";
 import { formatGroupedInt } from "../../lib/folder-ai-summary-formatters";
 import type { SummaryPipelineKind } from "../../types/folder-ai-summary-types";
 import { SummaryActionCard } from "./SummaryActionCard";
+import type { SummaryMetricGridItem } from "./SummaryMetricGrid";
 import { SummaryStatusGlyph, PendingSpinner } from "./SummaryStatusGlyph";
 import { SummaryStatusLines } from "./SummaryStatusLines";
 import { statusTone } from "./summary-card-formatters";
@@ -67,6 +68,7 @@ export function SummaryPipelineCard({
   onRunPipeline,
   completedLabel,
   issueLabel,
+  extraItems,
   onInfoClick,
   onViewClick,
   viewTitle,
@@ -81,6 +83,7 @@ export function SummaryPipelineCard({
   onRunPipeline?: (pipeline: SummaryPipelineKind) => void;
   completedLabel?: string;
   issueLabel?: string;
+  extraItems?: SummaryMetricGridItem[];
   onInfoClick?: () => void;
   onViewClick?: () => void;
   viewTitle?: string;
@@ -115,7 +118,15 @@ export function SummaryPipelineCard({
       onViewClick={onViewClick}
       viewTitle={viewTitle}
     >
-      {loading ? null : <SummaryStatusLines pipeline={pipeline} completedLabel={completedLabel} issueLabel={issueLabel} tone={tone} />}
+      {loading ? null : (
+        <SummaryStatusLines
+          pipeline={pipeline}
+          completedLabel={completedLabel}
+          issueLabel={issueLabel}
+          tone={tone}
+          extraItems={extraItems}
+        />
+      )}
     </SummaryActionCard>
   );
 }
