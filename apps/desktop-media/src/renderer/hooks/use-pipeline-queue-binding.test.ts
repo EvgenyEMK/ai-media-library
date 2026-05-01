@@ -84,4 +84,65 @@ describe("syncSummaryPipelineCompletionsFromQueueSnapshot", () => {
     expect(firstSignal?.jobId).toBe("face-job");
     expect(store.getState().lastAiPipelineCompletion?.jobId).toBe("sentinel");
   });
+
+  it("publishes completion signal for cancelled summary job when some files were processed", () => {
+    const store = createDesktopStore();
+    const seenJobIds = new Set<string>();
+
+    syncSummaryPipelineCompletionsFromQueueSnapshot(
+      store,
+      snapshotWithRecentJob(
+        job({
+          jobId: "semantic-cancelled-job",
+          pipelineId: "semantic-index",
+          state: "cancelled",
+          params: { folderPath: "C:\\photos\\trip", recursive: true },
+          progress: {
+            phase: "indexing",
+            processed: 12,
+            total: 20,
+            message: "Cancelled by user",
+            details: null,
+            lastUpdatedAt: Date.parse("2026-05-01T12:00:00.000Z"),
+          },
+        }),
+      ),
+      seenJobIds,
+    );
+
+    expect(store.getState().lastAiPipelineCompletion).toEqual({
+      jobId: "semantic-cancelled-job",
+      folderPath: "C:\\photos\\trip",
+      kind: "semantic",
+      completedAt: "2026-05-01T12:01:00.000Z",
+    });
+  });
+
+  it("ignores cancelled summary job when nothing was processed", () => {
+    const store = createDesktopStore();
+    const seenJobIds = new Set<string>();
+
+    syncSummaryPipelineCompletionsFromQueueSnapshot(
+      store,
+      snapshotWithRecentJob(
+        job({
+          jobId: "face-cancelled-empty",
+          pipelineId: "face-detection",
+          state: "cancelled",
+          params: { folderPath: "C:\\photos\\trip", recursive: true },
+          progress: {
+            phase: "queued",
+            processed: 0,
+            total: 20,
+            message: "Cancelled before start",
+            details: null,
+            lastUpdatedAt: Date.parse("2026-05-01T12:00:00.000Z"),
+          },
+        }),
+      ),
+      seenJobIds,
+    );
+
+    expect(store.getState().lastAiPipelineCompletion).toBeNull();
+  });
 });

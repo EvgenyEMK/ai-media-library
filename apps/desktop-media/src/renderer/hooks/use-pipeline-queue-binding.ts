@@ -19,7 +19,9 @@ function folderPathFromJobParams(params: unknown): string | null {
 
 function completionSignalFromJob(job: JobView): AiPipelineCompletionSignal | null {
   const kind = summaryPipelineKindByPipelineId[job.pipelineId];
-  if (!kind || (job.state !== "succeeded" && job.state !== "failed")) return null;
+  const hasProcessedOnCancel =
+    job.state === "cancelled" && typeof job.progress.processed === "number" && job.progress.processed > 0;
+  if (!kind || (job.state !== "succeeded" && job.state !== "failed" && !hasProcessedOnCancel)) return null;
   const folderPath = folderPathFromJobParams(job.params);
   if (!folderPath) return null;
   return {
