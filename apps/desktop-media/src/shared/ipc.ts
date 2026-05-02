@@ -176,6 +176,9 @@ export const IPC_CHANNELS = {
   startFolderFaceSummaryStream: "media:start-folder-face-summary-stream",
   cancelFolderFaceSummaryStream: "media:cancel-folder-face-summary-stream",
   folderFaceSummaryProgress: "media:folder-face-summary-progress",
+  startFolderAiSummaryStream: "media:start-folder-ai-summary-stream",
+  cancelFolderAiSummaryStream: "media:cancel-folder-ai-summary-stream",
+  folderAiSummaryStreamProgress: "media:folder-ai-summary-stream-progress",
   getFolderAiFailedFiles: "media:get-folder-ai-failed-files",
   getFolderAiWronglyRotatedImages: "media:get-folder-ai-wrongly-rotated-images",
   getFolderAiCoverage: "media:get-folder-ai-coverage",
@@ -950,6 +953,11 @@ export type FolderFaceSummaryStreamEvent =
       summary: FolderFaceSummary;
       coverage: FolderAiCoverageReport;
     }
+  | { kind: "done"; jobId: string }
+  | { kind: "error"; jobId: string; message: string };
+
+export type FolderAiSummaryStreamEvent =
+  | { kind: "row"; jobId: string; rowId: string; coverage: FolderAiCoverageReport }
   | { kind: "done"; jobId: string }
   | { kind: "error"; jobId: string; message: string };
 
@@ -1926,6 +1934,14 @@ export interface DesktopApi {
   cancelFolderFaceSummaryStream: (jobId: string) => Promise<boolean>;
   onFolderFaceSummaryProgress: (
     listener: (payload: FolderFaceSummaryStreamEvent) => void,
+  ) => () => void;
+  startFolderAiSummaryStream: (
+    folderPath: string,
+    jobId: string,
+  ) => Promise<FolderFaceSummaryStreamStart>;
+  cancelFolderAiSummaryStream: (jobId: string) => Promise<boolean>;
+  onFolderAiSummaryStreamProgress: (
+    listener: (payload: FolderAiSummaryStreamEvent) => void,
   ) => () => void;
   getFolderAiFailedFiles: (
     folderPath: string,

@@ -12,12 +12,18 @@ import {
   locationDetailsAsPipeline,
 } from "../lib/folder-ai-summary-formatters";
 import { UI_TEXT } from "../lib/ui-text";
+import { CellSpinner } from "./desktop-folder-face-summary-table-cells";
 import { PipelineStatusCell } from "./DesktopFolderAiPipelineStatusCell";
+import { PendingSpinner } from "./folder-ai-summary/SummaryStatusGlyph";
 
 interface DesktopFolderGeoSummaryTableProps {
-  selectedWithSubfolders: FolderAiCoverageReport;
-  selectedDirectOnly: FolderAiCoverageReport;
-  subfolders: Array<{ folderPath: string; name: string; coverage: FolderAiCoverageReport }>;
+  /** Root folder path; used for single-folder layout label while coverage is loading. */
+  folderPath: string;
+  selectedWithSubfolders: FolderAiCoverageReport | undefined;
+  selectedDirectOnly: FolderAiCoverageReport | undefined;
+  subfolders: Array<{ folderPath: string; name: string; coverage: FolderAiCoverageReport | undefined }>;
+  streamRowsIncomplete?: boolean;
+  streamError?: string | null;
   onOpenFolderSummary?: (folderPath: string) => void;
 }
 
@@ -124,12 +130,31 @@ function GeoRow({
   onSubfolderClick,
 }: {
   label: string;
-  coverage: FolderAiCoverageReport;
+  coverage: FolderAiCoverageReport | undefined;
   highlighted?: boolean;
   noBottomBorder?: boolean;
   subfolderPath?: string;
   onSubfolderClick?: (folderPath: string) => void;
 }): ReactElement {
+  if (!coverage) {
+    return (
+      <tr className={highlighted ? "bg-primary/12" : undefined}>
+        <td className={cn("border-b border-border px-3 py-2.5 text-left align-top font-medium", noBottomBorder && "border-b-0", highlighted && "text-sm font-semibold")}>
+          <FolderCell label={label} subfolderPath={subfolderPath} onSubfolderClick={onSubfolderClick} />
+        </td>
+        <td className={cn("border-b border-border px-3 py-2.5 align-top", noBottomBorder && "border-b-0")}>
+          <CellSpinner />
+        </td>
+        <td className={cn("border-b border-border px-3 py-2.5 align-top", noBottomBorder && "border-b-0")}>
+          <CellSpinner />
+        </td>
+        <td className={cn("border-b border-border px-3 py-2.5 align-top", noBottomBorder && "border-b-0")}>
+          <CellSpinner />
+        </td>
+      </tr>
+    );
+  }
+
   return (
     <tr className={highlighted ? "bg-primary/12" : undefined}>
       <td className={cn("border-b border-border px-3 py-2.5 text-left align-top font-medium", noBottomBorder && "border-b-0", highlighted && "text-sm font-semibold")}>
@@ -149,14 +174,29 @@ function GeoRow({
 }
 
 export function DesktopFolderGeoSummaryTable({
+  folderPath,
   selectedWithSubfolders,
   selectedDirectOnly,
   subfolders,
+  streamRowsIncomplete = false,
+  streamError = null,
   onOpenFolderSummary,
 }: DesktopFolderGeoSummaryTableProps): ReactElement {
   const hasSubfolders = subfolders.length > 0;
   return (
-    <div className="overflow-visible rounded-[10px] border border-border bg-card">
+    <div className="flex flex-col gap-3">
+      {streamError ? <p className="m-0 text-sm text-red-400">{streamError}</p> : null}
+      {streamRowsIncomplete ? (
+        <div
+          className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm text-muted-foreground"
+          aria-live="polite"
+        >
+          <PendingSpinner className="h-4 w-4 shrink-0" />
+          <span>{UI_TEXT.folderAiPipelineTableComputing}</span>
+        </div>
+      ) : null}
+
+      <div className="overflow-visible rounded-[10px] border border-border bg-card">
       <table className="w-full border-collapse text-[15px]">
         <thead>
           <tr>
@@ -191,10 +231,16 @@ export function DesktopFolderGeoSummaryTable({
               ))}
             </>
           ) : (
-            <GeoRow label={folderDisplayNameFromPath(selectedDirectOnly.folderPath)} coverage={selectedDirectOnly} highlighted noBottomBorder />
+            <GeoRow
+              label={folderDisplayNameFromPath(selectedDirectOnly?.folderPath ?? folderPath)}
+              coverage={selectedDirectOnly}
+              highlighted
+              noBottomBorder
+            />
           )}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

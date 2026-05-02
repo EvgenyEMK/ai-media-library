@@ -97,6 +97,7 @@ export const UI_TEXT = {
   folderFaceTableTaggedHelp:
     "Tagged counts faces with a confirmed person-tag (applied directly or via accepted suggestion).",
   folderFaceTableComputing: "Computing face statistics…",
+  folderAiPipelineTableComputing: "Computing pipeline coverage…",
   folderAiSummaryLoading: "Loading summary…",
   folderAiSummaryRefresh: "Refresh",
   folderAiSummaryNote: "Based on last folders scan and AI analysis timestamps in database",

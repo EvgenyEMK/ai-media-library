@@ -6,7 +6,6 @@ import type {
   FolderAiFailedFileItem,
   FolderAiPipelineKind,
   FolderAiSummaryOverviewReport,
-  FolderAiSummaryReport,
 } from "../../shared/ipc";
 import { useFolderAiSummaryPipelineActions } from "../hooks/use-folder-ai-summary-pipeline-actions";
 import { cn } from "../lib/cn";
@@ -23,6 +22,7 @@ import { DesktopFolderGeoSummaryTable } from "./DesktopFolderGeoSummaryTable";
 import { DesktopFolderFaceSummaryTable } from "./DesktopFolderFaceSummaryTable";
 import { PendingSpinner } from "./folder-ai-summary/SummaryStatusGlyph";
 import { useDesktopStore } from "../stores/desktop-store";
+import { useFolderAiSummaryTableStream } from "../hooks/use-folder-ai-summary-table-stream";
 import { useFolderFaceSummaryStream } from "../hooks/use-folder-face-summary-stream";
 import { PipelineOnboardingModal, type PipelineOnboardingSlideId } from "./folder-ai-summary/PipelineOnboardingModal";
 
@@ -113,11 +113,7 @@ export function DesktopFolderAiSummaryView({
   const [selectedWithSubfolders, setSelectedWithSubfolders] = useState<FolderAiCoverageReport | null>(null);
   const [selectedDirectOnly, setSelectedDirectOnly] = useState<FolderAiCoverageReport | null>(null);
   const [overviewReport, setOverviewReport] = useState<FolderAiSummaryOverviewReport | null>(null);
-  const [subfolders, setSubfolders] = useState<FolderAiSummaryReport["subfolders"]>([]);
   const [activeTab, setActiveTab] = useState<SummaryTab>("summary");
-  const [detailsLoaded, setDetailsLoaded] = useState(false);
-  const [detailsLoading, setDetailsLoading] = useState(false);
-  const [detailsError, setDetailsError] = useState<string | null>(null);
   const [failedListContext, setFailedListContext] = useState<FailedListContext | null>(null);
   const [failedListLoading, setFailedListLoading] = useState(false);
   const [failedListError, setFailedListError] = useState<string | null>(null);
@@ -146,12 +142,9 @@ export function DesktopFolderAiSummaryView({
     setFolderScanLoading(true);
     setCoverageLoading(true);
     setError(null);
-    setDetailsError(null);
-    setDetailsLoaded(false);
     setOverviewReport(null);
     setSelectedWithSubfolders(null);
     setSelectedDirectOnly(null);
-    setSubfolders([]);
     try {
       const overviewStartedAt = performance.now();
       const overviewPromise = window.desktopApi.getFolderAiSummaryOverview(folderPath, { includeSubfolders: false });
@@ -245,7 +238,6 @@ export function DesktopFolderAiSummaryView({
       setError(UI_TEXT.folderAiSummaryError);
       setSelectedWithSubfolders(null);
       setSelectedDirectOnly(null);
-      setSubfolders([]);
     } finally {
       if (loadSequenceRef.current === loadSequence) {
         setOverviewLoading(false);
@@ -259,23 +251,6 @@ export function DesktopFolderAiSummaryView({
       }
     }
   }, [folderPath, folderScanOutdatedAfterDays]);
-
-  const loadDetails = useCallback(async (): Promise<void> => {
-    if (!folderPath || detailsLoaded || detailsLoading) return;
-    setDetailsLoading(true);
-    setDetailsError(null);
-    try {
-      const report = await window.desktopApi.getFolderAiSummaryReport(folderPath);
-      setSelectedWithSubfolders(report.selectedWithSubfolders);
-      setSelectedDirectOnly(report.selectedDirectOnly);
-      setSubfolders(report.subfolders);
-      setDetailsLoaded(true);
-    } catch {
-      setDetailsError(UI_TEXT.folderAiSummaryError);
-    } finally {
-      setDetailsLoading(false);
-    }
-  }, [detailsLoaded, detailsLoading, folderPath]);
 
   useEffect(() => {
     void load();
@@ -292,12 +267,6 @@ export function DesktopFolderAiSummaryView({
       void load();
     }
   }, [folderPath, lastAiPipelineCompletion, load]);
-
-  useEffect(() => {
-    if (activeTab === "ai" || activeTab === "geo") {
-      void loadDetails();
-    }
-  }, [activeTab, loadDetails]);
 
   useEffect(() => {
     if (failedListItems.length === 0) {
@@ -385,7 +354,7 @@ export function DesktopFolderAiSummaryView({
   const loading = overviewLoading || folderScanLoading || coverageLoading;
   const hasSubfolders =
     selectedFolderChildrenCount > 0 ||
-    (overviewReport ? overviewReport.hasDirectSubfolders || overviewReport.subfolders.length > 0 : subfolders.length > 0);
+    (overviewReport ? overviewReport.hasDirectSubfolders || overviewReport.subfolders.length > 0 : false);
   const summaryTitle = hasSubfolders ? UI_TEXT.folderAiSummaryTreeTitle : UI_TEXT.folderAiSummaryFolderTitle;
   const dashboardCoverage = hasSubfolders ? selectedWithSubfolders : selectedDirectOnly;
   const dashboardOverview = hasSubfolders ? overviewReport?.selectedWithSubfolders : overviewReport?.selectedDirectOnly;
@@ -404,6 +373,15 @@ export function DesktopFolderAiSummaryView({
     Boolean(selectedWithSubfolders && selectedDirectOnly && dashboardCoverage);
 
   const faceStream = useFolderFaceSummaryStream(folderPath, faceStreamEnabled);
+
+  const aiGeoStreamEnabled =
+    (activeTab === "ai" || activeTab === "geo") &&
+    !loading &&
+    !error &&
+    !isFailedListView &&
+    Boolean(selectedWithSubfolders && selectedDirectOnly && dashboardCoverage);
+
+  const aiGeoStream = useFolderAiSummaryTableStream(folderPath, aiGeoStreamEnabled);
 
   return (
     <div className="relative flex w-full max-w-screen-2xl flex-col gap-4 px-5 py-4">
@@ -424,6 +402,7 @@ export function DesktopFolderAiSummaryView({
                 else {
                   void load();
                   if (activeTab === "face") faceStream.refresh();
+                  if (activeTab === "ai" || activeTab === "geo") aiGeoStream.refresh();
                 }
               }}
               aria-label={UI_TEXT.folderAiSummaryRefresh}
@@ -460,7 +439,6 @@ export function DesktopFolderAiSummaryView({
       ) : null}
 
       {error ? <p className="m-0 text-red-400">{error}</p> : null}
-      {detailsError ? <p className="m-0 text-red-400">{detailsError}</p> : null}
 
       {!error && !isFailedListView && (loading || !selectedWithSubfolders || !selectedDirectOnly || !dashboardCoverage) ? (
         <DesktopFolderAiSummaryDashboard
@@ -519,14 +497,18 @@ export function DesktopFolderAiSummaryView({
             )
           ) : null}
           {activeTab === "ai" ? (
-            !detailsLoaded ? (
+            aiGeoStream.streamError && aiGeoStream.rowSpecs.length === 0 ? (
+              <p className="m-0 text-sm text-red-400">{aiGeoStream.streamError}</p>
+            ) : aiGeoStream.rowSpecs.length === 0 ? (
               <DetailsLoadingSpinner />
             ) : (
               <DesktopFolderAiSummaryTable
                 folderPath={folderPath}
-                selectedWithSubfolders={selectedWithSubfolders}
-                selectedDirectOnly={selectedDirectOnly}
-                subfolders={subfolders}
+                selectedWithSubfolders={aiGeoStream.selectedWithSubfolders}
+                selectedDirectOnly={aiGeoStream.selectedDirectOnly}
+                subfolders={aiGeoStream.subfolders}
+                streamRowsIncomplete={!aiGeoStream.allDone}
+                streamError={aiGeoStream.streamError}
                 onRunPipeline={(pipeline) => void runPipelineForFolderWithSubfolders(pipeline)}
                 actionPendingPipeline={actionPendingPipeline}
                 onOpenFolderSummary={onOpenFolderSummary}
@@ -540,13 +522,18 @@ export function DesktopFolderAiSummaryView({
             )
           ) : null}
           {activeTab === "geo" ? (
-            !detailsLoaded ? (
+            aiGeoStream.streamError && aiGeoStream.rowSpecs.length === 0 ? (
+              <p className="m-0 text-sm text-red-400">{aiGeoStream.streamError}</p>
+            ) : aiGeoStream.rowSpecs.length === 0 ? (
               <DetailsLoadingSpinner />
             ) : (
               <DesktopFolderGeoSummaryTable
-                selectedWithSubfolders={selectedWithSubfolders}
-                selectedDirectOnly={selectedDirectOnly}
-                subfolders={subfolders}
+                folderPath={folderPath}
+                selectedWithSubfolders={aiGeoStream.selectedWithSubfolders}
+                selectedDirectOnly={aiGeoStream.selectedDirectOnly}
+                subfolders={aiGeoStream.subfolders}
+                streamRowsIncomplete={!aiGeoStream.allDone}
+                streamError={aiGeoStream.streamError}
                 onOpenFolderSummary={onOpenFolderSummary}
               />
             )
