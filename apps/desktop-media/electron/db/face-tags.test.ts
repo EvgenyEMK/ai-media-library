@@ -80,9 +80,9 @@ describe.skipIf(!HAS_SQLITE)("face-tags — birth_date", () => {
       ) VALUES (?, 'local-default', ?, ?, 'auto', ?, ?)`,
     ).run("face-1", "media-1", person.id, now, now);
     db.prepare(
-      `INSERT INTO person_groups (id, library_id, name, created_at, updated_at)
-       VALUES (?, 'local-default', 'Family', ?, ?)`,
-    ).run("group-1", now, now);
+      `INSERT INTO person_groups (id, library_id, name, created_at)
+       VALUES (?, 'local-default', 'Family', ?)`,
+    ).run("group-1", now);
     db.prepare(
       `INSERT INTO person_tag_groups (tag_id, group_id, library_id, created_at)
        VALUES (?, ?, 'local-default', ?)`,
