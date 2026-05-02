@@ -18,6 +18,7 @@
     "test:e2e-ai-search": "pnpm --filter @emk/desktop-media test:e2e:no-build -- tests/e2e/semantic-search.spec.ts tests/e2e/quick-filters.spec.ts tests/e2e/search-timing-diag.spec.ts",
     "test:e2e-face-pipeline": "pnpm --filter @emk/desktop-media test:e2e:no-build -- tests/e2e/face-detection-yolo12s.spec.ts tests/e2e/face-detection-aux-models.spec.ts tests/e2e/rotated-face-similarity.spec.ts tests/e2e/unconfirmed-face-search.spec.ts",
     "test:e2e-viewer": "pnpm --filter @emk/desktop-media test:e2e:no-build -- tests/e2e/viewer.spec.ts tests/e2e/viewer-video.spec.ts tests/e2e/viewer-info-panel.spec.ts tests/e2e/viewer-face-tags-overlay-regression.spec.ts",
+    "test:e2e-people-module": "pnpm --filter @emk/desktop-media test:e2e:no-build -- tests/e2e/people-module.spec.ts",
     "download-ai-models": "node scripts/download-ai-models.mjs"
   },
   "devDependencies": {

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { createPortal } from "react-dom";
 import { Loader2, Plus } from "lucide-react";
 import type { DesktopPersonGroup } from "../../shared/ipc";
 import { PeopleMembershipChip } from "./people-membership-chip";
@@ -36,6 +37,9 @@ export function PeopleDirectoryGroupCell({
   const [draftName, setDraftName] = useState("");
   const [isSavingNew, setIsSavingNew] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const [popupPosition, setPopupPosition] = useState<{ left: number; top: number } | null>(null);
 
   const assignedIds = useMemo(() => new Set(assignedGroups.map((g) => g.id)), [assignedGroups]);
 
@@ -47,11 +51,24 @@ export function PeopleDirectoryGroupCell({
       .slice(0, 50);
   }, [allGroups, assignedIds, filter]);
 
+  const updatePopupPosition = useCallback(() => {
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const width = 256;
+    const margin = 8;
+    setPopupPosition({
+      left: Math.min(Math.max(margin, rect.left), window.innerWidth - width - margin),
+      top: rect.bottom + 4,
+    });
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     const onDoc = (event: MouseEvent) => {
       const el = rootRef.current;
-      if (el && !el.contains(event.target as Node)) {
+      const popup = popupRef.current;
+      const target = event.target as Node;
+      if (el && !el.contains(target) && popup && !popup.contains(target)) {
         setOpen(false);
         setCreatingNew(false);
         setFilter("");
@@ -61,6 +78,17 @@ export function PeopleDirectoryGroupCell({
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePopupPosition();
+    window.addEventListener("resize", updatePopupPosition);
+    window.addEventListener("scroll", updatePopupPosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePopupPosition);
+      window.removeEventListener("scroll", updatePopupPosition, true);
+    };
+  }, [open, updatePopupPosition]);
 
   const submitNew = async (): Promise<void> => {
     const trimmed = draftName.trim();
@@ -92,6 +120,7 @@ export function PeopleDirectoryGroupCell({
       <div className="relative inline-flex">
         <button
           type="button"
+          ref={buttonRef}
           disabled={isBusy}
           onClick={() => {
             setOpen((v) => {
@@ -115,8 +144,13 @@ export function PeopleDirectoryGroupCell({
           <Plus className="size-4" aria-hidden />
         </button>
 
-        {open ? (
-          <div className="absolute left-0 top-full z-20 mt-1 w-64 rounded-md border border-border bg-popover p-2 shadow-md">
+        {open && popupPosition
+          ? createPortal(
+          <div
+            ref={popupRef}
+            className="fixed z-50 w-64 rounded-md border border-border bg-popover p-2 shadow-lg"
+            style={{ left: popupPosition.left, top: popupPosition.top }}
+          >
             {creatingNew ? (
               <div className="flex items-center gap-1">
                 <Input
@@ -190,8 +224,10 @@ export function PeopleDirectoryGroupCell({
                 </ul>
               </>
             )}
-          </div>
-        ) : null}
+          </div>,
+          document.body,
+        )
+          : null}
       </div>
 
     </div>

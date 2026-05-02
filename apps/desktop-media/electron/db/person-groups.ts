@@ -106,7 +106,7 @@ export function listPersonTagsInGroup(
   const db = getDesktopDatabase();
   const rows = db
     .prepare(
-      `SELECT mt.id, mt.name, COALESCE(mt.pinned, 0) AS pinned
+      `SELECT mt.id, mt.name, COALESCE(mt.pinned, 0) AS pinned, mt.birth_date
        FROM media_tags mt
        INNER JOIN person_tag_groups ptg
          ON ptg.tag_id = mt.id AND ptg.library_id = mt.library_id
@@ -115,11 +115,17 @@ export function listPersonTagsInGroup(
          AND mt.tag_type = 'person'
        ORDER BY COALESCE(mt.pinned, 0) DESC, mt.name COLLATE NOCASE ASC`,
     )
-    .all(groupId, libraryId) as Array<{ id: string; name: string; pinned: number }>;
+    .all(groupId, libraryId) as Array<{
+    id: string;
+    name: string;
+    pinned: number;
+    birth_date: string | null;
+  }>;
   return rows.map((r) => ({
     id: r.id,
     label: r.name,
     pinned: r.pinned === 1,
+    birthDate: r.birth_date ?? null,
   }));
 }
 

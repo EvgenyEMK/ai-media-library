@@ -247,9 +247,15 @@ const api: DesktopApi = {
       ipcRenderer.removeListener(IPC_CHANNELS.similarUntaggedCountsProgress, wrapped);
     };
   },
-  createPersonTag: (label) => ipcRenderer.invoke(IPC_CHANNELS.createPersonTag, label),
+  createPersonTag: (label, birthDate) =>
+    ipcRenderer.invoke(IPC_CHANNELS.createPersonTag, label, birthDate),
   updatePersonTagLabel: (tagId, label) =>
     ipcRenderer.invoke(IPC_CHANNELS.updatePersonTagLabel, tagId, label),
+  updatePersonTagBirthDate: (tagId, birthDate) =>
+    ipcRenderer.invoke(IPC_CHANNELS.updatePersonTagBirthDate, tagId, birthDate),
+  getPersonTagDeleteUsage: (tagId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.getPersonTagDeleteUsage, tagId),
+  deletePersonTag: (tagId) => ipcRenderer.invoke(IPC_CHANNELS.deletePersonTag, tagId),
   setPersonTagPinned: (tagId, pinned) =>
     ipcRenderer.invoke(IPC_CHANNELS.setPersonTagPinned, tagId, pinned),
   listFaceInstancesForMediaItem: (mediaItemId) =>

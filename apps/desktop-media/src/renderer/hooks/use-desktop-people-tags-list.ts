@@ -1,48 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
 import type { DesktopPersonGroup, DesktopPersonTagWithFaceCount } from "../../shared/ipc";
-import { comparePersonTagRows } from "../lib/compare-person-tag-rows";
 import { loadDesktopPeopleTagsBundle } from "../lib/load-desktop-people-tags-bundle";
 import { resolveSimilarUntaggedDisplay } from "../lib/person-similar-untagged-display";
 import { useDesktopStore } from "../stores/desktop-store";
 import { useDesktopPeopleTagsPagination } from "./use-desktop-people-tags-pagination";
+import { useDesktopPeopleTagsListActions } from "./use-desktop-people-tags-list-actions";
 import { usePersonTagGroupActions } from "./use-person-tag-group-actions";
 import { usePersonTagLabelEdit } from "./use-person-tag-label-edit";
+import type { DesktopPeopleTagsListState } from "./use-desktop-people-tags-list-types";
 
 export const PEOPLE_TAGS_LIST_PAGE_SIZE = 10;
 
 const LOAD_ERROR = "Failed to load people tags.";
 
-export function useDesktopPeopleTagsList(): {
-  rows: DesktopPersonTagWithFaceCount[];
-  filteredRows: DesktopPersonTagWithFaceCount[];
-  visibleRows: DesktopPersonTagWithFaceCount[];
-  allGroups: DesktopPersonGroup[];
-  groupsByTagId: Record<string, DesktopPersonGroup[]>;
-  isLoading: boolean;
-  errorMessage: string | null;
-  editingId: string | null;
-  draftLabel: string;
-  savingId: string | null;
-  savingGroupTagId: string | null;
-  peopleListPage: number;
-  setPeopleListPage: (page: number) => void;
-  nameFilter: string;
-  setNameFilter: (value: string) => void;
-  pinBusyId: string | null;
-  refreshListAndLiveSimilarCounts: () => Promise<void>;
-  setDraftLabel: (value: string) => void;
-  startEdit: (row: DesktopPersonTagWithFaceCount) => void;
-  cancelEdit: () => void;
-  saveEdit: (tagId: string) => Promise<void>;
-  handleAddGroup: (tagId: string, groupId: string) => Promise<void>;
-  handleRemoveGroup: (tagId: string, groupId: string) => Promise<void>;
-  handleCreateGroupForTag: (tagId: string, name: string) => Promise<void>;
-  handleSetPinned: (tagId: string, pinned: boolean) => Promise<void>;
-  resolveSimilarDisplay: (row: DesktopPersonTagWithFaceCount) => ReturnType<
-    typeof resolveSimilarUntaggedDisplay
-  >;
-  showSimilarColumnSpinner: boolean;
-} {
+export function useDesktopPeopleTagsList(): DesktopPeopleTagsListState {
   const [rows, setRows] = useState<DesktopPersonTagWithFaceCount[]>([]);
   const [allGroups, setAllGroups] = useState<DesktopPersonGroup[]>([]);
   const [groupsByTagId, setGroupsByTagId] = useState<Record<string, DesktopPersonGroup[]>>({});
@@ -64,8 +35,10 @@ export function useDesktopPeopleTagsList(): {
   const {
     editingId,
     draftLabel,
+    draftBirthDate,
     savingId,
     setDraftLabel,
+    setDraftBirthDate,
     startEdit,
     cancelEdit,
     saveEdit,
@@ -119,26 +92,28 @@ export function useDesktopPeopleTagsList(): {
     }
   }, [peopleListPage, nameFilter]);
 
+  const {
+    birthDateHidden,
+    toggleBirthDateHidden,
+    addOpen,
+    openAddRow,
+    cancelAdd,
+    createPerson,
+    handleSetPinned,
+    pendingDelete,
+    requestDeletePerson,
+    confirmDeletePerson,
+    cancelDeletePerson,
+  } = useDesktopPeopleTagsListActions(
+    setRows,
+    setPinBusyId,
+    setErrorMessage,
+    refreshListAndLiveSimilarCounts,
+  );
+
   useEffect(() => {
     void load();
   }, [load]);
-
-  const handleSetPinned = useCallback(async (tagId: string, pinned: boolean) => {
-    setPinBusyId(tagId);
-    setErrorMessage(null);
-    try {
-      const updated = await window.desktopApi.setPersonTagPinned(tagId, pinned);
-      setRows((current) =>
-        current
-          .map((row) => (row.id === tagId ? { ...row, pinned: updated.pinned } : row))
-          .sort(comparePersonTagRows),
-      );
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Failed to update pin.");
-    } finally {
-      setPinBusyId(null);
-    }
-  }, []);
 
   const resolveSimilarDisplay = useCallback(
     (row: DesktopPersonTagWithFaceCount) =>
@@ -163,6 +138,7 @@ export function useDesktopPeopleTagsList(): {
     errorMessage,
     editingId,
     draftLabel,
+    draftBirthDate,
     savingId,
     savingGroupTagId,
     peopleListPage,
@@ -172,6 +148,7 @@ export function useDesktopPeopleTagsList(): {
     pinBusyId,
     refreshListAndLiveSimilarCounts,
     setDraftLabel,
+    setDraftBirthDate,
     startEdit,
     cancelEdit,
     saveEdit,
@@ -181,5 +158,15 @@ export function useDesktopPeopleTagsList(): {
     handleSetPinned,
     resolveSimilarDisplay,
     showSimilarColumnSpinner,
+    birthDateHidden,
+    toggleBirthDateHidden,
+    addOpen,
+    openAddRow,
+    cancelAdd,
+    createPerson,
+    pendingDelete,
+    requestDeletePerson,
+    confirmDeletePerson,
+    cancelDeletePerson,
   };
 }

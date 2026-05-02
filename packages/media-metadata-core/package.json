@@ -7,12 +7,14 @@
   "types": "./src/index.ts",
   "scripts": {
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "build": "echo @emk/media-metadata-core is source-only"
+    "build": "echo @emk/media-metadata-core is source-only",
+    "test": "vitest run"
   },
   "dependencies": {
     "@xmldom/xmldom": "0.9.4"
   },
   "devDependencies": {
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.0"
   }
 }

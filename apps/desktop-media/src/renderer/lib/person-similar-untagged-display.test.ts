@@ -7,6 +7,7 @@ function row(similarFaceCount: number): DesktopPersonTagWithFaceCount {
     id: "t1",
     label: "Test",
     pinned: false,
+    birthDate: null,
     taggedFaceCount: 0,
     similarFaceCount,
   };

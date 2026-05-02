@@ -1,6 +1,7 @@
 import { type ReactElement } from "react";
 import { Check, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useDesktopPeopleGroupsTab } from "../hooks/use-desktop-people-groups-tab";
+import { ConfirmActionDialog } from "./ConfirmActionDialog";
 import { PeopleMembershipChip } from "./people-membership-chip";
 import { Input } from "./ui/input";
 
@@ -17,6 +18,7 @@ const UI_TEXT = {
   save: "Save",
   cancel: "Cancel",
   delete: "Delete group",
+  deleteConfirm: "Delete",
 } as const;
 
 const revealOnGroupRowHover =
@@ -35,13 +37,16 @@ export function DesktopPeopleGroupsTab(): ReactElement {
     draftName,
     setDraftName,
     savingGroupId,
+    pendingDeleteGroup,
     load,
     handleRemovePersonFromGroup,
     handleCreate,
     startEdit,
     cancelEdit,
     saveEdit,
-    handleDelete,
+    requestDelete,
+    confirmDelete,
+    cancelDelete,
   } = useDesktopPeopleGroupsTab();
 
   return (
@@ -110,92 +115,112 @@ export function DesktopPeopleGroupsTab(): ReactElement {
                 key={g.id}
                 className="rounded-xl border border-border bg-card p-4 shadow-sm"
               >
-                <div className="group/groupRow flex flex-wrap items-center gap-2">
-                  {isEditing ? (
-                    <>
-                      <Input
-                        value={draftName}
-                        onChange={(e) => setDraftName(e.target.value)}
-                        className="h-9 max-w-md flex-1"
-                        autoFocus
-                        disabled={busy}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") void saveEdit(g.id);
-                          if (e.key === "Escape") cancelEdit();
-                        }}
-                      />
-                      <button
-                        type="button"
-                        disabled={busy || !draftName.trim()}
-                        onClick={() => void saveEdit(g.id)}
-                        className="inline-flex size-9 items-center justify-center rounded-md border border-primary bg-primary/10 text-primary disabled:opacity-50"
-                        aria-label={UI_TEXT.save}
-                        title={UI_TEXT.save}
-                      >
-                        {busy ? (
-                          <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                          <Check className="size-4" />
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={cancelEdit}
-                        className="inline-flex size-9 items-center justify-center rounded-md border border-border hover:bg-muted"
-                        aria-label={UI_TEXT.cancel}
-                        title={UI_TEXT.cancel}
-                      >
-                        <X className="size-4" />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <h2 className="min-w-0 flex-1 text-lg font-semibold">{g.name}</h2>
-                      <button
-                        type="button"
-                        onClick={() => startEdit(g)}
-                        disabled={busy}
-                        className={`inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50 ${revealOnGroupRowHover}`}
-                        aria-label={`${UI_TEXT.editName}: ${g.name}`}
-                        title={UI_TEXT.editName}
-                      >
-                        <Pencil className="size-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleDelete(g.id)}
-                        disabled={busy}
-                        className={`inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-destructive/50 text-destructive hover:bg-destructive/10 disabled:opacity-50 ${revealOnGroupRowHover}`}
-                        aria-label={UI_TEXT.delete}
-                        title={UI_TEXT.delete}
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
-                    </>
-                  )}
-                </div>
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {members.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{UI_TEXT.noMembers}</p>
-                  ) : (
-                    members.map((p) => (
-                      <PeopleMembershipChip
-                        key={p.id}
-                        label={p.label}
-                        disabled={busy}
-                        onRemove={() => void handleRemovePersonFromGroup(g.id, p)}
-                        removeAriaLabel={`Remove ${p.label} from this group`}
-                        removeTitle="Remove from group"
-                      />
-                    ))
-                  )}
+                <div className="group/groupRow">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {isEditing ? (
+                      <>
+                        <Input
+                          value={draftName}
+                          onChange={(e) => setDraftName(e.target.value)}
+                          className="h-9 max-w-md flex-1"
+                          autoFocus
+                          disabled={busy}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") void saveEdit(g.id);
+                            if (e.key === "Escape") cancelEdit();
+                          }}
+                        />
+                        <button
+                          type="button"
+                          disabled={busy || !draftName.trim()}
+                          onClick={() => void saveEdit(g.id)}
+                          className="inline-flex size-9 items-center justify-center rounded-md border border-primary bg-primary/10 text-primary disabled:opacity-50"
+                          aria-label={UI_TEXT.save}
+                          title={UI_TEXT.save}
+                        >
+                          {busy ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : (
+                            <Check className="size-4" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={cancelEdit}
+                          className="inline-flex size-9 items-center justify-center rounded-md border border-border hover:bg-muted"
+                          aria-label={UI_TEXT.cancel}
+                          title={UI_TEXT.cancel}
+                        >
+                          <X className="size-4" />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <h2 className="min-w-0 flex-1 text-lg font-semibold">{g.name}</h2>
+                        <button
+                          type="button"
+                          onClick={() => startEdit(g)}
+                          disabled={busy}
+                          className={`inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50 ${revealOnGroupRowHover}`}
+                          aria-label={`${UI_TEXT.editName}: ${g.name}`}
+                          title={UI_TEXT.editName}
+                        >
+                          <Pencil className="size-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => requestDelete(g)}
+                          disabled={busy}
+                          className={`inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-destructive/50 text-destructive hover:bg-destructive/10 disabled:opacity-50 ${revealOnGroupRowHover}`}
+                          aria-label={UI_TEXT.delete}
+                          title={UI_TEXT.delete}
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {members.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">{UI_TEXT.noMembers}</p>
+                    ) : (
+                      members.map((p) => (
+                        <PeopleMembershipChip
+                          key={p.id}
+                          label={p.label}
+                          disabled={busy}
+                          onRemove={() => void handleRemovePersonFromGroup(g.id, p)}
+                          removeAriaLabel={`Remove ${p.label} from this group`}
+                          removeTitle="Remove from group"
+                        />
+                      ))
+                    )}
+                  </div>
                 </div>
               </li>
             );
           })}
         </ul>
       )}
+      <ConfirmActionDialog
+        open={pendingDeleteGroup !== null}
+        title={
+          pendingDeleteGroup ? `Delete group ${pendingDeleteGroup.name} ?` : ""
+        }
+        confirmLabel={UI_TEXT.deleteConfirm}
+        isBusy={pendingDeleteGroup ? savingGroupId === pendingDeleteGroup.id : false}
+        emphasizeCancel
+        onConfirm={() => void confirmDelete()}
+        onCancel={cancelDelete}
+      >
+        <div className="space-y-2">
+          <p>This does not delete the people in the group.</p>
+          <p className="text-foreground">
+            People in this group: {(pendingDeleteGroup && membersByGroupId[pendingDeleteGroup.id]?.length) ?? 0}
+          </p>
+        </div>
+      </ConfirmActionDialog>
     </div>
   );
 }

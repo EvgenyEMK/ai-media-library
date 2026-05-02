@@ -1,28 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import type { DesktopPersonGroup, DesktopPersonTag } from "../../shared/ipc";
+import type { DesktopPeopleGroupsTabState } from "./use-desktop-people-groups-tab-types";
 
 const LOAD_ERROR = "Failed to load groups.";
 
-export function useDesktopPeopleGroupsTab(): {
-  groups: DesktopPersonGroup[];
-  membersByGroupId: Record<string, DesktopPersonTag[]>;
-  isLoading: boolean;
-  errorMessage: string | null;
-  newName: string;
-  setNewName: (v: string) => void;
-  isCreating: boolean;
-  editingGroupId: string | null;
-  draftName: string;
-  setDraftName: (v: string) => void;
-  savingGroupId: string | null;
-  load: () => Promise<void>;
-  handleRemovePersonFromGroup: (groupId: string, person: DesktopPersonTag) => Promise<void>;
-  handleCreate: () => Promise<void>;
-  startEdit: (g: DesktopPersonGroup) => void;
-  cancelEdit: () => void;
-  saveEdit: (groupId: string) => Promise<void>;
-  handleDelete: (groupId: string) => Promise<void>;
-} {
+export function useDesktopPeopleGroupsTab(): DesktopPeopleGroupsTabState {
   const [groups, setGroups] = useState<DesktopPersonGroup[]>([]);
   const [membersByGroupId, setMembersByGroupId] = useState<Record<string, DesktopPersonTag[]>>(
     {},
@@ -34,6 +16,7 @@ export function useDesktopPeopleGroupsTab(): {
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
   const [savingGroupId, setSavingGroupId] = useState<string | null>(null);
+  const [pendingDeleteGroup, setPendingDeleteGroup] = useState<DesktopPersonGroup | null>(null);
 
   const loadMembers = useCallback(async (list: DesktopPersonGroup[]) => {
     const entries = await Promise.all(
@@ -145,12 +128,22 @@ export function useDesktopPeopleGroupsTab(): {
     [draftName],
   );
 
-  const handleDelete = useCallback(async (groupId: string) => {
-    if (!window.confirm("Delete this group? People tags are not deleted.")) return;
+  const requestDelete = useCallback((group: DesktopPersonGroup) => {
+    setPendingDeleteGroup(group);
+  }, []);
+
+  const cancelDelete = useCallback(() => {
+    setPendingDeleteGroup(null);
+  }, []);
+
+  const confirmDelete = useCallback(async () => {
+    const groupId = pendingDeleteGroup?.id;
+    if (!groupId) return;
     setSavingGroupId(groupId);
     setErrorMessage(null);
     try {
       await window.desktopApi.deletePersonGroup(groupId);
+      setPendingDeleteGroup(null);
       setGroups((prev) => prev.filter((g) => g.id !== groupId));
       setMembersByGroupId((prev) => {
         const next = { ...prev };
@@ -162,7 +155,7 @@ export function useDesktopPeopleGroupsTab(): {
     } finally {
       setSavingGroupId(null);
     }
-  }, []);
+  }, [pendingDeleteGroup]);
 
   return {
     groups,
@@ -176,12 +169,15 @@ export function useDesktopPeopleGroupsTab(): {
     draftName,
     setDraftName,
     savingGroupId,
+    pendingDeleteGroup,
     load,
     handleRemovePersonFromGroup,
     handleCreate,
     startEdit,
     cancelEdit,
     saveEdit,
-    handleDelete,
+    requestDelete,
+    confirmDelete,
+    cancelDelete,
   };
 }
