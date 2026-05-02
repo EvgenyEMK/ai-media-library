@@ -133,6 +133,9 @@ export const IPC_CHANNELS = {
   similarUntaggedCountsProgress: "media:similar-untagged-counts-progress",
   createPersonTag: "media:create-person-tag",
   updatePersonTagLabel: "media:update-person-tag-label",
+  updatePersonTagBirthDate: "media:update-person-tag-birth-date",
+  getPersonTagDeleteUsage: "media:get-person-tag-delete-usage",
+  deletePersonTag: "media:delete-person-tag",
   setPersonTagPinned: "media:set-person-tag-pinned",
   listFaceInstancesForMediaItem: "media:list-face-instances-for-media-item",
   assignPersonTagToFace: "media:assign-person-tag-to-face",
@@ -1504,6 +1507,15 @@ export interface DesktopPersonTag {
   label: string;
   /** When true, shown first in people lists and as quick chips in AI image search. */
   pinned: boolean;
+  /** ISO date-only `YYYY-MM-DD`, or null when unknown. */
+  birthDate: string | null;
+}
+
+export interface DesktopPersonTagDeleteUsage {
+  tagId: string;
+  label: string;
+  faceCount: number;
+  mediaItemCount: number;
 }
 
 export type FaceEmbeddingStatus = "pending" | "indexing" | "ready" | "failed";
@@ -1778,6 +1790,8 @@ export interface DesktopPersonTagWithFaceCount {
   id: string;
   label: string;
   pinned: boolean;
+  /** ISO date-only `YYYY-MM-DD`, or null when unknown. */
+  birthDate: string | null;
   taggedFaceCount: number;
   similarFaceCount: number;
 }
@@ -2049,8 +2063,11 @@ export interface DesktopApi {
   onSimilarUntaggedCountsProgress: (
     listener: SimilarUntaggedCountsProgressListener,
   ) => () => void;
-  createPersonTag: (label: string) => Promise<DesktopPersonTag>;
+  createPersonTag: (label: string, birthDate?: string | null) => Promise<DesktopPersonTag>;
   updatePersonTagLabel: (tagId: string, label: string) => Promise<DesktopPersonTag>;
+  updatePersonTagBirthDate: (tagId: string, birthDate: string | null) => Promise<DesktopPersonTag>;
+  getPersonTagDeleteUsage: (tagId: string) => Promise<DesktopPersonTagDeleteUsage>;
+  deletePersonTag: (tagId: string) => Promise<boolean>;
   setPersonTagPinned: (tagId: string, pinned: boolean) => Promise<DesktopPersonTag>;
   listFaceInstancesForMediaItem: (mediaItemId: string) => Promise<DesktopFaceInstance[]>;
   assignPersonTagToFace: (faceInstanceId: string, tagId: string) => Promise<DesktopFaceInstance | null>;

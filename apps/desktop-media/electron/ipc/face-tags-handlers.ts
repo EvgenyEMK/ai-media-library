@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { BrowserWindow, ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../src/shared/ipc";
 import { getDesktopDatabase } from "../db/client";
+import { DEFAULT_LIBRARY_ID } from "../db/folder-analysis-status";
 import {
   assignPersonTagToFaceInstance,
   assignPersonTagsToFaceInstances,
@@ -9,13 +10,16 @@ import {
   countTaggedFacesForPerson,
   createPersonTag,
   deleteFaceInstance,
+  deletePersonTag,
   getFaceCropPathsByIds,
   getFaceInfoByIds,
+  getPersonTagDeleteUsage,
   listFaceInstancesByMediaItem,
   listFacesTaggedForPerson,
   listPersonTags,
   listPersonTagsWithFaceCounts,
   setPersonTagPinned,
+  updatePersonTagBirthDate,
   updatePersonTagLabel,
 } from "../db/face-tags";
 import {
@@ -185,9 +189,12 @@ export function registerFaceTagsHandlers(): void {
     return listPersonTagsInGroup(groupId);
   });
 
-  ipcMain.handle(IPC_CHANNELS.createPersonTag, async (_event, label: string) => {
-    return createPersonTag(label);
-  });
+  ipcMain.handle(
+    IPC_CHANNELS.createPersonTag,
+    async (_event, label: string, birthDate?: string | null) => {
+      return createPersonTag(label, DEFAULT_LIBRARY_ID, birthDate);
+    },
+  );
 
   ipcMain.handle(
     IPC_CHANNELS.updatePersonTagLabel,
@@ -195,6 +202,21 @@ export function registerFaceTagsHandlers(): void {
       return updatePersonTagLabel(tagId, label);
     },
   );
+
+  ipcMain.handle(
+    IPC_CHANNELS.updatePersonTagBirthDate,
+    async (_event, tagId: string, birthDate: string | null) => {
+      return updatePersonTagBirthDate(tagId, birthDate);
+    },
+  );
+
+  ipcMain.handle(IPC_CHANNELS.getPersonTagDeleteUsage, async (_event, tagId: string) => {
+    return getPersonTagDeleteUsage(tagId);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.deletePersonTag, async (_event, tagId: string) => {
+    return deletePersonTag(tagId);
+  });
 
   ipcMain.handle(
     IPC_CHANNELS.setPersonTagPinned,

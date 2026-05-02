@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS media_tags (
   library_id TEXT NOT NULL,
   name TEXT NOT NULL,
   tag_type TEXT NOT NULL,
+  birth_date TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   UNIQUE(library_id, name, tag_type)
@@ -657,6 +658,12 @@ const MIGRATIONS: Array<{ id: string; sql: string }> = [
       DROP INDEX IF EXISTS idx_media_items_location;
       CREATE INDEX IF NOT EXISTS idx_media_items_location_v2
         ON media_items (library_id, country, location_area, location_area2, city);
+    `,
+  },
+  {
+    id: "025_person_birth_date",
+    sql: `
+      ALTER TABLE media_tags ADD COLUMN birth_date TEXT;
     `,
   },
 ];

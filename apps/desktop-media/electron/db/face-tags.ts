@@ -5,6 +5,49 @@ import { getDesktopDatabase } from "./client";
 import { FACE_BBOX_REF_HEIGHT_SQL, FACE_BBOX_REF_WIDTH_SQL } from "./face-instance-display-dimensions";
 import { DEFAULT_LIBRARY_ID } from "./folder-analysis-status";
 
+function normalizeBirthDate(input: unknown): string | null {
+  if (input === null || input === undefined) {
+    return null;
+  }
+  if (typeof input !== "string") {
+    throw new Error("Birth date must be YYYY-MM-DD.");
+  }
+  const trimmed = input.trim();
+  if (trimmed === "") {
+    return null;
+  }
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (!match) {
+    throw new Error("Birth date must be YYYY-MM-DD.");
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    throw new Error("Birth date must be YYYY-MM-DD.");
+  }
+  return trimmed;
+}
+
+function rowToDesktopPersonTag(row: {
+  id: string;
+  name: string;
+  pinned: number;
+  birth_date: string | null | undefined;
+}): DesktopPersonTag {
+  return {
+    id: row.id,
+    label: row.name,
+    pinned: row.pinned === 1,
+    birthDate: row.birth_date ?? null,
+  };
+}
+
 export interface DesktopFaceInstance {
   id: string;
   media_item_id: string;
@@ -37,27 +80,28 @@ export function listPersonTags(libraryId = DEFAULT_LIBRARY_ID): DesktopPersonTag
   const db = getDesktopDatabase();
   const rows = db
     .prepare(
-      `SELECT id, name, COALESCE(pinned, 0) AS pinned
+      `SELECT id, name, COALESCE(pinned, 0) AS pinned, birth_date
        FROM media_tags
        WHERE library_id = ?
          AND tag_type = 'person'
        ORDER BY COALESCE(pinned, 0) DESC, name COLLATE NOCASE ASC`,
     )
-    .all(libraryId) as Array<{ id: string; name: string; pinned: number }>;
+    .all(libraryId) as Array<{ id: string; name: string; pinned: number; birth_date: string | null }>;
 
-  return rows.map((row) => ({
-    id: row.id,
-    label: row.name,
-    pinned: row.pinned === 1,
-  }));
+  return rows.map((row) => rowToDesktopPersonTag(row));
 }
 
-export function createPersonTag(label: string, libraryId = DEFAULT_LIBRARY_ID): DesktopPersonTag {
+export function createPersonTag(
+  label: string,
+  libraryId = DEFAULT_LIBRARY_ID,
+  birthDate?: string | null,
+): DesktopPersonTag {
   const db = getDesktopDatabase();
   const trimmed = label.trim();
   if (!trimmed) {
     throw new Error("Person tag label is required.");
   }
+  const normalizedBirth = normalizeBirthDate(birthDate);
 
   const existing = db
     .prepare(
@@ -70,16 +114,18 @@ export function createPersonTag(label: string, libraryId = DEFAULT_LIBRARY_ID): 
     )
     .get(libraryId, trimmed) as { id: string; name: string } | undefined;
   if (existing) {
-    const pinRow = db
+    const row = db
       .prepare(
-        `SELECT COALESCE(pinned, 0) AS pinned FROM media_tags WHERE id = ? AND library_id = ? LIMIT 1`,
+        `SELECT id, name, COALESCE(pinned, 0) AS pinned, birth_date
+         FROM media_tags WHERE id = ? AND library_id = ? LIMIT 1`,
       )
-      .get(existing.id, libraryId) as { pinned: number } | undefined;
-    return {
-      id: existing.id,
-      label: existing.name,
-      pinned: pinRow?.pinned === 1,
-    };
+      .get(existing.id, libraryId) as
+      | { id: string; name: string; pinned: number; birth_date: string | null }
+      | undefined;
+    if (!row) {
+      throw new Error("Person tag not found.");
+    }
+    return rowToDesktopPersonTag(row);
   }
 
   const now = new Date().toISOString();
@@ -90,12 +136,13 @@ export function createPersonTag(label: string, libraryId = DEFAULT_LIBRARY_ID): 
       library_id,
       name,
       tag_type,
+      birth_date,
       created_at,
       updated_at
-    ) VALUES (?, ?, ?, 'person', ?, ?)`,
-  ).run(id, libraryId, trimmed, now, now);
+    ) VALUES (?, ?, ?, 'person', ?, ?, ?)`,
+  ).run(id, libraryId, trimmed, normalizedBirth, now, now);
 
-  return { id, label: trimmed, pinned: false };
+  return { id, label: trimmed, pinned: false, birthDate: normalizedBirth };
 }
 
 export function updatePersonTagLabel(
@@ -145,18 +192,53 @@ export function updatePersonTagLabel(
 
   const after = db
     .prepare(
-      `SELECT id, name, COALESCE(pinned, 0) AS pinned
+      `SELECT id, name, COALESCE(pinned, 0) AS pinned, birth_date
        FROM media_tags
        WHERE id = ? AND library_id = ?
        LIMIT 1`,
     )
-    .get(tagId, libraryId) as { id: string; name: string; pinned: number };
+    .get(tagId, libraryId) as { id: string; name: string; pinned: number; birth_date: string | null };
 
-  return {
-    id: after.id,
-    label: after.name,
-    pinned: after.pinned === 1,
-  };
+  return rowToDesktopPersonTag(after);
+}
+
+export function updatePersonTagBirthDate(
+  tagId: string,
+  birthDate: unknown,
+  libraryId = DEFAULT_LIBRARY_ID,
+): DesktopPersonTag {
+  const db = getDesktopDatabase();
+  const normalized = normalizeBirthDate(birthDate);
+
+  const existing = db
+    .prepare(
+      `SELECT id, name
+       FROM media_tags
+       WHERE id = ? AND library_id = ? AND tag_type = 'person'
+       LIMIT 1`,
+    )
+    .get(tagId, libraryId) as { id: string; name: string } | undefined;
+  if (!existing) {
+    throw new Error("Person tag not found.");
+  }
+
+  const now = new Date().toISOString();
+  db.prepare(
+    `UPDATE media_tags
+     SET birth_date = ?, updated_at = ?
+     WHERE id = ? AND library_id = ?`,
+  ).run(normalized, now, tagId, libraryId);
+
+  const after = db
+    .prepare(
+      `SELECT id, name, COALESCE(pinned, 0) AS pinned, birth_date
+       FROM media_tags
+       WHERE id = ? AND library_id = ?
+       LIMIT 1`,
+    )
+    .get(tagId, libraryId) as { id: string; name: string; pinned: number; birth_date: string | null };
+
+  return rowToDesktopPersonTag(after);
 }
 
 export function setPersonTagPinned(
@@ -184,13 +266,121 @@ export function setPersonTagPinned(
      WHERE id = ? AND library_id = ?`,
   ).run(pinned ? 1 : 0, now, tagId, libraryId);
 
-  return { id: existing.id, label: existing.name, pinned };
+  const after = db
+    .prepare(
+      `SELECT id, name, COALESCE(pinned, 0) AS pinned, birth_date
+       FROM media_tags
+       WHERE id = ? AND library_id = ?
+       LIMIT 1`,
+    )
+    .get(tagId, libraryId) as { id: string; name: string; pinned: number; birth_date: string | null };
+
+  return rowToDesktopPersonTag(after);
+}
+
+export interface PersonTagDeleteUsage {
+  tagId: string;
+  label: string;
+  faceCount: number;
+  mediaItemCount: number;
+}
+
+export function getPersonTagDeleteUsage(
+  tagId: string,
+  libraryId = DEFAULT_LIBRARY_ID,
+): PersonTagDeleteUsage {
+  const db = getDesktopDatabase();
+  const tag = db
+    .prepare(
+      `SELECT id, name
+       FROM media_tags
+       WHERE id = ? AND library_id = ? AND tag_type = 'person'
+       LIMIT 1`,
+    )
+    .get(tagId, libraryId) as { id: string; name: string } | undefined;
+  if (!tag) {
+    throw new Error("Person tag not found.");
+  }
+
+  const row = db
+    .prepare(
+      `SELECT
+         COUNT(fi.id) AS face_count,
+         COUNT(DISTINCT fi.media_item_id) AS media_item_count
+       FROM media_face_instances fi
+       INNER JOIN media_items mi
+         ON mi.id = fi.media_item_id
+        AND mi.library_id = fi.library_id
+        AND mi.deleted_at IS NULL
+       WHERE fi.library_id = ?
+         AND fi.tag_id = ?`,
+    )
+    .get(libraryId, tagId) as
+    | { face_count: number | bigint | null; media_item_count: number | bigint | null }
+    | undefined;
+
+  return {
+    tagId: tag.id,
+    label: tag.name,
+    faceCount: Number(row?.face_count ?? 0),
+    mediaItemCount: Number(row?.media_item_count ?? 0),
+  };
+}
+
+export function deletePersonTag(
+  tagId: string,
+  libraryId = DEFAULT_LIBRARY_ID,
+): boolean {
+  const db = getDesktopDatabase();
+  const existing = db
+    .prepare(
+      `SELECT id
+       FROM media_tags
+       WHERE id = ? AND library_id = ? AND tag_type = 'person'
+       LIMIT 1`,
+    )
+    .get(tagId, libraryId) as { id: string } | undefined;
+  if (!existing) {
+    return false;
+  }
+
+  const now = new Date().toISOString();
+  const tx = db.transaction(() => {
+    db.prepare(
+      `UPDATE media_face_instances
+       SET tag_id = NULL, updated_at = ?
+       WHERE library_id = ? AND tag_id = ?`,
+    ).run(now, libraryId, tagId);
+    db.prepare(`DELETE FROM media_item_person_suggestions WHERE library_id = ? AND tag_id = ?`).run(
+      libraryId,
+      tagId,
+    );
+    db.prepare(`DELETE FROM person_centroids WHERE library_id = ? AND tag_id = ?`).run(
+      libraryId,
+      tagId,
+    );
+    db.prepare(`DELETE FROM person_tag_groups WHERE library_id = ? AND tag_id = ?`).run(
+      libraryId,
+      tagId,
+    );
+    db.prepare(`DELETE FROM media_album_person_tags WHERE library_id = ? AND tag_id = ?`).run(
+      libraryId,
+      tagId,
+    );
+    db.prepare(`DELETE FROM media_tags WHERE library_id = ? AND id = ? AND tag_type = 'person'`).run(
+      libraryId,
+      tagId,
+    );
+  });
+  tx();
+  return true;
 }
 
 export interface PersonTagWithFaceCount {
   id: string;
   label: string;
   pinned: boolean;
+  birthDate: string | null;
   taggedFaceCount: number;
   /**
    * Cached `person_centroids.similar_untagged_face_count` (written by `refreshSuggestionsForTag`
@@ -215,6 +405,7 @@ export function listPersonTagsWithFaceCounts(
          mt.id,
          mt.name,
          COALESCE(mt.pinned, 0) AS pinned,
+         mt.birth_date,
          (
            SELECT COUNT(*)
            FROM media_face_instances fi
@@ -237,6 +428,7 @@ export function listPersonTagsWithFaceCounts(
     id: string;
     name: string;
     pinned: number;
+    birth_date: string | null;
     tagged_face_count: number;
     similar_face_count: number;
   }>;
@@ -245,6 +437,7 @@ export function listPersonTagsWithFaceCounts(
     id: row.id,
     label: row.name,
     pinned: row.pinned === 1,
+    birthDate: row.birth_date ?? null,
     taggedFaceCount: row.tagged_face_count,
     similarFaceCount: row.similar_face_count,
   }));
@@ -278,7 +471,8 @@ export function listFaceInstancesByMediaItem(
          ${FACE_BBOX_REF_HEIGHT_SQL} AS ref_image_height,
          t.id AS tag_id_ref,
          t.name AS tag_name,
-         COALESCE(t.pinned, 0) AS tag_pinned
+         COALESCE(t.pinned, 0) AS tag_pinned,
+         t.birth_date AS tag_birth_date
        FROM media_face_instances fi
        INNER JOIN media_items mi ON mi.id = fi.media_item_id
        LEFT JOIN media_tags t ON t.id = fi.tag_id
@@ -309,6 +503,7 @@ export function listFaceInstancesByMediaItem(
     tag_id_ref: string | null;
     tag_name: string | null;
     tag_pinned: number | null;
+    tag_birth_date: string | null;
   }>;
 
   return rows.map((row, index) => ({
@@ -324,6 +519,7 @@ export function listFaceInstancesByMediaItem(
             id: row.tag_id_ref,
             label: row.tag_name,
             pinned: row.tag_pinned === 1,
+            birthDate: row.tag_birth_date ?? null,
           }
         : null,
     bounding_box: {
