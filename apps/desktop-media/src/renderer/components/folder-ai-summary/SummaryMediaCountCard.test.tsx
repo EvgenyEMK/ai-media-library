@@ -15,7 +15,10 @@ function scanFreshness(overrides: Partial<FolderScanFreshness> = {}): FolderScan
     scannedCount: 2,
     unscannedCount: 0,
     totalMedia: 2,
+    directSubfolderCount: 2,
     notFullyScannedDirectSubfolderCount: 0,
+    outdatedScannedFolderCount: 0,
+    scannedFolderCount: 1,
     ...overrides,
   };
 }
@@ -32,13 +35,14 @@ describe("LastDataScanCard", () => {
     );
 
     expect(screen.getByRole("heading", { name: "Folder tree scan" })).toBeVisible();
-    expect(screen.getByText("Not scanned: 2")).toBeVisible();
-    expect(container.querySelector("section")).toHaveClass("border-destructive");
+    expect(screen.getByText("Not scanned direct subfolders")).toBeVisible();
+    expect(screen.getByText("2")).toBeVisible();
+    expect(container.querySelector("section")).toHaveClass("border-destructive/70");
   });
 
-  it("keeps missing subfolder count hidden for fully scanned trees", () => {
+  it("hides missing direct subfolder row when fully scanned", () => {
     render(<LastDataScanCard scanFreshness={scanFreshness()} hasSubfolders />);
 
-    expect(screen.queryByText(/Not scanned:/)).toBeNull();
+    expect(screen.queryByText("Not scanned direct subfolders")).toBeNull();
   });
 });

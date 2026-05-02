@@ -6,7 +6,7 @@ import type {
   InitOptions,
   LookUpPoint,
 } from "local-reverse-geocoder";
-import type { GeocodedLocation, GeocoderStatus } from "./geocoder-types";
+import type { GeocodedLocation, GeocoderInitProgress, GeocoderStatus } from "./geocoder-types";
 import { isoCountryName } from "./country-codes";
 
 function mapGeoNameHitToLocation(hit: GeoNameRecord): GeocodedLocation {
@@ -66,7 +66,8 @@ export function resetGeocoderForTests(loader?: GeocoderModuleLoader): void {
 let geocoderReady = false;
 let geocoderInitializing = false;
 let geocoderError: string | null = null;
-let statusListener: ((status: GeocoderStatus, error?: string) => void) | null = null;
+let statusListener: ((progress: GeocoderInitProgress) => void) | null = null;
+let downloadProgressInterval: NodeJS.Timeout | null = null;
 
 const GEOCODER_CACHE_DATASETS = [
   { dirName: "cities1000", baseName: "cities1000" },
@@ -74,14 +75,49 @@ const GEOCODER_CACHE_DATASETS = [
   { dirName: "admin2_codes", baseName: "admin2CodesASCII" },
 ];
 
-function emitStatus(status: GeocoderStatus, error?: string): void {
+function datasetDownloadProgress(geonamesPath: string): { progressPercent: number; progressLabel: string } {
+  const totalDatasets = GEOCODER_CACHE_DATASETS.length;
+  const cachedDatasets = GEOCODER_CACHE_DATASETS.filter(
+    ({ dirName, baseName }) => getCachedDatasetPath(path.join(geonamesPath, dirName), baseName) !== null,
+  ).length;
+  // Keep a small headroom for parse/finalize before "ready".
+  const progressPercent = Math.min(95, Math.round((cachedDatasets / totalDatasets) * 95));
+  return {
+    progressPercent,
+    progressLabel: `Downloaded datasets: ${cachedDatasets}/${totalDatasets}`,
+  };
+}
+
+function stopDownloadProgressUpdates(): void {
+  if (downloadProgressInterval) {
+    clearInterval(downloadProgressInterval);
+    downloadProgressInterval = null;
+  }
+}
+
+function startDownloadProgressUpdates(geonamesPath: string): void {
+  stopDownloadProgressUpdates();
+  downloadProgressInterval = setInterval(() => {
+    if (!geocoderInitializing) {
+      stopDownloadProgressUpdates();
+      return;
+    }
+    emitStatus("downloading", undefined, datasetDownloadProgress(geonamesPath));
+  }, 700);
+}
+
+function emitStatus(
+  status: GeocoderStatus,
+  error?: string,
+  extra?: Pick<GeocoderInitProgress, "progressPercent" | "progressLabel">,
+): void {
   if (statusListener) {
-    statusListener(status, error);
+    statusListener({ status, error, ...(extra ?? {}) });
   }
 }
 
 export function onGeocoderStatusChange(
-  listener: (status: GeocoderStatus, error?: string) => void,
+  listener: (progress: GeocoderInitProgress) => void,
 ): () => void {
   statusListener = listener;
   return () => {
@@ -197,6 +233,7 @@ export async function initGeocoder(
   if ((geocoderReady && options.forceRefresh !== true) || geocoderInitializing) return;
   geocoderInitializing = true;
   geocoderError = null;
+  stopDownloadProgressUpdates();
 
   /** Playwright E2E only: same IPC/progress events without fetching GeoNames. */
   if (shouldUseE2eGeocoderStub()) {
@@ -208,12 +245,14 @@ export async function initGeocoder(
       });
       geocoderReady = true;
       geocoderInitializing = false;
+      stopDownloadProgressUpdates();
       emitStatus("ready");
       console.log("[geocoder] E2E stub: skipped real GeoNames download");
       return;
     } catch (err) {
       geocoderInitializing = false;
       geocoderReady = false;
+      stopDownloadProgressUpdates();
       const msg = err instanceof Error ? err.message : String(err);
       geocoderError = msg;
       emitStatus("error", msg);
@@ -227,7 +266,12 @@ export async function initGeocoder(
       clearCachedGeocoderData(geonamesPath);
     }
     const usingCachedData = options.forceRefresh === true ? false : stabilizeCachedGeocoderData(geonamesPath);
-    emitStatus(usingCachedData ? "loading-cache" : "downloading");
+    if (usingCachedData) {
+      emitStatus("loading-cache", undefined, { progressPercent: 100, progressLabel: "Using cached GeoNames data" });
+    } else {
+      emitStatus("downloading", undefined, datasetDownloadProgress(geonamesPath));
+      startDownloadProgressUpdates(geonamesPath);
+    }
     const geocoder = getGeocoder();
 
     const initOptions: InitOptions = {
@@ -243,7 +287,14 @@ export async function initGeocoder(
 
     await new Promise<void>((resolve, reject) => {
       try {
-        emitStatus(usingCachedData ? "loading-cache" : "downloading");
+        if (usingCachedData) {
+          emitStatus("loading-cache", undefined, {
+            progressPercent: 100,
+            progressLabel: "Using cached GeoNames data",
+          });
+        } else {
+          emitStatus("downloading", undefined, datasetDownloadProgress(geonamesPath));
+        }
         geocoder.init(initOptions, () => {
           resolve();
         });
@@ -254,13 +305,15 @@ export async function initGeocoder(
 
     geocoderReady = true;
     geocoderInitializing = false;
-    emitStatus("ready");
+    stopDownloadProgressUpdates();
+    emitStatus("ready", undefined, { progressPercent: 100, progressLabel: "GeoNames data ready" });
     console.log(
       `[geocoder] initialization complete source=${usingCachedData ? "cache" : "download-or-refresh"}`,
     );
   } catch (err) {
     geocoderInitializing = false;
     geocoderReady = false;
+    stopDownloadProgressUpdates();
     const msg = err instanceof Error ? err.message : String(err);
     geocoderError = msg;
     emitStatus("error", msg);

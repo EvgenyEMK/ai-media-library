@@ -13,4 +13,6 @@ export type GeocoderStatus = "idle" | "downloading" | "loading-cache" | "parsing
 export interface GeocoderInitProgress {
   status: GeocoderStatus;
   error?: string;
+  progressPercent?: number;
+  progressLabel?: string;
 }

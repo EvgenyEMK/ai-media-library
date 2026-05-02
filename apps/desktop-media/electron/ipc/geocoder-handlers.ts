@@ -7,11 +7,10 @@ import {
 } from "../geocoder/reverse-geocoder";
 import { resolveGeonamesPath } from "../app-paths";
 import { emitGeocoderInitProgress } from "./progress-emitters";
-import type { GeocoderStatus } from "../geocoder/geocoder-types";
 
 export function registerGeocoderHandlers(): void {
-  onGeocoderStatusChange((status: GeocoderStatus, error?: string) => {
-    emitGeocoderInitProgress({ status, error });
+  onGeocoderStatusChange((progress) => {
+    emitGeocoderInitProgress(progress);
   });
 
   ipcMain.handle(IPC_CHANNELS.getGeocoderCacheStatus, async () => {

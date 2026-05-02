@@ -22,54 +22,81 @@ test.describe("Image AI analysis readiness", () => {
 
     await clickSidebarLibraryRoot(mainWindow, testFolder);
 
-    // Collect progress events in the renderer.
     await mainWindow.evaluate(() => {
       // @ts-expect-error - attach for tests
-      window.__e2ePhotoEvents = [];
-      // @ts-expect-error - attach for tests
-      window.__e2ePhotoUnsub = window.desktopApi.onPhotoAnalysisProgress((e) => {
-        // @ts-expect-error - attach for tests
-        window.__e2ePhotoEvents.push(e);
+      window.__e2ePhotoPipelineProgress = [];
+      // @ts-expect-error
+      window.__e2ePipelineLifecycle = [];
+      // @ts-expect-error
+      window.__e2eUnsubJob = window.desktopApi.pipelines.onJobProgress((e) => {
+        if (e.pipelineId !== "photo-analysis") return;
+        // @ts-expect-error
+        window.__e2ePhotoPipelineProgress.push({
+          processed: e.progress.processed,
+          total: e.progress.total,
+          message: e.progress.message,
+          details: e.progress.details,
+        });
+      });
+      // @ts-expect-error
+      window.__e2eUnsubLife = window.desktopApi.pipelines.onLifecycle((e) => {
+        // @ts-expect-error
+        window.__e2ePipelineLifecycle.push(e);
       });
     });
 
-    const actionsButton = mainWindow.getByRole("button", { name: "More actions" });
-    await actionsButton.click();
+    try {
+      const actionsButton = mainWindow.getByRole("button", { name: "More actions" });
+      await actionsButton.click();
 
-    // Start analysis via the play button on the "Image AI analysis" row.
-    const menu = mainWindow.locator(".desktop-actions-menu");
-    const row = menu.locator(".photo-ai-row");
-    await expect(row.getByText("Image AI analysis")).toBeVisible();
-    await row.locator("button.face-detect-play-btn").click();
+      const menu = mainWindow.locator(".desktop-actions-menu");
+      const row = menu.locator(".photo-ai-row");
+      await expect(row.getByText("Image AI analysis")).toBeVisible();
+      await row.locator("button.face-detect-play-btn").click();
 
-    // Wait for job completion.
-    await mainWindow.waitForFunction(() => {
-      // @ts-expect-error - attached in test
-      const events = window.__e2ePhotoEvents ?? [];
-      return events.some((e: any) => e && e.type === "job-completed");
-    }, { timeout: 60_000 });
+      await mainWindow.waitForFunction(
+        () => {
+          // @ts-expect-error
+          const life = window.__e2ePipelineLifecycle ?? [];
+          return life.some((e: { type: string }) => e.type === "bundle-finished");
+        },
+        { timeout: 120_000 },
+      );
 
-    const summary = await mainWindow.evaluate(() => {
-      // @ts-expect-error - attached in test
-      const events = window.__e2ePhotoEvents ?? [];
-      const failed = events.filter((e: any) => e?.type === "item-updated" && e?.item?.status === "failed");
-      const success = events.filter((e: any) => e?.type === "item-updated" && e?.item?.status === "success");
-      const completed = events.find((e: any) => e?.type === "job-completed");
-      return {
-        failedCount: failed.length,
-        successCount: success.length,
-        completed: completed ? { failed: completed.failed, completed: completed.completed, cancelled: completed.cancelled } : null,
-      };
-    });
+      const summary = await mainWindow.evaluate(() => {
+        // @ts-expect-error
+        const prog = window.__e2ePhotoPipelineProgress ?? [];
+        let failedCount = 0;
+        let successCount = 0;
+        for (const row of prog) {
+          const d = row.details;
+          if (d && typeof d === "object" && d !== null && "path" in d && typeof (d as { path?: unknown }).path === "string") {
+            const rec = d as { path: string; error?: unknown };
+            if (typeof rec.error === "string" && rec.error.length > 0) {
+              failedCount += 1;
+            } else if (typeof row.message === "string" && row.message.startsWith("Analyzed:")) {
+              successCount += 1;
+            }
+          }
+        }
+        // @ts-expect-error
+        const life = window.__e2ePipelineLifecycle ?? [];
+        const finished = life.find((e: { type: string }) => e.type === "bundle-finished") as
+          | { type: string; state?: string }
+          | undefined;
+        return { failedCount, successCount, bundleState: finished?.state ?? null };
+      });
 
-    expect(summary.failedCount).toBe(0);
-    expect(summary.successCount).toBeGreaterThan(0);
-    expect(summary.completed?.failed ?? 0).toBe(0);
-
-    await mainWindow.evaluate(() => {
-      // @ts-expect-error - attached in test
-      window.__e2ePhotoUnsub?.();
-    });
+      expect(summary.failedCount).toBe(0);
+      expect(summary.successCount).toBeGreaterThan(0);
+      expect(summary.bundleState).toBe("succeeded");
+    } finally {
+      await mainWindow.evaluate(() => {
+        // @ts-expect-error
+        window.__e2eUnsubJob?.();
+        // @ts-expect-error
+        window.__e2eUnsubLife?.();
+      });
+    }
   });
 });
-

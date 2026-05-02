@@ -112,6 +112,9 @@ async function resolveFixturePaths(mainWindow: Page, folderPath: string): Promis
 test.use({ e2eGeocoderStub: true });
 
 test.describe("GPS geolocation metadata scan", () => {
+  /** Cold metadata + geocode under full-suite load can exceed the default 180s. */
+  test.setTimeout(300_000);
+
   test("geocodes only GPS images and reports zero geo updates on repeat scan", async ({
     mainWindow,
   }) => {

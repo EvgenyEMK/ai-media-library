@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { PipelineQueueSnapshot } from "../../shared/pipeline-types";
+import { enqueueFolderAiPipeline } from "../lib/enqueue-folder-ai-pipeline";
 import { useDesktopStoreApi } from "../stores/desktop-store";
 import type { SummaryPipelineKind } from "../types/folder-ai-summary-types";
 
@@ -12,19 +12,7 @@ interface UseFolderAiSummaryPipelineActionsParams {
 
 interface UseFolderAiSummaryPipelineActionsResult {
   actionPendingPipeline: SummaryPipelineKind | null;
-  showPipelineBlockedDialog: boolean;
-  setShowPipelineBlockedDialog: (visible: boolean) => void;
   runPipelineForFolderWithSubfolders: (pipeline: SummaryPipelineKind) => Promise<void>;
-}
-
-function hasAnyActiveAiPipeline(snapshot: PipelineQueueSnapshot): boolean {
-  return snapshot.running.some((bundle) =>
-    bundle.jobs.some((job) =>
-      job.pipelineId === "photo-analysis" ||
-      job.pipelineId === "face-detection" ||
-      job.pipelineId === "semantic-index",
-    ),
-  );
 }
 
 export function useFolderAiSummaryPipelineActions({
@@ -34,59 +22,7 @@ export function useFolderAiSummaryPipelineActions({
   onRunPhotoPipeline,
 }: UseFolderAiSummaryPipelineActionsParams): UseFolderAiSummaryPipelineActionsResult {
   const store = useDesktopStoreApi();
-  const [showPipelineBlockedDialog, setShowPipelineBlockedDialog] = useState(false);
   const [actionPendingPipeline, setActionPendingPipeline] = useState<SummaryPipelineKind | null>(null);
-
-  const markPipelineStartingInUi = useCallback(
-    (pipeline: SummaryPipelineKind): void => {
-      store.setState((s) => {
-        if (pipeline === "rotation") {
-          s.imageRotationError = null;
-          s.imageRotationStatus = "running";
-          s.imageRotationPanelVisible = true;
-          s.imageRotationJobId = null;
-          s.imageRotationProcessed = 0;
-          s.imageRotationTotal = 0;
-          s.imageRotationWronglyRotated = 0;
-          s.imageRotationSkipped = 0;
-          s.imageRotationFailed = 0;
-          s.imageRotationFolderPath = folderPath;
-          return;
-        }
-        if (pipeline === "semantic") {
-          s.semanticIndexError = null;
-          s.semanticIndexStatus = "running";
-          s.semanticIndexPanelVisible = true;
-          s.semanticIndexJobId = null;
-          s.semanticIndexItemOrder = [];
-          s.semanticIndexItemsByKey = {};
-          s.semanticIndexAverageSecondsPerFile = null;
-          s.semanticIndexCurrentFolderPath = null;
-          s.semanticIndexPhase = null;
-        } else if (pipeline === "face") {
-          s.faceError = null;
-          s.faceStatus = "running";
-          s.facePanelVisible = true;
-          s.faceJobId = null;
-          s.faceItemOrder = [];
-          s.faceItemsByKey = {};
-          s.faceAverageSecondsPerFile = null;
-          s.faceCurrentFolderPath = null;
-        } else {
-          s.aiError = null;
-          s.aiStatus = "running";
-          s.aiPanelVisible = true;
-          s.aiJobId = null;
-          s.aiItemOrder = [];
-          s.aiItemsByKey = {};
-          s.aiAverageSecondsPerFile = null;
-          s.aiCurrentFolderPath = null;
-          s.aiPhase = null;
-        }
-      });
-    },
-    [folderPath, store],
-  );
 
   const markPipelineStartFailedInUi = useCallback(
     (pipeline: SummaryPipelineKind, message: string): void => {
@@ -115,81 +51,20 @@ export function useFolderAiSummaryPipelineActions({
   const runPipelineForFolderWithSubfolders = useCallback(
     async (pipeline: SummaryPipelineKind): Promise<void> => {
       if (!folderPath || actionPendingPipeline) return;
-      const liveState = store.getState();
-      if (
-        liveState.aiStatus === "running" ||
-        liveState.faceStatus === "running" ||
-        liveState.semanticIndexStatus === "running" ||
-        liveState.imageRotationStatus === "running"
-      ) {
-        setShowPipelineBlockedDialog(true);
-        return;
-      }
-      try {
-        const snapshot = await window.desktopApi.pipelines.getSnapshot();
-        if (hasAnyActiveAiPipeline(snapshot)) {
-          setShowPipelineBlockedDialog(true);
-          return;
-        }
-      } catch {
-        // Store state already protects common cases if this defensive check fails.
-      }
       setActionPendingPipeline(pipeline);
       try {
         if (pipeline === "rotation") {
-          markPipelineStartingInUi("rotation");
-          const result = await window.desktopApi.detectFolderImageRotation({ folderPath, recursive: true });
-          store.setState((s) => {
-            s.imageRotationJobId = result.jobId;
-            s.imageRotationTotal = result.total;
-          });
-          await new Promise<void>((resolve) => {
-            const unsubscribe = window.desktopApi.onImageRotationProgress((event) => {
-              if (event.jobId !== result.jobId) return;
-              if (event.type === "job-completed" || event.type === "job-cancelled" || event.type === "job-failed") {
-                unsubscribe();
-                resolve();
-              }
-            });
-          });
+          await enqueueFolderAiPipeline({ folderPath, pipeline: "rotation", recursive: true });
         } else if (pipeline === "semantic") {
           if (onRunSemanticPipeline) await onRunSemanticPipeline(folderPath, true, false);
-          else {
-            markPipelineStartingInUi("semantic");
-            const result = await window.desktopApi.indexFolderSemanticEmbeddings({
-              folderPath,
-              recursive: true,
-              mode: "missing",
-            });
-            store.setState((s) => {
-              s.semanticIndexJobId = result.jobId;
-            });
-          }
+          else await enqueueFolderAiPipeline({ folderPath, pipeline: "semantic", recursive: true });
         } else if (pipeline === "face") {
           if (onRunFacePipeline) await onRunFacePipeline(folderPath, true, false);
-          else {
-            markPipelineStartingInUi("face");
-            const result = await window.desktopApi.detectFolderFaces({
-              folderPath,
-              recursive: true,
-              mode: "missing",
-            });
-            store.setState((s) => {
-              s.faceJobId = result.jobId;
-            });
-          }
+          else await enqueueFolderAiPipeline({ folderPath, pipeline: "face", recursive: true });
         } else if (onRunPhotoPipeline) {
           await onRunPhotoPipeline(folderPath, true, false);
         } else {
-          markPipelineStartingInUi("photo");
-          const result = await window.desktopApi.analyzeFolderPhotos({
-            folderPath,
-            recursive: true,
-            mode: "missing",
-          });
-          store.setState((s) => {
-            s.aiJobId = result.jobId;
-          });
+          await enqueueFolderAiPipeline({ folderPath, pipeline: "photo", recursive: true });
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Could not start pipeline.";
@@ -202,7 +77,6 @@ export function useFolderAiSummaryPipelineActions({
       actionPendingPipeline,
       folderPath,
       markPipelineStartFailedInUi,
-      markPipelineStartingInUi,
       onRunFacePipeline,
       onRunPhotoPipeline,
       onRunSemanticPipeline,
@@ -212,8 +86,6 @@ export function useFolderAiSummaryPipelineActions({
 
   return {
     actionPendingPipeline,
-    showPipelineBlockedDialog,
-    setShowPipelineBlockedDialog,
     runPipelineForFolderWithSubfolders,
   };
 }

@@ -4,6 +4,7 @@ import { app, ipcMain } from "electron";
 import { IPC_CHANNELS } from "../../src/shared/ipc";
 import { getDesktopDatabase } from "../db/client";
 import { DEFAULT_LIBRARY_ID } from "../db/folder-analysis-status";
+import { getFolderGeoCoverage } from "../db/folder-geo-coverage";
 import {
   analyzePathsWithLlmStreaming,
   llmResultToPathExtraction,
@@ -74,6 +75,15 @@ export function splitPathsForLlm(paths: string[]): {
     pathsForFileLlm.push(filePath);
   }
   return { pathsForFileLlm, skippedCameraPrefixPaths };
+}
+
+/** Opt-in via `EMK_DEBUG_PATH_EXTRACTION` (same as other path extraction debug). */
+function debugPathAnalysis(message: string, details?: Record<string, unknown>): void {
+  pathExtractionDebugLog(
+    details != null
+      ? `[path-analysis][debug] ${message} ${JSON.stringify(details)}`
+      : `[path-analysis][debug] ${message}`,
+  );
 }
 
 export function folderContextFromResult(result: LlmPathResult): FolderLlmContext {
@@ -206,8 +216,16 @@ export function registerPathAnalysisHandlers(): void {
         : [folderPath];
       const imageEntries = await collectImageEntriesForFoldersWithProgress(folders);
       const paths = normalizePathList(imageEntries.map((e) => e.path));
+      debugPathAnalysis("request prepared", {
+        folderPath,
+        recursive,
+        folders: folders.length,
+        imageEntries: imageEntries.length,
+        uniquePaths: paths.length,
+      });
 
       await ensureCatalogForImagesWithProgress(paths);
+      debugPathAnalysis("catalog ensured", { folderPath, uniquePaths: paths.length });
 
       pathExtractionDebugLog(
         `[path-analysis] job prep: folders=${folders.length} imageEntries=${imageEntries.length} uniquePaths=${paths.length}`,
@@ -238,6 +256,7 @@ export function registerPathAnalysisHandlers(): void {
       pathExtractionDebugLog(
         `[path-analysis] using Ollama model "${ollamaModel}" (from /api/tags; same resolution as AI search query understanding)`,
       );
+      debugPathAnalysis("model resolved", { folderPath, model: ollamaModel });
 
       const jobId = randomUUID();
       const job: RunningPathAnalysisJob = {
@@ -246,6 +265,7 @@ export function registerPathAnalysisHandlers(): void {
       };
       job.powerSaveToken = acquirePowerSave(`path-analysis:${folderPath}`);
       runningPathAnalysisJobs.set(jobId, job);
+      debugPathAnalysis("job-started emit", { jobId, folderPath, total: paths.length });
 
       emitPathAnalysisProgress({
         type: "job-started",
@@ -259,6 +279,12 @@ export function registerPathAnalysisHandlers(): void {
       pathExtractionDebugLog(
         `[path-analysis] LLM inputs: folders=${foldersForLlm.length} filePaths=${pathsForFileLlm.length} skippedCameraPrefix=${skippedCameraPrefixPaths.length}`,
       );
+      debugPathAnalysis("llm inputs split", {
+        jobId,
+        foldersForLlm: foldersForLlm.length,
+        pathsForFileLlm: pathsForFileLlm.length,
+        skippedCameraPrefixPaths: skippedCameraPrefixPaths.length,
+      });
 
       void runPathAnalysisBackground(
         jobId,
@@ -310,25 +336,57 @@ async function runPathAnalysisBackground(
 
   try {
     const folderContextByFolder = new Map<string, FolderLlmContext>();
+    debugPathAnalysis("background started", {
+      jobId,
+      folderPath,
+      total,
+      foldersForLlm: foldersForLlm.length,
+      pathsForFileLlm: pathsForFileLlm.length,
+      skippedCameraPrefixPaths: skippedCameraPrefixPaths.length,
+      model,
+    });
     if (foldersForLlm.length > 0) {
+      debugPathAnalysis("folder-context llm phase started", { jobId, total: foldersForLlm.length });
       await analyzePathsWithLlmStreaming(
         foldersForLlm,
         model,
-        async ({ batchPaths, batchResults }) => {
+        async ({ batchPaths, batchResults, cumulativeProcessed, total: folderTotal }) => {
           const n = Math.min(batchPaths.length, batchResults.length);
           for (let i = 0; i < n; i++) {
             folderContextByFolder.set(batchPaths[i]!, folderContextFromResult(batchResults[i]!));
           }
+          const locationResults = batchResults.filter((result) => result.location != null).length;
+          debugPathAnalysis("folder-context batch completed", {
+            jobId,
+            batchPaths: batchPaths.length,
+            batchResults: batchResults.length,
+            locationResults,
+            cumulativeProcessed,
+            total: folderTotal,
+            storedContexts: folderContextByFolder.size,
+            cancelled: job.cancelled,
+          });
           return !job.cancelled;
         },
       );
+      debugPathAnalysis("folder-context llm phase completed", {
+        jobId,
+        storedContexts: folderContextByFolder.size,
+      });
     }
     if (job.cancelled) {
+      debugPathAnalysis("background stopped after folder context because job is cancelled", { jobId });
       return;
     }
 
-    await analyzePathsWithLlmStreaming(pathsForFileLlm, model, async ({ batchPaths, batchResults }) => {
+    if (pathsForFileLlm.length === 0) {
+      debugPathAnalysis("file llm phase skipped because no file paths require LLM", { jobId });
+    } else {
+      debugPathAnalysis("file llm phase started", { jobId, total: pathsForFileLlm.length });
+    }
+    await analyzePathsWithLlmStreaming(pathsForFileLlm, model, async ({ batchPaths, batchResults, cumulativeProcessed }) => {
       if (job.cancelled) {
+        debugPathAnalysis("file llm batch ignored because job is cancelled", { jobId });
         return false;
       }
       if (batchPaths.length !== batchResults.length) {
@@ -337,8 +395,21 @@ async function runPathAnalysisBackground(
         );
       }
       const n = Math.min(batchPaths.length, batchResults.length);
+      const locationResults = batchResults.filter((result) => result.location != null).length;
+      const dateResults = batchResults.filter((result) => result.date != null).length;
+      debugPathAnalysis("file llm batch received", {
+        jobId,
+        batchPaths: batchPaths.length,
+        batchResults: batchResults.length,
+        locationResults,
+        dateResults,
+        cumulativeProcessed,
+        processedBeforePersist: processed,
+        failedBeforePersist: failed,
+      });
       for (let i = 0; i < n; i++) {
         if (job.cancelled) {
+          debugPathAnalysis("persist loop stopped because job is cancelled", { jobId });
           return false;
         }
         const filePath = batchPaths[i];
@@ -380,11 +451,19 @@ async function runPathAnalysisBackground(
         processed,
         total,
       });
+      debugPathAnalysis("progress emitted after file batch", { jobId, processed, failed, total });
       return !job.cancelled;
     });
 
+    if (skippedCameraPrefixPaths.length > 0) {
+      debugPathAnalysis("camera-prefix fallback phase started", {
+        jobId,
+        skippedCameraPrefixPaths: skippedCameraPrefixPaths.length,
+      });
+    }
     for (const filePath of skippedCameraPrefixPaths) {
       if (job.cancelled) {
+        debugPathAnalysis("camera-prefix fallback stopped because job is cancelled", { jobId });
         return;
       }
       const folderContext = folderContextByFolder.get(path.dirname(filePath));
@@ -421,6 +500,7 @@ async function runPathAnalysisBackground(
         processed,
         total,
       });
+      debugPathAnalysis("progress emitted after camera-prefix fallback", { jobId, processed, failed, total });
     }
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -433,6 +513,7 @@ async function runPathAnalysisBackground(
     console.error(
       `[path-analysis] after LLM error: processed=${processed} failedBefore=${prevFailed} failedTotal=${failed} (job ${jobId})`,
     );
+    debugPathAnalysis("background caught error", { jobId, processed, failed, total, error: msg });
   } finally {
     if (job.powerSaveToken) {
       releasePowerSave(job.powerSaveToken);
@@ -440,6 +521,7 @@ async function runPathAnalysisBackground(
     }
 
     if (job.cancelled) {
+      debugPathAnalysis("job-cancelled emit", { jobId, folderPath, processed, failed, total });
       emitPathAnalysisProgress({
         type: "job-cancelled",
         jobId,
@@ -453,7 +535,17 @@ async function runPathAnalysisBackground(
         pathExtractionDebugLog(
           `[path-analysis][failure-samples] copy-paste below:\n${JSON.stringify(failureSamples, null, 2)}`,
         );
+        debugPathAnalysis("failure samples", { jobId, failureSamples });
       }
+      const geoCoverage = getFolderGeoCoverage({ folderPath, recursive: true });
+      debugPathAnalysis("geo coverage after completion", {
+        jobId,
+        imagesWithGps: geoCoverage.images.withGpsCount,
+        imagesWithoutGps: geoCoverage.images.withoutGpsCount,
+        pathLlmDone: geoCoverage.pathLlmLocationDetails?.doneCount ?? 0,
+        pathLlmTotalImages: geoCoverage.pathLlmLocationDetails?.totalImages ?? 0,
+      });
+      debugPathAnalysis("job-completed emit", { jobId, folderPath, total, processed, failed });
       emitPathAnalysisProgress({
         type: "job-completed",
         jobId,

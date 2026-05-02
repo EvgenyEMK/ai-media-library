@@ -1,11 +1,14 @@
 import { Brain, Image as ImageIcon, RotateCw, Search, Users, Video } from "lucide-react";
 import type { ReactElement } from "react";
 import type { FolderAiCoverageReport, FolderAiSummaryOverview } from "../../../shared/ipc";
+import { formatCoveragePercent, formatGroupedInt } from "../../lib/folder-ai-summary-formatters";
+import { getFolderAiPipelineQueueStatus } from "../../lib/folder-ai-pipeline-queue-status";
 import { UI_TEXT } from "../../lib/ui-text";
 import { useDesktopStore } from "../../stores/desktop-store";
 import type { SummaryPipelineKind } from "../../types/folder-ai-summary-types";
 import { LastDataScanCard, SummaryMediaCountCard } from "./SummaryMediaCountCard";
 import { SummaryGeoLocationCard } from "./SummaryGeoLocationCard";
+import type { SummaryMetricGridItem } from "./SummaryMetricGrid";
 import { SummaryPipelineCard } from "./SummaryPipelineCard";
 import { SummarySettingsCheckbox } from "./SummarySettingsCheckbox";
 import { pendingGeoCoverage, pendingOverview, pendingPipeline } from "./summary-card-formatters";
@@ -24,6 +27,10 @@ const pendingCoverage: FolderAiCoverageReport = {
     locationDetails: { doneCount: 0, totalWithGps: 0, label: "empty" },
   },
 };
+
+function SummaryCardGroup({ children }: { children: ReactElement | Array<ReactElement | null> | null }): ReactElement {
+  return <div className="flex flex-wrap gap-3">{children}</div>;
+}
 
 export interface FolderAiSummaryDashboardCardVisibility {
   imagesCount: boolean;
@@ -57,6 +64,12 @@ interface DesktopFolderAiSummaryDashboardProps {
   hasSubfolders?: boolean;
   actionPendingPipeline?: SummaryPipelineKind | null;
   onRunPipeline?: (pipeline: SummaryPipelineKind) => void;
+  actionPendingGeoLocation?: boolean;
+  geoQueueStatus?: ReturnType<typeof getFolderAiPipelineQueueStatus>;
+  onRunGeoLocation?: () => void;
+  onOpenPipelineInfo?: (pipeline: SummaryPipelineKind | "geo" | "folderScan") => void;
+  showInfoIcons?: boolean;
+  onViewRotationResults?: () => void;
   actionPendingFolderScan?: boolean;
   onRunFolderScan?: () => void;
   cardVisibility?: Partial<FolderAiSummaryDashboardCardVisibility>;
@@ -72,6 +85,12 @@ export function DesktopFolderAiSummaryDashboard({
   hasSubfolders = false,
   actionPendingPipeline = null,
   onRunPipeline,
+  actionPendingGeoLocation = false,
+  geoQueueStatus = null,
+  onRunGeoLocation,
+  onOpenPipelineInfo,
+  showInfoIcons = true,
+  onViewRotationResults,
   actionPendingFolderScan = false,
   onRunFolderScan,
   cardVisibility,
@@ -79,11 +98,34 @@ export function DesktopFolderAiSummaryDashboard({
   const outdatedAfterDays = useDesktopStore(
     (state) => state.folderScanningSettings.markFolderScanOutdatedAfterDays,
   );
+  const pipelineRunning = useDesktopStore((state) => state.pipelineRunning);
+  const pipelineQueued = useDesktopStore((state) => state.pipelineQueued);
   const visible = { ...DEFAULT_FOLDER_AI_SUMMARY_CARD_VISIBILITY, ...cardVisibility };
+  const faceExtraItems: SummaryMetricGridItem[] =
+    coverage.face.label === "not_done"
+      ? []
+      : [
+          {
+            label: "Images with faces",
+            value: `${formatCoveragePercent(coverage.face.imagesWithFacesCount ?? 0, Math.max(coverage.totalImages, 1))} (${formatGroupedInt(coverage.face.imagesWithFacesCount ?? 0)})`,
+          },
+          {
+            label: "Images with tagged faces",
+            value: `${formatCoveragePercent(coverage.face.imagesWithTaggedFacesCount ?? 0, Math.max(coverage.totalImages, 1))} (${formatGroupedInt(coverage.face.imagesWithTaggedFacesCount ?? 0)})`,
+          },
+        ];
   const showImagePipelineSection = visible.semantic || visible.face || visible.photo || visible.rotation;
+  const showFileScanMetadataSection = visible.lastDataScan || visible.geoLocation;
+  const queueStatusFor = (pipeline: SummaryPipelineKind) =>
+    getFolderAiPipelineQueueStatus({
+      running: pipelineRunning,
+      queued: pipelineQueued,
+      pipeline,
+      folderPath: coverage.folderPath,
+    });
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap gap-3">
+      <SummaryCardGroup>
         {visible.imagesCount ? (
           <SummaryMediaCountCard
             icon={ImageIcon}
@@ -100,24 +142,45 @@ export function DesktopFolderAiSummaryDashboard({
             loading={overviewLoading}
           />
         ) : null}
-        {visible.lastDataScan ? (
-          <LastDataScanCard
-            scanFreshness={overview.scanFreshness}
-            hasSubfolders={hasSubfolders}
-            loading={folderScanLoading}
-            actionPending={actionPendingFolderScan}
-            outdatedAfterDays={outdatedAfterDays}
-            onRunFolderScan={onRunFolderScan}
-          />
-        ) : null}
-      </div>
+      </SummaryCardGroup>
+
+      {showFileScanMetadataSection ? (
+        <section className="flex flex-col gap-3">
+          <h3 className="m-0 text-sm font-semibold text-muted-foreground">
+            {UI_TEXT.folderAiSummaryFileScanMetadataSection}
+          </h3>
+          <SummaryCardGroup>
+            {visible.lastDataScan ? (
+              <LastDataScanCard
+                scanFreshness={overview.scanFreshness}
+                hasSubfolders={hasSubfolders}
+                loading={folderScanLoading}
+                actionPending={actionPendingFolderScan}
+                outdatedAfterDays={outdatedAfterDays}
+                onRunFolderScan={onRunFolderScan}
+                onInfoClick={showInfoIcons && onOpenPipelineInfo ? () => onOpenPipelineInfo("folderScan") : undefined}
+              />
+            ) : null}
+            {visible.geoLocation ? (
+              <SummaryGeoLocationCard
+                coverage={coverage}
+                loading={coverageLoading}
+                actionPending={actionPendingGeoLocation}
+                queueStatus={geoQueueStatus}
+                onRunPipeline={onRunGeoLocation}
+                onInfoClick={showInfoIcons && onOpenPipelineInfo ? () => onOpenPipelineInfo("geo") : undefined}
+              />
+            ) : null}
+          </SummaryCardGroup>
+        </section>
+      ) : null}
 
       {showImagePipelineSection ? (
         <section className="flex flex-col gap-3">
           <h3 className="m-0 text-sm font-semibold text-muted-foreground">
             {UI_TEXT.folderAiSummaryDashboardImagesSection}
           </h3>
-          <div className="flex flex-wrap gap-3">
+          <SummaryCardGroup>
             {visible.semantic ? (
               <SummaryPipelineCard
                 icon={Search}
@@ -126,6 +189,7 @@ export function DesktopFolderAiSummaryDashboard({
                 actionPipeline="semantic"
                 loading={coverageLoading}
                 actionPending={actionPendingPipeline === "semantic"}
+                queueStatus={queueStatusFor("semantic")}
                 onRunPipeline={onRunPipeline}
               />
             ) : null}
@@ -137,7 +201,10 @@ export function DesktopFolderAiSummaryDashboard({
                 actionPipeline="face"
                 loading={coverageLoading}
                 actionPending={actionPendingPipeline === "face"}
+                queueStatus={queueStatusFor("face")}
                 onRunPipeline={onRunPipeline}
+                extraItems={faceExtraItems}
+                onInfoClick={showInfoIcons && onOpenPipelineInfo ? () => onOpenPipelineInfo("face") : undefined}
               />
             ) : null}
             {visible.photo ? (
@@ -148,6 +215,7 @@ export function DesktopFolderAiSummaryDashboard({
                 actionPipeline="photo"
                 loading={coverageLoading}
                 actionPending={actionPendingPipeline === "photo"}
+                queueStatus={queueStatusFor("photo")}
                 onRunPipeline={onRunPipeline}
               />
             ) : null}
@@ -159,21 +227,16 @@ export function DesktopFolderAiSummaryDashboard({
                 actionPipeline="rotation"
                 loading={coverageLoading}
                 actionPending={actionPendingPipeline === "rotation"}
+                queueStatus={queueStatusFor("rotation")}
                 onRunPipeline={onRunPipeline}
-                completedLabel="analyzed"
-                issueLabel="wrongly rotated"
+                completedLabel="Analyzed"
+                issueLabel="Wrongly rotated"
+                onInfoClick={showInfoIcons && onOpenPipelineInfo ? () => onOpenPipelineInfo("rotation") : undefined}
+                onViewClick={(coverage.rotation.issueCount ?? 0) > 0 ? onViewRotationResults : undefined}
+                viewTitle={UI_TEXT.folderAiSummaryRotationReviewOpen}
               />
             ) : null}
-          </div>
-        </section>
-      ) : null}
-
-      {visible.geoLocation ? (
-        <section className="flex flex-col gap-3" aria-label={UI_TEXT.folderAiSummaryDashboardPrototypeVariants}>
-          <h3 className="m-0 text-sm font-semibold text-muted-foreground">{UI_TEXT.folderAiSummaryGeoLocation}</h3>
-          <div className="flex flex-wrap gap-3">
-            <SummaryGeoLocationCard coverage={coverage} loading={coverageLoading} />
-          </div>
+          </SummaryCardGroup>
         </section>
       ) : null}
 

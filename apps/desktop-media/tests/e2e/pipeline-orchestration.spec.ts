@@ -77,13 +77,15 @@ test.describe("Pipeline orchestration — central scheduler", () => {
         ]),
       );
 
-      // The dock should now show the bundle under "Recently finished".
+      // The dock should now show the bundle under "Recently finished" (collapsed by default).
       const recentSection = mainWindow.getByLabel("Pipeline queue");
       await expect(recentSection).toBeVisible();
+      const completedToggle = recentSection.getByRole("button", { name: /Completed \(\d+\)/ });
+      await expect(completedToggle).toBeVisible();
+      await completedToggle.click();
       await expect(
         recentSection.getByText("Extract dates from filenames", { exact: true }),
       ).toBeVisible();
-      await expect(recentSection.getByText("Completed", { exact: true })).toBeVisible();
 
       // The final scheduler snapshot must show the bundle in `recent` and
       // empty `running` / `queued` arrays.
@@ -200,9 +202,13 @@ test.describe("Pipeline orchestration — chained bundle with output→input bin
         "gps-geocode",
       ]);
 
-      // The breadcrumb in the dock should display all three job ids.
+      // The breadcrumb in the dock should display all three job ids (expand Completed if needed).
       const recentSection = mainWindow.getByLabel("Pipeline queue");
       await expect(recentSection).toBeVisible();
+      const completedToggle = recentSection.getByRole("button", { name: /Completed \(\d+\)/ });
+      if (await completedToggle.isVisible()) {
+        await completedToggle.click();
+      }
       for (const pipeline of ["path-rule-extraction", "geocoder-init", "gps-geocode"]) {
         await expect(recentSection.getByText(pipeline).first()).toBeVisible();
       }

@@ -295,6 +295,62 @@ describe("PipelineScheduler", () => {
     await flushMicrotasks();
   });
 
+  it("rejects a duplicate folder job when the same pipeline is already running", async () => {
+    registerControllableDef({ id: "photo-analysis", group: "ollama" });
+    const sched = new PipelineScheduler();
+
+    const first = sched.enqueueBundle({
+      displayName: "first",
+      jobs: [{ pipelineId: "photo-analysis", params: { folderPath: "C:/Photos/Trip", recursive: true } }],
+    });
+    expect(first.ok).toBe(true);
+    await flushMicrotasks();
+
+    const duplicate = sched.enqueueBundle({
+      displayName: "duplicate",
+      jobs: [{ pipelineId: "photo-analysis", params: { folderPath: "C:/Photos/Trip", recursive: true } }],
+    });
+
+    expect(duplicate.ok).toBe(false);
+    if (!duplicate.ok) {
+      expect(duplicate.rejection.kind).toBe("duplicate-active-job");
+    }
+    expect(sched.getSnapshot().running).toHaveLength(1);
+    expect(sched.getSnapshot().queued).toHaveLength(0);
+  });
+
+  it("rejects a subfolder job covered by an already queued recursive job for the same pipeline", async () => {
+    registerControllableDef({ id: "semantic-index", group: "ollama" });
+    registerControllableDef({ id: "photo-analysis", group: "ollama" });
+    const sched = new PipelineScheduler();
+
+    sched.enqueueBundle({
+      displayName: "blocker",
+      jobs: [{ pipelineId: "semantic-index", params: { folderPath: "C:/Other", recursive: true } }],
+    });
+    const parent = sched.enqueueBundle({
+      displayName: "parent",
+      jobs: [{ pipelineId: "photo-analysis", params: { folderPath: "C:/Photos", recursive: true } }],
+    });
+    expect(parent.ok).toBe(true);
+    await flushMicrotasks();
+    expect(sched.getSnapshot().queued).toHaveLength(1);
+
+    const child = sched.enqueueBundle({
+      displayName: "child",
+      jobs: [{ pipelineId: "photo-analysis", params: { folderPath: "C:/Photos/Trip", recursive: true } }],
+    });
+
+    expect(child.ok).toBe(false);
+    if (!child.ok) {
+      if (child.rejection.kind !== "duplicate-active-job") {
+        throw new Error(`expected duplicate-active-job, got ${child.rejection.kind}`);
+      }
+      expect(child.rejection.existingFolderPath).toBe("C:/Photos");
+    }
+    expect(sched.getSnapshot().queued).toHaveLength(1);
+  });
+
   it("cancels a running bundle and aborts its job", async () => {
     let aborted = false;
     pipelineRegistry.register({

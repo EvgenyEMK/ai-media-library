@@ -38,13 +38,20 @@ function pipelineLabel(done: number, total: number): FolderAiPipelineLabel {
   return "partial";
 }
 
-function toPipelineCounts(done: number, failed: number, total: number, issueCount?: number): FolderAiPipelineCounts {
+function toPipelineCounts(
+  done: number,
+  failed: number,
+  total: number,
+  issueCount?: number,
+  extras?: Pick<FolderAiPipelineCounts, "imagesWithFacesCount" | "imagesWithTaggedFacesCount">,
+): FolderAiPipelineCounts {
   return {
     doneCount: done,
     failedCount: failed,
     totalImages: total,
-    label: pipelineLabel(done, total),
+    label: pipelineLabel(Math.min(done + failed, total), total),
     ...(typeof issueCount === "number" ? { issueCount } : {}),
+    ...(extras ?? {}),
   };
 }
 
@@ -82,18 +89,45 @@ export function getFolderAiCoverage(params: {
       SUM(CASE WHEN mi.photo_analysis_processed_at IS NOT NULL AND (mi.photo_analysis_failed_at IS NULL OR mi.photo_analysis_processed_at > mi.photo_analysis_failed_at) THEN 1 ELSE 0 END) AS photo_done,
       SUM(CASE WHEN mi.face_detection_processed_at IS NOT NULL AND (mi.face_detection_failed_at IS NULL OR mi.face_detection_processed_at > mi.face_detection_failed_at) THEN 1 ELSE 0 END) AS face_done,
       SUM(CASE WHEN me_img.embedding_status = 'ready' THEN 1 ELSE 0 END) AS semantic_done,
-      SUM(CASE WHEN json_extract(mi.ai_metadata, '$.orientation_detection') IS NOT NULL THEN 1 ELSE 0 END) AS rotation_done,
-      SUM(CASE WHEN CAST(json_extract(mi.ai_metadata, '$.orientation_detection.correction_angle_clockwise') AS INTEGER) IN (90, 180, 270) THEN 1 ELSE 0 END) AS rotation_wrong,
-      SUM(CASE WHEN json_extract(mi.ai_metadata, '$.orientation_detection_error') IS NOT NULL AND json_extract(mi.ai_metadata, '$.orientation_detection') IS NULL THEN 1 ELSE 0 END) AS rotation_failed,
+      SUM(CASE WHEN json_extract(mi.ai_metadata, '$.orientation_detection') IS NOT NULL
+        AND (
+          json_extract(mi.ai_metadata, '$.orientation_detection_error') IS NULL
+          OR json_extract(mi.ai_metadata, '$.orientation_detection.processed_at') > json_extract(mi.ai_metadata, '$.orientation_detection_error.failed_at')
+        )
+        THEN 1 ELSE 0 END) AS rotation_done,
+      SUM(CASE WHEN CAST(json_extract(mi.ai_metadata, '$.orientation_detection.correction_angle_clockwise') AS INTEGER) IN (90, 180, 270)
+        AND (
+          json_extract(mi.ai_metadata, '$.orientation_detection_error') IS NULL
+          OR json_extract(mi.ai_metadata, '$.orientation_detection.processed_at') > json_extract(mi.ai_metadata, '$.orientation_detection_error.failed_at')
+        )
+        THEN 1 ELSE 0 END) AS rotation_wrong,
+      SUM(CASE WHEN json_extract(mi.ai_metadata, '$.orientation_detection_error') IS NOT NULL
+        AND (
+          json_extract(mi.ai_metadata, '$.orientation_detection') IS NULL
+          OR json_extract(mi.ai_metadata, '$.orientation_detection_error.failed_at') >= json_extract(mi.ai_metadata, '$.orientation_detection.processed_at')
+        )
+        THEN 1 ELSE 0 END) AS rotation_failed,
       SUM(CASE WHEN mi.photo_analysis_failed_at IS NOT NULL AND (mi.photo_analysis_processed_at IS NULL OR mi.photo_analysis_failed_at >= mi.photo_analysis_processed_at) THEN 1 ELSE 0 END) AS photo_failed,
       SUM(CASE WHEN mi.face_detection_failed_at IS NOT NULL AND (mi.face_detection_processed_at IS NULL OR mi.face_detection_failed_at >= mi.face_detection_processed_at) THEN 1 ELSE 0 END) AS face_failed,
-      SUM(CASE WHEN me_img.embedding_status = 'failed' THEN 1 ELSE 0 END) AS semantic_failed
+      SUM(CASE WHEN me_img.embedding_status = 'failed' THEN 1 ELSE 0 END) AS semantic_failed,
+      SUM(CASE WHEN fi.has_faces = 1 THEN 1 ELSE 0 END) AS face_images_with_faces,
+      SUM(CASE WHEN fi.has_tagged_faces = 1 THEN 1 ELSE 0 END) AS face_images_with_tagged_faces
     FROM media_items mi
     LEFT JOIN media_embeddings me_img
       ON me_img.media_item_id = mi.id
       AND me_img.library_id = mi.library_id
       AND me_img.embedding_type = 'image'
       AND me_img.model_version = ?
+    LEFT JOIN (
+      SELECT
+        media_item_id,
+        1 AS has_faces,
+        MAX(CASE WHEN tag_id IS NOT NULL THEN 1 ELSE 0 END) AS has_tagged_faces
+      FROM media_face_instances
+      WHERE library_id = ?
+      GROUP BY media_item_id
+    ) fi
+      ON fi.media_item_id = mi.id
     WHERE mi.library_id = ?
       AND mi.deleted_at IS NULL
       AND ${imagePred}
@@ -103,7 +137,7 @@ export function getFolderAiCoverage(params: {
 
   const db = getDesktopDatabase();
   const stmt = db.prepare(sql);
-  const bindRecursive: unknown[] = [modelVersion, libraryId, likePattern];
+  const bindRecursive: unknown[] = [modelVersion, libraryId, libraryId, likePattern];
   if (!params.recursive) {
     bindRecursive.push(folderPrefix, sep);
   }
@@ -119,6 +153,8 @@ export function getFolderAiCoverage(params: {
     photo_failed: number | null;
     face_failed: number | null;
     semantic_failed: number | null;
+    face_images_with_faces: number | null;
+    face_images_with_tagged_faces: number | null;
   };
 
   const total = Number(row?.total ?? 0);
@@ -131,13 +167,18 @@ export function getFolderAiCoverage(params: {
   const photoFailed = Number(row?.photo_failed ?? 0);
   const faceFailed = Number(row?.face_failed ?? 0);
   const semanticFailed = Number(row?.semantic_failed ?? 0);
+  const faceImagesWithFaces = Number(row?.face_images_with_faces ?? 0);
+  const faceImagesWithTaggedFaces = Number(row?.face_images_with_tagged_faces ?? 0);
 
   return {
     folderPath,
     recursive: params.recursive,
     totalImages: total,
     photo: toPipelineCounts(photoDone, photoFailed, total),
-    face: toPipelineCounts(faceDone, faceFailed, total),
+    face: toPipelineCounts(faceDone, faceFailed, total, undefined, {
+      imagesWithFacesCount: faceImagesWithFaces,
+      imagesWithTaggedFacesCount: faceImagesWithTaggedFaces,
+    }),
     semantic: toPipelineCounts(semanticDone, semanticFailed, total),
     rotation: toPipelineCounts(rotationDone, rotationFailed, total, rotationWrong),
     geo: getFolderGeoCoverage({
@@ -161,6 +202,14 @@ function emptyReport(folderPath: string, recursive: boolean): FolderAiCoverageRe
       images: { total: 0, withGpsCount: 0, withoutGpsCount: 0, locationDetailsDoneCount: 0 },
       videos: { total: 0, withGpsCount: 0, withoutGpsCount: 0, locationDetailsDoneCount: 0 },
       locationDetails: { doneCount: 0, totalWithGps: 0, label: "empty" },
+      pathLlmLocationDetails: {
+        doneCount: 0,
+        totalImages: 0,
+        filesWithCountry: 0,
+        filesWithArea: 0,
+        filesWithCity: 0,
+        label: "empty",
+      },
     },
   };
 }
@@ -266,6 +315,14 @@ export function getFolderAiRollupsForPaths(
         images: { total, withGpsCount: 0, withoutGpsCount: total, locationDetailsDoneCount: 0 },
         videos: { total: 0, withGpsCount: 0, withoutGpsCount: 0, locationDetailsDoneCount: 0 },
         locationDetails: { doneCount: 0, totalWithGps: 0, label: "empty" },
+        pathLlmLocationDetails: {
+          doneCount: 0,
+          totalImages: total,
+          filesWithCountry: 0,
+          filesWithArea: 0,
+          filesWithCity: 0,
+          label: "not_done",
+        },
       },
     };
     out[trimmedPaths[i]] = folderCoverageToSidebarRollup(cov);

@@ -42,7 +42,10 @@ function emptyOverview(folderPath: string, recursive: boolean): FolderAiSummaryO
       scannedCount: 0,
       unscannedCount: 0,
       totalMedia: 0,
+      directSubfolderCount: 0,
       notFullyScannedDirectSubfolderCount: 0,
+      outdatedScannedFolderCount: 0,
+      scannedFolderCount: 0,
     },
   };
 }
@@ -75,7 +78,7 @@ export function getFolderSummaryOverview(params: {
       SUM(CASE WHEN mi.metadata_extracted_at IS NOT NULL THEN 1 ELSE 0 END) AS scanned_count,
       SUM(CASE WHEN mi.metadata_extracted_at IS NULL THEN 1 ELSE 0 END) AS unscanned_count,
       MIN(mi.metadata_extracted_at) AS oldest_metadata_extracted_at,
-      MAX(mi.metadata_extracted_at) AS last_metadata_extracted_at,
+      MAX(mi.file_mtime_ms) AS last_file_mtime_ms,
       (
         SELECT metadata_scanned_at
         FROM folder_analysis_status fas
@@ -114,7 +117,7 @@ export function getFolderSummaryOverview(params: {
     scanned_count: number | null;
     unscanned_count: number | null;
     oldest_metadata_extracted_at: string | null;
-    last_metadata_extracted_at: string | null;
+    last_file_mtime_ms: number | null;
     last_metadata_scan_completed_at: string | null;
     oldest_folder_scan_completed_at: string | null;
   };
@@ -133,12 +136,51 @@ export function getFolderSummaryOverview(params: {
       lastMetadataScanCompletedAt: row?.last_metadata_scan_completed_at ?? null,
       oldestFolderScanCompletedAt: row?.oldest_folder_scan_completed_at ?? row?.last_metadata_scan_completed_at ?? null,
       oldestMetadataExtractedAt: row?.oldest_metadata_extracted_at ?? null,
-      lastMetadataExtractedAt: row?.last_metadata_extracted_at ?? null,
+      lastMetadataExtractedAt: row?.last_file_mtime_ms ? new Date(row.last_file_mtime_ms).toISOString() : null,
       scannedCount,
       unscannedCount,
       totalMedia: scannedCount + unscannedCount,
+      directSubfolderCount: 0,
       notFullyScannedDirectSubfolderCount: 0,
+      outdatedScannedFolderCount: 0,
+      scannedFolderCount: 0,
     },
+  };
+}
+
+export function getFolderScanAgeSummary(params: {
+  folderPath: string;
+  olderThanIso: string;
+  libraryId?: string;
+}): {
+  outdatedScannedFolderCount: number;
+  scannedFolderCount: number;
+} {
+  const libraryId = params.libraryId ?? DEFAULT_LIBRARY_ID;
+  const folderPath = params.folderPath?.trim();
+  if (!folderPath) return { outdatedScannedFolderCount: 0, scannedFolderCount: 0 };
+
+  const sep = separatorForFolderPath(folderPath);
+  const folderPrefix = folderPath.endsWith(sep) ? folderPath : `${folderPath}${sep}`;
+  const likePattern = `${escapeLikePattern(folderPrefix)}%`;
+  const row = getDesktopDatabase()
+    .prepare(
+      `SELECT
+         COUNT(*) AS scanned_folder_count,
+         SUM(CASE WHEN metadata_scanned_at < ? THEN 1 ELSE 0 END) AS outdated_scanned_folder_count
+       FROM folder_analysis_status
+       WHERE library_id = ?
+         AND metadata_scanned_at IS NOT NULL
+         AND (folder_path = ? OR folder_path LIKE ? ESCAPE '~')`,
+    )
+    .get(params.olderThanIso, libraryId, folderPath, likePattern) as {
+    scanned_folder_count: number | null;
+    outdated_scanned_folder_count: number | null;
+  };
+
+  return {
+    outdatedScannedFolderCount: Number(row?.outdated_scanned_folder_count ?? 0),
+    scannedFolderCount: Number(row?.scanned_folder_count ?? 0),
   };
 }
 

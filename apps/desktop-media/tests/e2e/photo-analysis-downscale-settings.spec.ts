@@ -32,32 +32,14 @@ test.describe("AI image analysis LLM downscale settings", () => {
     electronApp,
     mainWindow,
   }) => {
-    await electronApp.evaluate(async ({ ipcMain, BrowserWindow }) => {
+    await electronApp.evaluate(async ({ ipcMain }) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (globalThis as any).__e2ePhotoAnalyzeRequests = [];
-      ipcMain.removeHandler("media:analyze-folder-photos");
-      ipcMain.handle("media:analyze-folder-photos", async (event, request) => {
-        const jobId = `e2e-photo-${Date.now()}`;
+      (globalThis as any).__e2ePipelinePhotoEnqueueRequests = [];
+      ipcMain.removeHandler("pipelines:enqueue-bundle");
+      ipcMain.handle("pipelines:enqueue-bundle", async (_event, request: unknown) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ((globalThis as any).__e2ePhotoAnalyzeRequests as unknown[]).push(request);
-        const bw = BrowserWindow.fromWebContents(event.sender);
-        bw?.webContents.send("media:photo-analysis-progress", {
-          type: "job-started",
-          jobId,
-          folderPath: request.folderPath,
-          total: 0,
-          items: [],
-        });
-        bw?.webContents.send("media:photo-analysis-progress", {
-          type: "job-completed",
-          jobId,
-          folderPath: request.folderPath,
-          completed: 0,
-          failed: 0,
-          cancelled: 0,
-          averageSecondsPerFile: 0,
-        });
-        return { jobId, total: 0 };
+        ((globalThis as any).__e2ePipelinePhotoEnqueueRequests as unknown[]).push(request);
+        return { ok: true, bundleId: `e2e-downscale-${Date.now()}` };
       });
     });
 
@@ -71,17 +53,9 @@ test.describe("AI image analysis LLM downscale settings", () => {
     const subAFolderButton = sidebar.getByRole("button", { name: "sub-a", exact: true });
 
     await mainWindow.evaluate(async (folderPath) => {
-      const { jobId } = await window.desktopApi.scanFolderMetadata({
+      await window.desktopApi.scanFolderMetadata({
         folderPath,
         recursive: true,
-      });
-      await new Promise<void>((resolve) => {
-        const unsubscribe = window.desktopApi.onMetadataScanProgress((event) => {
-          if (event.type === "job-completed" && event.jobId === jobId) {
-            unsubscribe();
-            resolve();
-          }
-        });
       });
     }, fixture.root);
     await mainWindow.getByRole("button", { name: "Close scan results" }).click();
@@ -96,20 +70,25 @@ test.describe("AI image analysis LLM downscale settings", () => {
       .poll(async () =>
         electronApp.evaluate(() => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          return ((globalThis as any).__e2ePhotoAnalyzeRequests ?? []) as unknown[];
+          return ((globalThis as any).__e2ePipelinePhotoEnqueueRequests ?? []) as unknown[];
         }),
       )
       .toHaveLength(1);
 
     let requests = await electronApp.evaluate(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return ((globalThis as any).__e2ePhotoAnalyzeRequests ?? []) as Array<{
-        downscaleBeforeLlm?: boolean;
-        downscaleLongestSidePx?: number;
+      return ((globalThis as any).__e2ePipelinePhotoEnqueueRequests ?? []) as Array<{
+        kind: string;
+        payload: {
+          pipelineId?: string;
+          params?: { downscaleBeforeLlm?: boolean; downscaleLongestSidePx?: number };
+        };
       }>;
     });
-    expect(requests[0]!.downscaleBeforeLlm).toBe(true);
-    expect(requests[0]!.downscaleLongestSidePx).toBe(1024);
+    expect(requests[0]!.kind).toBe("single-job");
+    expect(requests[0]!.payload.pipelineId).toBe("photo-analysis");
+    expect(requests[0]!.payload.params!.downscaleBeforeLlm).toBe(true);
+    expect(requests[0]!.payload.params!.downscaleLongestSidePx).toBe(1024);
 
     await mainWindow.getByText("Settings").click();
     const hideAdvancedSettingsCheckbox = mainWindow.getByRole("checkbox", {
@@ -140,17 +119,18 @@ test.describe("AI image analysis LLM downscale settings", () => {
       .poll(async () =>
         electronApp.evaluate(() => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          return ((globalThis as any).__e2ePhotoAnalyzeRequests ?? []) as unknown[];
+          return ((globalThis as any).__e2ePipelinePhotoEnqueueRequests ?? []) as unknown[];
         }),
       )
       .toHaveLength(2);
 
     requests = await electronApp.evaluate(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return ((globalThis as any).__e2ePhotoAnalyzeRequests ?? []) as Array<{
-        downscaleBeforeLlm?: boolean;
+      return ((globalThis as any).__e2ePipelinePhotoEnqueueRequests ?? []) as Array<{
+        kind: string;
+        payload: { params?: { downscaleBeforeLlm?: boolean } };
       }>;
     });
-    expect(requests[1]!.downscaleBeforeLlm).toBe(false);
+    expect(requests[1]!.payload.params!.downscaleBeforeLlm).toBe(false);
   });
 });

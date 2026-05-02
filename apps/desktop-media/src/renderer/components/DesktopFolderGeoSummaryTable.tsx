@@ -1,5 +1,9 @@
 import type { ReactElement } from "react";
-import type { FolderAiCoverageReport, FolderGeoMediaCoverage } from "../../shared/ipc";
+import type {
+  FolderAiCoverageReport,
+  FolderGeoMediaCoverage,
+  FolderGeoPathLlmCoverage,
+} from "../../shared/ipc";
 import { cn } from "../lib/cn";
 import {
   folderDisplayNameFromPath,
@@ -20,26 +24,69 @@ interface DesktopFolderGeoSummaryTableProps {
 const headerClass =
   "sticky top-[88px] z-[2] border-b border-border bg-[#151d2e] px-3 py-2.5 text-left text-sm font-semibold tracking-wide text-foreground shadow-[0_1px_0_#2a3040]";
 
-function GpsCoverageCell({ coverage }: { coverage: FolderGeoMediaCoverage }): ReactElement {
-  if (coverage.total === 0) {
+function CoverageBar({
+  title,
+  doneCount,
+  total,
+}: {
+  title: string;
+  doneCount: number;
+  total: number;
+}): ReactElement {
+  if (total === 0) {
+    return (
+      <div>
+        <div className="mb-1 font-semibold text-muted-foreground">{title} —</div>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <div className="mb-1 font-semibold text-muted-foreground">
+        {title} {formatCoveragePercent(doneCount, total)} ({formatGroupedInt(doneCount)})
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+        <div className="h-full rounded-full bg-muted-foreground" style={{ width: `${Math.min(100, (doneCount / total) * 100)}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function FileGpsCoverageCell({
+  images,
+  videos,
+}: {
+  images: FolderGeoMediaCoverage;
+  videos: FolderGeoMediaCoverage;
+}): ReactElement {
+  if (images.total + videos.total === 0) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+  return (
+    <div className="min-w-[220px] space-y-2 text-sm">
+      <CoverageBar title="Images" doneCount={images.withGpsCount} total={images.total} />
+      <CoverageBar title="Videos" doneCount={videos.withGpsCount} total={videos.total} />
+    </div>
+  );
+}
+
+function PathLlmCoverageCell({ detail }: { detail: FolderGeoPathLlmCoverage | undefined }): ReactElement {
+  const totalImages = detail?.totalImages ?? 0;
+  const doneCount = detail?.doneCount ?? 0;
+  if (totalImages === 0) {
     return <span className="text-muted-foreground">—</span>;
   }
   return (
     <div className="min-w-[190px] text-sm">
-      <div className="mb-1 font-semibold text-warning">
-        {formatCoveragePercent(coverage.withGpsCount, coverage.total)} GPS
+      <div className="mb-1 font-semibold text-muted-foreground">
+        {formatCoveragePercent(doneCount, totalImages)} ({formatGroupedInt(doneCount)})
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
-        <div
-          className="h-full rounded-full bg-warning"
-          style={{ width: `${Math.min(100, (coverage.withGpsCount / coverage.total) * 100)}%` }}
-        />
+        <div className="h-full rounded-full bg-muted-foreground" style={{ width: `${Math.min(100, (doneCount / totalImages) * 100)}%` }} />
       </div>
-      <div className="mt-1 grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-sm text-muted-foreground">
-        <span>{UI_TEXT.folderAiSummaryGpsWith}:</span>
-        <span className="text-left font-medium text-foreground">{formatGroupedInt(coverage.withGpsCount)}</span>
-        <span>{UI_TEXT.folderAiSummaryGpsWithout}:</span>
-        <span className="text-left font-medium text-foreground">{formatGroupedInt(coverage.withoutGpsCount)}</span>
+      <div className="mt-1.5 text-xs text-muted-foreground">
+        Files with Country: {formatGroupedInt(detail?.filesWithCountry ?? 0)}, Area: {formatGroupedInt(detail?.filesWithArea ?? 0)}, City:{" "}
+        {formatGroupedInt(detail?.filesWithCity ?? 0)}
       </div>
     </div>
   );
@@ -92,10 +139,10 @@ function GeoRow({
         <PipelineStatusCell pipeline={locationDetailsAsPipeline(coverage.geo.locationDetails)} />
       </td>
       <td className={cn("border-b border-border px-3 py-2.5 text-left align-top", noBottomBorder && "border-b-0")}>
-        <GpsCoverageCell coverage={coverage.geo.images} />
+        <FileGpsCoverageCell images={coverage.geo.images} videos={coverage.geo.videos} />
       </td>
       <td className={cn("border-b border-border px-3 py-2.5 text-left align-top", noBottomBorder && "border-b-0")}>
-        <GpsCoverageCell coverage={coverage.geo.videos} />
+        <PathLlmCoverageCell detail={coverage.geo.pathLlmLocationDetails} />
       </td>
     </tr>
   );
@@ -115,8 +162,8 @@ export function DesktopFolderGeoSummaryTable({
           <tr>
             <th className={headerClass}>{UI_TEXT.folderAiSummaryColumnFolder}</th>
             <th className={headerClass}>{UI_TEXT.folderAiSummaryColumnLocationDetails}</th>
-            <th className={headerClass}>{UI_TEXT.folderAiSummaryColumnImagesGps}</th>
-            <th className={headerClass}>{UI_TEXT.folderAiSummaryColumnVideosGps}</th>
+            <th className={headerClass}>{UI_TEXT.folderAiSummaryColumnFilesGps}</th>
+            <th className={headerClass}>{UI_TEXT.folderAiSummaryColumnPathLlmLocationDetails}</th>
           </tr>
         </thead>
         <tbody>

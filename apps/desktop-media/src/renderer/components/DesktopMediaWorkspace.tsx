@@ -1,4 +1,4 @@
-import { useCallback, type ReactElement, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useState, type ReactElement, type Dispatch, type SetStateAction } from "react";
 import { BarChart3 } from "lucide-react";
 import {
   ImageEditSuggestionsView,
@@ -19,16 +19,18 @@ import { DesktopMetadataManualScanResultPanel } from "./DesktopMetadataManualSca
 import { SemanticSearchPanel } from "./SemanticSearchPanel";
 import type { DesktopPipelineHandlers } from "../hooks/use-desktop-pipeline-handlers";
 import { useMediaItemStarRatingChange } from "../hooks/use-media-item-star-rating-change";
+import { useRotationReviewItems } from "../hooks/use-rotation-review-items";
 import { formatSemanticCosinePercent } from "../lib/format-semantic-similarity";
 import { MEDIA_PANE_EMPTY_STATE_CLASS } from "../lib/media-pane-ui";
 import { lookupMediaMetadataByItemId } from "../lib/media-metadata-lookup";
 import { UI_TEXT } from "../lib/ui-text";
 import type { DesktopMediaItemMetadata } from "../../shared/ipc";
 import { useDesktopStore, type DesktopStore, type DesktopStoreState } from "../stores/desktop-store";
-import type { MainPaneViewMode } from "../types/app-types";
+import type { MainPaneViewMode, RotationReviewScope } from "../types/app-types";
 
 /** Future: surface Adobe-style rejected (-1) in grid/list; kept off until pick/reject UX ships. */
 const STAR_RATING_SHOW_REJECTED_UI = false;
+const ROTATION_REVIEW_PAGE_SIZE = 24;
 
 function renderListThumbnail(
   imageUrl: string | null | undefined,
@@ -70,6 +72,9 @@ interface DesktopMediaWorkspaceProps {
   store: DesktopStore;
   mainPaneViewMode: MainPaneViewMode;
   setMainPaneViewMode: Dispatch<SetStateAction<MainPaneViewMode>>;
+  rotationReviewScope: RotationReviewScope | null;
+  setRotationReviewScope: Dispatch<SetStateAction<RotationReviewScope | null>>;
+  onOpenRotationReview: (folderPath: string, includeSubfolders: boolean) => void;
   selectedFolder: string | null;
   semanticPanelOpen: boolean;
   faceModelDownload: DesktopStoreState["faceModelDownload"];
@@ -94,6 +99,9 @@ export function DesktopMediaWorkspace({
   store,
   mainPaneViewMode,
   setMainPaneViewMode,
+  rotationReviewScope,
+  setRotationReviewScope,
+  onOpenRotationReview,
   selectedFolder,
   semanticPanelOpen,
   faceModelDownload,
@@ -122,6 +130,15 @@ export function DesktopMediaWorkspace({
   const selectedFolderChildrenCount = useDesktopStore((s) =>
     selectedFolder ? (s.childrenByPath[selectedFolder]?.length ?? 0) : 0,
   );
+  const [rotationReviewPage, setRotationReviewPage] = useState(1);
+  const rotationReviewItems = useRotationReviewItems(
+    rotationReviewScope,
+    rotationReviewPage,
+    ROTATION_REVIEW_PAGE_SIZE,
+  );
+  useEffect(() => {
+    setRotationReviewPage(1);
+  }, [rotationReviewScope?.folderPath, rotationReviewScope?.includeSubfolders]);
   const commitStarRating = useMediaItemStarRatingChange();
   const onStarRatingChangeForPath = useCallback(
     (path: string) => (next: number) => {
@@ -159,6 +176,24 @@ export function DesktopMediaWorkspace({
       });
     },
     [filteredMediaItems, store],
+  );
+  const openRotationReviewItemInViewer = useCallback(
+    (item: ImageEditSuggestionsItem): void => {
+      if (!item.imageUrl) return;
+      store.getState().openViewer(0, "folder", {
+        itemListOverride: [
+          {
+            id: item.id,
+            sourcePath: item.id,
+            title: item.title,
+            storage_url: item.imageUrl,
+            thumbnail_url: item.imageUrl,
+            mediaType: "image",
+          },
+        ],
+      });
+    },
+    [store],
   );
   const showEmptyFolderSummaryCta =
     Boolean(selectedFolder) &&
@@ -203,11 +238,51 @@ export function DesktopMediaWorkspace({
       ) : (
       <div className="min-h-0 flex-1 overflow-auto">
         {mainPaneViewMode === "imageEditSuggestions" ? (
-          <ImageEditSuggestionsView
-            hasFolderSelected={Boolean(selectedFolder)}
-            items={imageEditSuggestionItems}
-            onBackToPhotos={() => setMainPaneViewMode("media")}
-          />
+          rotationReviewScope ? (
+            <ImageEditSuggestionsView
+              hasFolderSelected
+              variant="rotationReview"
+              title="Wrongly rotated images"
+              suggestedSummaryLabel="Wrongly rotated images"
+              noSuggestionsMessage="No wrongly rotated images found for this folder."
+              applyChangesNote="Review only - apply/save coming soon."
+              items={rotationReviewItems.items}
+              loading={rotationReviewItems.loading}
+              error={rotationReviewItems.error}
+              pagination={{
+                page: rotationReviewPage,
+                pageSize: ROTATION_REVIEW_PAGE_SIZE,
+                total: rotationReviewItems.total,
+                onPageChange: setRotationReviewPage,
+              }}
+              headerExtra={
+                <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={rotationReviewScope.includeSubfolders}
+                    onChange={(event) =>
+                      setRotationReviewScope({
+                        folderPath: rotationReviewScope.folderPath,
+                        includeSubfolders: event.currentTarget.checked,
+                      })
+                    }
+                  />
+                  <span>Include subfolders</span>
+                </label>
+              }
+              onOriginalImageClick={openRotationReviewItemInViewer}
+              onBackToPhotos={() => {
+                setRotationReviewScope(null);
+                setMainPaneViewMode("media");
+              }}
+            />
+          ) : (
+            <ImageEditSuggestionsView
+              hasFolderSelected={Boolean(selectedFolder)}
+              items={imageEditSuggestionItems}
+              onBackToPhotos={() => setMainPaneViewMode("media")}
+            />
+          )
         ) : mainPaneViewMode === "folderAiSummary" && selectedFolder ? (
           <DesktopFolderAiSummaryView
             folderPath={selectedFolder}
@@ -222,6 +297,7 @@ export function DesktopMediaWorkspace({
               pipeline.handleAnalyzePhotos(folderPath, recursive, overrideExisting)
             }
             onOpenFolderSummary={handleOpenFolderAiSummary}
+            onOpenRotationReview={onOpenRotationReview}
           />
         ) : (
           <>

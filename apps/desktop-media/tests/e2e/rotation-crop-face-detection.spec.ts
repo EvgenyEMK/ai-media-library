@@ -44,7 +44,6 @@ async function detectFaceCount(
 ): Promise<{ faceCount: number; orientationAngle: number | null; orientationSource: string | null }> {
   const result = await mainWindow.evaluate(async ({ model, imagePath }) => {
     const settings = await window.desktopApi.getSettings();
-    await window.desktopApi.ensureDetectorModel(model);
     await window.desktopApi.ensureAuxModel(
       "orientation",
       settings.faceDetection.imageOrientationDetection.model,
@@ -61,6 +60,16 @@ async function detectFaceCount(
         detectorModel: model,
       },
     });
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const ensured = await window.desktopApi.ensureDetectorModel(model);
+      if (ensured.success) {
+        break;
+      }
+      if (attempt === 2) {
+        throw new Error(`ensureDetectorModel(${model}): ${ensured.error ?? "unknown"}`);
+      }
+      await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+    }
     const run = await window.desktopApi.detectFacesForMediaItem(imagePath, {
       ...settings.faceDetection,
       detectorModel: model,

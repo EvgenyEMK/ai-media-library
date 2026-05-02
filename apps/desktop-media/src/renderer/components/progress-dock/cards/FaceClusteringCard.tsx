@@ -5,6 +5,7 @@ import { formatCount, formatCountRatio } from "../../../lib/progress-stats-forma
 import type { DesktopStore } from "../../../stores/desktop-store";
 import { ProgressDockCloseButton } from "../ProgressDockCloseButton";
 import { useProgressEta } from "./use-progress-eta";
+import { ProgressCardBody } from "./ProgressCardBody";
 
 interface FaceClusteringCardProps {
   store: DesktopStore;
@@ -43,62 +44,45 @@ export function FaceClusteringCard({
     processed: faceClusteringProcessed,
     total: faceClusteringTotal,
   });
+  const progressPercent = faceClusteringProgressPercent;
+  const statsText = `${faceClusteringPhaseLabel} ${formatCountRatio(
+    faceClusteringProcessed,
+    faceClusteringTotal,
+  )}${faceClusteringTotalFaces > 0 && faceClusteringPhase === "loading" ? ` | Faces: ${formatCount(faceClusteringTotalFaces)}` : ""}`;
+  const rightText = faceClusteringTimeLeftText
+    ? `${UI_TEXT.analysisTimeLeftLabel}: ${faceClusteringTimeLeftText}`
+    : null;
+  const footer =
+    !isFaceClusteringRunning && faceClusteringStatus === "completed" && faceClusteringClusterCount !== null
+      ? `Done: ${formatCount(faceClusteringClusterCount)} group${faceClusteringClusterCount === 1 ? "" : "s"}`
+      : !isFaceClusteringRunning && faceClusteringStatus === "cancelled"
+        ? "Cancelled."
+        : null;
 
   return (
-    <section className="m-0 rounded-lg border border-border px-2.5 py-2">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="m-0 min-w-0 flex-1 text-sm">{UI_TEXT.faceClusteringPanelTitle}</h2>
-        <div className="flex items-center gap-2">
-          <ProgressDockCloseButton
-            title={isFaceClusteringRunning ? UI_TEXT.faceClusteringCancel : UI_TEXT.faceClusteringClose}
-            ariaLabel={isFaceClusteringRunning ? UI_TEXT.faceClusteringCancel : UI_TEXT.faceClusteringClose}
-            disabled={isFaceClusteringRunning && !faceClusteringJobId}
-            onClick={() => {
-              if (isFaceClusteringRunning) {
-                onCancelFaceClustering();
-              }
-              store.getState().setFaceClusteringPanelVisible(false);
-              store.getState().resetFaceClustering();
-            }}
-          />
-        </div>
-      </div>
-      {faceClusteringError ? (
-        <div className="mt-2 rounded-lg border border-red-900/60 bg-red-950/40 px-2.5 py-2 text-sm text-red-200">
-          {faceClusteringError}
-        </div>
-      ) : null}
-      {isFaceClusteringRunning ? (
-        <div className="mt-2 flex flex-col gap-2 overflow-auto">
-          <div className="h-2 w-full overflow-hidden rounded-full bg-[#20293d]" aria-label="Face grouping progress">
-            <div
-              className="h-full bg-[#79d7a4] transition-[width] duration-100 ease-linear"
-              style={{ width: `${faceClusteringProgressPercent}%` }}
-            />
-          </div>
-          <div className="text-xs text-muted-foreground">
-            <div className="flex items-center justify-between gap-2">
-              <span>
-                {`${faceClusteringPhaseLabel} ${formatCountRatio(faceClusteringProcessed, faceClusteringTotal)}`}
-                {faceClusteringTotalFaces > 0 && faceClusteringPhase === "loading"
-                  ? ` | ${formatCount(faceClusteringTotalFaces)} faces`
-                  : ""}
-              </span>
-              {faceClusteringTimeLeftText ? (
-                <span className="shrink-0">
-                  {UI_TEXT.analysisTimeLeftLabel}: {faceClusteringTimeLeftText}
-                </span>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      ) : faceClusteringStatus === "completed" && faceClusteringClusterCount !== null ? (
-        <div className="text-xs text-muted-foreground">
-          {`Done: ${formatCount(faceClusteringClusterCount)} group${faceClusteringClusterCount === 1 ? "" : "s"}`}
-        </div>
-      ) : faceClusteringStatus === "cancelled" ? (
-        <div className="text-xs text-muted-foreground">Cancelled.</div>
-      ) : null}
-    </section>
+    <ProgressCardBody
+      title={UI_TEXT.faceClusteringPanelTitle}
+      action={
+        <ProgressDockCloseButton
+          title={isFaceClusteringRunning ? UI_TEXT.faceClusteringCancel : UI_TEXT.faceClusteringClose}
+          ariaLabel={isFaceClusteringRunning ? UI_TEXT.faceClusteringCancel : UI_TEXT.faceClusteringClose}
+          disabled={isFaceClusteringRunning && !faceClusteringJobId}
+          onClick={() => {
+            if (isFaceClusteringRunning) {
+              onCancelFaceClustering();
+            }
+            store.getState().setFaceClusteringPanelVisible(false);
+            store.getState().resetFaceClustering();
+          }}
+        />
+      }
+      progressPercent={progressPercent}
+      ariaLabel="Face grouping progress"
+      statsText={statsText}
+      rightText={rightText}
+      error={faceClusteringError}
+      showProgress={isFaceClusteringRunning}
+      footer={footer}
+    />
   );
 }

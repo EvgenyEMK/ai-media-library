@@ -1,12 +1,15 @@
-import { ListChecks, Play } from "lucide-react";
+import { Check, CircleDashed, ListChecks, Play } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useState, type ReactElement } from "react";
+import type { ReactElement } from "react";
 import type { FolderScanFreshness } from "../../../shared/ipc";
 import { cn } from "../../lib/cn";
-import { formatGroupedInt } from "../../lib/folder-ai-summary-formatters";
+import { formatCoveragePercent, formatGroupedInt } from "../../lib/folder-ai-summary-formatters";
 import { UI_TEXT } from "../../lib/ui-text";
+import { SummaryActionCard } from "./SummaryActionCard";
+import { SummaryMetricGrid, type SummaryMetricGridItem } from "./SummaryMetricGrid";
 import { PendingSpinner } from "./SummaryStatusGlyph";
 import { formatOldestScanLabel } from "./summary-card-formatters";
+import type { SummaryStatusTone } from "./summary-card-types";
 
 export function SummaryMediaCountCard({
   icon: Icon,
@@ -20,7 +23,7 @@ export function SummaryMediaCountCard({
   loading?: boolean;
 }): ReactElement {
   return (
-    <section className="flex min-w-[220px] flex-1 items-center rounded-xl border border-border bg-card px-4 py-4 shadow-sm">
+    <section className="flex min-w-[450px] flex-1 items-center rounded-xl border border-border bg-card px-4 py-4 shadow-sm">
       <div className="flex items-center gap-4">
         <Icon size={80} className="shrink-0 text-foreground" aria-hidden="true" />
         <div>
@@ -41,6 +44,7 @@ export function LastDataScanCard({
   actionPending = false,
   outdatedAfterDays = 7,
   onRunFolderScan,
+  onInfoClick,
 }: {
   scanFreshness: FolderScanFreshness;
   hasSubfolders: boolean;
@@ -48,11 +52,13 @@ export function LastDataScanCard({
   actionPending?: boolean;
   outdatedAfterDays?: number;
   onRunFolderScan?: () => void;
+  onInfoClick?: () => void;
 }): ReactElement {
-  const [showHelp, setShowHelp] = useState(false);
-  const folderScan = formatOldestScanLabel(scanFreshness.oldestFolderScanCompletedAt);
   const lastDataChange = formatOldestScanLabel(scanFreshness.lastMetadataExtractedAt);
+  const directSubfolders = scanFreshness.directSubfolderCount;
   const notScanned = scanFreshness.notFullyScannedDirectSubfolderCount;
+  const outdatedScannedFolders = scanFreshness.outdatedScannedFolderCount;
+  const scannedFolders = scanFreshness.scannedFolderCount;
   const title = hasSubfolders ? UI_TEXT.folderAiSummaryFolderTreeScanTitle : UI_TEXT.folderAiSummaryFolderScanTitle;
   const oldestScanMs = scanFreshness.oldestFolderScanCompletedAt
     ? new Date(scanFreshness.oldestFolderScanCompletedAt).getTime()
@@ -61,68 +67,76 @@ export function LastDataScanCard({
     oldestScanMs !== null &&
     Number.isFinite(oldestScanMs) &&
     Date.now() - oldestScanMs > outdatedAfterDays * 24 * 60 * 60 * 1000;
-  const toneClass = notScanned > 0
-    ? "border-destructive"
-    : isOutdated
-      ? "border-warning/70"
-      : "border-border";
   const playToneClass = notScanned > 0
     ? "text-destructive hover:text-destructive"
-    : isOutdated
+    : isOutdated || outdatedScannedFolders > 0
       ? "text-warning hover:text-warning"
-      : "text-border hover:text-success";
+      : "text-muted-foreground hover:text-foreground";
+  const scanTone: SummaryStatusTone = notScanned > 0 ? "red" : outdatedScannedFolders > 0 || isOutdated ? "amber" : "green";
+  const scannedDirectSubfolders = Math.max(directSubfolders - notScanned, 0);
+  const scanPercent =
+    scanTone === "red"
+      ? formatCoveragePercent(scannedDirectSubfolders, Math.max(directSubfolders, 1))
+      : scanTone === "amber"
+        ? formatCoveragePercent(outdatedScannedFolders, Math.max(scannedFolders, 1))
+        : null;
+  const outdatedPercent = scannedFolders > 0
+    ? formatCoveragePercent(outdatedScannedFolders, scannedFolders)
+    : "0%";
+  const metricItems: SummaryMetricGridItem[] = [];
+  if (notScanned > 0) {
+    metricItems.push({
+      label: "Not scanned direct subfolders",
+      value: formatGroupedInt(notScanned),
+      valueClassName: "text-destructive",
+    });
+  }
+  if (outdatedScannedFolders > 0) {
+    metricItems.push({
+      label: `Outdated scan (>${formatGroupedInt(outdatedAfterDays)} days):`,
+      value: `${formatGroupedInt(outdatedScannedFolders)} (${outdatedPercent})`,
+      valueClassName: "text-warning",
+    });
+  }
+  metricItems.push({ label: "Last file change", value: lastDataChange });
+
+  const actionSlot = onRunFolderScan ? (
+    <button
+      type="button"
+      className={cn("inline-flex h-10 w-10 shrink-0 appearance-none items-center justify-center border-0 bg-transparent p-0 shadow-none outline-none ring-0 transition-all duration-150 ease-out hover:scale-125 disabled:cursor-not-allowed disabled:opacity-50", playToneClass)}
+      title="Run folder scan"
+      aria-label={`Run ${title}`}
+      disabled={actionPending}
+      onClick={onRunFolderScan}
+    >
+      <Play size={25} aria-hidden="true" />
+    </button>
+  ) : undefined;
+
   return (
-    <section className={cn("relative min-w-[300px] flex-1 rounded-xl border bg-card px-4 py-4 shadow-sm", toneClass)}>
-      <div className="grid h-full grid-cols-[72px_minmax(0,1fr)] gap-x-4">
-        <div className="flex h-full items-center justify-center">
-          <ListChecks size={56} className="text-foreground" aria-hidden="true" />
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h3 className="m-0 text-[1.65rem] font-semibold leading-tight text-foreground">{title}</h3>
-            <button
-              type="button"
-              aria-label={`Show help for ${title}`}
-              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border bg-transparent p-0 text-sm text-muted-foreground shadow-none"
-              onClick={() => setShowHelp((value) => !value)}
-            >
-              ?
-            </button>
-          </div>
-          {showHelp ? (
-            <div className="absolute left-4 right-4 top-16 z-10 rounded-lg border border-border bg-popover p-3 text-sm leading-5 text-popover-foreground shadow-lg">
-              {UI_TEXT.folderAiSummaryFolderScanHelp}
-            </div>
-          ) : null}
+    <SummaryActionCard
+      icon={ListChecks}
+      title={title}
+      tone={scanTone}
+      titleClassName="text-[1.65rem]"
+      statusSlot={
+        <>
           {loading ? (
-            <div className="mt-3 flex min-h-10 items-center">
-              <PendingSpinner className="h-8 w-8" />
-            </div>
+            <PendingSpinner className="h-8 w-8" />
+          ) : scanTone === "green" ? (
+            <Check size={34} className="text-success" aria-hidden="true" />
           ) : (
-            <div className="mt-3 flex items-start justify-between gap-3">
-              <div className="grid gap-1 text-sm text-muted-foreground">
-                <span>Oldest scan: {folderScan}</span>
-                {notScanned > 0 ? (
-                  <span className="text-destructive">Not scanned: {formatGroupedInt(notScanned)}</span>
-                ) : null}
-                <span>Last data change: {lastDataChange}</span>
-              </div>
-              {onRunFolderScan ? (
-                <button
-                  type="button"
-                  className={cn("inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-transparent p-0 shadow-none hover:border-current disabled:cursor-not-allowed disabled:opacity-50", playToneClass)}
-                  title="Run folder scan"
-                  aria-label={`Run ${title}`}
-                  disabled={actionPending}
-                  onClick={onRunFolderScan}
-                >
-                  <Play size={16} aria-hidden="true" />
-                </button>
-              ) : null}
-            </div>
+            <span className={cn("inline-flex items-center gap-2", scanTone === "red" ? "text-destructive" : "text-warning")}>
+              <CircleDashed size={28} aria-hidden="true" />
+              <span className="text-2xl font-semibold leading-none">{scanPercent}</span>
+            </span>
           )}
-        </div>
-      </div>
-    </section>
+        </>
+      }
+      actionSlot={actionSlot}
+      onInfoClick={onInfoClick}
+    >
+      {loading ? null : <SummaryMetricGrid items={metricItems} />}
+    </SummaryActionCard>
   );
 }

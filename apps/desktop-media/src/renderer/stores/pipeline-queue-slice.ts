@@ -27,6 +27,8 @@ export interface PipelineQueueSlice {
   pipelineQueued: BundleView[];
   /** Bundles in a terminal state, capped to the dock's display window. */
   pipelineRecent: BundleView[];
+  /** Recently-finished bundle ids explicitly dismissed from the dock UI. */
+  dismissedRecentBundleIds: string[];
   /** Last several lifecycle events (newest first). Capped to ~10 entries. */
   pipelineLifecycleLog: PipelineLifecycleEvent[];
 
@@ -40,6 +42,8 @@ export interface PipelineQueueSlice {
   ) => void;
   /** Append a lifecycle event. */
   appendPipelineLifecycle: (event: PipelineLifecycleEvent) => void;
+  /** Hide one recent bundle row from the dock. */
+  dismissRecentBundle: (bundleId: string) => void;
   /** Clear the lifecycle log (used after a manual "dismiss"). */
   clearPipelineLifecycleLog: () => void;
 }
@@ -53,13 +57,16 @@ export const createPipelineQueueSlice: StateCreator<
   pipelineRunning: [],
   pipelineQueued: [],
   pipelineRecent: [],
+  dismissedRecentBundleIds: [],
   pipelineLifecycleLog: [],
 
   setPipelineQueueSnapshot: (snapshot) =>
     set((state) => {
       state.pipelineRunning = snapshot.running;
       state.pipelineQueued = snapshot.queued;
-      state.pipelineRecent = snapshot.recent;
+      state.pipelineRecent = snapshot.recent.filter(
+        (bundle) => !state.dismissedRecentBundleIds.includes(bundle.bundleId),
+      );
     }),
 
   patchJobProgress: (bundleId, jobId, progress) =>
@@ -84,6 +91,14 @@ export const createPipelineQueueSlice: StateCreator<
       if (state.pipelineLifecycleLog.length > LIFECYCLE_LOG_LIMIT) {
         state.pipelineLifecycleLog.length = LIFECYCLE_LOG_LIMIT;
       }
+    }),
+
+  dismissRecentBundle: (bundleId) =>
+    set((state) => {
+      if (!state.dismissedRecentBundleIds.includes(bundleId)) {
+        state.dismissedRecentBundleIds.push(bundleId);
+      }
+      state.pipelineRecent = state.pipelineRecent.filter((bundle) => bundle.bundleId !== bundleId);
     }),
 
   clearPipelineLifecycleLog: () =>

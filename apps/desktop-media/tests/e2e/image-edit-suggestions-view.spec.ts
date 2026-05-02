@@ -21,12 +21,16 @@ test.describe("Image edit suggestions metadata", () => {
     test.skip(!fs.existsSync(path.join(e2ePhotosDir, ROTATED_ASSET)), `Missing ${ROTATED_ASSET}`);
     const rotatedPath = path.join(e2ePhotosDir, ROTATED_ASSET);
 
-    await mainWindow.evaluate(async () => {
+    const faceDetectionForDetect = await mainWindow.evaluate(async () => {
       const settings = await window.desktopApi.getSettings();
       await window.desktopApi.ensureAuxModel(
         "orientation",
         settings.faceDetection.imageOrientationDetection.model,
       );
+      const faceDetection = {
+        ...settings.faceDetection,
+        detectorModel: "yolov12s-face" as const,
+      };
       await window.desktopApi.saveSettings({
         ...settings,
         wrongImageRotationDetection: {
@@ -34,12 +38,13 @@ test.describe("Image edit suggestions metadata", () => {
           enabled: true,
           useFaceLandmarkFeaturesFallback: true,
         },
-        faceDetection: {
-          ...settings.faceDetection,
-          detectorModel: "yolov12s-face",
-        },
+        faceDetection,
       });
-      await window.desktopApi.ensureDetectorModel("yolov12s-face");
+      const ensured = await window.desktopApi.ensureDetectorModel("yolov12s-face");
+      if (!ensured.success) {
+        throw new Error(`ensureDetectorModel(yolov12s-face): ${ensured.error ?? "unknown"}`);
+      }
+      return faceDetection;
     });
 
     await mockFolderDialog(electronApp, e2ePhotosDir);
@@ -48,8 +53,9 @@ test.describe("Image edit suggestions metadata", () => {
     await mainWindow.waitForTimeout(2_000);
 
     const detectResult = await mainWindow.evaluate(
-      async (sourcePath) => window.desktopApi.detectFacesForMediaItem(sourcePath),
-      rotatedPath,
+      async ({ sourcePath, faceDetection }) =>
+        window.desktopApi.detectFacesForMediaItem(sourcePath, faceDetection),
+      { sourcePath: rotatedPath, faceDetection: faceDetectionForDetect },
     );
     expect(detectResult.success).toBe(true);
 

@@ -171,6 +171,7 @@ export const IPC_CHANNELS = {
   getFolderAiSummaryReport: "media:get-folder-ai-summary-report",
   getFolderFaceSummaryReport: "media:get-folder-face-summary-report",
   getFolderAiFailedFiles: "media:get-folder-ai-failed-files",
+  getFolderAiWronglyRotatedImages: "media:get-folder-ai-wrongly-rotated-images",
   getFolderAiCoverage: "media:get-folder-ai-coverage",
   getFolderAiRollupsBatch: "media:get-folder-ai-rollups-batch",
   detectFolderImageRotation: "media:detect-folder-image-rotation",
@@ -809,6 +810,8 @@ export interface FolderAiPipelineCounts {
   totalImages: number;
   label: FolderAiPipelineLabel;
   issueCount?: number;
+  imagesWithFacesCount?: number;
+  imagesWithTaggedFacesCount?: number;
 }
 
 export interface FolderGeoMediaCoverage {
@@ -824,10 +827,23 @@ export interface FolderGeoLocationDetailsCoverage {
   label: FolderAiPipelineLabel;
 }
 
+export interface FolderGeoPathLlmCoverage {
+  doneCount: number;
+  totalImages: number;
+  /** Images with non-null path_llm `country` or `country_code` in `ai_metadata.locations_by_source`. */
+  filesWithCountry: number;
+  /** Images with non-null path_llm area in `ai_metadata.locations_by_source`. */
+  filesWithArea: number;
+  /** Images with non-null path_llm city in `ai_metadata.locations_by_source`. */
+  filesWithCity: number;
+  label: FolderAiPipelineLabel;
+}
+
 export interface FolderGeoCoverageReport {
   images: FolderGeoMediaCoverage;
   videos: FolderGeoMediaCoverage;
   locationDetails: FolderGeoLocationDetailsCoverage;
+  pathLlmLocationDetails?: FolderGeoPathLlmCoverage;
 }
 
 export interface FolderAiCoverageReport {
@@ -915,7 +931,10 @@ export interface FolderScanFreshness {
   scannedCount: number;
   unscannedCount: number;
   totalMedia: number;
+  directSubfolderCount: number;
   notFullyScannedDirectSubfolderCount: number;
+  outdatedScannedFolderCount: number;
+  scannedFolderCount: number;
 }
 
 export interface FolderAiSummaryOverview {
@@ -944,7 +963,10 @@ export interface FolderAiSummaryOverviewRequestOptions {
 
 export interface FolderTreeScanSummary {
   hasDirectSubfolders: boolean;
+  directSubfolderCount: number;
   notFullyScannedDirectSubfolderCount: number;
+  outdatedScannedFolderCount: number;
+  scannedFolderCount: number;
 }
 
 export type ImageRotationProgressEvent =
@@ -1001,6 +1023,30 @@ export interface FolderAiFailedFileItem {
   mediaKind: MediaKind;
   failedAt: string | null;
   error: string | null;
+}
+
+export interface FolderAiWronglyRotatedImagesPageRequest {
+  folderPath: string;
+  recursive: boolean;
+  page: number;
+  pageSize: number;
+}
+
+export interface FolderAiWronglyRotatedImageItem {
+  id: string;
+  sourcePath: string;
+  name: string;
+  imageUrl: string;
+  folderPathRelative: string | null;
+  rotationAngleClockwise: 90 | 180 | 270;
+  cropRel: RelativeCropBox | null;
+}
+
+export interface FolderAiWronglyRotatedImagesPageResult {
+  items: FolderAiWronglyRotatedImageItem[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface PhotoAnalysisModelInfo {
@@ -1443,6 +1489,10 @@ export type GeocoderInitStatus = "idle" | "downloading" | "loading-cache" | "par
 export type GeocoderInitProgressEvent = {
   status: GeocoderInitStatus;
   error?: string;
+  /** Download/indexing progress percent when available. */
+  progressPercent?: number;
+  /** Optional user-facing progress detail (e.g. downloaded datasets). */
+  progressLabel?: string;
 };
 
 export interface GeocoderCacheStatus {
@@ -1812,7 +1862,7 @@ export interface DesktopApi {
     folderPath: string,
     options?: FolderAiSummaryOverviewRequestOptions,
   ) => Promise<FolderAiSummaryOverviewReport>;
-  getFolderTreeScanSummary: (folderPath: string) => Promise<FolderTreeScanSummary>;
+  getFolderTreeScanSummary: (folderPath: string, outdatedAfterDays?: number) => Promise<FolderTreeScanSummary>;
   getFolderAiSummaryReport: (folderPath: string) => Promise<FolderAiSummaryReport>;
   getFolderFaceSummaryReport: (folderPath: string) => Promise<FolderFaceSummaryReport>;
   getFolderAiFailedFiles: (
@@ -1820,6 +1870,9 @@ export interface DesktopApi {
     pipeline: FolderAiPipelineKind,
     recursive: boolean,
   ) => Promise<FolderAiFailedFileItem[]>;
+  getFolderAiWronglyRotatedImages: (
+    request: FolderAiWronglyRotatedImagesPageRequest,
+  ) => Promise<FolderAiWronglyRotatedImagesPageResult>;
   getFolderAiCoverage: (folderPath: string, recursive: boolean) => Promise<FolderAiCoverageReport>;
   getFolderAiRollupsBatch: (folderPaths: string[]) => Promise<Record<string, FolderAiSidebarRollup>>;
   detectFolderImageRotation: (request: {

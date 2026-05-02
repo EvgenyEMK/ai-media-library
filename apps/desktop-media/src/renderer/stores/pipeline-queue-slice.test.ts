@@ -28,6 +28,7 @@ const SAMPLE_SNAPSHOT: PipelineQueueSnapshot = {
         {
           jobId: "j1",
           pipelineId: "metadata-scan",
+          params: {},
           state: "running",
           progress: {
             phase: "scanning",
@@ -56,6 +57,7 @@ const SAMPLE_SNAPSHOT: PipelineQueueSnapshot = {
         {
           jobId: "j2",
           pipelineId: "gps-geocode",
+          params: {},
           state: "pending",
           progress: {
             phase: null,
