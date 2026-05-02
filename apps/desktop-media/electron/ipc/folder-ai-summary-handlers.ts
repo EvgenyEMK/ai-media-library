@@ -23,6 +23,7 @@ import {
   getFolderSummaryOverview,
 } from "../db/folder-summary-overview";
 import { readDirectFolderChildren, readFolderChildren } from "../fs-media";
+import { registerFolderFaceSummaryStreamHandlers } from "./folder-face-summary-stream";
 import { MULTIMODAL_EMBED_MODEL } from "../semantic-embeddings";
 
 const DEBUG_FOLDER_AI_SUMMARY = true;
@@ -332,6 +333,8 @@ export function registerFolderAiSummaryHandlers(): void {
       });
     },
   );
+
+  registerFolderFaceSummaryStreamHandlers();
 }
 
 function buildFolderWhere(
