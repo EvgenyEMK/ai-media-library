@@ -1,12 +1,18 @@
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getCalls: { sql: string; args: unknown[] }[] = [];
 const allCalls: { sql: string; args: unknown[] }[] = [];
 
+/** POSIX-style paths so path.relative / pathToFileURL match CI (Linux) and dev (Windows). */
+const LIBRARY_ROOT = "/photos";
+const ITEM_SOURCE = `${LIBRARY_ROOT}/trip/rotated.jpg`;
+
 const rows = [
   {
     id: "item-1",
-    source_path: "C:\\photos\\trip\\rotated.jpg",
+    source_path: ITEM_SOURCE,
     filename: "rotated.jpg",
     ai_metadata: JSON.stringify({
       orientation_detection: {
@@ -57,7 +63,7 @@ describe("getWronglyRotatedImagesPage", () => {
 
   it("uses the same orientation-success predicate as folder coverage", () => {
     const parts = buildWronglyRotatedImagesQueryParts({
-      folderPath: "C:\\photos",
+      folderPath: LIBRARY_ROOT,
       recursive: true,
     });
 
@@ -65,16 +71,22 @@ describe("getWronglyRotatedImagesPage", () => {
     expect(parts.whereSql).toContain("$.orientation_detection_error");
     expect(parts.whereSql).toContain("$.orientation_detection.processed_at");
     expect(parts.whereSql).toContain("$.orientation_detection_error.failed_at");
-    expect(parts.whereArgs).toEqual(["local-default", "C:\\photos\\%"]);
+    expect(parts.whereArgs).toEqual(["local-default", `${LIBRARY_ROOT}/%`]);
   });
 
   it("returns a paginated page with rotation and crop preview data", () => {
     const page = getWronglyRotatedImagesPage({
-      folderPath: "C:\\photos",
+      folderPath: LIBRARY_ROOT,
       recursive: true,
       page: 2,
       pageSize: 12,
     });
+
+    const relDir = path.relative(
+      path.normalize(LIBRARY_ROOT),
+      path.dirname(path.normalize(ITEM_SOURCE)),
+    );
+    const folderPathRelative = relDir && relDir !== "." ? relDir : null;
 
     expect(page).toEqual({
       total: 1,
@@ -83,10 +95,10 @@ describe("getWronglyRotatedImagesPage", () => {
       items: [
         {
           id: "item-1",
-          sourcePath: "C:\\photos\\trip\\rotated.jpg",
+          sourcePath: ITEM_SOURCE,
           name: "rotated.jpg",
-          imageUrl: "file:///C:/photos/trip/rotated.jpg",
-          folderPathRelative: "trip",
+          imageUrl: pathToFileURL(ITEM_SOURCE).toString(),
+          folderPathRelative,
           rotationAngleClockwise: 90,
           cropRel: { x: 0.1, y: 0.2, width: 0.7, height: 0.6 },
         },
