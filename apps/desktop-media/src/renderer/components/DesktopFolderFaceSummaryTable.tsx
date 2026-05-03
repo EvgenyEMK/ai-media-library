@@ -9,7 +9,7 @@ import { FOLDER_FACE_SUMMARY_STREAM_ROW_IDS, FOLDER_FACE_SUMMARY_SUBFOLDER_ROW_P
 import type { SummaryPipelineKind } from "../types/folder-ai-summary-types";
 import { UI_TEXT } from "../lib/ui-text";
 import { FaceSummaryRow } from "./desktop-folder-face-summary-table-row";
-import { PendingSpinner } from "./folder-ai-summary/SummaryStatusGlyph";
+import { PendingSpinner } from "./folder-ai-summary/SummaryStatusPrimitives";
 
 /** `top` from `--folder-ai-sticky-stack-offset` (set on Folder AI summary page root). -1px closes subpixel bleed above thead. */
 const headerClass =

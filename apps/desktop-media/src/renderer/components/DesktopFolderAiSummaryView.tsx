@@ -20,7 +20,7 @@ import { DesktopFolderAiSummaryDashboard } from "./DesktopFolderAiSummaryDashboa
 import { DesktopFolderAiSummaryTable } from "./DesktopFolderAiSummaryTable";
 import { DesktopFolderGeoSummaryTable } from "./DesktopFolderGeoSummaryTable";
 import { DesktopFolderFaceSummaryTable } from "./DesktopFolderFaceSummaryTable";
-import { PendingSpinner } from "./folder-ai-summary/SummaryStatusGlyph";
+import { PendingSpinner } from "./folder-ai-summary/SummaryStatusPrimitives";
 import { useDesktopStore } from "../stores/desktop-store";
 import { useFolderAiSummaryTableStream } from "../hooks/use-folder-ai-summary-table-stream";
 import { useFolderFaceSummaryStream } from "../hooks/use-folder-face-summary-stream";
@@ -28,7 +28,8 @@ import { PipelineOnboardingModal, type PipelineOnboardingSlideId } from "./folde
 
 type SummaryTab = "summary" | "face" | "ai" | "geo";
 
-const DEBUG_FOLDER_AI_SUMMARY = true;
+/** Set to `true` to log `[debug][folder-ai-summary]` lines in the renderer console. */
+const DEBUG_FOLDER_AI_SUMMARY = false;
 
 function debugFolderAiSummary(message: string, details?: Record<string, unknown>): void {
   if (!DEBUG_FOLDER_AI_SUMMARY) return;
@@ -187,10 +188,13 @@ export function DesktopFolderAiSummaryView({
                 ...current.selectedWithSubfolders,
                 scanFreshness: {
                   ...current.selectedWithSubfolders.scanFreshness,
-                  directSubfolderCount: scanSummary.directSubfolderCount,
-                  notFullyScannedDirectSubfolderCount: scanSummary.notFullyScannedDirectSubfolderCount,
-                  outdatedScannedFolderCount: scanSummary.outdatedScannedFolderCount,
-                  scannedFolderCount: scanSummary.scannedFolderCount,
+                  folderTreeQuickScan: scanSummary.quickScan,
+                  oldestFolderScanCompletedAt:
+                    scanSummary.quickScan != null && scanSummary.quickScan.ultraFoldersScanned > 0
+                      ? scanSummary.quickScan.treeFoldersWithDirectMediaOnDiskCount > 0
+                        ? scanSummary.quickScan.oldestMetadataFolderScanAtAmongWalkedFolders
+                        : current.selectedWithSubfolders.scanFreshness.oldestFolderScanCompletedAt
+                      : current.selectedWithSubfolders.scanFreshness.oldestFolderScanCompletedAt,
                 },
               },
             };
@@ -201,10 +205,6 @@ export function DesktopFolderAiSummaryView({
             loadSequence,
             elapsedMs: Math.round(performance.now() - folderScanStartedAt),
             hasDirectSubfolders: scanSummary.hasDirectSubfolders,
-            directSubfolderCount: scanSummary.directSubfolderCount,
-            notFullyScannedDirectSubfolderCount: scanSummary.notFullyScannedDirectSubfolderCount,
-            outdatedScannedFolderCount: scanSummary.outdatedScannedFolderCount,
-            scannedFolderCount: scanSummary.scannedFolderCount,
           });
         })
         .catch(() => {
@@ -487,7 +487,6 @@ export function DesktopFolderAiSummaryView({
           <DesktopFolderAiSummaryDashboard
             coverage={dashboardCoverage ?? undefined}
             overview={dashboardOverview}
-            hasSubfolders={hasSubfolders}
             overviewLoading={overviewLoading || !dashboardOverview}
             folderScanLoading={folderScanLoading || !dashboardOverview}
             coverageLoading={coverageLoading || !dashboardCoverage}
@@ -502,7 +501,6 @@ export function DesktopFolderAiSummaryView({
               <DesktopFolderAiSummaryDashboard
                 coverage={dashboardCoverage}
                 overview={dashboardOverview}
-                hasSubfolders={hasSubfolders}
                 overviewLoading={overviewLoading || !dashboardOverview}
                 folderScanLoading={folderScanLoading || !dashboardOverview}
                 coverageLoading={coverageLoading}

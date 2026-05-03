@@ -118,12 +118,6 @@ export const UI_TEXT = {
   folderAiPipelineStripLabel: "AI pipeline status for this folder (direct images only)",
   folderAiPipelineStripImagesOnlyHint: "AI status (images only)",
   folderAiPipelineStripUnavailable: "AI status unavailable",
-  metadataScanFollowUpPhoto: "AI image analysis",
-  metadataScanFollowUpFace: "Face detection",
-  metadataScanFollowUpSemantic: "AI search index",
-  metadataScanFollowUpFilePhrase: "file(s) across",
-  metadataScanFollowUpFolderPhrase: "folder(s)",
-  metadataScanFollowUpLineTail: "may still need AI analysis. You can run:",
   cancelFaceDetection: "Cancel face detection",
   cancelPhotoAnalysis: "Cancel image AI analysis",
   onlyIfMissing: "Only if missing",
@@ -166,6 +160,8 @@ export const UI_TEXT = {
   metadataScanScanning: "Reading metadata and updating database",
   /** Optional phase: reverse-geocode GPS coordinates into country/city fields. */
   metadataScanGeocoding: "Updating location data from GPS",
+  /** Final phase: reconcile DB rows, prune folder status, and emit the scan summary. */
+  metadataScanFinalizing: "Finalizing scan results",
   /** Card heading when the scan is idle, completed, or the phase is not shown separately. */
   metadataScanCardTitle: "Media metadata scan",
   /** Card heading during the file-identity / observe phase (folder name is appended by the UI). */
@@ -174,6 +170,8 @@ export const UI_TEXT = {
   metadataScanScanningCardTitle: "Media metadata scan - updating database",
   /** Card heading while reverse-geocoding GPS metadata. */
   metadataScanGeocodingCardTitle: "Media metadata scan - updating locations",
+  /** Card heading while final reconciliation / pruning runs after per-file scanning. */
+  metadataScanFinalizingCardTitle: "Media metadata scan - finalizing results",
   loadingFolder: "Loading folder images...",
   progressPanelTitle: "Background operations",
   progressPathAnalysisTitle: "Path metadata (LLM)",
@@ -209,22 +207,4 @@ First-time setup downloads ~2 GB of GeoNames geographic data (cached locally for
   geocoderInitParsing: "Building location index…",
   geocoderInitReady: "Location database ready.",
   geocoderInitError: "Location database initialization failed.",
-  metadataManualScanResultTitle: "Scan results",
-  metadataManualScanResultClose: "Close scan results",
-  metadataManualScanRecursiveHint: "Including subfolders",
-  metadataManualScanCancelledHint:
-    "The scan was cancelled; the lists below reflect changes found before cancellation (missing files are listed only if file discovery had finished).",
-  metadataManualScanGroupNew: "New files",
-  metadataManualScanGroupUpdated: "Updated files",
-  metadataManualScanGroupMoved: "Renamed or moved",
-  metadataManualScanGroupDeleted: "Missing on disk, but kept as inactive in database",
-  metadataManualScanGroupFailed: "Failed",
-  metadataManualScanPathColumnPrevious: "Previous path",
-  metadataManualScanPathColumnNew: "New path",
-  metadataManualScanShowAll: "Show all",
-  metadataManualScanShowLess: "Show first 50",
-  metadataManualScanPurgeDeleted: "Remove missing files from database (faces, embeddings, tags)",
-  metadataManualScanPurgeConfirm:
-    "Permanently remove these missing files from the database and delete related face detections, embeddings, and tags? This cannot be undone.",
-  metadataManualScanPurgeWorking: "Removing…",
 } as const;

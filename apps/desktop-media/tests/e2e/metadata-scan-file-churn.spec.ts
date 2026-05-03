@@ -11,7 +11,10 @@ import {
   removeMoveChurnFixture,
   type MoveChurnFixture,
 } from "./fixtures/test-images";
+import type { MetadataScanProgressEvent } from "../../src/shared/ipc";
 import { UI_TEXT } from "../../src/renderer/lib/ui-text";
+
+type MetadataJobCompleted = Extract<MetadataScanProgressEvent, { type: "job-completed" }>;
 
 /** Two JPEGs under `<root>/media` so the library root has no direct images (avoids auto-scan filling the catalog before the manual scan). */
 function createNestedTwoFileLibrary(): { root: string; mediaDir: string } {
@@ -58,8 +61,38 @@ async function addLibraryAndSelectRoot(
   await mainWindow.waitForTimeout(1_500);
 }
 
-async function runRecursiveMetadataScan(mainWindow: Page, libraryRoot: string): Promise<void> {
+function awaitNextManualMetadataScanForFolder(
+  mainWindow: Page,
+  folderPath: string,
+): Promise<MetadataJobCompleted> {
+  return mainWindow.evaluate((fp) => {
+    return new Promise<MetadataJobCompleted>((resolve, reject) => {
+      let targetJobId: string | null = null;
+      const timer = window.setTimeout(() => {
+        unsub();
+        reject(new Error("Timed out waiting for manual metadata scan job-completed"));
+      }, 180_000);
+      const unsub = window.desktopApi.onMetadataScanProgress((event) => {
+        if (event.type === "job-started" && event.triggerSource === "manual" && event.folderPath === fp) {
+          targetJobId = event.jobId;
+          return;
+        }
+        if (event.type === "job-completed" && targetJobId !== null && event.jobId === targetJobId) {
+          window.clearTimeout(timer);
+          unsub();
+          resolve(event);
+        }
+      });
+    });
+  }, folderPath);
+}
+
+async function runRecursiveMetadataScan(
+  mainWindow: Page,
+  libraryRoot: string,
+): Promise<MetadataJobCompleted> {
   const normalized = path.normalize(libraryRoot);
+  const completion = awaitNextManualMetadataScanForFolder(mainWindow, normalized);
   const sidebar = mainDesktopSidebar(mainWindow);
   const rootRow = sidebar.getByRole("button", { name: normalized, exact: true });
   /** Row container: `SidebarTree` wraps the folder label button in `div.group.relative`. */
@@ -71,20 +104,7 @@ async function runRecursiveMetadataScan(mainWindow: Page, libraryRoot: string): 
   await expect(subfolders).toBeVisible({ timeout: 10_000 });
   await subfolders.check();
   await mainWindow.locator('[title="Start metadata scan"]').first().click();
-}
-
-async function waitForManualScanPanel(mainWindow: Page): Promise<void> {
-  await expect(mainWindow.getByText(UI_TEXT.metadataManualScanResultTitle)).toBeVisible({
-    timeout: 180_000,
-  });
-}
-
-async function closeManualScanPanel(mainWindow: Page): Promise<void> {
-  const closeBtn = mainWindow.getByRole("button", { name: UI_TEXT.metadataManualScanResultClose });
-  await closeBtn.click();
-  await expect(mainWindow.getByText(UI_TEXT.metadataManualScanResultTitle)).toBeHidden({
-    timeout: 10_000,
-  });
+  return completion;
 }
 
 test.describe("Metadata scan — file churn (move / delete / duplicate / rename)", () => {
@@ -95,37 +115,23 @@ test.describe("Metadata scan — file churn (move / delete / duplicate / rename)
     await addLibraryAndSelectRoot(electronApp, mainWindow, moveFixture.root);
 
     await runRecursiveMetadataScan(mainWindow, moveFixture.root);
-    await waitForManualScanPanel(mainWindow);
-    await closeManualScanPanel(mainWindow);
 
     fs.renameSync(moveFixture.fileToMove, moveFixture.fileToMoveDest);
 
-    await runRecursiveMetadataScan(mainWindow, moveFixture.root);
-    await waitForManualScanPanel(mainWindow);
-
-    await expect(
-      mainWindow.getByText(UI_TEXT.metadataManualScanGroupDeleted, { exact: false }),
-    ).toHaveCount(0);
-
-    await closeManualScanPanel(mainWindow);
+    const afterMove = await runRecursiveMetadataScan(mainWindow, moveFixture.root);
+    expect(afterMove.filesDeleted).toHaveLength(0);
   });
 
   test("deleting a file is reported as missing on disk", async ({ electronApp, mainWindow }) => {
     await addLibraryAndSelectRoot(electronApp, mainWindow, deleteFixture.root);
 
     await runRecursiveMetadataScan(mainWindow, deleteFixture.root);
-    await waitForManualScanPanel(mainWindow);
-    await closeManualScanPanel(mainWindow);
 
     const toDelete = path.join(deleteFixture.mediaDir, "a.jpg");
     fs.unlinkSync(toDelete);
 
-    await runRecursiveMetadataScan(mainWindow, deleteFixture.root);
-    await waitForManualScanPanel(mainWindow);
-
-    await expect(mainWindow.getByText(UI_TEXT.metadataManualScanGroupDeleted)).toBeVisible();
-
-    await closeManualScanPanel(mainWindow);
+    const afterDelete = await runRecursiveMetadataScan(mainWindow, deleteFixture.root);
+    expect(afterDelete.filesDeleted.length).toBeGreaterThanOrEqual(1);
   });
 
   test("same-folder duplicate and rename appear without missing-on-disk regression", async ({
@@ -143,29 +149,19 @@ test.describe("Metadata scan — file churn (move / delete / duplicate / rename)
       await addLibraryAndSelectRoot(electronApp, mainWindow, dupRoot);
 
       await runRecursiveMetadataScan(mainWindow, dupRoot);
-      await waitForManualScanPanel(mainWindow);
-      await closeManualScanPanel(mainWindow);
 
       const original = path.join(dupMedia, "solo.jpg");
       const duplicate = path.join(dupMedia, "solo-copy.jpg");
       fs.copyFileSync(original, duplicate);
 
-      await runRecursiveMetadataScan(mainWindow, dupRoot);
-      await waitForManualScanPanel(mainWindow);
-      await expect(
-        mainWindow.getByText(UI_TEXT.metadataManualScanGroupDeleted, { exact: false }),
-      ).toHaveCount(0);
-      await closeManualScanPanel(mainWindow);
+      const afterDup = await runRecursiveMetadataScan(mainWindow, dupRoot);
+      expect(afterDup.filesDeleted).toHaveLength(0);
 
       const renamed = path.join(dupMedia, "renamed-photo.jpg");
       fs.renameSync(duplicate, renamed);
 
-      await runRecursiveMetadataScan(mainWindow, dupRoot);
-      await waitForManualScanPanel(mainWindow);
-      await expect(
-        mainWindow.getByText(UI_TEXT.metadataManualScanGroupDeleted, { exact: false }),
-      ).toHaveCount(0);
-      await closeManualScanPanel(mainWindow);
+      const afterRename = await runRecursiveMetadataScan(mainWindow, dupRoot);
+      expect(afterRename.filesDeleted).toHaveLength(0);
     } finally {
       removeDir(dupRoot);
     }

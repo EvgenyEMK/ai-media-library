@@ -14,8 +14,6 @@ import { DesktopFaceModelDownloadBanner } from "./DesktopFaceModelDownloadBanner
 import { DesktopMediaItemActionsMenu } from "./DesktopMediaItemActionsMenu";
 import { DesktopMediaItemListRow } from "./DesktopMediaItemListRow";
 import { DesktopFolderAiSummaryView } from "./DesktopFolderAiSummaryView";
-import { DesktopMetadataScanFollowUpBar } from "./DesktopMetadataScanFollowUpBar";
-import { DesktopMetadataManualScanResultPanel } from "./DesktopMetadataManualScanResultPanel";
 import { SemanticSearchPanel } from "./SemanticSearchPanel";
 import type { DesktopPipelineHandlers } from "../hooks/use-desktop-pipeline-handlers";
 import { useMediaItemStarRatingChange } from "../hooks/use-media-item-star-rating-change";
@@ -122,8 +120,6 @@ export function DesktopMediaWorkspace({
   openFolderViewerById: _openFolderViewerById,
 }: DesktopMediaWorkspaceProps): ReactElement {
   const mediaMetadataByItemId = useDesktopStore((s) => s.mediaMetadataByItemId);
-  const metadataManualScanResult = useDesktopStore((s) => s.metadataManualScanResult);
-  const metadataScanFollowUp = useDesktopStore((s) => s.metadataScanFollowUp);
   const showSummaryOnEmptyFolderSelection = useDesktopStore(
     (s) => s.folderScanningSettings.showFolderAiSummaryWhenSelectingEmptyFolder,
   );
@@ -204,9 +200,6 @@ export function DesktopMediaWorkspace({
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-      {!metadataManualScanResult && metadataScanFollowUp ? (
-        <DesktopMetadataScanFollowUpBar layout="compact" pipeline={pipeline} />
-      ) : null}
       {faceModelDownload.visible && faceModelDownload.status === "running" ? (
         <div className="shrink-0">
           <DesktopFaceModelDownloadBanner
@@ -233,9 +226,6 @@ export function DesktopMediaWorkspace({
         <SemanticSearchPanel onSearch={() => void pipeline.handleSemanticSearch()} />
       ) : null}
 
-      {metadataManualScanResult ? (
-        <DesktopMetadataManualScanResultPanel pipeline={pipeline} />
-      ) : (
       <div className="min-h-0 flex-1 overflow-auto">
         {mainPaneViewMode === "imageEditSuggestions" ? (
           rotationReviewScope ? (
@@ -455,7 +445,6 @@ export function DesktopMediaWorkspace({
           </>
         )}
       </div>
-      )}
     </div>
   );
 }

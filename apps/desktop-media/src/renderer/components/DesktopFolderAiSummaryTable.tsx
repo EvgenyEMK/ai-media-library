@@ -7,7 +7,7 @@ import { UI_TEXT } from "../lib/ui-text";
 import type { SummaryPipelineKind } from "../types/folder-ai-summary-types";
 import { CellSpinner } from "./desktop-folder-face-summary-table-cells";
 import { PipelineStatusCell } from "./DesktopFolderAiPipelineStatusCell";
-import { PendingSpinner } from "./folder-ai-summary/SummaryStatusGlyph";
+import { PendingSpinner } from "./folder-ai-summary/SummaryStatusPrimitives";
 
 interface SummaryRowProps {
   label: string;

@@ -61,7 +61,6 @@ interface DesktopFolderAiSummaryDashboardProps {
   overviewLoading?: boolean;
   folderScanLoading?: boolean;
   coverageLoading?: boolean;
-  hasSubfolders?: boolean;
   actionPendingPipeline?: SummaryPipelineKind | null;
   onRunPipeline?: (pipeline: SummaryPipelineKind) => void;
   actionPendingGeoLocation?: boolean;
@@ -82,7 +81,6 @@ export function DesktopFolderAiSummaryDashboard({
   overviewLoading = loading && overview === pendingOverview,
   folderScanLoading = overviewLoading,
   coverageLoading = loading,
-  hasSubfolders = false,
   actionPendingPipeline = null,
   onRunPipeline,
   actionPendingGeoLocation = false,
@@ -153,7 +151,6 @@ export function DesktopFolderAiSummaryDashboard({
             {visible.lastDataScan ? (
               <LastDataScanCard
                 scanFreshness={overview.scanFreshness}
-                hasSubfolders={hasSubfolders}
                 loading={folderScanLoading}
                 actionPending={actionPendingFolderScan}
                 outdatedAfterDays={outdatedAfterDays}

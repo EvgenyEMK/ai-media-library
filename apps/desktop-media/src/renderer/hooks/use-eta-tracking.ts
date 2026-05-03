@@ -335,6 +335,7 @@ export interface MetadataProgressState {
   metadataFolderName: string | null;
   metadataCardTitle: string;
   metadataGpsGeocodingEnabled: boolean;
+  metadataUserPhaseCount: 3 | 4;
   metadataGeoDataUpdated: number;
   metadataCounts: {
     running: number;
@@ -355,6 +356,7 @@ export function useMetadataProgress(): MetadataProgressState {
   const metadataPhaseTotal = useDesktopStore((s) => s.metadataPhaseTotal);
   const metadataItemsByKey = useDesktopStore((s) => s.metadataItemsByKey);
   const metadataGpsGeocodingEnabled = useDesktopStore((s) => s.metadataGpsGeocodingEnabled);
+  const metadataUserPhaseCount = useDesktopStore((s) => s.metadataUserPhaseCount);
   const metadataGeoDataUpdated = useDesktopStore((s) => s.metadataGeoDataUpdated);
   const isMetadataScanning = metadataStatus === "running";
 
@@ -399,7 +401,7 @@ export function useMetadataProgress(): MetadataProgressState {
       metadataCounts.unchanged +
       metadataCounts.failed +
       metadataCounts.cancelled
-    : isMetadataScanning && (metadataPhase === "scanning" || metadataPhase === "geocoding")
+    : isMetadataScanning && (metadataPhase === "scanning" || metadataPhase === "geocoding" || metadataPhase === "finalizing")
       ? metadataPhaseProcessed
       : isMetadataScanning && metadataPhase === "preparing"
         ? metadataPhaseProcessed
@@ -421,6 +423,8 @@ export function useMetadataProgress(): MetadataProgressState {
       ? UI_TEXT.metadataScanPreparing
       : metadataPhase === "geocoding"
         ? UI_TEXT.metadataScanGeocoding
+        : metadataPhase === "finalizing"
+          ? UI_TEXT.metadataScanFinalizing
         : null;
   const metadataFolderName =
     isMetadataScanning && metadataCurrentFolderPath
@@ -433,11 +437,13 @@ export function useMetadataProgress(): MetadataProgressState {
         ? UI_TEXT.metadataScanScanningCardTitle
         : metadataPhase === "geocoding"
           ? UI_TEXT.metadataScanGeocodingCardTitle
-        : UI_TEXT.metadataScanCardTitle;
+          : metadataPhase === "finalizing"
+            ? UI_TEXT.metadataScanFinalizingCardTitle
+            : UI_TEXT.metadataScanCardTitle;
 
   const metadataScanFinalizing =
     isMetadataScanning &&
-    metadataPhase === "scanning" &&
+    (metadataPhase === "scanning" || metadataPhase === "finalizing") &&
     metadataPhaseTotal > 0 &&
     metadataPhaseProcessed >= metadataPhaseTotal;
 
@@ -450,6 +456,7 @@ export function useMetadataProgress(): MetadataProgressState {
     metadataFolderName,
     metadataCardTitle,
     metadataGpsGeocodingEnabled,
+    metadataUserPhaseCount,
     metadataGeoDataUpdated: metadataSummary?.geoDataUpdated ?? metadataGeoDataUpdated,
     metadataCounts,
   };

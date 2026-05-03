@@ -1,6 +1,6 @@
 import path from "node:path";
 import { performance } from "node:perf_hooks";
-import { ipcMain } from "electron";
+import { app, ipcMain } from "electron";
 import {
   IPC_CHANNELS,
   inferCatalogMediaKind,
@@ -11,23 +11,23 @@ import {
   type FolderAiSummaryReport,
   type FolderAiWronglyRotatedImagesPageRequest,
   type FolderAiWronglyRotatedImagesPageResult,
+  type FolderTreeQuickScanResult,
   type FolderTreeScanSummary,
 } from "../../src/shared/ipc";
+import { runFolderTreeQuickScans } from "../lib/folder-tree-quick-scan-engine";
+import { readSettings } from "../storage";
 import { getDesktopDatabase } from "../db/client";
 import { getFolderAiCoverage, getFolderAiRollupsForPaths } from "../db/folder-ai-coverage";
 import { getWronglyRotatedImagesPage } from "../db/folder-ai-wrongly-rotated-images";
 import { getFolderFaceSummaryReport } from "../db/folder-face-summary";
-import {
-  getFolderScanAgeSummary,
-  getFolderMetadataScanCompletedAtByPath,
-  getFolderSummaryOverview,
-} from "../db/folder-summary-overview";
+import { getFolderSummaryOverview } from "../db/folder-summary-overview";
 import { readDirectFolderChildren, readFolderChildren } from "../fs-media";
 import { registerFolderFaceSummaryStreamHandlers } from "./folder-face-summary-stream";
 import { registerFolderAiSummaryStreamHandlers } from "./folder-ai-summary-table-stream";
 import { MULTIMODAL_EMBED_MODEL } from "../semantic-embeddings";
 
-const DEBUG_FOLDER_AI_SUMMARY = true;
+/** Set to `true` to log `[debug][folder-ai-summary]` lines in the main process. */
+const DEBUG_FOLDER_AI_SUMMARY = false;
 
 function debugFolderAiSummary(message: string, details?: Record<string, unknown>): void {
   if (!DEBUG_FOLDER_AI_SUMMARY) return;
@@ -94,20 +94,6 @@ export function registerFolderAiSummaryHandlers(): void {
         });
       }
 
-      const directScanStartedAt = performance.now();
-      const directSubfolderScanCompletedAtByPath = getFolderMetadataScanCompletedAtByPath(
-        children.map((node) => node.path),
-      );
-      const notFullyScannedDirectSubfolderCount = children.filter(
-        (node) => directSubfolderScanCompletedAtByPath[node.path] == null,
-      ).length;
-      selectedWithSubfolders.scanFreshness.notFullyScannedDirectSubfolderCount =
-        notFullyScannedDirectSubfolderCount;
-      debugFolderAiSummary("overview:direct-scan-complete", {
-        folderPath: normalized,
-        elapsed: elapsedSince(directScanStartedAt),
-        notFullyScannedDirectSubfolderCount,
-      });
       debugFolderAiSummary("overview:complete", { folderPath: normalized, elapsed: elapsedSince(startedAt) });
 
       return {
@@ -121,15 +107,12 @@ export function registerFolderAiSummaryHandlers(): void {
 
   ipcMain.handle(
     IPC_CHANNELS.getFolderTreeScanSummary,
-    async (_event, folderPath: string, outdatedAfterDays = 7): Promise<FolderTreeScanSummary> => {
+    async (_event, folderPath: string, _outdatedAfterDays = 7): Promise<FolderTreeScanSummary> => {
       const normalized = folderPath?.trim();
       if (!normalized) {
         return {
           hasDirectSubfolders: false,
-          directSubfolderCount: 0,
-          notFullyScannedDirectSubfolderCount: 0,
-          outdatedScannedFolderCount: 0,
-          scannedFolderCount: 0,
+          quickScan: null,
         };
       }
 
@@ -143,32 +126,26 @@ export function registerFolderAiSummaryHandlers(): void {
         directSubfolders: children.length,
       });
 
-      const directScanStartedAt = performance.now();
-      const directSubfolderScanCompletedAtByPath = getFolderMetadataScanCompletedAtByPath(
-        children.map((node) => node.path),
-      );
-      const notFullyScannedDirectSubfolderCount = children.filter(
-        (node) => directSubfolderScanCompletedAtByPath[node.path] == null,
-      ).length;
-      const normalizedOutdatedAfterDays = Math.max(1, Math.round(Number(outdatedAfterDays) || 7));
-      const olderThanIso = new Date(Date.now() - normalizedOutdatedAfterDays * 24 * 60 * 60 * 1000).toISOString();
-      const scanAgeSummary = getFolderScanAgeSummary({ folderPath: normalized, olderThanIso });
+      let quickScan: FolderTreeQuickScanResult | null = null;
+      try {
+        const settings = await readSettings(app.getPath("userData"));
+        quickScan = await runFolderTreeQuickScans({
+          rootFolderPath: normalized,
+          movedMatchMode: settings.folderScanning.quickScanMovedFileMatchMode,
+        });
+      } catch (err) {
+        console.warn("[debug][folder-tree-scan] quick scan failed", err);
+      }
       debugFolderAiSummary("tree-scan:complete", {
         folderPath: normalized,
         elapsed: elapsedSince(startedAt),
-        directScanElapsed: elapsedSince(directScanStartedAt),
         directSubfolders: children.length,
-        notFullyScannedDirectSubfolderCount,
-        outdatedScannedFolderCount: scanAgeSummary.outdatedScannedFolderCount,
-        scannedFolderCount: scanAgeSummary.scannedFolderCount,
+        quickScanPresent: quickScan != null,
       });
 
       return {
         hasDirectSubfolders: children.length > 0,
-        directSubfolderCount: children.length,
-        notFullyScannedDirectSubfolderCount,
-        outdatedScannedFolderCount: scanAgeSummary.outdatedScannedFolderCount,
-        scannedFolderCount: scanAgeSummary.scannedFolderCount,
+        quickScan,
       };
     },
   );

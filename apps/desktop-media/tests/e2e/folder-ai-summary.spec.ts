@@ -18,13 +18,6 @@ test.afterAll(() => {
   removeMoveChurnFixture(fixture);
 });
 
-async function closeScanResultsIfVisible(mainWindow: Parameters<typeof mainDesktopSidebar>[0]): Promise<void> {
-  const closeButton = mainWindow.getByRole("button", { name: "Close scan results" });
-  if (await closeButton.isVisible()) {
-    await closeButton.click();
-  }
-}
-
 async function expandBackgroundOperationsPanelIfNeeded(
   mainWindow: Parameters<typeof mainDesktopSidebar>[0],
 ): Promise<void> {
@@ -35,7 +28,7 @@ async function expandBackgroundOperationsPanelIfNeeded(
 }
 
 test.describe("Folder AI summary", () => {
-  test("folder tree scan card counts only direct children missing scan timestamps", async ({
+  test("folder tree scan card reflects full-tree scan coverage", async ({
     electronApp,
     mainWindow,
   }) => {
@@ -48,12 +41,31 @@ test.describe("Folder AI summary", () => {
     await rootRowButton.click();
 
     await mainWindow.evaluate(async (folderPath) => {
-      await window.desktopApi.scanFolderMetadata({
+      const completion = new Promise<void>((resolve, reject) => {
+        let jobId: string | null = null;
+        const timer = window.setTimeout(() => {
+          unsub();
+          reject(new Error("Timed out waiting for metadata scan job-completed"));
+        }, 120_000);
+        const unsub = window.desktopApi.onMetadataScanProgress((event) => {
+          if (event.type === "job-started" && event.folderPath === folderPath) {
+            jobId = event.jobId;
+            return;
+          }
+          if (event.type === "job-completed" && jobId !== null && event.jobId === jobId) {
+            window.clearTimeout(timer);
+            unsub();
+            resolve();
+          }
+        });
+      });
+      const scanPromise = window.desktopApi.scanFolderMetadata({
         folderPath,
         recursive: true,
       });
+      await completion;
+      await scanPromise;
     }, fixture.subA);
-    await closeScanResultsIfVisible(mainWindow);
 
     await rootRowButton.click({ button: "right" });
     await mainWindow
@@ -65,9 +77,10 @@ test.describe("Folder AI summary", () => {
     const folderTreeScanCard = mainWindow
       .getByRole("heading", { name: "Folder tree scan" })
       .locator("xpath=ancestor::section[contains(@class,'border')]");
-    await expect(folderTreeScanCard.getByText("Not scanned direct subfolders")).toBeVisible();
-    await expect(folderTreeScanCard.locator(".inline-grid").getByText("1", { exact: true })).toBeVisible();
-    await expect(folderTreeScanCard).toHaveClass(/border-destructive/);
+    // Fixture has direct media only under `sub-a`; scanning `sub-a` covers the only direct-media folder in the root tree.
+    await expect(folderTreeScanCard.getByText("Folders analyzed (quick scan)")).toBeVisible();
+    await expect(folderTreeScanCard).not.toContainText("Folders missing full scan");
+    await expect(folderTreeScanCard).toHaveClass(/border-success/);
     await expect(folderTreeScanCard.getByText("Last file change")).toBeVisible();
     await expect(folderTreeScanCard.locator(".inline-grid").getByText(/\d{1,2} \w+ \d{4}/)).toBeVisible();
   });
@@ -90,7 +103,6 @@ test.describe("Folder AI summary", () => {
         recursive: true,
       });
     }, fixture.root);
-    await closeScanResultsIfVisible(mainWindow);
 
     await rootRowButton.click({ button: "right" });
     await mainWindow
@@ -180,7 +192,6 @@ test.describe("Folder AI summary", () => {
         recursive: true,
       });
     }, fixture.root);
-    await closeScanResultsIfVisible(mainWindow);
 
     // Trigger from Folder AI summary play button.
     await rootRowButton.click({ button: "right" });
@@ -247,7 +258,6 @@ test.describe("Folder AI summary", () => {
         recursive: true,
       });
     }, fixture.root);
-    await closeScanResultsIfVisible(mainWindow);
 
     await rootRowButton.click({ button: "right" });
     await mainWindow
@@ -290,7 +300,6 @@ test.describe("Folder AI summary", () => {
         recursive: true,
       });
     }, fixture.root);
-    await closeScanResultsIfVisible(mainWindow);
 
     await rootRowButton.click({ button: "right" });
     await mainWindow

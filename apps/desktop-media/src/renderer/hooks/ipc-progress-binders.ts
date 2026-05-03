@@ -354,11 +354,11 @@ export function bindMetadataScanProgress(store: DesktopStore): () => void {
         s.metadataPhase = "preparing";
         s.metadataPhaseProcessed = 0;
         s.metadataPhaseTotal = event.total;
-        s.metadataGpsGeocodingEnabled = false;
+        s.metadataUserPhaseCount = event.metadataUserPhaseCount;
+        s.metadataGpsGeocodingEnabled = event.metadataUserPhaseCount === 4;
         s.metadataGeoDataUpdated = 0;
         s.metadataItemOrder = [];
         s.metadataItemsByKey = {};
-        s.metadataManualScanResult = null;
       });
       console.log(`[metadata-scan][renderer][${new Date().toISOString()}] job-started state updated`);
       return;
@@ -374,9 +374,14 @@ export function bindMetadataScanProgress(store: DesktopStore): () => void {
         s.metadataPhase = event.phase;
         s.metadataPhaseProcessed = event.processed;
         s.metadataPhaseTotal = event.total;
+        if (event.gpsGeocodingEnabled != null) {
+          s.metadataGpsGeocodingEnabled = event.gpsGeocodingEnabled;
+        }
         if (event.phase === "geocoding") {
           s.metadataGpsGeocodingEnabled = true;
           s.metadataGeoDataUpdated = event.geoDataUpdated ?? s.metadataGeoDataUpdated;
+        } else if (event.geoDataUpdated != null) {
+          s.metadataGeoDataUpdated = event.geoDataUpdated;
         }
       });
       return;
@@ -413,20 +418,9 @@ export function bindMetadataScanProgress(store: DesktopStore): () => void {
         event.geoDataUpdated > 0 ||
         event.pathMoves.length > 0 ||
         event.filesDeleted.length > 0;
-      const foldersNeedingAiFollowUpCount = event.foldersTouched.filter(
-        (ft) => ft.needsAiFollowUp > 0,
-      ).length;
       const completionTouchedFolders = Array.from(
         new Set([event.folderPath, ...event.foldersTouched.map((folder) => folder.folderPath)]),
       );
-
-      const manualDetailEligible =
-        event.triggerSource === "manual" &&
-        (event.filesCreated.length > 0 ||
-          event.filesUpdated.length > 0 ||
-          event.filesFailed.length > 0 ||
-          event.pathMoves.length > 0 ||
-          event.filesDeleted.length > 0);
 
       store.setState((s) => {
         s.metadataStatus = "completed";
@@ -446,26 +440,6 @@ export function bindMetadataScanProgress(store: DesktopStore): () => void {
         };
         s.metadataGpsGeocodingEnabled = event.gpsGeocodingEnabled;
         s.metadataGeoDataUpdated = event.geoDataUpdated;
-        if (event.filesNeedingAiPipelineFollowUp > 0) {
-          s.metadataScanFollowUp = {
-            scanRootFolderPath: event.folderPath,
-            filesNeedingAiPipelineFollowUp: event.filesNeedingAiPipelineFollowUp,
-            foldersNeedingAiFollowUpCount,
-          };
-        }
-        if (manualDetailEligible) {
-          s.metadataManualScanResult = {
-            jobId: event.jobId,
-            folderPath: event.folderPath,
-            recursive: event.recursive,
-            scanCancelled: event.scanCancelled,
-            filesCreated: event.filesCreated,
-            filesUpdated: event.filesUpdated,
-            filesFailed: event.filesFailed,
-            pathMoves: event.pathMoves,
-            filesDeleted: event.filesDeleted,
-          };
-        }
         s.lastMetadataScanCompletion = {
           jobId: event.jobId,
           folderPath: event.folderPath,

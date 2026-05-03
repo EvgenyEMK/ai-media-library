@@ -53,12 +53,31 @@ test.describe("AI image analysis LLM downscale settings", () => {
     const subAFolderButton = sidebar.getByRole("button", { name: "sub-a", exact: true });
 
     await mainWindow.evaluate(async (folderPath) => {
-      await window.desktopApi.scanFolderMetadata({
+      const completion = new Promise<void>((resolve, reject) => {
+        let jobId: string | null = null;
+        const timer = window.setTimeout(() => {
+          unsub();
+          reject(new Error("Timed out waiting for metadata scan job-completed"));
+        }, 180_000);
+        const unsub = window.desktopApi.onMetadataScanProgress((event) => {
+          if (event.type === "job-started" && event.triggerSource === "manual" && event.folderPath === folderPath) {
+            jobId = event.jobId;
+            return;
+          }
+          if (event.type === "job-completed" && jobId !== null && event.jobId === jobId) {
+            window.clearTimeout(timer);
+            unsub();
+            resolve();
+          }
+        });
+      });
+      const scanPromise = window.desktopApi.scanFolderMetadata({
         folderPath,
         recursive: true,
       });
+      await completion;
+      await scanPromise;
     }, fixture.root);
-    await mainWindow.getByRole("button", { name: "Close scan results" }).click();
     await subAFolderButton.click();
 
     await mainWindow.getByRole("button", { name: "More actions" }).click();

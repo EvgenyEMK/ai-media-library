@@ -166,6 +166,21 @@ export async function runMetadataScanJob(params: {
     status: "pending",
   }));
 
+  let pathExtractionEnabled = true;
+  let gpsGeocodingEnabled = false;
+  const userDataPath = app.getPath("userData");
+  const geonamesPath = resolveGeonamesPath(app);
+  try {
+    const appSettings = await readSettings(userDataPath);
+    pathExtractionEnabled = appSettings.pathExtraction.extractDates;
+    gpsGeocodingEnabled = appSettings.folderScanning.detectLocationFromGps;
+  } catch {
+    // Settings read failure — keep path extraction enabled as default
+  }
+  /** User-visible step count in the dock; must match setting, not whether this run has files to geocode. */
+  const metadataUserPhaseCount: 3 | 4 = gpsGeocodingEnabled ? 4 : 3;
+  const gpsGeocodePhasePlanned = metadataUserPhaseCount === 4;
+
   emitProgress({
     type: "job-started",
     jobId,
@@ -174,6 +189,7 @@ export async function runMetadataScanJob(params: {
     triggerSource,
     total: items.length,
     items,
+    metadataUserPhaseCount,
   });
 
   const scanT0 = Date.now();
@@ -285,18 +301,19 @@ export async function runMetadataScanJob(params: {
     }
     completedFolderScanBatch.clear();
   };
-
-  let pathExtractionEnabled = true;
-  let gpsGeocodingEnabled = false;
-  const userDataPath = app.getPath("userData");
-  const geonamesPath = resolveGeonamesPath(app);
-  try {
-    const appSettings = await readSettings(userDataPath);
-    pathExtractionEnabled = appSettings.pathExtraction.extractDates;
-    gpsGeocodingEnabled = appSettings.folderScanning.detectLocationFromGps;
-  } catch {
-    // Settings read failure — keep path extraction enabled as default
-  }
+  const FINALIZING_TOTAL = 3;
+  const emitFinalizingProgress = (processed: number): void => {
+    if (job.cancelled) return;
+    emitProgress({
+      type: "phase-updated",
+      jobId,
+      phase: "finalizing",
+      processed,
+      total: FINALIZING_TOTAL,
+      gpsGeocodingEnabled: gpsGeocodePhasePlanned,
+      geoDataUpdated,
+    });
+  };
 
   try {
     if (!job.cancelled) {
@@ -451,6 +468,7 @@ export async function runMetadataScanJob(params: {
           phase: "geocoding",
           processed: 0,
           total: itemsToGeocode.length,
+          gpsGeocodingEnabled,
           geoDataUpdated,
         });
         if (!isGeocoderReady()) {
@@ -479,6 +497,7 @@ export async function runMetadataScanJob(params: {
                 phase: "geocoding",
                 processed: Math.min(i + batch.length, itemsToGeocode.length),
                 total: itemsToGeocode.length,
+                gpsGeocodingEnabled,
                 geoDataUpdated,
               });
             }
@@ -491,6 +510,7 @@ export async function runMetadataScanJob(params: {
               phase: "geocoding",
               processed: 0,
               total: 0,
+              gpsGeocodingEnabled,
               geoDataUpdated,
             });
           }
@@ -498,7 +518,18 @@ export async function runMetadataScanJob(params: {
       } catch (geocodeErr) {
         console.error(`[metadata-scan][${scanTs()}] geocoding phase error:`, geocodeErr);
       }
+    } else if (!job.cancelled && gpsGeocodingEnabled && scannedMediaItemIds.length === 0) {
+      emitProgress({
+        type: "phase-updated",
+        jobId,
+        phase: "geocoding",
+        processed: 0,
+        total: 0,
+        gpsGeocodingEnabled,
+        geoDataUpdated,
+      });
     }
+    emitFinalizingProgress(0);
 
     if (prepareCompletedFully) {
       const observedByFolder = new Map<string, Set<string>>();
@@ -526,13 +557,16 @@ export async function runMetadataScanJob(params: {
         );
       }
     }
+    emitFinalizingProgress(1);
 
     if (!job.cancelled && params.recursive) {
-      for (const folderPath of entriesByFolder.keys()) {
+      for (const folderPath of scanFolders) {
         observedFolders.add(folderPath);
       }
       pruneFolderAnalysisStatusesNotInSet(params.folderPath, observedFolders, DEFAULT_LIBRARY_ID);
     }
+    emitFinalizingProgress(2);
+    emitFinalizingProgress(3);
   } finally {
     flushCompletedFolderScanBatch();
     if (job.powerSaveToken) {

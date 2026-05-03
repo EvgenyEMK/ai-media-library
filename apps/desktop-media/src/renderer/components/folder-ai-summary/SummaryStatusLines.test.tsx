@@ -26,4 +26,21 @@ describe("SummaryStatusLines", () => {
     expect(screen.getByText("Failed")).toBeVisible();
     expect(screen.getByText("2")).toBeVisible();
   });
+
+  it("hides to-analyze line when no items remain", () => {
+    render(
+      <SummaryStatusLines
+        pipeline={{
+          doneCount: 8,
+          failedCount: 2,
+          totalImages: 10,
+          label: "partial",
+        }}
+        tone="amber"
+      />,
+    );
+
+    expect(screen.queryByText("To analyze")).toBeNull();
+    expect(screen.getByText("Failed")).toBeVisible();
+  });
 });

@@ -14,7 +14,7 @@ import {
 import { UI_TEXT } from "../lib/ui-text";
 import { CellSpinner } from "./desktop-folder-face-summary-table-cells";
 import { PipelineStatusCell } from "./DesktopFolderAiPipelineStatusCell";
-import { PendingSpinner } from "./folder-ai-summary/SummaryStatusGlyph";
+import { PendingSpinner } from "./folder-ai-summary/SummaryStatusPrimitives";
 
 interface DesktopFolderGeoSummaryTableProps {
   /** Root folder path; used for single-folder layout label while coverage is loading. */

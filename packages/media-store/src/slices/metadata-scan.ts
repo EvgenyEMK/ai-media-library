@@ -1,7 +1,7 @@
 import type { StateCreator } from "zustand";
 import type { MetadataScanItem, ProcessingItemStatus, MetadataScanItemAction, TaskStatus } from "../types";
 
-export type MetadataScanPhase = "preparing" | "scanning" | "geocoding";
+export type MetadataScanPhase = "preparing" | "scanning" | "geocoding" | "finalizing";
 
 export interface MetadataScanSummary {
   created: number;
@@ -27,6 +27,8 @@ export interface MetadataScanSlice {
   metadataPhaseProcessed: number;
   metadataPhaseTotal: number;
   metadataGpsGeocodingEnabled: boolean;
+  /** From `job-started`; fixed 3 or 4 for metadata scan step prefix (n/N). */
+  metadataUserPhaseCount: 3 | 4;
   metadataGeoDataUpdated: number;
 
   startMetadataJob: (jobId: string, items: MetadataScanItem[]) => void;
@@ -52,6 +54,7 @@ export const createMetadataScanSlice: StateCreator<MetadataScanSlice, [["zustand
   metadataPhaseProcessed: 0,
   metadataPhaseTotal: 0,
   metadataGpsGeocodingEnabled: false,
+  metadataUserPhaseCount: 3,
   metadataGeoDataUpdated: 0,
 
   startMetadataJob: (jobId, items) =>
@@ -66,6 +69,7 @@ export const createMetadataScanSlice: StateCreator<MetadataScanSlice, [["zustand
       state.metadataPhaseProcessed = 0;
       state.metadataPhaseTotal = items.length;
       state.metadataGpsGeocodingEnabled = false;
+      state.metadataUserPhaseCount = 3;
       state.metadataGeoDataUpdated = 0;
       for (const item of items) {
         state.metadataItemsByKey[item.path] = item;
@@ -129,6 +133,7 @@ export const createMetadataScanSlice: StateCreator<MetadataScanSlice, [["zustand
       state.metadataPhaseProcessed = 0;
       state.metadataPhaseTotal = 0;
       state.metadataGpsGeocodingEnabled = false;
+      state.metadataUserPhaseCount = 3;
       state.metadataGeoDataUpdated = 0;
     }),
 });

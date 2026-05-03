@@ -1,4 +1,4 @@
-import { Check, CircleDashed, ListChecks, Play } from "lucide-react";
+import { ListChecks, Play } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ReactElement } from "react";
 import type { FolderScanFreshness } from "../../../shared/ipc";
@@ -6,8 +6,9 @@ import { cn } from "../../lib/cn";
 import { formatCoveragePercent, formatGroupedInt } from "../../lib/folder-ai-summary-formatters";
 import { UI_TEXT } from "../../lib/ui-text";
 import { SummaryActionCard } from "./SummaryActionCard";
+import { SummaryCardStatusStack } from "./SummaryCardStatusStack";
 import { SummaryMetricGrid, type SummaryMetricGridItem } from "./SummaryMetricGrid";
-import { PendingSpinner } from "./SummaryStatusGlyph";
+import { PendingSpinner, SummaryCardStatusIndicator } from "./SummaryStatusPrimitives";
 import { formatOldestScanLabel } from "./summary-card-formatters";
 import type { SummaryStatusTone } from "./summary-card-types";
 
@@ -39,7 +40,6 @@ export function SummaryMediaCountCard({
 
 export function LastDataScanCard({
   scanFreshness,
-  hasSubfolders,
   loading = false,
   actionPending = false,
   outdatedAfterDays = 7,
@@ -47,7 +47,6 @@ export function LastDataScanCard({
   onInfoClick,
 }: {
   scanFreshness: FolderScanFreshness;
-  hasSubfolders: boolean;
   loading?: boolean;
   actionPending?: boolean;
   outdatedAfterDays?: number;
@@ -55,46 +54,96 @@ export function LastDataScanCard({
   onInfoClick?: () => void;
 }): ReactElement {
   const lastDataChange = formatOldestScanLabel(scanFreshness.lastMetadataExtractedAt);
-  const directSubfolders = scanFreshness.directSubfolderCount;
-  const notScanned = scanFreshness.notFullyScannedDirectSubfolderCount;
-  const outdatedScannedFolders = scanFreshness.outdatedScannedFolderCount;
-  const scannedFolders = scanFreshness.scannedFolderCount;
-  const title = hasSubfolders ? UI_TEXT.folderAiSummaryFolderTreeScanTitle : UI_TEXT.folderAiSummaryFolderScanTitle;
+  const title = UI_TEXT.folderAiSummaryFolderTreeScanTitle;
+  const qs = scanFreshness.folderTreeQuickScan;
+  const treeTotal = qs?.ultraFoldersScanned ?? 0;
+  const treeNeed = qs?.treeFoldersWithDirectMediaOnDiskCount ?? 0;
+  const treeCovered = qs?.treeFoldersWithMetadataFolderScanCount ?? 0;
+  const foldersMissingFullScan = Math.max(treeNeed - treeCovered, 0);
+  const addedChanged = qs != null ? qs.newFileCount + qs.modifiedFileCount : 0;
+  const movedCount = qs?.movedFileCount ?? 0;
+
+  const isRed =
+    (qs != null && treeNeed > 0 && foldersMissingFullScan > 0) || addedChanged > 0;
+
+  const fullTreeCoveredByFolderScan =
+    qs != null && addedChanged === 0 && (treeNeed === 0 || foldersMissingFullScan === 0);
+
   const oldestScanMs = scanFreshness.oldestFolderScanCompletedAt
     ? new Date(scanFreshness.oldestFolderScanCompletedAt).getTime()
     : null;
-  const isOutdated =
-    oldestScanMs !== null &&
+  const isFullScanOutdated =
+    fullTreeCoveredByFolderScan &&
+    oldestScanMs != null &&
     Number.isFinite(oldestScanMs) &&
     Date.now() - oldestScanMs > outdatedAfterDays * 24 * 60 * 60 * 1000;
-  const playToneClass = notScanned > 0
-    ? "text-destructive hover:text-destructive"
-    : isOutdated || outdatedScannedFolders > 0
-      ? "text-warning hover:text-warning"
-      : "text-muted-foreground hover:text-foreground";
-  const scanTone: SummaryStatusTone = notScanned > 0 ? "red" : outdatedScannedFolders > 0 || isOutdated ? "amber" : "green";
-  const scannedDirectSubfolders = Math.max(directSubfolders - notScanned, 0);
-  const scanPercent =
-    scanTone === "red"
-      ? formatCoveragePercent(scannedDirectSubfolders, Math.max(directSubfolders, 1))
-      : scanTone === "amber"
-        ? formatCoveragePercent(outdatedScannedFolders, Math.max(scannedFolders, 1))
-        : null;
-  const outdatedPercent = scannedFolders > 0
-    ? formatCoveragePercent(outdatedScannedFolders, scannedFolders)
-    : "0%";
+
+  const isAmber = !loading && !isRed && fullTreeCoveredByFolderScan && isFullScanOutdated;
+
+  const scanTone: SummaryStatusTone = loading
+    ? "neutral"
+    : qs == null
+      ? "neutral"
+      : isRed
+        ? "red"
+        : isAmber
+          ? "amber"
+          : "green";
+
+  const folderPercent =
+    treeNeed === 0 ? "100%" : formatCoveragePercent(treeCovered, Math.max(treeNeed, 1));
+
+  const statusCountLine =
+    qs != null && treeNeed > 0
+      ? (
+          <span className="flex flex-col items-center">
+            <span>{formatGroupedInt(treeCovered)}</span>
+            <span>folders</span>
+          </span>
+        )
+      : undefined;
+
+  const playToneClass = loading
+    ? "text-muted-foreground hover:text-foreground"
+    : isRed
+      ? "text-destructive hover:text-destructive"
+      : isAmber
+        ? "text-warning hover:text-warning"
+        : "text-muted-foreground hover:text-foreground";
+
   const metricItems: SummaryMetricGridItem[] = [];
-  if (notScanned > 0) {
+  if (!loading && foldersMissingFullScan > 0) {
     metricItems.push({
-      label: "Not scanned direct subfolders",
-      value: formatGroupedInt(notScanned),
+      label: "Folders missing full scan",
+      value: formatGroupedInt(foldersMissingFullScan),
       valueClassName: "text-destructive",
     });
   }
-  if (outdatedScannedFolders > 0) {
+  if (!loading && addedChanged > 0) {
     metricItems.push({
-      label: `Outdated scan (>${formatGroupedInt(outdatedAfterDays)} days):`,
-      value: `${formatGroupedInt(outdatedScannedFolders)} (${outdatedPercent})`,
+      label: "Files to add/update in database",
+      value: formatGroupedInt(addedChanged),
+      valueClassName: "text-destructive",
+    });
+  }
+  if (!loading && movedCount > 0) {
+    metricItems.push({
+      label: "Moved files",
+      value: formatGroupedInt(movedCount),
+      valueClassName: "text-muted-foreground",
+    });
+  }
+  if (!loading && qs != null && treeNeed > 0) {
+    metricItems.push({
+      label: "Folders analyzed (quick scan)",
+      value: formatGroupedInt(treeNeed),
+      valueClassName: "text-muted-foreground",
+    });
+  }
+  if (!loading && isAmber && isFullScanOutdated) {
+    metricItems.push({
+      label: `Full scan older than ${formatGroupedInt(outdatedAfterDays)} days`,
+      value: formatOldestScanLabel(scanFreshness.oldestFolderScanCompletedAt),
       valueClassName: "text-warning",
     });
   }
@@ -120,18 +169,11 @@ export function LastDataScanCard({
       tone={scanTone}
       titleClassName="text-[1.65rem]"
       statusSlot={
-        <>
-          {loading ? (
-            <PendingSpinner className="h-8 w-8" />
-          ) : scanTone === "green" ? (
-            <Check size={34} className="text-success" aria-hidden="true" />
-          ) : (
-            <span className={cn("inline-flex items-center gap-2", scanTone === "red" ? "text-destructive" : "text-warning")}>
-              <CircleDashed size={28} aria-hidden="true" />
-              <span className="text-2xl font-semibold leading-none">{scanPercent}</span>
-            </span>
-          )}
-        </>
+        <SummaryCardStatusStack
+          loading={loading}
+          topRow={<SummaryCardStatusIndicator tone={scanTone} empty={qs == null} percentLabel={scanTone === "green" ? undefined : folderPercent} />}
+          bottomRow={statusCountLine}
+        />
       }
       actionSlot={actionSlot}
       onInfoClick={onInfoClick}

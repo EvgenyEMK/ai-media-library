@@ -33,10 +33,7 @@ export const pendingOverview: FolderAiSummaryOverview = {
     scannedCount: 0,
     unscannedCount: 0,
     totalMedia: 0,
-    directSubfolderCount: 0,
-    notFullyScannedDirectSubfolderCount: 0,
-    outdatedScannedFolderCount: 0,
-    scannedFolderCount: 0,
+    folderTreeQuickScan: null,
   },
 };
 
