@@ -50,7 +50,7 @@ export function DesktopFolderFaceSummaryTable({
   const treeLayout = !singleFolderLayout && rowSpecs.length > 0;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 pb-10">
       {streamError ? <p className="m-0 text-sm text-red-400">{streamError}</p> : null}
       {rowSpecs.length > 0 && !allDone ? (
         <div

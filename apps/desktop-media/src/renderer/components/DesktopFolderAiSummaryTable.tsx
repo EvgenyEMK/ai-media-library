@@ -198,7 +198,7 @@ export function DesktopFolderAiSummaryTable({
   onOpenWronglyRotatedImages,
 }: DesktopFolderAiSummaryTableProps): ReactElement {
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 pb-10">
       {streamError ? <p className="m-0 text-sm text-red-400">{streamError}</p> : null}
       {streamRowsIncomplete ? (
         <div
