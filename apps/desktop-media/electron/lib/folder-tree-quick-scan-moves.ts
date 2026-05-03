@@ -109,6 +109,12 @@ export async function pairQuickScanMoves(params: {
   return { moves, remainingDeleted, remainingNew };
 }
 
+/**
+ * Parent directory of a catalog / disk file path. Uses `path.win32` when the
+ * string contains Windows separators so Linux CI and POSIX dev machines still
+ * parse library paths that originated on Windows correctly.
+ */
 export function parentFolderForFilePath(filePath: string): string {
-  return path.normalize(path.dirname(filePath));
+  const impl = path.sep === "\\" || filePath.includes("\\") ? path.win32 : path.posix;
+  return impl.normalize(impl.dirname(filePath));
 }
