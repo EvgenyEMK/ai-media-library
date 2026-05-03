@@ -91,7 +91,7 @@ To swap a provider (e.g., replace Ollama with a different embedding model), crea
 
 - `upsertMediaItemFromFilePath` (`electron/db/media-item-metadata.ts`) returns `needsAiPipelineFollowUp`: true for **new** catalog rows or when **`invalidateMediaItemAiAfterMetadataRefresh`** runs (content/geometry/hash-driven invalidation per `shouldInvalidateAiAfterCatalogUpdate`); false for metadata-only updates that skip invalidation.
 - `runMetadataScanJob` (`electron/ipc/metadata-scan-handlers.ts`) aggregates **`filesNeedingAiPipelineFollowUp`** and per-folder **`needsAiFollowUp`** into `MetadataScanProgressEvent` `job-completed` (`src/shared/ipc.ts`).
-- Renderer (`bindMetadataScanProgress`): **`metadataScanFollowUp`** (top banner) is set only when **`filesNeedingAiPipelineFollowUp > 0`**; **`foldersWithCatalogChanges`** (sidebar amber outline) is set for any folder with catalog **created** or **updated**, including non-invalidating updates. Product UX: `docs/PRODUCT-FEATURES/media-library/FOLDER-ANALYTICS-MENU-UX.md` §7.2–7.4.
+- Renderer (`bindMetadataScanProgress`): **`foldersWithCatalogChanges`** (sidebar amber outline) reflects folders with catalog **created** or **updated**, including non-invalidating updates. `job-completed` still carries **`filesNeedingAiPipelineFollowUp`** for logs and future UI. Product UX: `docs/PRODUCT-FEATURES/media-library/FOLDER-ANALYTICS-MENU-UX.md` §7.2–7.4.
 
 ### AI image search (hybrid)
 

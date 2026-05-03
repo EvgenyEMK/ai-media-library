@@ -417,9 +417,6 @@ export function bindMetadataScanProgress(store: DesktopStore): () => void {
         event.geoDataUpdated > 0 ||
         event.pathMoves.length > 0 ||
         event.filesDeleted.length > 0;
-      const foldersNeedingAiFollowUpCount = event.foldersTouched.filter(
-        (ft) => ft.needsAiFollowUp > 0,
-      ).length;
       const completionTouchedFolders = Array.from(
         new Set([event.folderPath, ...event.foldersTouched.map((folder) => folder.folderPath)]),
       );
@@ -442,13 +439,6 @@ export function bindMetadataScanProgress(store: DesktopStore): () => void {
         };
         s.metadataGpsGeocodingEnabled = event.gpsGeocodingEnabled;
         s.metadataGeoDataUpdated = event.geoDataUpdated;
-        if (event.filesNeedingAiPipelineFollowUp > 0) {
-          s.metadataScanFollowUp = {
-            scanRootFolderPath: event.folderPath,
-            filesNeedingAiPipelineFollowUp: event.filesNeedingAiPipelineFollowUp,
-            foldersNeedingAiFollowUpCount,
-          };
-        }
         s.lastMetadataScanCompletion = {
           jobId: event.jobId,
           folderPath: event.folderPath,

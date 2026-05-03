@@ -53,12 +53,6 @@ export interface DesktopSlice {
   folderAnalysisByPath: Record<string, FolderAnalysisStatus>;
   /** Subtree AI rollup per folder path (sidebar icons). */
   folderRollupByPath: Record<string, FolderAiSidebarRollup>;
-  /** After metadata scan, prompt when new or AI-invalidated files need pipeline runs. */
-  metadataScanFollowUp: null | {
-    scanRootFolderPath: string;
-    filesNeedingAiPipelineFollowUp: number;
-    foldersNeedingAiFollowUpCount: number;
-  };
 
   lastMetadataScanCompletion: MetadataScanCompletionSignal | null;
   lastAiPipelineCompletion: AiPipelineCompletionSignal | null;
@@ -133,12 +127,6 @@ export interface DesktopSlice {
   setChildrenByPath: (path: string, children: FolderNode[]) => void;
   setFolderAnalysisByPath: (statuses: Record<string, FolderAnalysisStatus>) => void;
   updateFolderAnalysis: (path: string, status: FolderAnalysisStatus) => void;
-  setMetadataScanFollowUp: (payload: {
-    scanRootFolderPath: string;
-    filesNeedingAiPipelineFollowUp: number;
-    foldersNeedingAiFollowUpCount: number;
-  }) => void;
-  clearMetadataScanFollowUp: () => void;
   setLastMetadataScanCompletion: (payload: MetadataScanCompletionSignal) => void;
   setLastAiPipelineCompletion: (payload: AiPipelineCompletionSignal) => void;
   setFolderLoading: (loading: boolean) => void;
@@ -215,7 +203,6 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   childrenByPath: {},
   folderAnalysisByPath: {},
   folderRollupByPath: {},
-  metadataScanFollowUp: null,
   lastMetadataScanCompletion: null,
   lastAiPipelineCompletion: null,
   isFolderLoading: false,
@@ -332,16 +319,6 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   updateFolderAnalysis: (path, status) =>
     set((state) => {
       state.folderAnalysisByPath[path] = status;
-    }),
-
-  setMetadataScanFollowUp: (payload) =>
-    set((state) => {
-      state.metadataScanFollowUp = payload;
-    }),
-
-  clearMetadataScanFollowUp: () =>
-    set((state) => {
-      state.metadataScanFollowUp = null;
     }),
 
   setLastMetadataScanCompletion: (payload) =>
