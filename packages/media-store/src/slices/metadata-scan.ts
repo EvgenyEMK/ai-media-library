@@ -1,7 +1,7 @@
 import type { StateCreator } from "zustand";
 import type { MetadataScanItem, ProcessingItemStatus, MetadataScanItemAction, TaskStatus } from "../types";
 
-export type MetadataScanPhase = "preparing" | "scanning" | "geocoding";
+export type MetadataScanPhase = "preparing" | "scanning" | "geocoding" | "finalizing";
 
 export interface MetadataScanSummary {
   created: number;

@@ -399,7 +399,7 @@ export function useMetadataProgress(): MetadataProgressState {
       metadataCounts.unchanged +
       metadataCounts.failed +
       metadataCounts.cancelled
-    : isMetadataScanning && (metadataPhase === "scanning" || metadataPhase === "geocoding")
+    : isMetadataScanning && (metadataPhase === "scanning" || metadataPhase === "geocoding" || metadataPhase === "finalizing")
       ? metadataPhaseProcessed
       : isMetadataScanning && metadataPhase === "preparing"
         ? metadataPhaseProcessed
@@ -421,6 +421,8 @@ export function useMetadataProgress(): MetadataProgressState {
       ? UI_TEXT.metadataScanPreparing
       : metadataPhase === "geocoding"
         ? UI_TEXT.metadataScanGeocoding
+        : metadataPhase === "finalizing"
+          ? UI_TEXT.metadataScanFinalizing
         : null;
   const metadataFolderName =
     isMetadataScanning && metadataCurrentFolderPath
@@ -433,11 +435,13 @@ export function useMetadataProgress(): MetadataProgressState {
         ? UI_TEXT.metadataScanScanningCardTitle
         : metadataPhase === "geocoding"
           ? UI_TEXT.metadataScanGeocodingCardTitle
-        : UI_TEXT.metadataScanCardTitle;
+          : metadataPhase === "finalizing"
+            ? UI_TEXT.metadataScanFinalizingCardTitle
+            : UI_TEXT.metadataScanCardTitle;
 
   const metadataScanFinalizing =
     isMetadataScanning &&
-    metadataPhase === "scanning" &&
+    (metadataPhase === "scanning" || metadataPhase === "finalizing") &&
     metadataPhaseTotal > 0 &&
     metadataPhaseProcessed >= metadataPhaseTotal;
 

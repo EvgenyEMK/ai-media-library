@@ -121,7 +121,7 @@ export function LastDataScanCard({
   }
   if (!loading && addedChanged > 0) {
     metricItems.push({
-      label: "Added / changed files",
+      label: "Files to add/update in database",
       value: formatGroupedInt(addedChanged),
       valueClassName: "text-destructive",
     });

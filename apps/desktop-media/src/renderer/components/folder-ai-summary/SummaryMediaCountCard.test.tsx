@@ -85,7 +85,7 @@ describe("LastDataScanCard", () => {
       />,
     );
 
-    expect(screen.getByText("Added / changed files")).toBeVisible();
+    expect(screen.getByText("Files to add/update in database")).toBeVisible();
     expect(screen.getByText("3")).toBeVisible();
   });
 

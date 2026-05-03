@@ -285,6 +285,19 @@ export async function runMetadataScanJob(params: {
     }
     completedFolderScanBatch.clear();
   };
+  const FINALIZING_TOTAL = 3;
+  const emitFinalizingProgress = (processed: number): void => {
+    if (job.cancelled) return;
+    emitProgress({
+      type: "phase-updated",
+      jobId,
+      phase: "finalizing",
+      processed,
+      total: FINALIZING_TOTAL,
+      gpsGeocodingEnabled,
+      geoDataUpdated,
+    });
+  };
 
   let pathExtractionEnabled = true;
   let gpsGeocodingEnabled = false;
@@ -429,6 +442,7 @@ export async function runMetadataScanJob(params: {
       cancelled = scanEntries.length;
       console.log(`[metadata-scan][${scanTs()}] scanning phase SKIPPED (cancelled) jobId=${jobId} total=${scanEntries.length}`);
     }
+    emitFinalizingProgress(0);
     let scannedMediaItemIds: string[] = [];
     if (!job.cancelled && scanEntries.length > 0) {
       const scannedPaths = scanEntries.map((entry) => entry.path);
@@ -437,6 +451,7 @@ export async function runMetadataScanJob(params: {
       scannedMediaItemIds = scannedRows.map((row) => row.id);
       filesWithGps = scannedRows.filter((row) => row.latitude != null && row.longitude != null).length;
     }
+    emitFinalizingProgress(1);
 
     // --- GPS reverse geocoding phase ---
     // Include every cataloged item in the scanned paths, not only created/updated rows,
@@ -451,6 +466,7 @@ export async function runMetadataScanJob(params: {
           phase: "geocoding",
           processed: 0,
           total: itemsToGeocode.length,
+          gpsGeocodingEnabled,
           geoDataUpdated,
         });
         if (!isGeocoderReady()) {
@@ -479,6 +495,7 @@ export async function runMetadataScanJob(params: {
                 phase: "geocoding",
                 processed: Math.min(i + batch.length, itemsToGeocode.length),
                 total: itemsToGeocode.length,
+                gpsGeocodingEnabled,
                 geoDataUpdated,
               });
             }
@@ -491,6 +508,7 @@ export async function runMetadataScanJob(params: {
               phase: "geocoding",
               processed: 0,
               total: 0,
+              gpsGeocodingEnabled,
               geoDataUpdated,
             });
           }
@@ -499,6 +517,7 @@ export async function runMetadataScanJob(params: {
         console.error(`[metadata-scan][${scanTs()}] geocoding phase error:`, geocodeErr);
       }
     }
+    emitFinalizingProgress(1);
 
     if (prepareCompletedFully) {
       const observedByFolder = new Map<string, Set<string>>();
@@ -526,6 +545,7 @@ export async function runMetadataScanJob(params: {
         );
       }
     }
+    emitFinalizingProgress(2);
 
     if (!job.cancelled && params.recursive) {
       for (const folderPath of scanFolders) {
@@ -533,6 +553,7 @@ export async function runMetadataScanJob(params: {
       }
       pruneFolderAnalysisStatusesNotInSet(params.folderPath, observedFolders, DEFAULT_LIBRARY_ID);
     }
+    emitFinalizingProgress(3);
   } finally {
     flushCompletedFolderScanBatch();
     if (job.powerSaveToken) {

@@ -29,7 +29,7 @@ export function SummaryStatusLines({
   const failedToneClass = tone === "green" ? "text-warning" : "text-destructive";
 
   const items: SummaryMetricGridItem[] = [];
-  if (hasMedia && showActionFirst) {
+  if (hasMedia && showActionFirst && remaining > 0) {
     items.push({ label: "To analyze", value: formatGroupedInt(remaining), valueClassName: actionToneClass });
   }
   if (hasMedia && showAnalyzedLine) {

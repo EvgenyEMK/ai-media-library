@@ -30,9 +30,17 @@ export function MetadataScanCard({
   metadataJobId,
   onCancelMetadataScan,
 }: MetadataScanCardProps): ReactElement {
-  const metadataSteps = metadataProgress.metadataGpsGeocodingEnabled ? 3 : 2;
+  const metadataSteps = metadataProgress.metadataGpsGeocodingEnabled ? 4 : 3;
   const metadataStepIndex =
-    metadataPhase === "preparing" ? 1 : metadataPhase === "scanning" ? 2 : metadataPhase === "geocoding" ? 3 : null;
+    metadataPhase === "preparing"
+      ? 1
+      : metadataPhase === "scanning"
+        ? 2
+        : metadataPhase === "geocoding"
+          ? 3
+          : metadataPhase === "finalizing"
+            ? metadataSteps
+            : null;
   const metadataStepPrefix =
     isMetadataScanning && metadataStepIndex !== null ? `${metadataStepIndex}/${metadataSteps}: ` : "";
   const metadataBarPercent =
@@ -45,11 +53,17 @@ export function MetadataScanCard({
     running: isMetadataScanning,
     jobId: metadataJobId,
     processed:
-      metadataPhase === "preparing" || metadataPhase === "scanning" || metadataPhase === "geocoding"
+      metadataPhase === "preparing" ||
+        metadataPhase === "scanning" ||
+        metadataPhase === "geocoding" ||
+        metadataPhase === "finalizing"
         ? metadataPhaseProcessed
         : metadataProgress.metadataProcessed,
     total:
-      metadataPhase === "preparing" || metadataPhase === "scanning" || metadataPhase === "geocoding"
+      metadataPhase === "preparing" ||
+        metadataPhase === "scanning" ||
+        metadataPhase === "geocoding" ||
+        metadataPhase === "finalizing"
         ? metadataPhaseTotal
         : metadataProgress.metadataTotal,
   });
@@ -59,7 +73,9 @@ export function MetadataScanCard({
       ? `${metadataProgress.metadataProgressLabel} ${formatCountRatio(metadataPhaseProcessed, metadataPhaseTotal)}`
       : isMetadataScanning && metadataPhase === "geocoding"
         ? `${metadataProgress.metadataProgressLabel} ${formatCountRatio(metadataPhaseProcessed, metadataPhaseTotal)} | With GPS: ${formatCount(metadataProgress.metadataGeoDataUpdated)}`
-        : `${metadataProgress.metadataProgressLabel ? `${metadataProgress.metadataProgressLabel} ` : ""}Processed: ${formatCountRatio(metadataProgress.metadataProcessed, metadataProgress.metadataTotal)} | New: ${formatCount(metadataProgress.metadataCounts.created)} | Updated: ${formatCount(metadataProgress.metadataCounts.updated)}${metadataProgress.metadataCounts.failed > 0 ? ` | Failed: ${formatCount(metadataProgress.metadataCounts.failed)}` : ""}${metadataProgress.metadataGpsGeocodingEnabled && metadataPhase !== "geocoding" ? ` | With GPS: ${formatCount(metadataProgress.metadataGeoDataUpdated)}` : ""}`;
+        : isMetadataScanning && metadataPhase === "finalizing"
+          ? `${metadataProgress.metadataProgressLabel} ${formatCountRatio(metadataPhaseProcessed, metadataPhaseTotal)}`
+          : `${metadataProgress.metadataProgressLabel ? `${metadataProgress.metadataProgressLabel} ` : ""}Processed: ${formatCountRatio(metadataProgress.metadataProcessed, metadataProgress.metadataTotal)} | New: ${formatCount(metadataProgress.metadataCounts.created)} | Updated: ${formatCount(metadataProgress.metadataCounts.updated)}${metadataProgress.metadataCounts.failed > 0 ? ` | Failed: ${formatCount(metadataProgress.metadataCounts.failed)}` : ""}${metadataProgress.metadataGpsGeocodingEnabled && metadataPhase !== "geocoding" ? ` | With GPS: ${formatCount(metadataProgress.metadataGeoDataUpdated)}` : ""}`;
   const rightText = metadataTimeLeftText
     ? `${UI_TEXT.analysisTimeLeftLabel}: ${metadataTimeLeftText}`
     : null;
@@ -101,6 +117,8 @@ export function MetadataScanCard({
           ? UI_TEXT.metadataScanPreparing
           : metadataPhase === "scanning"
             ? UI_TEXT.metadataScanScanning
+            : metadataPhase === "finalizing"
+              ? UI_TEXT.metadataScanFinalizing
             : "Metadata scan progress"
       }
       statsText={statsText}
