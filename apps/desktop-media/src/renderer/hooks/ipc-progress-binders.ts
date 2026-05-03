@@ -354,7 +354,8 @@ export function bindMetadataScanProgress(store: DesktopStore): () => void {
         s.metadataPhase = "preparing";
         s.metadataPhaseProcessed = 0;
         s.metadataPhaseTotal = event.total;
-        s.metadataGpsGeocodingEnabled = false;
+        s.metadataUserPhaseCount = event.metadataUserPhaseCount;
+        s.metadataGpsGeocodingEnabled = event.metadataUserPhaseCount === 4;
         s.metadataGeoDataUpdated = 0;
         s.metadataItemOrder = [];
         s.metadataItemsByKey = {};

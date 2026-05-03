@@ -166,6 +166,21 @@ export async function runMetadataScanJob(params: {
     status: "pending",
   }));
 
+  let pathExtractionEnabled = true;
+  let gpsGeocodingEnabled = false;
+  const userDataPath = app.getPath("userData");
+  const geonamesPath = resolveGeonamesPath(app);
+  try {
+    const appSettings = await readSettings(userDataPath);
+    pathExtractionEnabled = appSettings.pathExtraction.extractDates;
+    gpsGeocodingEnabled = appSettings.folderScanning.detectLocationFromGps;
+  } catch {
+    // Settings read failure — keep path extraction enabled as default
+  }
+  const metadataUserPhaseCount: 3 | 4 =
+    gpsGeocodingEnabled && scanEntries.length > 0 ? 4 : 3;
+  const gpsGeocodePhasePlanned = metadataUserPhaseCount === 4;
+
   emitProgress({
     type: "job-started",
     jobId,
@@ -174,6 +189,7 @@ export async function runMetadataScanJob(params: {
     triggerSource,
     total: items.length,
     items,
+    metadataUserPhaseCount,
   });
 
   const scanT0 = Date.now();
@@ -294,22 +310,10 @@ export async function runMetadataScanJob(params: {
       phase: "finalizing",
       processed,
       total: FINALIZING_TOTAL,
-      gpsGeocodingEnabled,
+      gpsGeocodingEnabled: gpsGeocodePhasePlanned,
       geoDataUpdated,
     });
   };
-
-  let pathExtractionEnabled = true;
-  let gpsGeocodingEnabled = false;
-  const userDataPath = app.getPath("userData");
-  const geonamesPath = resolveGeonamesPath(app);
-  try {
-    const appSettings = await readSettings(userDataPath);
-    pathExtractionEnabled = appSettings.pathExtraction.extractDates;
-    gpsGeocodingEnabled = appSettings.folderScanning.detectLocationFromGps;
-  } catch {
-    // Settings read failure — keep path extraction enabled as default
-  }
 
   try {
     if (!job.cancelled) {
@@ -442,7 +446,6 @@ export async function runMetadataScanJob(params: {
       cancelled = scanEntries.length;
       console.log(`[metadata-scan][${scanTs()}] scanning phase SKIPPED (cancelled) jobId=${jobId} total=${scanEntries.length}`);
     }
-    emitFinalizingProgress(0);
     let scannedMediaItemIds: string[] = [];
     if (!job.cancelled && scanEntries.length > 0) {
       const scannedPaths = scanEntries.map((entry) => entry.path);
@@ -451,7 +454,6 @@ export async function runMetadataScanJob(params: {
       scannedMediaItemIds = scannedRows.map((row) => row.id);
       filesWithGps = scannedRows.filter((row) => row.latitude != null && row.longitude != null).length;
     }
-    emitFinalizingProgress(1);
 
     // --- GPS reverse geocoding phase ---
     // Include every cataloged item in the scanned paths, not only created/updated rows,
@@ -517,7 +519,7 @@ export async function runMetadataScanJob(params: {
         console.error(`[metadata-scan][${scanTs()}] geocoding phase error:`, geocodeErr);
       }
     }
-    emitFinalizingProgress(1);
+    emitFinalizingProgress(0);
 
     if (prepareCompletedFully) {
       const observedByFolder = new Map<string, Set<string>>();
@@ -545,7 +547,7 @@ export async function runMetadataScanJob(params: {
         );
       }
     }
-    emitFinalizingProgress(2);
+    emitFinalizingProgress(1);
 
     if (!job.cancelled && params.recursive) {
       for (const folderPath of scanFolders) {
@@ -553,6 +555,7 @@ export async function runMetadataScanJob(params: {
       }
       pruneFolderAnalysisStatusesNotInSet(params.folderPath, observedFolders, DEFAULT_LIBRARY_ID);
     }
+    emitFinalizingProgress(2);
     emitFinalizingProgress(3);
   } finally {
     flushCompletedFolderScanBatch();

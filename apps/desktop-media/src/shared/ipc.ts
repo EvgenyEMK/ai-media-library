@@ -1490,6 +1490,8 @@ export type MetadataScanProgressEvent =
       triggerSource: MetadataScanTriggerSource;
       total: number;
       items: MetadataScanItemState[];
+      /** Fixed for the whole job: 4 = preparing→scanning→geocoding→finalizing; 3 = no geocoding phase. */
+      metadataUserPhaseCount: 3 | 4;
     }
   | {
       type: "phase-updated";

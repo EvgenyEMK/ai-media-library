@@ -30,7 +30,7 @@ export function MetadataScanCard({
   metadataJobId,
   onCancelMetadataScan,
 }: MetadataScanCardProps): ReactElement {
-  const metadataSteps = metadataProgress.metadataGpsGeocodingEnabled ? 4 : 3;
+  const metadataSteps = metadataProgress.metadataUserPhaseCount;
   const metadataStepIndex =
     metadataPhase === "preparing"
       ? 1

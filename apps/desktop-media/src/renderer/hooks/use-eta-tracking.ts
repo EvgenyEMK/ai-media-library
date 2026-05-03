@@ -335,6 +335,7 @@ export interface MetadataProgressState {
   metadataFolderName: string | null;
   metadataCardTitle: string;
   metadataGpsGeocodingEnabled: boolean;
+  metadataUserPhaseCount: 3 | 4;
   metadataGeoDataUpdated: number;
   metadataCounts: {
     running: number;
@@ -355,6 +356,7 @@ export function useMetadataProgress(): MetadataProgressState {
   const metadataPhaseTotal = useDesktopStore((s) => s.metadataPhaseTotal);
   const metadataItemsByKey = useDesktopStore((s) => s.metadataItemsByKey);
   const metadataGpsGeocodingEnabled = useDesktopStore((s) => s.metadataGpsGeocodingEnabled);
+  const metadataUserPhaseCount = useDesktopStore((s) => s.metadataUserPhaseCount);
   const metadataGeoDataUpdated = useDesktopStore((s) => s.metadataGeoDataUpdated);
   const isMetadataScanning = metadataStatus === "running";
 
@@ -454,6 +456,7 @@ export function useMetadataProgress(): MetadataProgressState {
     metadataFolderName,
     metadataCardTitle,
     metadataGpsGeocodingEnabled,
+    metadataUserPhaseCount,
     metadataGeoDataUpdated: metadataSummary?.geoDataUpdated ?? metadataGeoDataUpdated,
     metadataCounts,
   };

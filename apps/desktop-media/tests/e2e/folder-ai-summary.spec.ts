@@ -41,10 +41,30 @@ test.describe("Folder AI summary", () => {
     await rootRowButton.click();
 
     await mainWindow.evaluate(async (folderPath) => {
-      await window.desktopApi.scanFolderMetadata({
+      const completion = new Promise<void>((resolve, reject) => {
+        let jobId: string | null = null;
+        const timer = window.setTimeout(() => {
+          unsub();
+          reject(new Error("Timed out waiting for metadata scan job-completed"));
+        }, 120_000);
+        const unsub = window.desktopApi.onMetadataScanProgress((event) => {
+          if (event.type === "job-started" && event.folderPath === folderPath) {
+            jobId = event.jobId;
+            return;
+          }
+          if (event.type === "job-completed" && jobId !== null && event.jobId === jobId) {
+            window.clearTimeout(timer);
+            unsub();
+            resolve();
+          }
+        });
+      });
+      const scanPromise = window.desktopApi.scanFolderMetadata({
         folderPath,
         recursive: true,
       });
+      await completion;
+      await scanPromise;
     }, fixture.subA);
 
     await rootRowButton.click({ button: "right" });
@@ -57,9 +77,10 @@ test.describe("Folder AI summary", () => {
     const folderTreeScanCard = mainWindow
       .getByRole("heading", { name: "Folder tree scan" })
       .locator("xpath=ancestor::section[contains(@class,'border')]");
-    await expect(folderTreeScanCard.getByText("Folders missing full scan")).toBeVisible();
+    // Fixture has direct media only under `sub-a`; scanning `sub-a` covers the only direct-media folder in the root tree.
     await expect(folderTreeScanCard.getByText("Folders analyzed (quick scan)")).toBeVisible();
-    await expect(folderTreeScanCard).toHaveClass(/border-destructive/);
+    await expect(folderTreeScanCard).not.toContainText("Folders missing full scan");
+    await expect(folderTreeScanCard).toHaveClass(/border-success/);
     await expect(folderTreeScanCard.getByText("Last file change")).toBeVisible();
     await expect(folderTreeScanCard.locator(".inline-grid").getByText(/\d{1,2} \w+ \d{4}/)).toBeVisible();
   });
