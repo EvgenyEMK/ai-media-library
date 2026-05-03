@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactElement } from "react";
 import { RefreshCw, X } from "lucide-react";
 import type {
   DesktopMediaItemMetadata,
@@ -383,48 +383,81 @@ export function DesktopFolderAiSummaryView({
 
   const aiGeoStream = useFolderAiSummaryTableStream(folderPath, aiGeoStreamEnabled);
 
+  const summaryPageStickyStackRef = useRef<HTMLDivElement>(null);
+  const [stickyStackHeightPx, setStickyStackHeightPx] = useState(88);
+
+  const showSummaryTabs =
+    !loading &&
+    !error &&
+    !isFailedListView &&
+    Boolean(selectedWithSubfolders && selectedDirectOnly && dashboardCoverage);
+
+  useLayoutEffect(() => {
+    const el = summaryPageStickyStackRef.current;
+    if (!el) return;
+    const measure = (): void => {
+      setStickyStackHeightPx(Math.ceil(el.getBoundingClientRect().height));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return (): void => {
+      ro.disconnect();
+    };
+  }, [showSummaryTabs, activeTab, summaryTitle, isFailedListView, folderPath, loading, error]);
+
+  const stickyStackCssVar: CSSProperties = {
+    ["--folder-ai-sticky-stack-offset" as string]: `${stickyStackHeightPx}px`,
+  };
+
   return (
-    <div className="relative flex w-full max-w-screen-2xl flex-col gap-4 px-5 py-4">
-      <div className="sticky top-0 z-20 flex flex-wrap items-start justify-between gap-3 border-b border-border bg-background/95 pb-3 pt-1 backdrop-blur">
-        <div className="min-w-0 flex-1">
-          <h2 className="m-0 text-lg">
-            {isFailedListView ? UI_TEXT.folderAiSummaryFailedListTitle : summaryTitle}
-          </h2>
-          <p className="m-0 mt-1 break-all text-sm text-muted-foreground">{folderPath}</p>
-        </div>
-        <div className="inline-flex shrink-0 items-center gap-2">
-          {!loading ? (
+    <div className="relative flex w-full max-w-screen-2xl flex-col gap-0 px-5 py-4" style={stickyStackCssVar}>
+      <div
+        ref={summaryPageStickyStackRef}
+        className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3 pb-3 pt-1">
+          <div className="min-w-0 flex-1">
+            <h2 className="m-0 text-lg">
+              {isFailedListView ? UI_TEXT.folderAiSummaryFailedListTitle : summaryTitle}
+            </h2>
+            <p className="m-0 mt-1 break-all text-sm text-muted-foreground">{folderPath}</p>
+          </div>
+          <div className="inline-flex shrink-0 items-center gap-2">
+            {!loading ? (
+              <button
+                type="button"
+                className={iconBtnClass}
+                onClick={() => {
+                  if (failedListContext) void loadFailedList(failedListContext);
+                  else {
+                    void load();
+                    if (activeTab === "face") faceStream.refresh();
+                    if (activeTab === "ai" || activeTab === "geo") aiGeoStream.refresh();
+                  }
+                }}
+                aria-label={UI_TEXT.folderAiSummaryRefresh}
+                title={UI_TEXT.folderAiSummaryRefresh}
+              >
+                <RefreshCw size={18} aria-hidden="true" />
+              </button>
+            ) : null}
             <button
               type="button"
               className={iconBtnClass}
-              onClick={() => {
-                if (failedListContext) void loadFailedList(failedListContext);
-                else {
-                  void load();
-                  if (activeTab === "face") faceStream.refresh();
-                  if (activeTab === "ai" || activeTab === "geo") aiGeoStream.refresh();
-                }
-              }}
-              aria-label={UI_TEXT.folderAiSummaryRefresh}
-              title={UI_TEXT.folderAiSummaryRefresh}
+              onClick={onBackToPhotos}
+              aria-label={UI_TEXT.folderAiSummaryBack}
+              title={UI_TEXT.folderAiSummaryBack}
             >
-              <RefreshCw size={18} aria-hidden="true" />
+              <X size={18} aria-hidden="true" />
             </button>
-          ) : null}
-          <button
-            type="button"
-            className={iconBtnClass}
-            onClick={onBackToPhotos}
-            aria-label={UI_TEXT.folderAiSummaryBack}
-            title={UI_TEXT.folderAiSummaryBack}
-          >
-            <X size={18} aria-hidden="true" />
-          </button>
+          </div>
         </div>
+        {showSummaryTabs ? <SummaryTabs activeTab={activeTab} onTabChange={setActiveTab} /> : null}
       </div>
 
       {isFailedListView ? (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1">
           <button
             type="button"
             className="m-0 inline-flex h-8 items-center justify-center rounded-md border border-input bg-secondary px-3 text-sm shadow-none"
@@ -438,43 +471,46 @@ export function DesktopFolderAiSummaryView({
         </div>
       ) : null}
 
-      {error ? <p className="m-0 text-red-400">{error}</p> : null}
+      {error ? <p className="m-0 mt-4 text-red-400">{error}</p> : null}
 
       {!error && !isFailedListView && (loading || !selectedWithSubfolders || !selectedDirectOnly || !dashboardCoverage) ? (
-        <DesktopFolderAiSummaryDashboard
-          coverage={dashboardCoverage ?? undefined}
-          overview={dashboardOverview}
-          hasSubfolders={hasSubfolders}
-          overviewLoading={overviewLoading || !dashboardOverview}
-          folderScanLoading={folderScanLoading || !dashboardOverview}
-          coverageLoading={coverageLoading || !dashboardCoverage}
-        />
+        <div className="mt-4">
+          <DesktopFolderAiSummaryDashboard
+            coverage={dashboardCoverage ?? undefined}
+            overview={dashboardOverview}
+            hasSubfolders={hasSubfolders}
+            overviewLoading={overviewLoading || !dashboardOverview}
+            folderScanLoading={folderScanLoading || !dashboardOverview}
+            coverageLoading={coverageLoading || !dashboardCoverage}
+          />
+        </div>
       ) : null}
 
       {!loading && !error && !isFailedListView && selectedWithSubfolders && selectedDirectOnly && dashboardCoverage ? (
         <>
-          <SummaryTabs activeTab={activeTab} onTabChange={setActiveTab} />
           {activeTab === "summary" ? (
-            <DesktopFolderAiSummaryDashboard
-              coverage={dashboardCoverage}
-              overview={dashboardOverview}
-              hasSubfolders={hasSubfolders}
-              overviewLoading={overviewLoading || !dashboardOverview}
-              folderScanLoading={folderScanLoading || !dashboardOverview}
-              coverageLoading={coverageLoading}
-              actionPendingPipeline={actionPendingPipeline}
-              onRunPipeline={(pipeline) => void runDashboardPipeline(pipeline)}
-              actionPendingGeoLocation={folderScanPending}
-              onRunGeoLocation={() => void runFolderScanWithSubfolders()}
-              onOpenPipelineInfo={openOnboarding}
-              onViewRotationResults={
-                (dashboardCoverage.rotation.issueCount ?? 0) > 0 && onOpenRotationReview
-                  ? () => onOpenRotationReview(folderPath, true)
-                  : undefined
-              }
-              actionPendingFolderScan={folderScanPending}
-              onRunFolderScan={() => void runFolderScanWithSubfolders()}
-            />
+            <div className="mt-4">
+              <DesktopFolderAiSummaryDashboard
+                coverage={dashboardCoverage}
+                overview={dashboardOverview}
+                hasSubfolders={hasSubfolders}
+                overviewLoading={overviewLoading || !dashboardOverview}
+                folderScanLoading={folderScanLoading || !dashboardOverview}
+                coverageLoading={coverageLoading}
+                actionPendingPipeline={actionPendingPipeline}
+                onRunPipeline={(pipeline) => void runDashboardPipeline(pipeline)}
+                actionPendingGeoLocation={folderScanPending}
+                onRunGeoLocation={() => void runFolderScanWithSubfolders()}
+                onOpenPipelineInfo={openOnboarding}
+                onViewRotationResults={
+                  (dashboardCoverage.rotation.issueCount ?? 0) > 0 && onOpenRotationReview
+                    ? () => onOpenRotationReview(folderPath, true)
+                    : undefined
+                }
+                actionPendingFolderScan={folderScanPending}
+                onRunFolderScan={() => void runFolderScanWithSubfolders()}
+              />
+            </div>
           ) : null}
           {activeTab === "face" ? (
             faceStream.streamError && faceStream.rowSpecs.length === 0 ? (

@@ -11,8 +11,9 @@ import { UI_TEXT } from "../lib/ui-text";
 import { FaceSummaryRow } from "./desktop-folder-face-summary-table-row";
 import { PendingSpinner } from "./folder-ai-summary/SummaryStatusGlyph";
 
+/** `top` from `--folder-ai-sticky-stack-offset` (set on Folder AI summary page root). */
 const headerClass =
-  "sticky top-[88px] z-[2] border-b border-border bg-[#151d2e] px-3 py-2.5 text-left text-sm font-semibold tracking-wide text-foreground shadow-[0_1px_0_#2a3040]";
+  "sticky z-[2] border-b border-border bg-[#151d2e] px-3 py-2.5 text-left text-sm font-semibold tracking-wide text-foreground shadow-[0_1px_0_#2a3040] [top:var(--folder-ai-sticky-stack-offset,88px)]";
 
 export interface DesktopFolderFaceSummaryTableProps {
   rootFolderPath: string;

@@ -28,7 +28,7 @@ interface DesktopFolderGeoSummaryTableProps {
 }
 
 const headerClass =
-  "sticky top-[88px] z-[2] border-b border-border bg-[#151d2e] px-3 py-2.5 text-left text-sm font-semibold tracking-wide text-foreground shadow-[0_1px_0_#2a3040]";
+  "sticky z-[2] border-b border-border bg-[#151d2e] px-3 py-2.5 text-left text-sm font-semibold tracking-wide text-foreground shadow-[0_1px_0_#2a3040] [top:var(--folder-ai-sticky-stack-offset,88px)]";
 
 function CoverageBar({
   title,
