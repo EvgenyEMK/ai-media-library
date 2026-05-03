@@ -20,7 +20,6 @@ import {
   type PathExtractionSettings,
   type PhotoAnalysisSettings,
   type SmartAlbumSettings,
-  type MetadataManualScanResultPayload,
   type WrongImageRotationDetectionSettings,
 } from "../../shared/ipc";
 import {
@@ -61,8 +60,6 @@ export interface DesktopSlice {
     foldersNeedingAiFollowUpCount: number;
   };
 
-  /** Manual “Scan for file changes” only: detailed per-group file lists after the job. */
-  metadataManualScanResult: MetadataManualScanResultPayload | null;
   lastMetadataScanCompletion: MetadataScanCompletionSignal | null;
   lastAiPipelineCompletion: AiPipelineCompletionSignal | null;
 
@@ -142,7 +139,6 @@ export interface DesktopSlice {
     foldersNeedingAiFollowUpCount: number;
   }) => void;
   clearMetadataScanFollowUp: () => void;
-  setMetadataManualScanResult: (payload: MetadataManualScanResultPayload | null) => void;
   setLastMetadataScanCompletion: (payload: MetadataScanCompletionSignal) => void;
   setLastAiPipelineCompletion: (payload: AiPipelineCompletionSignal) => void;
   setFolderLoading: (loading: boolean) => void;
@@ -220,7 +216,6 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   folderAnalysisByPath: {},
   folderRollupByPath: {},
   metadataScanFollowUp: null,
-  metadataManualScanResult: null,
   lastMetadataScanCompletion: null,
   lastAiPipelineCompletion: null,
   isFolderLoading: false,
@@ -347,11 +342,6 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   clearMetadataScanFollowUp: () =>
     set((state) => {
       state.metadataScanFollowUp = null;
-    }),
-
-  setMetadataManualScanResult: (payload) =>
-    set((state) => {
-      state.metadataManualScanResult = payload;
     }),
 
   setLastMetadataScanCompletion: (payload) =>

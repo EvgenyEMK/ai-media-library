@@ -18,13 +18,6 @@ test.afterAll(() => {
   removeMoveChurnFixture(fixture);
 });
 
-async function closeScanResultsIfVisible(mainWindow: Parameters<typeof mainDesktopSidebar>[0]): Promise<void> {
-  const closeButton = mainWindow.getByRole("button", { name: "Close scan results" });
-  if (await closeButton.isVisible()) {
-    await closeButton.click();
-  }
-}
-
 async function expandBackgroundOperationsPanelIfNeeded(
   mainWindow: Parameters<typeof mainDesktopSidebar>[0],
 ): Promise<void> {
@@ -53,7 +46,6 @@ test.describe("Folder AI summary", () => {
         recursive: true,
       });
     }, fixture.subA);
-    await closeScanResultsIfVisible(mainWindow);
 
     await rootRowButton.click({ button: "right" });
     await mainWindow
@@ -90,7 +82,6 @@ test.describe("Folder AI summary", () => {
         recursive: true,
       });
     }, fixture.root);
-    await closeScanResultsIfVisible(mainWindow);
 
     await rootRowButton.click({ button: "right" });
     await mainWindow
@@ -180,7 +171,6 @@ test.describe("Folder AI summary", () => {
         recursive: true,
       });
     }, fixture.root);
-    await closeScanResultsIfVisible(mainWindow);
 
     // Trigger from Folder AI summary play button.
     await rootRowButton.click({ button: "right" });
@@ -247,7 +237,6 @@ test.describe("Folder AI summary", () => {
         recursive: true,
       });
     }, fixture.root);
-    await closeScanResultsIfVisible(mainWindow);
 
     await rootRowButton.click({ button: "right" });
     await mainWindow
@@ -290,7 +279,6 @@ test.describe("Folder AI summary", () => {
         recursive: true,
       });
     }, fixture.root);
-    await closeScanResultsIfVisible(mainWindow);
 
     await rootRowButton.click({ button: "right" });
     await mainWindow

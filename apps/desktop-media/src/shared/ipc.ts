@@ -1458,7 +1458,7 @@ export interface ScanFolderMetadataResult {
   total: number;
 }
 
-export type MetadataScanPhase = "preparing" | "scanning" | "geocoding";
+export type MetadataScanPhase = "preparing" | "scanning" | "geocoding" | "finalizing";
 
 export type MetadataScanTriggerSource = "manual" | "auto";
 
@@ -1481,19 +1481,6 @@ export interface MetadataScanDeletedFileRef {
   sourcePath: string;
 }
 
-/** Snapshot shown in the manual scan result overlay (renderer). */
-export interface MetadataManualScanResultPayload {
-  jobId: string;
-  folderPath: string;
-  recursive: boolean;
-  scanCancelled: boolean;
-  filesCreated: MetadataScanFilePathRef[];
-  filesUpdated: MetadataScanFilePathRef[];
-  filesFailed: MetadataScanFailedFileRef[];
-  pathMoves: MetadataScanPathMove[];
-  filesDeleted: MetadataScanDeletedFileRef[];
-}
-
 export type MetadataScanProgressEvent =
   | {
       type: "job-started";
@@ -1510,6 +1497,7 @@ export type MetadataScanProgressEvent =
       phase: MetadataScanPhase;
       processed: number;
       total: number;
+      gpsGeocodingEnabled?: boolean;
       geoDataUpdated?: number;
     }
   | {
