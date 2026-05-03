@@ -70,17 +70,13 @@ export function DesktopFolderFaceSummaryTable({
               <th className={headerClass}>
                 <div className="flex flex-col gap-0.5">
                   <span>{UI_TEXT.folderFaceTableColumnFaceDetectionLine1}</span>
-                  <span className="text-xs font-normal tracking-normal text-muted-foreground">
-                    {UI_TEXT.folderFaceTableColumnFaceDetectionLine2}
-                  </span>
+                  <span>{UI_TEXT.folderFaceTableColumnFaceDetectionLine2}</span>
                 </div>
               </th>
               <th className={headerClass}>
                 <div className="flex flex-col gap-0.5">
                   <span title={UI_TEXT.folderFaceTableTaggedHelp}>{UI_TEXT.folderFaceTableColumnFacesTaggedLine1}</span>
-                  <span className="text-xs font-normal tracking-normal text-muted-foreground">
-                    {UI_TEXT.folderFaceTableColumnFacesTaggedLine2}
-                  </span>
+                  <span>{UI_TEXT.folderFaceTableColumnFacesTaggedLine2}</span>
                 </div>
               </th>
               <th className={headerClass}>{UI_TEXT.folderFaceTableColumnSuggestedMatches}</th>

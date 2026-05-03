@@ -88,14 +88,14 @@ export const UI_TEXT = {
   folderAiSummarySubfolders: "Sub-folders",
   folderFaceTableColumnFaceDetectionLine1: "Face detection",
   folderFaceTableColumnFaceDetectionLine2: "status",
-  folderFaceTableColumnFacesTaggedLine1: "Faces",
-  folderFaceTableColumnFacesTaggedLine2: "Tagged",
+  folderFaceTableColumnFacesTaggedLine1: "Faces found",
+  folderFaceTableColumnFacesTaggedLine2: "Faces tagged",
   folderFaceTableColumnSuggestedMatches: "Suggested matches",
   folderFaceTableColumnPeoplePerImage: "People per image",
   /** People-per-image cell: prefix before person icon for the four-or-more bucket */
   folderFaceTablePeoplePerImageFourPlusPrefix: "4+",
   folderFaceTableTaggedHelp:
-    "Tagged counts faces with a confirmed person-tag (applied directly or via accepted suggestion).",
+    "Faces tagged counts faces with a confirmed person-tag (applied directly or via accepted suggestion).",
   folderFaceTableComputing: "Computing face statistics…",
   folderAiPipelineTableComputing: "Computing pipeline coverage…",
   folderAiSummaryLoading: "Loading summary…",
