@@ -4,7 +4,8 @@ import type { FolderAiCoverageReport, FolderAiPipelineCounts, FolderGeoMediaCove
 import { cn } from "../../lib/cn";
 import { formatCoveragePercent, formatGroupedInt } from "../../lib/folder-ai-summary-formatters";
 import { UI_TEXT } from "../../lib/ui-text";
-import { PendingSpinner, SummaryStatusGlyph } from "./SummaryStatusGlyph";
+import { SummaryStatusGlyph } from "./SummaryStatusGlyph";
+import { PendingSpinner } from "./SummaryStatusPrimitives";
 import type { FolderAiPipelineQueueStatus } from "../../lib/folder-ai-pipeline-queue-status";
 import { SummaryMetricGrid } from "./SummaryMetricGrid";
 import { statusTone, toneBorder, toneText } from "./summary-card-formatters";

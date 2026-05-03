@@ -3,6 +3,7 @@ import type { FolderAiSummaryOverview } from "../../src/shared/ipc";
 import { IMAGE_EXTENSIONS, VIDEO_EXTENSIONS } from "../../src/shared/ipc";
 import { getDesktopDatabase } from "./client";
 import { DEFAULT_LIBRARY_ID } from "./folder-analysis-status";
+import { folderPathMatchesStored } from "./folder-path-matching";
 
 function escapeLikePattern(value: string): string {
   return value.replace(/[%_~]/g, "~$&");
@@ -12,6 +13,10 @@ function separatorForFolderPath(folderPath: string): string {
   if (folderPath.includes("\\")) return "\\";
   if (folderPath.includes("/")) return "/";
   return path.sep;
+}
+
+function normalizeFolderLookupKey(folderPath: string): string {
+  return path.normalize(folderPath.trim());
 }
 
 function extensionPredicate(alias: string, extensions: Set<string>): string {
@@ -42,10 +47,7 @@ function emptyOverview(folderPath: string, recursive: boolean): FolderAiSummaryO
       scannedCount: 0,
       unscannedCount: 0,
       totalMedia: 0,
-      directSubfolderCount: 0,
-      notFullyScannedDirectSubfolderCount: 0,
-      outdatedScannedFolderCount: 0,
-      scannedFolderCount: 0,
+      folderTreeQuickScan: null,
     },
   };
 }
@@ -140,10 +142,7 @@ export function getFolderSummaryOverview(params: {
       scannedCount,
       unscannedCount,
       totalMedia: scannedCount + unscannedCount,
-      directSubfolderCount: 0,
-      notFullyScannedDirectSubfolderCount: 0,
-      outdatedScannedFolderCount: 0,
-      scannedFolderCount: 0,
+      folderTreeQuickScan: null,
     },
   };
 }
@@ -188,24 +187,44 @@ export function getFolderMetadataScanCompletedAtByPath(
   folderPaths: string[],
   libraryId = DEFAULT_LIBRARY_ID,
 ): Record<string, string | null> {
-  const normalizedPaths = Array.from(new Set(folderPaths.map((folderPath) => folderPath.trim()).filter(Boolean)));
-  if (normalizedPaths.length === 0) return {};
+  const originals = folderPaths.filter((p) => p?.trim());
+  if (originals.length === 0) return {};
 
-  const placeholders = normalizedPaths.map(() => "?").join(", ");
-  const rows = getDesktopDatabase()
-    .prepare(
-      `SELECT folder_path, metadata_scanned_at
-       FROM folder_analysis_status
-       WHERE library_id = ?
-         AND folder_path IN (${placeholders})`,
-    )
-    .all(libraryId, ...normalizedPaths) as Array<{
-    folder_path: string;
-    metadata_scanned_at: string | null;
-  }>;
+  const normalizedSet = Array.from(
+    new Set(originals.map((folderPath) => normalizeFolderLookupKey(folderPath)).filter(Boolean)),
+  );
+  if (normalizedSet.length === 0) return {};
 
-  return rows.reduce<Record<string, string | null>>((acc, row) => {
-    acc[row.folder_path] = row.metadata_scanned_at;
-    return acc;
-  }, {});
+  const db = getDesktopDatabase();
+  const rows =
+    process.platform === "win32"
+      ? (db
+          .prepare(
+            `SELECT folder_path, metadata_scanned_at
+             FROM folder_analysis_status
+             WHERE library_id = ?
+               AND folder_path COLLATE NOCASE IN (${normalizedSet.map(() => "?").join(", ")})`,
+          )
+          .all(libraryId, ...normalizedSet) as Array<{
+          folder_path: string;
+          metadata_scanned_at: string | null;
+        }>)
+      : (db
+          .prepare(
+            `SELECT folder_path, metadata_scanned_at
+             FROM folder_analysis_status
+             WHERE library_id = ?
+               AND folder_path IN (${normalizedSet.map(() => "?").join(", ")})`,
+          )
+          .all(libraryId, ...normalizedSet) as Array<{
+          folder_path: string;
+          metadata_scanned_at: string | null;
+        }>);
+
+  const result: Record<string, string | null> = {};
+  for (const original of originals) {
+    const hit = rows.find((row) => folderPathMatchesStored(row.folder_path, original));
+    result[original] = hit?.metadata_scanned_at ?? null;
+  }
+  return result;
 }

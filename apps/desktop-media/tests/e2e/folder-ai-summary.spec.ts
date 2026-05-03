@@ -35,7 +35,7 @@ async function expandBackgroundOperationsPanelIfNeeded(
 }
 
 test.describe("Folder AI summary", () => {
-  test("folder tree scan card counts only direct children missing scan timestamps", async ({
+  test("folder tree scan card reflects full-tree scan coverage", async ({
     electronApp,
     mainWindow,
   }) => {
@@ -65,8 +65,8 @@ test.describe("Folder AI summary", () => {
     const folderTreeScanCard = mainWindow
       .getByRole("heading", { name: "Folder tree scan" })
       .locator("xpath=ancestor::section[contains(@class,'border')]");
-    await expect(folderTreeScanCard.getByText("Not scanned direct subfolders")).toBeVisible();
-    await expect(folderTreeScanCard.locator(".inline-grid").getByText("1", { exact: true })).toBeVisible();
+    await expect(folderTreeScanCard.getByText("Folders missing full scan")).toBeVisible();
+    await expect(folderTreeScanCard.getByText("Folders analyzed (quick scan)")).toBeVisible();
     await expect(folderTreeScanCard).toHaveClass(/border-destructive/);
     await expect(folderTreeScanCard.getByText("Last file change")).toBeVisible();
     await expect(folderTreeScanCard.locator(".inline-grid").getByText(/\d{1,2} \w+ \d{4}/)).toBeVisible();

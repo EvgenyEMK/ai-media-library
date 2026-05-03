@@ -666,6 +666,22 @@ const MIGRATIONS: Array<{ id: string; sql: string }> = [
       ALTER TABLE media_tags ADD COLUMN birth_date TEXT;
     `,
   },
+  {
+    id: "026_folder_quick_scan_snapshot",
+    sql: `
+      CREATE TABLE IF NOT EXISTS folder_quick_scan_snapshot (
+        library_id TEXT NOT NULL,
+        folder_path TEXT NOT NULL,
+        dir_mtime_ms INTEGER NOT NULL,
+        subdir_names_sig TEXT NOT NULL DEFAULT '',
+        media_files_sig TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (library_id, folder_path)
+      );
+      CREATE INDEX IF NOT EXISTS idx_folder_quick_scan_snapshot_library_path
+        ON folder_quick_scan_snapshot (library_id, folder_path);
+    `,
+  },
 ];
 
 let db: SQLiteDatabase | null = null;

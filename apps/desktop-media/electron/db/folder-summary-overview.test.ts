@@ -81,10 +81,7 @@ describe("getFolderSummaryOverview", () => {
       scannedCount: 10,
       unscannedCount: 5,
       totalMedia: 15,
-      directSubfolderCount: 0,
-      notFullyScannedDirectSubfolderCount: 0,
-      outdatedScannedFolderCount: 0,
-      scannedFolderCount: 0,
+      folderTreeQuickScan: null,
     });
     expect(getCalls[0]?.args).toEqual([
       "local-default",
@@ -141,15 +138,18 @@ describe("getFolderMetadataScanCompletedAtByPath", () => {
 
     expect(scans).toEqual({
       "C:\\photos\\scanned": "2026-04-28T08:00:00.000Z",
+      "C:\\photos\\missing-row": null,
       "C:\\photos\\null-scan": null,
     });
-    expect(allCalls[0]?.args).toEqual([
-      "local-default",
-      "C:\\photos\\scanned",
-      "C:\\photos\\missing-row",
-      "C:\\photos\\null-scan",
-    ]);
-    expect(allCalls[0]?.sql).toContain("folder_path IN (?, ?, ?)");
+    const expectedBindArgs =
+      process.platform === "win32"
+        ? ["local-default", "C:\\photos\\scanned", "C:\\photos\\missing-row", "C:\\photos\\null-scan"]
+        : ["local-default", "C:\\photos\\scanned", "C:\\photos\\missing-row", "C:\\photos\\null-scan"];
+    expect(allCalls[0]?.args).toEqual(expectedBindArgs);
+    expect(
+      allCalls[0]?.sql.includes("folder_path IN (?, ?, ?)") ||
+        allCalls[0]?.sql.includes("folder_path COLLATE NOCASE IN (?, ?, ?)"),
+    ).toBe(true);
   });
 
   it("skips the database when no folder paths are provided", () => {

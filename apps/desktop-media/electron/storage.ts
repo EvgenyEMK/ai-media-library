@@ -314,6 +314,10 @@ function sanitizeFolderScanningSettings(candidate: unknown): FolderScanningSetti
         DEFAULT_FOLDER_SCANNING_SETTINGS.markFolderScanOutdatedAfterDays,
       ),
     ),
+    quickScanMovedFileMatchMode:
+      value.quickScanMovedFileMatchMode === "content-hash"
+        ? "content-hash"
+        : DEFAULT_FOLDER_SCANNING_SETTINGS.quickScanMovedFileMatchMode,
   };
 }
 

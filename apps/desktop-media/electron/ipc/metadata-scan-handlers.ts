@@ -528,7 +528,7 @@ export async function runMetadataScanJob(params: {
     }
 
     if (!job.cancelled && params.recursive) {
-      for (const folderPath of entriesByFolder.keys()) {
+      for (const folderPath of scanFolders) {
         observedFolders.add(folderPath);
       }
       pruneFolderAnalysisStatusesNotInSet(params.folderPath, observedFolders, DEFAULT_LIBRARY_ID);

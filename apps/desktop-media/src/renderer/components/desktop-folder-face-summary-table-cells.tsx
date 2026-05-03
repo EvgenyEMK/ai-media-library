@@ -5,7 +5,7 @@ import { cn } from "../lib/cn";
 import { formatGroupedInt } from "../lib/folder-ai-summary-formatters";
 import { summarizeMainSubjectsBuckets } from "../lib/main-subject-histogram-buckets";
 import { UI_TEXT } from "../lib/ui-text";
-import { PendingSpinner } from "./folder-ai-summary/SummaryStatusGlyph";
+import { PendingSpinner } from "./folder-ai-summary/SummaryStatusPrimitives";
 
 export function CellSpinner(): ReactElement {
   return (

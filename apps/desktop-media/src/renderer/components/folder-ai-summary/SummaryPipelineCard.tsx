@@ -6,8 +6,9 @@ import { cn } from "../../lib/cn";
 import { formatGroupedInt } from "../../lib/folder-ai-summary-formatters";
 import type { SummaryPipelineKind } from "../../types/folder-ai-summary-types";
 import { SummaryActionCard } from "./SummaryActionCard";
+import { SummaryCardStatusStack } from "./SummaryCardStatusStack";
 import type { SummaryMetricGridItem } from "./SummaryMetricGrid";
-import { SummaryStatusGlyph, PendingSpinner } from "./SummaryStatusGlyph";
+import { SummaryStatusGlyph } from "./SummaryStatusGlyph";
 import { SummaryStatusLines } from "./SummaryStatusLines";
 import { statusTone } from "./summary-card-formatters";
 import type { SummaryStatusTone } from "./summary-card-types";
@@ -106,12 +107,15 @@ export function SummaryPipelineCard({
       tone={tone}
       titleClassName={titleClass}
       statusSlot={
-        <>
-          {loading ? <PendingSpinner className="h-8 w-8" /> : <SummaryStatusGlyph pipeline={pipeline} />}
-          {!loading && tone === "amber" && pipeline.totalImages > 0 && pipeline.doneCount > 0 ? (
-            <span className="text-xs text-muted-foreground">{formatGroupedInt(pipeline.doneCount)}</span>
-          ) : null}
-        </>
+        <SummaryCardStatusStack
+          loading={loading}
+          topRow={<SummaryStatusGlyph pipeline={pipeline} />}
+          bottomRow={
+            !loading && tone === "amber" && pipeline.totalImages > 0 && pipeline.doneCount > 0
+              ? formatGroupedInt(pipeline.doneCount)
+              : undefined
+          }
+        />
       }
       actionSlot={actionSlot}
       onInfoClick={onInfoClick}

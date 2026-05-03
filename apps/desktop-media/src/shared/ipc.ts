@@ -470,6 +470,53 @@ export interface WrongImageRotationDetectionSettings {
   useFaceLandmarkFeaturesFallback: boolean;
 }
 
+/** How quick scan pairs "deleted + new" file rows as moves under a scanned tree. */
+export type QuickScanMovedFileMatchMode = "name-size" | "content-hash";
+
+export interface FolderTreeQuickScanMoveItem {
+  filename: string;
+  fromFolderPath: string;
+  toFolderPath: string;
+  previousPath: string;
+  newPath: string;
+}
+
+/**
+ * Result of normal + ultra folder-tree quick scans (see main-process `[debug][folder-tree-scan]`).
+ *
+ * **Folder-level `metadata_scanned_at` vs per-file `metadata_extracted_at`:** a directory can show
+ * `metadata_scanned_at` set after a metadata folder scan even if some files under it still have
+ * `metadata_extracted_at` null (e.g. new files added later, failed extraction, or not yet processed).
+ * Coverage % and “missing full scan” use only folders with **direct** image/video files on disk
+ * (denominator `treeFoldersWithDirectMediaOnDiskCount`); container-only dirs are excluded.
+ */
+export interface FolderTreeQuickScanResult {
+  ultraFastScanMs: number;
+  normalScanMs: number;
+  /** Disk layout walk + catalog diff (same wall time as interactive “normal” quick scan when ultra is off). */
+  normalTotalMs: number;
+  ultraChangedFolderCount: number;
+  /** Directories visited during the quick-scan disk walk (includes the root folder). */
+  ultraFoldersScanned: number;
+  ultraBaselineSeeded: boolean;
+  /** Walked folders that have ≥1 direct image/video on disk (coverage denominator). */
+  treeFoldersWithDirectMediaOnDiskCount: number;
+  /** Among those, count with `folder_analysis_status.metadata_scanned_at` set (coverage numerator). */
+  treeFoldersWithMetadataFolderScanCount: number;
+  /** Oldest `metadata_scanned_at` among direct-media folders that have it; drives amber when fully covered. */
+  oldestMetadataFolderScanAtAmongWalkedFolders: string | null;
+  newFileCount: number;
+  modifiedFileCount: number;
+  deletedFileCount: number;
+  movedFileCount: number;
+  newOrModifiedFolderCount: number;
+  movedMatchModeUsed: QuickScanMovedFileMatchMode;
+  deletedSamplePaths: string[];
+  movedItems: FolderTreeQuickScanMoveItem[];
+  newSamplePaths: string[];
+  modifiedSamplePaths: string[];
+}
+
 /** Single-folder image count threshold for automatic metadata scan after folder selection. */
 export interface FolderScanningSettings {
   /**
@@ -492,6 +539,11 @@ export interface FolderScanningSettings {
   detectLocationFromGps: boolean;
   /** Mark folder scan freshness as outdated when the oldest scan in the tree is older than this many days. */
   markFolderScanOutdatedAfterDays: number;
+  /**
+   * When pairing "deleted + new" paths as moves in the normal quick scan: match by filename + size (fast),
+   * or verify with SHA-256 of the new file vs catalog `content_hash` (slower, fewer false positives).
+   */
+  quickScanMovedFileMatchMode: QuickScanMovedFileMatchMode;
 }
 
 export interface AiImageSearchSettings {
@@ -577,6 +629,7 @@ export const DEFAULT_FOLDER_SCANNING_SETTINGS: FolderScanningSettings = {
   writeEmbeddedMetadataOnUserEdit: false,
   detectLocationFromGps: false,
   markFolderScanOutdatedAfterDays: 7,
+  quickScanMovedFileMatchMode: "name-size",
 };
 
 export const DEFAULT_AI_IMAGE_SEARCH_SETTINGS: AiImageSearchSettings = {
@@ -976,16 +1029,15 @@ export function folderFaceSummarySubfolderRowId(folderPath: string): string {
 
 export interface FolderScanFreshness {
   lastMetadataScanCompletedAt: string | null;
+  /** Oldest folder-level metadata scan under the tree; refined when `getFolderTreeScanSummary` completes (walked-tree MIN). */
   oldestFolderScanCompletedAt: string | null;
   oldestMetadataExtractedAt: string | null;
   lastMetadataExtractedAt: string | null;
   scannedCount: number;
   unscannedCount: number;
   totalMedia: number;
-  directSubfolderCount: number;
-  notFullyScannedDirectSubfolderCount: number;
-  outdatedScannedFolderCount: number;
-  scannedFolderCount: number;
+  /** Populated when `getFolderTreeScanSummary` runs quick scans; drives Folder tree scan card CTA. */
+  folderTreeQuickScan: FolderTreeQuickScanResult | null;
 }
 
 export interface FolderAiSummaryOverview {
@@ -1014,10 +1066,7 @@ export interface FolderAiSummaryOverviewRequestOptions {
 
 export interface FolderTreeScanSummary {
   hasDirectSubfolders: boolean;
-  directSubfolderCount: number;
-  notFullyScannedDirectSubfolderCount: number;
-  outdatedScannedFolderCount: number;
-  scannedFolderCount: number;
+  quickScan: FolderTreeQuickScanResult | null;
 }
 
 export type ImageRotationProgressEvent =

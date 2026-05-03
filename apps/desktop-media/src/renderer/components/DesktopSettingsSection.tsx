@@ -33,6 +33,7 @@ import {
   type PathExtractionSettings,
   type PhotoAnalysisSettings,
   type PhotoPendingFolderIconTint,
+  type QuickScanMovedFileMatchMode,
   type SmartAlbumRatingOperator,
   type SmartAlbumSettings,
   type WrongImageRotationDetectionSettings,
@@ -603,6 +604,33 @@ export function DesktopSettingsSection({
               }
             />
           ) : null}
+          {showAdvancedSettings ? (
+            <label
+              className={cn(
+                settingsCustomOptionSurfaceClass("accent-stripe"),
+                "flex flex-col gap-2 border-l-primary/70 p-3",
+              )}
+            >
+              <span className="text-sm font-medium text-foreground">Quick scan: detect moved files using</span>
+              <select
+                className="h-9 w-full max-w-lg rounded-md border border-border bg-background px-2 text-base"
+                value={folderScanningSettings.quickScanMovedFileMatchMode}
+                onChange={(e) =>
+                  onFolderScanningSettingChange(
+                    "quickScanMovedFileMatchMode",
+                    e.target.value as QuickScanMovedFileMatchMode,
+                  )
+                }
+              >
+                <option value="name-size">Filename + byte size (default, fast)</option>
+                <option value="content-hash">SHA-256 content hash (slower, fewer false positives)</option>
+              </select>
+              <p className="m-0 text-sm text-muted-foreground">
+                Applies to the normal quick scan in Folder AI summary when pairing removed catalog paths with new
+                files on disk as moves within the scanned tree.
+              </p>
+            </label>
+          ) : null}
           <SettingsCheckboxField
             title="Update file metadata on change of Rating, Title, Description"
             description={`XMP and EXIF are standard metadata blocks inside many image and video files; other apps (Lightroom, Windows) read them for star ratings and titles. When this option is on, after your change is saved in the database the app runs ExifTool to mirror rating into the file. When off, edits stay in the database only—original files on disk are not modified (recommended).`}
@@ -627,6 +655,8 @@ export function DesktopSettingsSection({
                   DEFAULT_FOLDER_SCANNING_SETTINGS.detectLocationFromGps &&
                 folderScanningSettings.markFolderScanOutdatedAfterDays ===
                   DEFAULT_FOLDER_SCANNING_SETTINGS.markFolderScanOutdatedAfterDays &&
+                folderScanningSettings.quickScanMovedFileMatchMode ===
+                  DEFAULT_FOLDER_SCANNING_SETTINGS.quickScanMovedFileMatchMode &&
                 pathExtractionSettings.extractDates === DEFAULT_PATH_EXTRACTION_SETTINGS.extractDates &&
                 pathExtractionSettings.useLlm === DEFAULT_PATH_EXTRACTION_SETTINGS.useLlm &&
                 pathExtractionSettings.llmModelPrimary === DEFAULT_PATH_EXTRACTION_SETTINGS.llmModelPrimary &&

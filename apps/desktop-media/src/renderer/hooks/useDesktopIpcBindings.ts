@@ -318,6 +318,8 @@ export function useDesktopSettingsPersistence(): void {
             prev.folderScanningSettings.detectLocationFromGps ||
           state.folderScanningSettings.markFolderScanOutdatedAfterDays !==
             prev.folderScanningSettings.markFolderScanOutdatedAfterDays ||
+          state.folderScanningSettings.quickScanMovedFileMatchMode !==
+            prev.folderScanningSettings.quickScanMovedFileMatchMode ||
           state.smartAlbumSettings.defaultStarRating !==
             prev.smartAlbumSettings.defaultStarRating ||
           state.smartAlbumSettings.defaultStarRatingOperator !==
