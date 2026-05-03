@@ -453,7 +453,16 @@ export function DesktopFolderAiSummaryView({
             </button>
           </div>
         </div>
-        {showSummaryTabs ? <SummaryTabs activeTab={activeTab} onTabChange={setActiveTab} /> : null}
+        {showSummaryTabs ? (
+          <>
+            <SummaryTabs activeTab={activeTab} onTabChange={setActiveTab} />
+            {/*
+              Opaque strip between tabs and scrolling table: included in sticky stack height so
+              thead `top` clears this gap and scrolling rows never show through it.
+            */}
+            <div className="h-3 shrink-0 bg-background" aria-hidden />
+          </>
+        ) : null}
       </div>
 
       {isFailedListView ? (
