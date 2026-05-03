@@ -22,6 +22,12 @@ For full coding rules, see `CLAUDE.md` at the repo root and `AGENTS.md` files at
 * All components and functions must have typed props and explicit return types.
 * **DO NOT add `import React from 'react';`** — JSX transform handles it automatically.
 
+### Cross-Platform Paths
+
+* GitHub unit tests run on Linux. Do not assume Node's default `path` module uses Windows semantics.
+* When parsing persisted or catalog paths that may contain backslashes, choose `path.win32` for Windows-style strings and `path.posix` for POSIX strings.
+* Tests that use Windows sample paths (for example `C:\...`) must pass on Linux CI; avoid assertions that only work on a Windows developer machine.
+
 ### Tailwind + Theming
 
 * Tailwind is the primary styling method for the desktop renderer.

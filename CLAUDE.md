@@ -49,6 +49,12 @@ pnpm test:all               # Both unit + E2E
 - All functions and components must have typed parameters and explicit return types.
 - Do not add `import React from 'react'` — JSX transform handles it.
 
+### 1a. Cross-Platform Paths
+
+- GitHub unit tests run on Linux. Do not assume Node's default `path` module uses Windows semantics.
+- When parsing persisted or catalog paths that may contain backslashes, choose `path.win32` for Windows-style strings and `path.posix` for POSIX strings.
+- Tests that use Windows sample paths (for example `C:\...`) must pass on Linux CI; avoid assertions that only work on a Windows developer machine.
+
 ### 2. File Size and Decomposition
 
 **Hard limits:**
