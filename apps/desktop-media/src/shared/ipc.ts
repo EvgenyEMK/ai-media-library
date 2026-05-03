@@ -173,6 +173,12 @@ export const IPC_CHANNELS = {
   getFolderTreeScanSummary: "media:get-folder-tree-scan-summary",
   getFolderAiSummaryReport: "media:get-folder-ai-summary-report",
   getFolderFaceSummaryReport: "media:get-folder-face-summary-report",
+  startFolderFaceSummaryStream: "media:start-folder-face-summary-stream",
+  cancelFolderFaceSummaryStream: "media:cancel-folder-face-summary-stream",
+  folderFaceSummaryProgress: "media:folder-face-summary-progress",
+  startFolderAiSummaryStream: "media:start-folder-ai-summary-stream",
+  cancelFolderAiSummaryStream: "media:cancel-folder-ai-summary-stream",
+  folderAiSummaryStreamProgress: "media:folder-ai-summary-stream-progress",
   getFolderAiFailedFiles: "media:get-folder-ai-failed-files",
   getFolderAiWronglyRotatedImages: "media:get-folder-ai-wrongly-rotated-images",
   getFolderAiCoverage: "media:get-folder-ai-coverage",
@@ -924,6 +930,48 @@ export interface FolderFaceSummaryReport {
     name: string;
     summary: FolderFaceSummary;
   }>;
+}
+
+export interface FolderFaceSummaryStreamRowSpec {
+  rowId: string;
+  folderPath: string;
+  name: string;
+  recursive: boolean;
+}
+
+export interface FolderFaceSummaryStreamStart {
+  folderPath: string;
+  jobId: string;
+  rows: FolderFaceSummaryStreamRowSpec[];
+}
+
+export type FolderFaceSummaryStreamEvent =
+  | {
+      kind: "row";
+      jobId: string;
+      rowId: string;
+      summary: FolderFaceSummary;
+      coverage: FolderAiCoverageReport;
+    }
+  | { kind: "done"; jobId: string }
+  | { kind: "error"; jobId: string; message: string };
+
+export type FolderAiSummaryStreamEvent =
+  | { kind: "row"; jobId: string; rowId: string; coverage: FolderAiCoverageReport }
+  | { kind: "done"; jobId: string }
+  | { kind: "error"; jobId: string; message: string };
+
+/** Row ids for `startFolderFaceSummaryStream` / face summary table (main + renderer). */
+export const FOLDER_FACE_SUMMARY_STREAM_ROW_IDS = {
+  selectedRecursive: "selectedRecursive",
+  selectedDirect: "selectedDirect",
+  singleFolder: "singleFolder",
+} as const;
+
+export const FOLDER_FACE_SUMMARY_SUBFOLDER_ROW_PREFIX = "subfolder:";
+
+export function folderFaceSummarySubfolderRowId(folderPath: string): string {
+  return `${FOLDER_FACE_SUMMARY_SUBFOLDER_ROW_PREFIX}${folderPath}`;
 }
 
 export interface FolderScanFreshness {
@@ -1879,6 +1927,22 @@ export interface DesktopApi {
   getFolderTreeScanSummary: (folderPath: string, outdatedAfterDays?: number) => Promise<FolderTreeScanSummary>;
   getFolderAiSummaryReport: (folderPath: string) => Promise<FolderAiSummaryReport>;
   getFolderFaceSummaryReport: (folderPath: string) => Promise<FolderFaceSummaryReport>;
+  startFolderFaceSummaryStream: (
+    folderPath: string,
+    jobId: string,
+  ) => Promise<FolderFaceSummaryStreamStart>;
+  cancelFolderFaceSummaryStream: (jobId: string) => Promise<boolean>;
+  onFolderFaceSummaryProgress: (
+    listener: (payload: FolderFaceSummaryStreamEvent) => void,
+  ) => () => void;
+  startFolderAiSummaryStream: (
+    folderPath: string,
+    jobId: string,
+  ) => Promise<FolderFaceSummaryStreamStart>;
+  cancelFolderAiSummaryStream: (jobId: string) => Promise<boolean>;
+  onFolderAiSummaryStreamProgress: (
+    listener: (payload: FolderAiSummaryStreamEvent) => void,
+  ) => () => void;
   getFolderAiFailedFiles: (
     folderPath: string,
     pipeline: FolderAiPipelineKind,

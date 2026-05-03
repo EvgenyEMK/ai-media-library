@@ -60,6 +60,38 @@ const api: DesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.getFolderAiSummaryReport, folderPath),
   getFolderFaceSummaryReport: (folderPath) =>
     ipcRenderer.invoke(IPC_CHANNELS.getFolderFaceSummaryReport, folderPath),
+  startFolderFaceSummaryStream: (folderPath, jobId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.startFolderFaceSummaryStream, folderPath, jobId),
+  cancelFolderFaceSummaryStream: (jobId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.cancelFolderFaceSummaryStream, jobId),
+  onFolderFaceSummaryProgress: (listener) => {
+    const wrapped = (
+      _event: Electron.IpcRendererEvent,
+      payload: Parameters<typeof listener>[0],
+    ) => {
+      listener(payload);
+    };
+    ipcRenderer.on(IPC_CHANNELS.folderFaceSummaryProgress, wrapped);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.folderFaceSummaryProgress, wrapped);
+    };
+  },
+  startFolderAiSummaryStream: (folderPath, jobId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.startFolderAiSummaryStream, folderPath, jobId),
+  cancelFolderAiSummaryStream: (jobId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.cancelFolderAiSummaryStream, jobId),
+  onFolderAiSummaryStreamProgress: (listener) => {
+    const wrapped = (
+      _event: Electron.IpcRendererEvent,
+      payload: Parameters<typeof listener>[0],
+    ) => {
+      listener(payload);
+    };
+    ipcRenderer.on(IPC_CHANNELS.folderAiSummaryStreamProgress, wrapped);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.folderAiSummaryStreamProgress, wrapped);
+    };
+  },
   getFolderAiFailedFiles: (folderPath, pipeline, recursive) =>
     ipcRenderer.invoke(IPC_CHANNELS.getFolderAiFailedFiles, folderPath, pipeline, recursive),
   getFolderAiWronglyRotatedImages: (request) =>
