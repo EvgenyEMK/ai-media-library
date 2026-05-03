@@ -177,8 +177,8 @@ export async function runMetadataScanJob(params: {
   } catch {
     // Settings read failure — keep path extraction enabled as default
   }
-  const metadataUserPhaseCount: 3 | 4 =
-    gpsGeocodingEnabled && scanEntries.length > 0 ? 4 : 3;
+  /** User-visible step count in the dock; must match setting, not whether this run has files to geocode. */
+  const metadataUserPhaseCount: 3 | 4 = gpsGeocodingEnabled ? 4 : 3;
   const gpsGeocodePhasePlanned = metadataUserPhaseCount === 4;
 
   emitProgress({
@@ -518,6 +518,16 @@ export async function runMetadataScanJob(params: {
       } catch (geocodeErr) {
         console.error(`[metadata-scan][${scanTs()}] geocoding phase error:`, geocodeErr);
       }
+    } else if (!job.cancelled && gpsGeocodingEnabled && scannedMediaItemIds.length === 0) {
+      emitProgress({
+        type: "phase-updated",
+        jobId,
+        phase: "geocoding",
+        processed: 0,
+        total: 0,
+        gpsGeocodingEnabled,
+        geoDataUpdated,
+      });
     }
     emitFinalizingProgress(0);
 
