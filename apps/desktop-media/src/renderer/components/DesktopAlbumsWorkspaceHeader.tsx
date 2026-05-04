@@ -28,6 +28,7 @@ export function DesktopAlbumsWorkspaceHeader({
   onCreate,
   searchControlsOpen,
   onSearchControlsOpenChange,
+  albumListSearchFiltersActiveCount,
   store,
   viewMode,
   albumQuickFiltersOpen,
@@ -58,6 +59,7 @@ export function DesktopAlbumsWorkspaceHeader({
   onCreate: () => void;
   searchControlsOpen: boolean;
   onSearchControlsOpenChange: (open: boolean) => void;
+  albumListSearchFiltersActiveCount: number;
   store: DesktopStore;
   viewMode: "grid" | "list";
   albumQuickFiltersOpen: boolean;
@@ -211,17 +213,16 @@ export function DesktopAlbumsWorkspaceHeader({
       ) : (
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="mr-auto text-xl font-semibold">Albums</h1>
-          <button
-            type="button"
-            onClick={() => onSearchControlsOpenChange(!searchControlsOpen)}
-            className={`inline-flex size-9 items-center justify-center rounded-md border border-border hover:bg-muted ${
-              searchControlsOpen ? "bg-primary/10 text-foreground" : ""
-            }`}
-            aria-label={searchControlsOpen ? "Hide album search" : "Show album search"}
+          <ToolbarIconButton
             title={searchControlsOpen ? "Hide album search" : "Show album search"}
+            ariaExpanded={searchControlsOpen}
+            ariaPressed={albumListSearchFiltersActiveCount > 0}
+            isActive={searchControlsOpen || albumListSearchFiltersActiveCount > 0}
+            badgeCount={albumListSearchFiltersActiveCount}
+            onClick={() => onSearchControlsOpenChange(!searchControlsOpen)}
           >
-            <Search size={18} aria-hidden="true" />
-          </button>
+            <Search size={16} aria-hidden="true" />
+          </ToolbarIconButton>
           <button
             type="button"
             onClick={() => {

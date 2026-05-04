@@ -129,6 +129,23 @@ describe.skipIf(!HAS_SQLITE)("media albums DB", () => {
     expect(albums.listAlbums({ locationQuery: "Austria" }).totalCount).toBe(0);
   });
 
+  it("filters albums by location against location_area2", () => {
+    const created = albums.createAlbum("Coastal");
+    insertMediaItem({
+      id: "area2-item",
+      sourcePath: "C:/photos/coast.jpg",
+      starRating: null,
+      aiQuality: null,
+      country: "USA",
+      city: null,
+      locationArea: "CA",
+      locationArea2: "Big Sur",
+    });
+    albums.addMediaItemsToAlbum(created.id, ["area2-item"]);
+    expect(albums.listAlbums({ locationQuery: "Sur" }).totalCount).toBe(1);
+    expect(albums.listAlbums({ locationQuery: "Big" }).totalCount).toBe(1);
+  });
+
   it("filters albums by title and paginates total counts", () => {
     albums.createAlbum("Summer Trip");
     albums.createAlbum("Winter Trip");

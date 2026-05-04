@@ -23,6 +23,8 @@ export interface AlbumListFilters {
   titleQuery?: string;
   locationQuery?: string;
   personTagIds?: string[];
+  /** When true and `personTagIds` is set, match albums linked via suggestions as well as confirmed faces. */
+  includeUnconfirmedFaces?: boolean;
   yearMonthFrom?: string;
   yearMonthTo?: string;
 }

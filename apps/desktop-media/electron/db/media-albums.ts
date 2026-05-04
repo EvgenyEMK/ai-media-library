@@ -166,12 +166,13 @@ function buildAlbumWhere(request: AlbumListRequest, libraryId: string): {
           mi_loc.country LIKE ?
           OR mi_loc.city LIKE ?
           OR mi_loc.location_area LIKE ?
+          OR mi_loc.location_area2 LIKE ?
           OR mi_loc.location_place LIKE ?
           OR mi_loc.location_name LIKE ?
         )
     )`);
     const q = `%${location}%`;
-    args.push(q, q, q, q, q);
+    args.push(q, q, q, q, q, q);
   }
   const bounds = normalizeAlbumDateBounds(request);
   if (bounds.start) {
@@ -203,27 +204,61 @@ function buildAlbumWhere(request: AlbumListRequest, libraryId: string): {
     args.push(bounds.end);
   }
   const personTagIds = (request.personTagIds ?? []).map((id) => id.trim()).filter(Boolean);
+  const includeUnconfirmedFaces = request.includeUnconfirmedFaces === true;
   for (const tagId of personTagIds) {
-    where.push(`(
-      EXISTS (
-        SELECT 1
-        FROM media_album_person_tags mapt
-        WHERE mapt.album_id = a.id
-          AND mapt.library_id = a.library_id
-          AND mapt.tag_id = ?
-      )
-      OR EXISTS (
-        SELECT 1
-        FROM media_album_items mai_person
-        JOIN media_face_instances fi
-          ON fi.media_item_id = mai_person.media_item_id
-         AND fi.library_id = mai_person.library_id
-        WHERE mai_person.media_album_id = a.id
-          AND mai_person.library_id = a.library_id
-          AND fi.tag_id = ?
-      )
-    )`);
-    args.push(tagId, tagId);
+    if (includeUnconfirmedFaces) {
+      where.push(`(
+        EXISTS (
+          SELECT 1
+          FROM media_album_person_tags mapt
+          WHERE mapt.album_id = a.id
+            AND mapt.library_id = a.library_id
+            AND mapt.tag_id = ?
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM media_album_items mai_person
+          JOIN media_face_instances fi
+            ON fi.media_item_id = mai_person.media_item_id
+           AND fi.library_id = mai_person.library_id
+          WHERE mai_person.media_album_id = a.id
+            AND mai_person.library_id = a.library_id
+            AND fi.tag_id = ?
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM media_album_items mai_person
+          JOIN media_item_person_suggestions ps
+            ON ps.media_item_id = mai_person.media_item_id
+           AND ps.library_id = mai_person.library_id
+          WHERE mai_person.media_album_id = a.id
+            AND mai_person.library_id = a.library_id
+            AND ps.tag_id = ?
+        )
+      )`);
+      args.push(tagId, tagId, tagId);
+    } else {
+      where.push(`(
+        EXISTS (
+          SELECT 1
+          FROM media_album_person_tags mapt
+          WHERE mapt.album_id = a.id
+            AND mapt.library_id = a.library_id
+            AND mapt.tag_id = ?
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM media_album_items mai_person
+          JOIN media_face_instances fi
+            ON fi.media_item_id = mai_person.media_item_id
+           AND fi.library_id = mai_person.library_id
+          WHERE mai_person.media_album_id = a.id
+            AND mai_person.library_id = a.library_id
+            AND fi.tag_id = ?
+        )
+      )`);
+      args.push(tagId, tagId);
+    }
   }
   return { where, args };
 }

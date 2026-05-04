@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+} from "react";
+import { Loader2, X } from "lucide-react";
 import {
   DEFAULT_THUMBNAIL_QUICK_FILTERS,
   countActiveQuickFilters,
@@ -25,6 +34,16 @@ import { ALBUM_ITEMS_PAGE_SIZE } from "./DesktopAlbumDetailPanel";
 import { BestOfYearFiltersPanel } from "./BestOfYearFiltersPanel";
 import { DesktopAlbumsWorkspaceHeader } from "./DesktopAlbumsWorkspaceHeader";
 import { SmartAlbumsWorkspace } from "./SmartAlbumsWorkspace";
+import {
+  ALBUM_LIST_LOCATION_INPUT_MAX_CLASS,
+  ALBUM_LIST_SEARCH_FIELD_DEBOUNCE_MS,
+  ALBUM_LIST_TITLE_INPUT_MAX_CLASS,
+} from "../lib/album-list-search-ui";
+import {
+  ALBUM_YEAR_MONTH_INPUT_HINT,
+  ALBUM_YEAR_MONTH_INPUT_PLACEHOLDER,
+  sanitizeAlbumYearMonthDigitsInput,
+} from "../lib/album-year-month-input";
 import { EMPTY_SMART_ALBUM_FILTERS, smartAlbumSettingsToFilters, useSmartAlbums } from "./useSmartAlbums";
 
 const ALBUM_PAGE_SIZE = 24;
@@ -95,11 +114,16 @@ export function DesktopAlbumsWorkspace({
   const previousDefaultSmartAlbumFiltersRef = useRef(defaultSmartAlbumFilters);
   const smartAlbums = useSmartAlbums(defaultSmartAlbumFilters);
 
-  const [titleQuery, setTitleQuery] = useState("");
-  const [locationQuery, setLocationQuery] = useState("");
-  const [yearMonthFrom, setYearMonthFrom] = useState("");
-  const [yearMonthTo, setYearMonthTo] = useState("");
+  const [titleDraft, setTitleDraft] = useState("");
+  const [locationDraft, setLocationDraft] = useState("");
+  const [yearMonthFromDraft, setYearMonthFromDraft] = useState("");
+  const [yearMonthToDraft, setYearMonthToDraft] = useState("");
+  const [titleFilter, setTitleFilter] = useState("");
+  const [locationFilter, setLocationFilter] = useState("");
+  const [yearMonthFromFilter, setYearMonthFromFilter] = useState("");
+  const [yearMonthToFilter, setYearMonthToFilter] = useState("");
   const [personTagIds, setPersonTagIds] = useState<string[]>([]);
+  const [includeUnconfirmedAlbumFaces, setIncludeUnconfirmedAlbumFaces] = useState(true);
   const [personTags, setPersonTags] = useState<PersonTagListMeta[]>([]);
   const [albumPage, setAlbumPage] = useState(0);
   const [albumTotal, setAlbumTotal] = useState(0);
@@ -148,6 +172,35 @@ export function DesktopAlbumsWorkspace({
   const [smartFilterPanelOpen, setSmartFilterPanelOpen] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const albumDateRangeFocusCleanupRef = useRef<(() => void) | null>(null);
+  const [showAlbumDateRangeHint, setShowAlbumDateRangeHint] = useState(false);
+
+  const albumDateRangeFieldShellRefCallback = useCallback((el: HTMLDivElement | null) => {
+    albumDateRangeFocusCleanupRef.current?.();
+    albumDateRangeFocusCleanupRef.current = null;
+    if (!el) {
+      setShowAlbumDateRangeHint(false);
+      return;
+    }
+    if (!searchControlsOpen) {
+      return;
+    }
+    const onFocusIn = (): void => {
+      setShowAlbumDateRangeHint(true);
+    };
+    const onFocusOut = (event: FocusEvent): void => {
+      const next = event.relatedTarget as Node | null;
+      if (!next || !el.contains(next)) {
+        setShowAlbumDateRangeHint(false);
+      }
+    };
+    el.addEventListener("focusin", onFocusIn);
+    el.addEventListener("focusout", onFocusOut);
+    albumDateRangeFocusCleanupRef.current = (): void => {
+      el.removeEventListener("focusin", onFocusIn);
+      el.removeEventListener("focusout", onFocusOut);
+    };
+  }, [searchControlsOpen]);
 
   const selectedAlbum = albums.find((album) => album.id === selectedAlbumId) ?? null;
   const smartPlaceRequest = useMemo<SmartAlbumPlacesRequest | null>(
@@ -186,7 +239,6 @@ export function DesktopAlbumsWorkspace({
         ? "areas"
         : "areas";
   const personTagKey = personTagIds.join("|");
-  const smartFilterPersonTagKey = (smartAlbumFilters.personTagIds ?? []).join("|");
   const showingCreate = mode === "create";
   const showingDetail = mode === "detail" && selectedAlbum !== null;
   const showingSmart = mode === "smart";
@@ -198,6 +250,27 @@ export function DesktopAlbumsWorkspace({
     () => countActiveSmartAlbumFilters(smartAlbumFilters),
     [smartAlbumFilters],
   );
+  const albumListSearchFiltersActiveCount = useMemo((): number => {
+    let count = 0;
+    if (titleDraft.trim() || titleFilter.trim()) count += 1;
+    if (locationDraft.trim() || locationFilter.trim()) count += 1;
+    if (yearMonthFromDraft.trim() || yearMonthFromFilter.trim()) count += 1;
+    if (yearMonthToDraft.trim() || yearMonthToFilter.trim()) count += 1;
+    if (personTagIds.length > 0) count += 1;
+    if (personTagIds.length > 0 && !includeUnconfirmedAlbumFaces) count += 1;
+    return count;
+  }, [
+    titleDraft,
+    titleFilter,
+    locationDraft,
+    locationFilter,
+    yearMonthFromDraft,
+    yearMonthFromFilter,
+    yearMonthToDraft,
+    yearMonthToFilter,
+    personTagIds,
+    includeUnconfirmedAlbumFaces,
+  ]);
   const showSmartFilterPanel = smartFilterPanelOpen;
 
   const loadAlbums = useCallback(async () => {
@@ -207,11 +280,13 @@ export function DesktopAlbumsWorkspace({
       const result = await actions.loadAlbums({
         offset: albumPage * ALBUM_PAGE_SIZE,
         limit: ALBUM_PAGE_SIZE,
-        titleQuery,
-        locationQuery,
-        yearMonthFrom,
-        yearMonthTo,
+        titleQuery: titleFilter,
+        locationQuery: locationFilter,
+        yearMonthFrom: yearMonthFromFilter,
+        yearMonthTo: yearMonthToFilter,
         personTagIds,
+        includeUnconfirmedFaces:
+          personTagIds.length > 0 ? includeUnconfirmedAlbumFaces : undefined,
       });
       setAlbumTotal(result.totalCount);
     } catch (error) {
@@ -219,7 +294,16 @@ export function DesktopAlbumsWorkspace({
     } finally {
       setIsLoading(false);
     }
-  }, [actions, albumPage, locationQuery, personTagIds, titleQuery, yearMonthFrom, yearMonthTo]);
+  }, [
+    actions,
+    albumPage,
+    locationFilter,
+    includeUnconfirmedAlbumFaces,
+    personTagIds,
+    titleFilter,
+    yearMonthFromFilter,
+    yearMonthToFilter,
+  ]);
 
   const loadAlbumItems = useCallback(async () => {
     if (!selectedAlbumId) {
@@ -339,8 +423,18 @@ export function DesktopAlbumsWorkspace({
   }, [defaultSmartAlbumFilters, setSmartAlbumFilters]);
 
   useEffect(() => {
+    const handle = window.setTimeout(() => {
+      setTitleFilter(titleDraft);
+      setLocationFilter(locationDraft);
+      setYearMonthFromFilter(yearMonthFromDraft);
+      setYearMonthToFilter(yearMonthToDraft);
+    }, ALBUM_LIST_SEARCH_FIELD_DEBOUNCE_MS);
+    return () => window.clearTimeout(handle);
+  }, [titleDraft, locationDraft, yearMonthFromDraft, yearMonthToDraft]);
+
+  useEffect(() => {
     void loadAlbums();
-  }, [loadAlbums, personTagKey]);
+  }, [loadAlbums, personTagKey, includeUnconfirmedAlbumFaces]);
 
   useEffect(() => {
     void loadAlbumItems().catch((error) => {
@@ -374,9 +468,16 @@ export function DesktopAlbumsWorkspace({
     void loadSmartRoots();
   }, [activeSmartAlbum, loadSmartRoots, showingSmart, smartAlbumFiltersForRpc, smartPlaceRequest]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setAlbumPage(0);
-  }, [titleQuery, locationQuery, yearMonthFrom, yearMonthTo, personTagKey]);
+  }, [
+    titleFilter,
+    locationFilter,
+    yearMonthFromFilter,
+    yearMonthToFilter,
+    personTagKey,
+    includeUnconfirmedAlbumFaces,
+  ]);
 
   useEffect(() => {
     setAlbumItemsPage(0);
@@ -496,6 +597,7 @@ export function DesktopAlbumsWorkspace({
           onCreate={() => void handleCreate()}
           searchControlsOpen={searchControlsOpen}
           onSearchControlsOpenChange={onSearchControlsOpenChange}
+          albumListSearchFiltersActiveCount={albumListSearchFiltersActiveCount}
           store={store}
           viewMode={viewMode}
           albumQuickFiltersOpen={albumQuickFiltersOpen}
@@ -508,37 +610,95 @@ export function DesktopAlbumsWorkspace({
         {!showingSmart && !showingDetail && !showingCreate ? (
           <>
             {searchControlsOpen ? (
-              <div className="border-b border-border bg-card/90 px-4 pb-4 backdrop-blur">
-                <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-4">
-                  <label className="grid gap-1">
-                    <span className="text-xs font-medium text-muted-foreground">Title</span>
-                    <Input value={titleQuery} onChange={(event) => setTitleQuery(event.target.value)} placeholder="Album title" />
-                  </label>
-                  <label className="grid gap-1">
-                    <span className="text-xs font-medium text-muted-foreground">Location</span>
+              <section className="relative shrink-0 border-b border-ai-search-border bg-ai-search-panel px-4 py-2.5 pr-[4.75rem] text-ai-search-text">
+                <button
+                  type="button"
+                  className="absolute right-4 top-2.5 inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-ai-search-border bg-ai-search-control text-ai-search-text hover:bg-ai-search-control/80"
+                  onClick={() => onSearchControlsOpenChange(false)}
+                  aria-label="Close album search filters"
+                  title="Close album search filters"
+                >
+                  <X size={16} aria-hidden="true" />
+                </button>
+                <div className="mt-2 flex flex-wrap items-start gap-x-4 gap-y-3 [&_input]:border-ai-search-border [&_input:not(:placeholder-shown):not(:focus)]:border-ai-search-accent [&_input]:bg-ai-search-control [&_input]:text-ai-search-text [&_input]:placeholder:text-ai-search-muted/75 [&_input]:focus:border-ai-search-accent [&_input]:focus:ring-ai-search-accent/45">
+                  <label className={`grid min-w-0 gap-1 ${ALBUM_LIST_TITLE_INPUT_MAX_CLASS}`}>
+                    <span className="text-xs font-medium text-ai-search-muted">Title</span>
                     <Input
-                      value={locationQuery}
-                      onChange={(event) => setLocationQuery(event.target.value)}
-                      placeholder="Country or city"
+                      value={titleDraft}
+                      onChange={(event) => setTitleDraft(event.target.value)}
+                      placeholder="Album title"
                     />
                   </label>
-                  <label className="grid gap-1">
-                    <span className="text-xs font-medium text-muted-foreground">From</span>
-                    <Input value={yearMonthFrom} onChange={(event) => setYearMonthFrom(event.target.value)} placeholder="YYYY or YYYY-MM" />
+                  <label className={`grid min-w-0 gap-1 ${ALBUM_LIST_LOCATION_INPUT_MAX_CLASS}`}>
+                    <span className="text-xs font-medium text-ai-search-muted">Location</span>
+                    <Input
+                      value={locationDraft}
+                      onChange={(event) => setLocationDraft(event.target.value)}
+                      placeholder="Country, area, or city"
+                    />
                   </label>
-                  <label className="grid gap-1">
-                    <span className="text-xs font-medium text-muted-foreground">To</span>
-                    <Input value={yearMonthTo} onChange={(event) => setYearMonthTo(event.target.value)} placeholder="YYYY or YYYY-MM" />
-                  </label>
+                  <div ref={albumDateRangeFieldShellRefCallback} className="flex min-w-0 flex-col gap-1">
+                    <div className="flex flex-wrap items-start gap-3">
+                      <label className="grid w-fit max-w-full gap-1">
+                        <span className="text-xs font-medium text-ai-search-muted">From</span>
+                        <Input
+                          value={yearMonthFromDraft}
+                          onChange={(event) =>
+                            setYearMonthFromDraft(sanitizeAlbumYearMonthDigitsInput(event.target.value))
+                          }
+                          placeholder={ALBUM_YEAR_MONTH_INPUT_PLACEHOLDER}
+                          inputMode="numeric"
+                          autoComplete="off"
+                          spellCheck={false}
+                          className="w-[13ch] max-w-full min-w-0 font-mono text-sm tabular-nums"
+                        />
+                      </label>
+                      <label className="grid w-fit max-w-full gap-1">
+                        <span className="text-xs font-medium text-ai-search-muted">To</span>
+                        <Input
+                          value={yearMonthToDraft}
+                          onChange={(event) =>
+                            setYearMonthToDraft(sanitizeAlbumYearMonthDigitsInput(event.target.value))
+                          }
+                          placeholder={ALBUM_YEAR_MONTH_INPUT_PLACEHOLDER}
+                          inputMode="numeric"
+                          autoComplete="off"
+                          spellCheck={false}
+                          className="w-[13ch] max-w-full min-w-0 font-mono text-sm tabular-nums"
+                        />
+                      </label>
+                    </div>
+                    <p
+                      className={`min-h-[1.25rem] text-xs text-ai-search-muted ${
+                        showAlbumDateRangeHint ? "" : "invisible"
+                      }`}
+                      aria-hidden={!showAlbumDateRangeHint}
+                    >
+                      {ALBUM_YEAR_MONTH_INPUT_HINT}
+                    </p>
+                  </div>
                 </div>
-                <div className="mt-3">
+                <div className="mt-2">
                   <SemanticSearchPersonTagsBar
                     tagsMeta={personTags}
                     selectedTagIds={personTagIds}
                     onToggleTag={togglePersonTag}
                   />
+                  <label
+                    className="mt-2 flex cursor-pointer items-center gap-1.5 text-xs text-ai-search-text/80 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60"
+                    title={personTagIds.length === 0 ? "Select at least one person tag" : undefined}
+                  >
+                    <input
+                      type="checkbox"
+                      className="cursor-pointer accent-ai-search-accent"
+                      checked={includeUnconfirmedAlbumFaces}
+                      disabled={personTagIds.length === 0}
+                      onChange={(event) => setIncludeUnconfirmedAlbumFaces(event.target.checked)}
+                    />
+                    <span>Include unconfirmed similar faces</span>
+                  </label>
                 </div>
-              </div>
+              </section>
             ) : null}
           </>
         ) : null}
@@ -598,7 +758,16 @@ export function DesktopAlbumsWorkspace({
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-auto p-4">
-          {isLoading ? <div className="text-sm text-muted-foreground">Loading albums...</div> : null}
+          {isLoading ? (
+            <div
+              className="flex items-center gap-2.5 text-lg font-medium text-primary"
+              role="status"
+              aria-live="polite"
+            >
+              <Loader2 className="size-6 shrink-0 animate-spin" strokeWidth={2.25} aria-hidden />
+              <span>Loading...</span>
+            </div>
+          ) : null}
           {!isLoading && albums.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">
               No albums match the current filters.
