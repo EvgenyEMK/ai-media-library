@@ -317,6 +317,7 @@ export function DesktopViewerInfoPanel({
 }: DesktopViewerInfoPanelProps): ReactElement {
   const isVideo = item.mediaType === "video";
   const viewerActiveInfoTab = useDesktopStore((s) => s.viewerActiveInfoTab);
+  const setViewerShowInfoPanel = useDesktopStore((s) => s.setViewerShowInfoPanel);
   const [activeTabId, setActiveTabId] = useState("info");
   const [selectedFaceIndex, setSelectedFaceIndex] = useState<number | null>(null);
   const [currentBoundingBoxes, setCurrentBoundingBoxes] = useState<BeingBoundingBox[]>(peopleBoundingBoxes);
@@ -432,6 +433,7 @@ export function DesktopViewerInfoPanel({
         setActiveTabId(tabId);
         if (tabId !== "tags") setSelectedFaceIndex(null);
       }}
+      onClosePanel={() => setViewerShowInfoPanel(false)}
       renderPhotoPane={() => (
         <div
           ref={imageContainerRef}

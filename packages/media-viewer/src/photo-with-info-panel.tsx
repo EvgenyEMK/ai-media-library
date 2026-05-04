@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type CSSProperties, type ReactElement, type ReactNode } from "react";
+import { IconX } from "./viewer-icons";
 
 export interface PhotoWithInfoTab {
   id: string;
@@ -9,13 +10,15 @@ export interface PhotoWithInfoTab {
   content: ReactNode;
 }
 
-interface PhotoWithInfoPanelProps {
+export interface PhotoWithInfoPanelProps {
   imageUrl?: string;
   imageAlt?: string;
   tabs: PhotoWithInfoTab[];
   activeTabId?: string;
   onTabChange?: (tabId: string) => void;
   renderPhotoPane?: () => ReactNode;
+  /** When set, an icon button is shown at the end of the tab row to dismiss the panel. */
+  onClosePanel?: () => void;
 }
 
 const styles: Record<string, CSSProperties> = {
@@ -47,11 +50,33 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0,
   },
   tabsHeader: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "stretch",
     gap: 8,
     padding: 12,
     borderBottom: "1px solid hsl(var(--border, 0 0% 14.9%) / 1)",
+  },
+  tabsHeaderTabs: {
+    flex: 1,
+    minWidth: 0,
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: 8,
+  },
+  closePanelButton: {
+    flexShrink: 0,
+    width: 40,
+    minHeight: 40,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    border: "1px solid hsl(var(--border, 0 0% 14.9%) / 1)",
+    borderRadius: 8,
+    background: "hsl(var(--muted, 0 0% 14.9%) / 1)",
+    color: "hsl(var(--muted-foreground, 0 0% 63.9%) / 1)",
+    padding: 0,
+    cursor: "pointer",
   },
   tabButton: {
     border: "1px solid hsl(var(--border, 0 0% 14.9%) / 1)",
@@ -96,6 +121,7 @@ export function PhotoWithInfoPanel({
   activeTabId,
   onTabChange,
   renderPhotoPane,
+  onClosePanel,
 }: PhotoWithInfoPanelProps): ReactElement {
   const firstTabId = tabs[0]?.id ?? "info";
   const [internalActive, setInternalActive] = useState<string>(firstTabId);
@@ -126,22 +152,35 @@ export function PhotoWithInfoPanel({
       </div>
       <div style={styles.sidePane}>
         <div style={styles.tabsHeader}>
-          {tabs.map((tab) => (
+          <div style={styles.tabsHeaderTabs}>
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => selectTab(tab.id)}
+                style={{
+                  ...styles.tabButton,
+                  ...(resolvedActiveTab === tab.id ? styles.tabButtonActive : {}),
+                }}
+              >
+                <span>{tab.label}</span>
+                {typeof tab.badgeCount === "number" ? (
+                  <span style={styles.tabBadge}>{tab.badgeCount}</span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+          {onClosePanel ? (
             <button
-              key={tab.id}
               type="button"
-              onClick={() => selectTab(tab.id)}
-              style={{
-                ...styles.tabButton,
-                ...(resolvedActiveTab === tab.id ? styles.tabButtonActive : {}),
-              }}
+              style={styles.closePanelButton}
+              onClick={onClosePanel}
+              title="Close info panel"
+              aria-label="Close info panel"
             >
-              <span>{tab.label}</span>
-              {typeof tab.badgeCount === "number" ? (
-                <span style={styles.tabBadge}>{tab.badgeCount}</span>
-              ) : null}
+              <IconX />
             </button>
-          ))}
+          ) : null}
         </div>
         <div style={styles.content}>{activeTab?.content ?? null}</div>
       </div>

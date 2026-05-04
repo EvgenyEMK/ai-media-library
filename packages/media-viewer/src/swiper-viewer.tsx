@@ -525,13 +525,13 @@ export function MediaSwiperViewer<TItem extends MediaSwiperViewerItem>({
                 </div>
                 {!isSlideshowPlaying && (
                   <div style={{ ...styles.controls, ...styles.controlsRight }}>
-                    {renderInfoPanel ? (
+                    {renderInfoPanel && !showInfoPanel ? (
                       <button
                         type="button"
                         style={styles.button}
                         onClick={toggleInfoPanel}
-                        title={showInfoPanel ? "Hide info" : "Show info"}
-                        aria-label={showInfoPanel ? "Hide info" : "Show info"}
+                        title="Show info"
+                        aria-label="Show info"
                       >
                         <IconInfo />
                       </button>
