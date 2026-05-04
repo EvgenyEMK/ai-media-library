@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactElement } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { SmartAlbumRootKind } from "@emk/shared-contracts";
 import { createDesktopAlbumActions } from "../actions/album-actions";
+import { DEFAULT_SIDEBAR_ALBUMS_EXPAND_RECENT } from "../lib/sidebar-albums-ui-defaults";
 import { useDesktopStore, useDesktopStoreApi } from "../stores/desktop-store";
 import { Input } from "./ui/input";
 
@@ -44,11 +45,14 @@ function AlbumSectionHeader({
 
 export function DesktopSidebarAlbumsSection({
   collapsed,
+  expandRecentAlbumsByDefault,
   onAlbumSelected,
   onSmartAlbumSelected,
   onShowAlbumList,
 }: {
   collapsed: boolean;
+  /** When omitted, uses `DEFAULT_SIDEBAR_ALBUMS_EXPAND_RECENT` (for future app settings). */
+  expandRecentAlbumsByDefault?: boolean;
   onAlbumSelected?: () => void;
   onSmartAlbumSelected?: (kind: SmartAlbumRootKind) => void;
   onShowAlbumList?: () => void;
@@ -57,7 +61,9 @@ export function DesktopSidebarAlbumsSection({
   const albums = useDesktopStore((s) => s.albums);
   const selectedAlbumId = useDesktopStore((s) => s.selectedAlbumId);
   const recentAlbumIds = useDesktopStore((s) => s.recentAlbumIds);
-  const [expandedSection, setExpandedSection] = useState<ExpandedAlbumSubsection>("recent");
+  const [expandedSection, setExpandedSection] = useState<ExpandedAlbumSubsection>(() =>
+    (expandRecentAlbumsByDefault ?? DEFAULT_SIDEBAR_ALBUMS_EXPAND_RECENT) ? "recent" : null,
+  );
   const [visibleRecentAlbumIds, setVisibleRecentAlbumIds] = useState<string[]>(recentAlbumIds);
   const [titleQuery, setTitleQuery] = useState("");
   const actions = useMemo(() => createDesktopAlbumActions(store), [store]);

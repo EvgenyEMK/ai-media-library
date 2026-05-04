@@ -36,6 +36,7 @@ function installDesktopApiMock(albums: MediaAlbumSummary[]): void {
 function renderSection(options: {
   albums: MediaAlbumSummary[];
   recentAlbumIds?: string[];
+  expandRecentAlbumsByDefault?: boolean;
   onAlbumSelected?: () => void;
   onSmartAlbumSelected?: (
     kind: "country-year-city" | "country-area-city" | "country-month-area" | "ai-countries" | "best-of-year"
@@ -51,6 +52,7 @@ function renderSection(options: {
     >
       <DesktopSidebarAlbumsSection
         collapsed={false}
+        expandRecentAlbumsByDefault={options.expandRecentAlbumsByDefault}
         onAlbumSelected={options.onAlbumSelected}
         onSmartAlbumSelected={options.onSmartAlbumSelected}
         onShowAlbumList={options.onShowAlbumList}
@@ -82,6 +84,8 @@ describe("DesktopSidebarAlbumsSection", () => {
       recentAlbumIds: ["album-b"],
     });
 
+    expect(await screen.findByPlaceholderText("Search albums")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "RECENT" }));
     expect(await screen.findByRole("button", { name: "Beta" })).toBeVisible();
     fireEvent.change(screen.getByPlaceholderText("Search albums"), { target: { value: "alp" } });
 
@@ -96,6 +100,8 @@ describe("DesktopSidebarAlbumsSection", () => {
       recentAlbumIds: ["album-a", "album-b"],
       onAlbumSelected,
     });
+    expect(await screen.findByPlaceholderText("Search albums")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "RECENT" }));
     expect(await screen.findByRole("button", { name: "Alpha" })).toBeVisible();
 
     fireEvent.click(screen.getByRole("button", { name: "Beta" }));
@@ -121,6 +127,29 @@ describe("DesktopSidebarAlbumsSection", () => {
     fireEvent.click(screen.getByTestId("desktop-sidebar-album-search-album-a"));
 
     expect(onAlbumSelected).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts with RECENT collapsed when there are recent albums", async () => {
+    renderSection({
+      albums: [album("album-a", "Alpha")],
+      recentAlbumIds: ["album-a"],
+    });
+
+    expect(await screen.findByPlaceholderText("Search albums")).toBeVisible();
+    const recentToggle = screen.getByRole("button", { name: "RECENT" });
+    expect(recentToggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "Alpha" })).toBeNull();
+  });
+
+  it("honors expandRecentAlbumsByDefault for initial RECENT state", async () => {
+    renderSection({
+      albums: [album("album-a", "Alpha")],
+      recentAlbumIds: ["album-a"],
+      expandRecentAlbumsByDefault: true,
+    });
+
+    expect(await screen.findByRole("button", { name: "Alpha" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "RECENT" })).toHaveAttribute("aria-expanded", "true");
   });
 
   it("shows smart album shortcuts below the existing album sections", async () => {

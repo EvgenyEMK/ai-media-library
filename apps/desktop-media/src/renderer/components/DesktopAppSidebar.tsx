@@ -27,6 +27,8 @@ interface DesktopAppSidebarProps {
   onAlbumSelected: () => void;
   onSmartAlbumSelected: (kind: SmartAlbumRootKind) => void;
   onShowAlbumList: () => void;
+  /** When set, overrides default RECENT expansion in the albums sidebar (e.g. from app settings). */
+  albumsSidebarExpandRecentByDefault?: boolean;
   folderTree: {
     handleAddLibrary: () => Promise<void>;
     handleToggleExpand: (folderPath: string) => Promise<void>;
@@ -53,6 +55,7 @@ export function DesktopAppSidebar({
   onAlbumSelected,
   onSmartAlbumSelected,
   onShowAlbumList,
+  albumsSidebarExpandRecentByDefault,
   folderTree,
 }: DesktopAppSidebarProps): ReactElement {
   return (
@@ -133,6 +136,7 @@ export function DesktopAppSidebar({
             content: (
               <DesktopSidebarAlbumsSection
                 collapsed={false}
+                expandRecentAlbumsByDefault={albumsSidebarExpandRecentByDefault}
                 onAlbumSelected={onAlbumSelected}
                 onSmartAlbumSelected={onSmartAlbumSelected}
                 onShowAlbumList={onShowAlbumList}
