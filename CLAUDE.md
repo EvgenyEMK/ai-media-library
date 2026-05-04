@@ -72,6 +72,7 @@ pnpm test:all               # Both unit + E2E
 - One concern per file. A component file renders UI; a hook file manages state/effects; a utility file exports pure functions.
 - Extract inline handler logic exceeding ~15 lines into a named function or hook.
 - Keep JSX return blocks readable — extract complex conditional sections into sub-components.
+- For a large screen or flow, prefer a **feature folder** under `apps/desktop-media/src/renderer/components/<feature>/` (for example `smart-albums/`, `progress-dock/`) with one primary exported component at the old path acting as a thin orchestrator; colocate sub-components, and move pure tree/build logic next to the renderer under `lib/` with unit tests.
 - Name files by what they export: `use-folder-actions.ts`, `label-formatters.ts`, `DesktopProgressDock.tsx`.
 
 ### 3. Automatable Actions Architecture (Command Pattern)
@@ -176,7 +177,7 @@ apps/
       ipc/                    # IPC handler modules (by feature group)
       db/                     # SQLite modules
     src/renderer/             # React renderer
-      components/             # Desktop-specific components
+      components/             # Desktop-specific components (see also components/<feature>/)
       hooks/                  # Desktop-specific hooks
       stores/                 # Desktop store composition
       lib/                    # Desktop utilities
@@ -202,6 +203,8 @@ docs/                         # Project documentation
   ROADMAP/                    # Planned features
   ARCHITECTURE/               # Technical architecture docs
 ```
+
+Larger renderer screens are split into `apps/desktop-media/src/renderer/components/<feature>/` subfolders (for example `smart-albums/`, `progress-dock/`) with pure helpers in `lib/` and tests on extracted logic.
 
 ---
 

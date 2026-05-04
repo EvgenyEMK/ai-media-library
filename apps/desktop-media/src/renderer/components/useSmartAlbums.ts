@@ -7,6 +7,10 @@ import type {
   SmartAlbumYearSummary,
 } from "@emk/shared-contracts";
 import type { SmartAlbumSettings } from "../../shared/ipc";
+import {
+  DEFAULT_SMART_PLACE_HIERARCHY_LEVELS,
+  type SmartPlaceHierarchyLevels,
+} from "../lib/smart-place-hierarchy";
 
 export const DEFAULT_SMART_ALBUM_FILTERS: SmartAlbumFilters = {
   includeUnconfirmedFaces: true,
@@ -41,16 +45,8 @@ export function smartAlbumSettingsToFilters(settings: SmartAlbumSettings): Smart
 }
 
 export const BEST_OF_YEAR_RANDOM_CANDIDATE_LIMIT = 1000;
-export interface SmartPlaceHierarchyLevels {
-  area1: boolean;
-  area2: boolean;
-  city: boolean;
-}
-export const DEFAULT_SMART_PLACE_HIERARCHY_LEVELS: SmartPlaceHierarchyLevels = {
-  area1: true,
-  area2: true,
-  city: true,
-};
+export type { SmartPlaceHierarchyLevels } from "../lib/smart-place-hierarchy";
+export { DEFAULT_SMART_PLACE_HIERARCHY_LEVELS } from "../lib/smart-place-hierarchy";
 
 export type ActiveSmartAlbum =
   | {

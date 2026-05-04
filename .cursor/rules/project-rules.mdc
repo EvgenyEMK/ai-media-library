@@ -83,6 +83,7 @@ Project documentation lives in `docs/`:
 * **Always follow DRY principles** — create reusable components instead of duplicating code.
 * Ensure imports follow alias structure (e.g. `@emk/media-store`, `@emk/shared-contracts`).
 * **Check for existing reusable components** before creating new ones.
+* **Desktop renderer:** split bulky screens into `apps/desktop-media/src/renderer/components/<feature>/` and keep orchestrator files thin; see `code-decomposition.mdc` and `apps/desktop-media/AGENTS.md`.
 
 ---
 
