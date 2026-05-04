@@ -67,13 +67,15 @@ export interface AlbumMembership {
 }
 
 export type SmartAlbumRootKind =
-  | "country-year-city"
+  | "country-year-area"
   | "country-area-city"
-  | "country-month-area"
   | "ai-countries"
   | "best-of-year";
 
-export type SmartAlbumPlaceGrouping = "year-city" | "area-city" | "month-area";
+/** Sub-view inside merged country date/place smart album (toolbar order: month, year+area, year hierarchy). */
+export type SmartAlbumYearAreaSubView = "month-area" | "year-area" | "year-city";
+
+export type SmartAlbumPlaceGrouping = "year-city" | "year-area" | "area-city" | "month-area";
 export type SmartAlbumPlaceSource = "gps" | "non-gps";
 
 /** Default AI `image_category` glob/literal patterns omitted from smart album queries (app settings; merged by the client). */
@@ -107,7 +109,6 @@ export interface SmartAlbumPlacesRequest {
   grouping: SmartAlbumPlaceGrouping;
   source: SmartAlbumPlaceSource;
   filters?: SmartAlbumFilters;
-  consolidateMonthAreaThreshold?: number;
 }
 
 export interface SmartAlbumPlaceEntry {

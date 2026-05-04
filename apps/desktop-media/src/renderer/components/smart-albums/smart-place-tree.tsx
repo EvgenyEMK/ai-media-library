@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import type {
   SmartAlbumPlaceCountry,
   SmartAlbumPlacesRequest,
+  SmartAlbumYearAreaSubView,
 } from "@emk/shared-contracts";
 import { buildAreaCityTreeForCountry } from "../../lib/build-area-city-tree";
 import type { SmartPlaceHierarchyLevels } from "../../lib/smart-place-hierarchy";
@@ -10,8 +11,12 @@ import type { ActiveSmartAlbum } from "../useSmartAlbums";
 import { SmartAlbumAreaCityHierarchyBar } from "./smart-album-area-city-hierarchy-bar";
 import { SmartAlbumAreaCityNodeList } from "./smart-album-area-city-node-list";
 import { SmartAlbumPlaceItemCard } from "./smart-album-place-item-card";
+import { SmartAlbumYearAreaSubviewBar } from "./smart-album-year-area-subview-bar";
 
 export function SmartPlaceTree({
+  showYearAreaSubviewBar,
+  yearAreaSubView,
+  onYearAreaSubViewChange,
   smartPlaceRequest,
   smartPlaceCountries,
   expandedSmartCountries,
@@ -24,6 +29,9 @@ export function SmartPlaceTree({
   onSmartPlaceHierarchyLevelsChange,
   onActiveSmartAlbumChange,
 }: {
+  showYearAreaSubviewBar: boolean;
+  yearAreaSubView: SmartAlbumYearAreaSubView;
+  onYearAreaSubViewChange: (next: SmartAlbumYearAreaSubView) => void;
   smartPlaceRequest: SmartAlbumPlacesRequest;
   smartPlaceCountries: SmartAlbumPlaceCountry[];
   expandedSmartCountries: string[];
@@ -37,9 +45,15 @@ export function SmartPlaceTree({
   onActiveSmartAlbumChange: (album: ActiveSmartAlbum) => void;
 }): ReactElement {
   const areaCityMode = smartPlaceRequest.grouping === "area-city";
+  /** Flat time×area cards (no nested year expand). Month uses YYYY-MM; year-area uses YYYY only. */
+  const flatTimeAreaGrid =
+    smartPlaceRequest.grouping === "month-area" || smartPlaceRequest.grouping === "year-area";
 
   return (
     <div className="space-y-2">
+      {showYearAreaSubviewBar ? (
+        <SmartAlbumYearAreaSubviewBar subView={yearAreaSubView} onSubViewChange={onYearAreaSubViewChange} />
+      ) : null}
       {areaCityMode ? (
         <SmartAlbumAreaCityHierarchyBar
           levels={smartPlaceHierarchyLevels}
@@ -66,7 +80,7 @@ export function SmartPlaceTree({
             </button>
             {isCountryExpanded ? (
               <div className="space-y-2 border-t border-border px-3 py-2">
-                {smartPlaceRequest.grouping === "month-area" ? (
+                {flatTimeAreaGrid ? (
                   <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
                     {country.groups.flatMap((group) =>
                       group.entries.map((entry) => (

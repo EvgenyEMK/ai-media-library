@@ -435,7 +435,7 @@ describe.skipIf(!HAS_SQLITE)("media albums DB", () => {
     ).toEqual(["lazio-2024"]);
   });
 
-  it("consolidates dense month-area countries into year-area entries", () => {
+  it("does not consolidate month-area: each YYYY-MM stays a separate group", () => {
     for (let month = 1; month <= 10; month += 1) {
       const monthText = String(month).padStart(2, "0");
       insertMediaItem({
@@ -450,24 +450,22 @@ describe.skipIf(!HAS_SQLITE)("media albums DB", () => {
       });
     }
 
-    const result = albums.listSmartAlbumPlaces({
-      grouping: "month-area",
-      source: "gps",
-      consolidateMonthAreaThreshold: 9,
-    });
+    const result = albums.listSmartAlbumPlaces({ grouping: "month-area", source: "gps" });
     const italy = result.countries.find((country) => country.country === "Italy");
-    expect(italy?.groups.map((group) => group.group)).toEqual(["2024"]);
-    expect(italy?.groups[0]?.entries.map((entry) => entry.label)).toEqual(["Tuscany"]);
+    const groupKeys = (italy?.groups.map((group) => group.group) ?? []).sort();
+    expect(groupKeys).toEqual(
+      ["2024-01", "2024-02", "2024-03", "2024-04", "2024-05", "2024-06", "2024-07", "2024-08", "2024-09", "2024-10"],
+    );
     expect(
       albums.listSmartAlbumItems({
         kind: "place",
         country: "Italy",
         city: "Tuscany",
-        group: "2024",
+        group: "2024-05",
         grouping: "month-area",
         source: "gps",
       }).totalCount,
-    ).toBe(10);
+    ).toBe(1);
   });
 
   it("excludes document-like, slide/diagram, and screenshot categories from place smart albums", () => {

@@ -85,7 +85,9 @@ function renderWorkspace(): void {
         <DesktopAlbumsWorkspace
           mode={mode}
           onModeChange={setMode}
-          smartAlbumRootKind="country-year-city"
+          smartAlbumRootKind="country-year-area"
+          yearAreaSubView="year-city"
+          onYearAreaSubViewChange={vi.fn()}
           searchControlsOpen={searchControlsOpen}
           onSearchControlsOpenChange={setSearchControlsOpen}
         />
@@ -111,7 +113,9 @@ function renderAlbumListWorkspace(desktopApi: ReturnType<typeof installDesktopAp
         <DesktopAlbumsWorkspace
           mode={mode}
           onModeChange={setMode}
-          smartAlbumRootKind="country-year-city"
+          smartAlbumRootKind="country-year-area"
+          yearAreaSubView="year-city"
+          onYearAreaSubViewChange={vi.fn()}
           searchControlsOpen={searchControlsOpen}
           onSearchControlsOpenChange={setSearchControlsOpen}
         />

@@ -19,6 +19,7 @@ import type {
   SmartAlbumPlaceEntry,
   SmartAlbumPlacesRequest,
   SmartAlbumRootKind,
+  SmartAlbumYearAreaSubView,
 } from "@emk/shared-contracts";
 import type { DesktopPersonTagWithFaceCount } from "../../shared/ipc";
 import { createDesktopAlbumActions } from "../actions/album-actions";
@@ -44,6 +45,7 @@ import {
   ALBUM_YEAR_MONTH_INPUT_PLACEHOLDER,
   sanitizeAlbumYearMonthDigitsInput,
 } from "../lib/album-year-month-input";
+import { smartAlbumAutoOpenFilterPanel } from "../lib/smart-album-auto-open-filter-panel";
 import { EMPTY_SMART_ALBUM_FILTERS, smartAlbumSettingsToFilters, useSmartAlbums } from "./useSmartAlbums";
 
 const ALBUM_PAGE_SIZE = 24;
@@ -89,6 +91,8 @@ interface DesktopAlbumsWorkspaceProps {
   mode: AlbumWorkspaceMode;
   onModeChange: (mode: AlbumWorkspaceMode) => void;
   smartAlbumRootKind: SmartAlbumRootKind;
+  yearAreaSubView: SmartAlbumYearAreaSubView;
+  onYearAreaSubViewChange: (next: SmartAlbumYearAreaSubView) => void;
   searchControlsOpen: boolean;
   onSearchControlsOpenChange: (open: boolean) => void;
 }
@@ -97,6 +101,8 @@ export function DesktopAlbumsWorkspace({
   mode,
   onModeChange,
   smartAlbumRootKind,
+  yearAreaSubView,
+  onYearAreaSubViewChange,
   searchControlsOpen,
   onSearchControlsOpenChange,
 }: DesktopAlbumsWorkspaceProps): ReactElement {
@@ -169,7 +175,9 @@ export function DesktopAlbumsWorkspace({
     DEFAULT_THUMBNAIL_QUICK_FILTERS,
   );
   const [albumQuickFiltersOpen, setAlbumQuickFiltersOpen] = useState(false);
-  const [smartFilterPanelOpen, setSmartFilterPanelOpen] = useState(true);
+  const [smartFilterPanelOpen, setSmartFilterPanelOpen] = useState(() =>
+    smartAlbumAutoOpenFilterPanel(smartAlbumRootKind),
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const albumDateRangeFocusCleanupRef = useRef<(() => void) | null>(null);
@@ -211,18 +219,16 @@ export function DesktopAlbumsWorkspace({
             grouping:
               smartAlbumRootKind === "country-area-city"
                 ? "area-city"
-                : smartAlbumRootKind === "country-month-area"
-                  ? "month-area"
+                : smartAlbumRootKind === "country-year-area"
+                  ? yearAreaSubView
                   : "year-city",
             source: smartAlbumRootKind === "ai-countries" ? "non-gps" : "gps",
           },
-    [smartAlbumRootKind],
+    [smartAlbumRootKind, yearAreaSubView],
   );
   const smartPlaceRootTitle =
     smartAlbumRootKind === "country-area-city"
       ? "Country > Area > City"
-      : smartAlbumRootKind === "country-month-area"
-        ? "Country > YYYY-MM Area"
       : smartAlbumRootKind === "ai-countries"
         ? "AI countries"
         : "Country > Year > Area";
@@ -357,7 +363,13 @@ export function DesktopAlbumsWorkspace({
         ? await actions.loadSmartAlbumItems({
             kind: "place",
             country: activeSmartAlbum.entry.country,
-            city: activeSmartAlbum.entry.leafLevel === "city" ? activeSmartAlbum.entry.city : null,
+            city: (() => {
+              const placeGrouping = smartPlaceRequest?.grouping ?? "year-city";
+              if (placeGrouping === "year-city" || placeGrouping === "year-area" || placeGrouping === "month-area") {
+                return (activeSmartAlbum.entry.city ?? activeSmartAlbum.entry.label ?? "").trim() || null;
+              }
+              return activeSmartAlbum.entry.leafLevel === "city" ? activeSmartAlbum.entry.city : null;
+            })(),
             group: activeSmartAlbum.entry.group,
             grouping: smartPlaceRequest?.grouping ?? "year-city",
             source: smartPlaceRequest?.source ?? "gps",
@@ -450,9 +462,9 @@ export function DesktopAlbumsWorkspace({
     setExpandedSmartCountries([]);
     setExpandedSmartGroups([]);
     setSmartItemsPage(0);
-    setSmartFilterPanelOpen(true);
+    setSmartFilterPanelOpen(smartAlbumAutoOpenFilterPanel(smartAlbumRootKind));
     void loadSmartRoots();
-  }, [showingSmart, smartAlbumRootKind]);
+  }, [showingSmart, smartAlbumRootKind, yearAreaSubView]);
 
   useEffect(() => {
     if (!showingSmart) {
@@ -702,7 +714,11 @@ export function DesktopAlbumsWorkspace({
             ) : null}
           </>
         ) : null}
-        {showingSmart && (smartAlbumRootKind === "best-of-year" || smartAlbumRootKind === "country-area-city") && showSmartFilterPanel ? (
+        {showingSmart &&
+        (smartAlbumRootKind === "best-of-year" ||
+          smartAlbumRootKind === "country-area-city" ||
+          smartAlbumRootKind === "country-year-area") &&
+        showSmartFilterPanel ? (
           <BestOfYearFiltersPanel
             filters={smartAlbumFilters}
             personTags={personTags}
@@ -722,6 +738,7 @@ export function DesktopAlbumsWorkspace({
         <SmartAlbumsWorkspace
           isLoading={isLoading}
           activeSmartAlbum={activeSmartAlbum}
+          smartAlbumRootKind={smartAlbumRootKind}
           smartPlaceRequest={smartPlaceRequest}
           smartPlaceCountries={smartPlaceCountries}
           smartYears={smartYears}
@@ -733,6 +750,8 @@ export function DesktopAlbumsWorkspace({
           smartItemsPage={smartItemsPage}
           smartItemsTotal={smartItemsTotal}
           smartPlaceHierarchyLevels={smartPlaceHierarchyLevels}
+          yearAreaSubView={yearAreaSubView}
+          onYearAreaSubViewChange={onYearAreaSubViewChange}
           quickFilters={albumQuickFilters}
           viewMode={viewMode}
           store={store}

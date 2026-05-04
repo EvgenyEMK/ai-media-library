@@ -1,6 +1,7 @@
 import { type Dispatch, type ReactElement, type RefObject, type SetStateAction } from "react";
 import { ArrowLeft, Filter, Grid3X3, List, Plus, RefreshCw, Search, Shuffle, Undo2 } from "lucide-react";
 import type { ThumbnailQuickFilterState } from "@emk/media-metadata-core";
+import type { SmartAlbumRootKind } from "@emk/shared-contracts";
 import type { DesktopStore } from "../stores/desktop-store";
 import { Input } from "./ui/input";
 import { QuickFiltersMenu } from "./QuickFiltersMenu";
@@ -44,7 +45,7 @@ export function DesktopAlbumsWorkspaceHeader({
   activeSmartTitle: string;
   selectedAlbumTitle: string | null;
   activeSmartAlbumKind: "place" | "best-of-year" | null;
-  smartAlbumRootKind: string;
+  smartAlbumRootKind: SmartAlbumRootKind;
   smartFiltersOpen: boolean;
   smartFiltersActiveCount: number;
   onSmartFiltersOpenChange: (open: boolean) => void;
@@ -92,7 +93,9 @@ export function DesktopAlbumsWorkspaceHeader({
                 : "Smart albums generated from dates, places, ratings, and AI metadata."}
             </p>
           </div>
-          {smartAlbumRootKind === "best-of-year" || smartAlbumRootKind === "country-area-city" ? (
+          {smartAlbumRootKind === "best-of-year" ||
+          smartAlbumRootKind === "country-area-city" ||
+          smartAlbumRootKind === "country-year-area" ? (
             <div className="flex items-center gap-2">
               <ToolbarIconButton
                 title={smartFiltersOpen ? "Hide filters" : "Show filters"}

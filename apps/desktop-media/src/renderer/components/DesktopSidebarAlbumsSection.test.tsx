@@ -39,9 +39,10 @@ function renderSection(options: {
   expandRecentAlbumsByDefault?: boolean;
   onAlbumSelected?: () => void;
   onSmartAlbumSelected?: (
-    kind: "country-year-city" | "country-area-city" | "country-month-area" | "ai-countries" | "best-of-year"
+    kind: "country-year-area" | "country-area-city" | "ai-countries" | "best-of-year"
   ) => void;
   onShowAlbumList?: () => void;
+  highlightedSmartAlbumKind?: "country-year-area" | "country-area-city" | "ai-countries" | "best-of-year" | null;
 }) {
   render(
     <DesktopStoreProvider
@@ -56,6 +57,7 @@ function renderSection(options: {
         onAlbumSelected={options.onAlbumSelected}
         onSmartAlbumSelected={options.onSmartAlbumSelected}
         onShowAlbumList={options.onShowAlbumList}
+        highlightedSmartAlbumKind={options.highlightedSmartAlbumKind ?? null}
       />
     </DesktopStoreProvider>,
   );
@@ -163,14 +165,28 @@ describe("DesktopSidebarAlbumsSection", () => {
     fireEvent.click(await screen.findByRole("button", { name: "SMART ALBUMS" }));
     fireEvent.click(screen.getByRole("button", { name: "Country > Year > Area" }));
     fireEvent.click(screen.getByRole("button", { name: "Country > Area > City" }));
-    fireEvent.click(screen.getByRole("button", { name: "Country > YYYY-MM Area" }));
-    fireEvent.click(screen.getByRole("button", { name: "AI countries" }));
     fireEvent.click(screen.getByRole("button", { name: "Best of Year" }));
 
-    expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(1, "country-year-city");
+    expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(1, "country-year-area");
     expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(2, "country-area-city");
-    expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(3, "country-month-area");
-    expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(4, "ai-countries");
-    expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(5, "best-of-year");
+    expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(3, "best-of-year");
+  });
+
+  it("lists ALL ALBUMS before SMART ALBUMS in the sidebar", async () => {
+    renderSection({ albums: [album("album-a", "Alpha")] });
+    const allHeader = await screen.findByRole("button", { name: "ALL ALBUMS" });
+    const smartHeader = screen.getByRole("button", { name: "SMART ALBUMS" });
+    expect(allHeader.compareDocumentPosition(smartHeader) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+  });
+
+  it("highlights the active smart album when highlightedSmartAlbumKind is set", async () => {
+    renderSection({
+      albums: [album("album-a", "Alpha")],
+      highlightedSmartAlbumKind: "best-of-year",
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "SMART ALBUMS" }));
+    const bestOfYearRow = screen.getByRole("button", { name: "Best of Year" });
+    expect(bestOfYearRow).toHaveClass("bg-primary/10");
+    expect(bestOfYearRow).toHaveClass("border-primary");
   });
 });

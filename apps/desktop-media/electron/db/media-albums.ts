@@ -14,6 +14,7 @@ import {
   type SmartAlbumPlacesResult,
   type SmartAlbumYearsRequest,
   type SmartAlbumYearsResult,
+  type SmartAlbumPlaceGrouping,
   normalizeAlbumDateBounds,
 } from "@emk/shared-contracts";
 import { DEFAULT_LIBRARY_ID } from "./folder-analysis-status";
@@ -21,7 +22,6 @@ import { getDesktopDatabase } from "./client";
 
 const DEFAULT_PAGE_SIZE = 48;
 const MAX_PAGE_SIZE = 200;
-const SMART_ALBUM_MONTH_AREA_CONSOLIDATE_THRESHOLD = 9;
 const BEST_OF_YEAR_RANDOM_CANDIDATE_LIMIT = 1000;
 
 interface AlbumRow {
@@ -668,17 +668,17 @@ export function listAlbumItems(
 }
 
 function normalizeSmartAlbumPlacesRequest(request?: SmartAlbumPlacesRequest): SmartAlbumPlacesRequest {
-  const threshold = Number.isFinite(request?.consolidateMonthAreaThreshold)
-    ? Math.max(0, Math.trunc(request?.consolidateMonthAreaThreshold ?? SMART_ALBUM_MONTH_AREA_CONSOLIDATE_THRESHOLD))
-    : SMART_ALBUM_MONTH_AREA_CONSOLIDATE_THRESHOLD;
+  const grouping: SmartAlbumPlaceGrouping =
+    request?.grouping === "area-city" ||
+    request?.grouping === "month-area" ||
+    request?.grouping === "year-area" ||
+    request?.grouping === "year-city"
+      ? request.grouping
+      : "year-city";
   return {
-    grouping:
-      request?.grouping === "area-city" || request?.grouping === "month-area"
-        ? request.grouping
-        : "year-city",
+    grouping,
     source: request?.source === "non-gps" ? "non-gps" : "gps",
     filters: request?.filters,
-    consolidateMonthAreaThreshold: threshold,
   };
 }
 
@@ -687,26 +687,25 @@ export function listSmartAlbumPlaces(
   libraryId = DEFAULT_LIBRARY_ID,
 ): SmartAlbumPlacesResult {
   const normalizedRequest = normalizeSmartAlbumPlacesRequest(request);
+  const grouping = normalizedRequest.grouping;
   const placeExpression =
-    normalizedRequest.grouping === "area-city"
+    grouping === "area-city"
       ? "TRIM(city)"
-      : normalizedRequest.grouping === "month-area"
-        ? "COALESCE(NULLIF(TRIM(location_area), ''), 'Unknown area')"
-        : "COALESCE(NULLIF(TRIM(location_area), ''), 'Unknown area')";
+      : "COALESCE(NULLIF(TRIM(location_area), ''), 'Unknown area')";
   const groupExpression =
-    normalizedRequest.grouping === "area-city"
+    grouping === "area-city"
       ? "COALESCE(NULLIF(TRIM(location_area2), ''), NULLIF(TRIM(location_area), ''), 'Unknown area')"
-      : normalizedRequest.grouping === "month-area"
+      : grouping === "month-area"
         ? "SUBSTR(COALESCE(photo_taken_at, file_created_at), 1, 7)"
         : "SUBSTR(COALESCE(photo_taken_at, file_created_at), 1, 4)";
   const groupParentSelect =
-    normalizedRequest.grouping === "area-city"
+    grouping === "area-city"
       ? "CASE WHEN NULLIF(TRIM(location_area2), '') IS NOT NULL THEN NULLIF(TRIM(location_area), '') ELSE NULL END AS group_parent_label"
       : "NULL AS group_parent_label";
   const groupPredicate =
-    normalizedRequest.grouping === "year-city"
+    grouping === "year-city" || grouping === "year-area"
       ? "group_label GLOB '[0-9][0-9][0-9][0-9]'"
-      : normalizedRequest.grouping === "month-area"
+      : grouping === "month-area"
         ? "group_label GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]'"
         : "1 = 1";
   const sourcePredicate = normalizedRequest.source === "gps"
@@ -717,9 +716,9 @@ export function listSmartAlbumPlaces(
     "deleted_at IS NULL",
     sourcePredicate,
     "NULLIF(TRIM(country), '') IS NOT NULL",
-    normalizedRequest.grouping === "area-city"
+    grouping === "area-city"
       ? "NULLIF(TRIM(city), '') IS NOT NULL"
-      : normalizedRequest.grouping === "month-area"
+      : grouping === "month-area"
         ? "NULLIF(TRIM(location_area), '') IS NOT NULL"
         : "NULLIF(TRIM(location_area), '') IS NOT NULL",
     "(NULLIF(TRIM(city), '') IS NULL OR TRIM(country) <> TRIM(city))",
@@ -788,76 +787,7 @@ export function listSmartAlbumPlaces(
     });
     countries.set(row.country, existing);
   }
-  const resultCountries = Array.from(countries.values());
-  if (normalizedRequest.grouping === "month-area") {
-    return {
-      countries: resultCountries.map((country) =>
-        shouldConsolidateMonthAreaCountry(
-          country,
-          normalizedRequest.consolidateMonthAreaThreshold ?? SMART_ALBUM_MONTH_AREA_CONSOLIDATE_THRESHOLD,
-        )
-          ? consolidateMonthAreaCountryToYearArea(country, normalizedRequest.source)
-          : country,
-      ),
-    };
-  }
-  return { countries: resultCountries };
-}
-
-function shouldConsolidateMonthAreaCountry(
-  country: SmartAlbumPlacesResult["countries"][number],
-  threshold: number,
-): boolean {
-  const leafCount = country.groups.reduce((count, group) => count + group.entries.length, 0);
-  return leafCount > threshold;
-}
-
-function consolidateMonthAreaCountryToYearArea(
-  country: SmartAlbumPlacesResult["countries"][number],
-  source: SmartAlbumPlacesRequest["source"],
-): SmartAlbumPlacesResult["countries"][number] {
-  const byYearArea = new Map<string, SmartAlbumPlaceRow>();
-  for (const group of country.groups) {
-    const year = group.group.slice(0, 4);
-    for (const entry of group.entries) {
-      const key = `${year}::${entry.label}`;
-      const current = byYearArea.get(key) ?? {
-        country: country.country,
-        group_label: year,
-        place_label: entry.label,
-        group_parent_label: null,
-        media_count: 0,
-      };
-      current.media_count += entry.mediaCount;
-      byYearArea.set(key, current);
-    }
-  }
-  const groups = new Map<string, SmartAlbumPlacesResult["countries"][number]["groups"][number]>();
-  for (const row of Array.from(byYearArea.values()).sort((a, b) => {
-    const yearSort = b.group_label.localeCompare(a.group_label);
-    return yearSort !== 0 ? yearSort : a.place_label.localeCompare(b.place_label);
-  })) {
-    const group = groups.get(row.group_label) ?? {
-      group: row.group_label,
-      mediaCount: 0,
-      entries: [],
-    };
-    group.mediaCount += row.media_count;
-    group.entries.push({
-      id: `place:${source}:month-area:${row.country}:${row.group_label}:${row.place_label}`,
-      country: row.country,
-      city: row.place_label,
-      group: row.group_label,
-      label: row.place_label,
-      mediaCount: row.media_count,
-    });
-    groups.set(row.group_label, group);
-  }
-  return {
-    country: country.country,
-    mediaCount: country.mediaCount,
-    groups: Array.from(groups.values()),
-  };
+  return { countries: Array.from(countries.values()) };
 }
 
 export function listSmartAlbumYears(

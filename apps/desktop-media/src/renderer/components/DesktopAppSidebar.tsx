@@ -27,6 +27,8 @@ interface DesktopAppSidebarProps {
   onAlbumSelected: () => void;
   onSmartAlbumSelected: (kind: SmartAlbumRootKind) => void;
   onShowAlbumList: () => void;
+  /** When albums workspace is in smart mode, which root is active (sidebar row highlight). */
+  sidebarHighlightedSmartAlbumKind: SmartAlbumRootKind | null;
   /** When set, overrides default RECENT expansion in the albums sidebar (e.g. from app settings). */
   albumsSidebarExpandRecentByDefault?: boolean;
   folderTree: {
@@ -55,6 +57,7 @@ export function DesktopAppSidebar({
   onAlbumSelected,
   onSmartAlbumSelected,
   onShowAlbumList,
+  sidebarHighlightedSmartAlbumKind,
   albumsSidebarExpandRecentByDefault,
   folderTree,
 }: DesktopAppSidebarProps): ReactElement {
@@ -140,6 +143,7 @@ export function DesktopAppSidebar({
                 onAlbumSelected={onAlbumSelected}
                 onSmartAlbumSelected={onSmartAlbumSelected}
                 onShowAlbumList={onShowAlbumList}
+                highlightedSmartAlbumKind={sidebarHighlightedSmartAlbumKind}
               />
             ),
           },

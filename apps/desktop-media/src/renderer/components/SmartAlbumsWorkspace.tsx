@@ -3,6 +3,8 @@ import type {
   AlbumMediaItem,
   SmartAlbumPlaceCountry,
   SmartAlbumPlacesRequest,
+  SmartAlbumRootKind,
+  SmartAlbumYearAreaSubView,
   SmartAlbumYearSummary,
 } from "@emk/shared-contracts";
 import type { ThumbnailQuickFilterState } from "@emk/media-metadata-core";
@@ -15,6 +17,7 @@ import { SmartPlaceTree } from "./smart-albums/smart-place-tree";
 export function SmartAlbumsWorkspace({
   isLoading,
   activeSmartAlbum,
+  smartAlbumRootKind,
   smartPlaceRequest,
   smartPlaceCountries,
   smartYears,
@@ -26,6 +29,8 @@ export function SmartAlbumsWorkspace({
   smartItemsPage,
   smartItemsTotal,
   smartPlaceHierarchyLevels,
+  yearAreaSubView,
+  onYearAreaSubViewChange,
   quickFilters,
   viewMode,
   store,
@@ -37,6 +42,7 @@ export function SmartAlbumsWorkspace({
 }: {
   isLoading: boolean;
   activeSmartAlbum: ActiveSmartAlbum;
+  smartAlbumRootKind: SmartAlbumRootKind;
   smartPlaceRequest: SmartAlbumPlacesRequest | null;
   smartPlaceCountries: SmartAlbumPlaceCountry[];
   smartYears: SmartAlbumYearSummary[];
@@ -48,6 +54,8 @@ export function SmartAlbumsWorkspace({
   smartItemsPage: number;
   smartItemsTotal: number;
   smartPlaceHierarchyLevels: SmartPlaceHierarchyLevels;
+  yearAreaSubView: SmartAlbumYearAreaSubView;
+  onYearAreaSubViewChange: (next: SmartAlbumYearAreaSubView) => void;
   quickFilters: ThumbnailQuickFilterState;
   viewMode: DesktopStoreState["viewMode"];
   store: DesktopStore;
@@ -70,6 +78,9 @@ export function SmartAlbumsWorkspace({
             </div>
           ) : (
             <SmartPlaceTree
+              showYearAreaSubviewBar={smartAlbumRootKind === "country-year-area"}
+              yearAreaSubView={yearAreaSubView}
+              onYearAreaSubViewChange={onYearAreaSubViewChange}
               smartPlaceRequest={smartPlaceRequest}
               smartPlaceCountries={smartPlaceCountries}
               expandedSmartCountries={expandedSmartCountries}
