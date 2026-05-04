@@ -9,7 +9,7 @@ const UI_TEXT = {
   compactLabel: "Albums",
   recent: "RECENT",
   smartAlbums: "SMART ALBUMS",
-  allAlbums: "All albums",
+  allAlbums: "ALL ALBUMS",
   countryYearCity: "Country > Year > Area",
   countryAreaCity: "Country > Area > City",
   countryMonthArea: "Country > YYYY-MM Area",
@@ -68,7 +68,7 @@ export function DesktopSidebarAlbumsSection({
 
   useEffect(() => {
     if (recentAlbumIds.length === 0) {
-      setExpandedSection("all");
+      setExpandedSection((current) => (current === "recent" ? null : current));
     }
   }, [recentAlbumIds.length]);
 
@@ -120,6 +120,30 @@ export function DesktopSidebarAlbumsSection({
 
   return (
     <div className="space-y-1 text-xs text-muted-foreground">
+      <div className="space-y-1">
+        <Input
+          value={titleQuery}
+          onChange={(event) => setTitleQuery(event.target.value)}
+          placeholder="Search albums"
+          className="h-8 text-sm"
+        />
+        {normalizedQuery
+          ? matchingAlbums.map((album) => (
+              <button
+                key={album.id}
+                type="button"
+                data-testid={`desktop-sidebar-album-search-${album.id}`}
+                onClick={() => selectAlbum(album.id)}
+                className={`block w-full truncate rounded border-0 px-5 py-1.5 text-left text-sm shadow-none outline-none hover:bg-muted ${
+                  album.id === selectedAlbumId ? "bg-primary/10 text-foreground hover:bg-primary/10" : "bg-transparent text-foreground"
+                }`}
+                title={album.title}
+              >
+                {album.title}
+              </button>
+            ))
+          : null}
+      </div>
       <AlbumSectionHeader
         title={UI_TEXT.recent}
         expanded={expandedSection === "recent"}
@@ -140,36 +164,6 @@ export function DesktopSidebarAlbumsSection({
             </button>
           ))
         : null}
-      <AlbumSectionHeader
-        title={UI_TEXT.allAlbums}
-        expanded={expandedSection === "all"}
-        onToggle={() => toggleSection("all")}
-      />
-      {expandedSection === "all" ? (
-        <div className="space-y-1">
-          <Input
-            value={titleQuery}
-            onChange={(event) => setTitleQuery(event.target.value)}
-            placeholder="Search albums"
-            className="h-8 text-sm"
-          />
-          {normalizedQuery
-            ? matchingAlbums.map((album) => (
-            <button
-              key={album.id}
-              type="button"
-              onClick={() => selectAlbum(album.id)}
-              className={`block w-full truncate rounded border-0 px-5 py-1.5 text-left text-sm shadow-none outline-none hover:bg-muted ${
-                album.id === selectedAlbumId ? "bg-primary/10 text-foreground hover:bg-primary/10" : "bg-transparent text-foreground"
-              }`}
-              title={album.title}
-            >
-              {album.title}
-            </button>
-            ))
-            : null}
-        </div>
-      ) : null}
       <AlbumSectionHeader
         title={UI_TEXT.smartAlbums}
         expanded={expandedSection === "smart"}
@@ -214,6 +208,12 @@ export function DesktopSidebarAlbumsSection({
           </button>
         </div>
       ) : null}
+      <AlbumSectionHeader
+        title={UI_TEXT.allAlbums}
+        expanded={expandedSection === "all"}
+        onToggle={() => toggleSection("all")}
+      />
+      {expandedSection === "all" ? <div className="space-y-1" /> : null}
     </div>
   );
 }

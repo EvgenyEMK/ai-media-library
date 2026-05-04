@@ -69,27 +69,24 @@ describe("DesktopSidebarAlbumsSection", () => {
     installDesktopApiMock([album("album-a", "Alpha"), album("album-b", "Beta")]);
   });
 
-  it("opens All albums by default when there are no recent albums", async () => {
+  it("shows search at top and hides album picks until the user types a query when there are no recent albums", async () => {
     renderSection({ albums: [album("album-a", "Alpha"), album("album-b", "Beta")] });
 
     expect(await screen.findByPlaceholderText("Search albums")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Alpha" })).toBeNull();
   });
 
-  it("keeps only one subsection open and lists All albums as search results", async () => {
+  it("lists search matches while recent albums stay visible", async () => {
     renderSection({
       albums: [album("album-a", "Alpha"), album("album-b", "Beta")],
       recentAlbumIds: ["album-b"],
     });
 
     expect(await screen.findByRole("button", { name: "Beta" })).toBeVisible();
-
-    fireEvent.click(screen.getByRole("button", { name: "All albums" }));
-    expect(screen.queryByRole("button", { name: "Beta" })).toBeNull();
     fireEvent.change(screen.getByPlaceholderText("Search albums"), { target: { value: "alp" } });
 
     expect(screen.getByRole("button", { name: "Alpha" })).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Beta" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Beta" })).toBeVisible();
   });
 
   it("keeps visible Recent order stable after selecting an album", async () => {
@@ -118,10 +115,10 @@ describe("DesktopSidebarAlbumsSection", () => {
       onAlbumSelected,
     });
 
-    fireEvent.click(await screen.findByRole("button", { name: "All albums" }));
+    fireEvent.click(await screen.findByRole("button", { name: "ALL ALBUMS" }));
     await waitFor(() => expect(onShowAlbumList).toHaveBeenCalledTimes(1));
     fireEvent.change(screen.getByPlaceholderText("Search albums"), { target: { value: "alp" } });
-    fireEvent.click(screen.getByRole("button", { name: "Alpha" }));
+    fireEvent.click(screen.getByTestId("desktop-sidebar-album-search-album-a"));
 
     expect(onAlbumSelected).toHaveBeenCalledTimes(1);
   });
