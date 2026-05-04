@@ -17,6 +17,7 @@ import {
   DEFAULT_PHOTO_ANALYSIS_SETTINGS,
   DEFAULT_SMART_ALBUM_SETTINGS,
   DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS,
+  SMART_ALBUM_EXCLUDABLE_IMAGE_CATEGORY_OPTIONS,
   FACE_DETECTOR_MODEL_OPTIONS,
   type AiImageSearchSettings,
   type AiInferenceGpuOption,
@@ -111,12 +112,12 @@ const UI_TEXT = {
   scanForFileChanges: "Scan for file changes",
   /** Covers scan policy, embedded metadata writes, path helpers, and GPS reverse geocoding. */
   fileMetadataManagement: "Folder scanning, file metadata and Geo-location",
-  smartAlbums: "Smart albums",
+  albumsSectionTitle: "Albums",
+  defaultAlbumFiltersTitle: "Default album filters",
+  defaultAlbumFiltersHint: "You can change the values in album filters panel.",
   defaultRatingTitle: "Default Rating",
   defaultAiRatingTitle: "Default AI rating",
-  excludedImageCategoriesTitle: "Excluded image categories",
-  smartAlbumsDescription:
-    "These defaults are applied when opening Best of Year smart albums. You can still adjust or clear filters in the album view.",
+  excludedImageCategoriesTitle: "Exclude image categories in smart albums",
   emptyFolderAiSummaryTitle: "On empty folder selection show AI analysis status summary for subfolders",
   emptyFolderAiSummaryDescription: `When the folder you select has no images or videos in it directly but it contains sub-folders, open the Folder AI analysis summary in the main pane—the same view as “Folder AI analysis summary” on the folder’s right-click menu. It shows a table with face detection, AI image analysis, and AI search index status for this folder and all sub-folders (large trees may take a few seconds). If the folder has no sub-folders, this summary is not shown.`,
   pathExtractDatesTitle: "Extract date(s) from file path",
@@ -219,7 +220,7 @@ function SmartAlbumDefaultRatingSetting({
   onChange: (value: number | null) => void;
 }): ReactElement {
   return (
-    <div className={cn(settingsCustomOptionSurfaceClass("accent-stripe"), "border-l-primary/70")}>
+    <div className="rounded-md border border-border bg-background/40 p-3">
       <div className="flex flex-wrap items-center gap-3">
         <h4 className="m-0 min-w-36 text-base font-medium text-foreground">{title}</h4>
         <button
@@ -227,9 +228,9 @@ function SmartAlbumDefaultRatingSetting({
           className="inline-flex h-8 min-w-11 items-center justify-center rounded-md border border-border bg-secondary px-2 text-sm font-semibold text-foreground hover:bg-muted"
           onClick={() => onOperatorChange(operator === "gte" ? "eq" : "gte")}
           aria-label={`${title} operator ${operator === "gte" ? "greater than or equal" : "equals"}`}
-          title="Click to switch between >= and ="
+          title="Click to switch between ≥ and ="
         >
-          {operator === "gte" ? ">=" : "="}
+          {operator === "gte" ? "≥" : "="}
         </button>
         <MediaItemStarRating
           starRating={value}
@@ -393,41 +394,66 @@ export function DesktopSettingsSection({
         </div>
       </SettingsSectionCard>
 
-      <SettingsSectionCard title={UI_TEXT.smartAlbums}>
+      <SettingsSectionCard title={UI_TEXT.albumsSectionTitle}>
         <div className="space-y-3">
-          <p className="m-0 text-sm leading-relaxed text-muted-foreground">
-            {UI_TEXT.smartAlbumsDescription}
-          </p>
-          <SmartAlbumDefaultRatingSetting
-            title={UI_TEXT.defaultRatingTitle}
-            value={smartAlbumSettings.defaultStarRating}
-            operator={smartAlbumSettings.defaultStarRatingOperator}
-            onOperatorChange={(next) =>
-              onSmartAlbumSettingChange("defaultStarRatingOperator", next)
-            }
-            onChange={(next) => onSmartAlbumSettingChange("defaultStarRating", next)}
-          />
-          <SmartAlbumDefaultRatingSetting
-            title={UI_TEXT.defaultAiRatingTitle}
-            value={smartAlbumSettings.defaultAiRating}
-            operator={smartAlbumSettings.defaultAiRatingOperator}
-            onOperatorChange={(next) =>
-              onSmartAlbumSettingChange("defaultAiRatingOperator", next)
-            }
-            onChange={(next) => onSmartAlbumSettingChange("defaultAiRating", next)}
-          />
+          <div className={cn(settingsCustomOptionSurfaceClass("muted"), "border-l-primary/70")}>
+            <h4 className="m-0 text-base font-medium text-foreground">{UI_TEXT.defaultAlbumFiltersTitle}</h4>
+            <p className="m-0 mt-1 text-sm text-muted-foreground">{UI_TEXT.defaultAlbumFiltersHint}</p>
+            <div className="mt-3 space-y-3">
+              <SmartAlbumDefaultRatingSetting
+                title={UI_TEXT.defaultRatingTitle}
+                value={smartAlbumSettings.defaultStarRating}
+                operator={smartAlbumSettings.defaultStarRatingOperator}
+                onOperatorChange={(next) =>
+                  onSmartAlbumSettingChange("defaultStarRatingOperator", next)
+                }
+                onChange={(next) => onSmartAlbumSettingChange("defaultStarRating", next)}
+              />
+              <SmartAlbumDefaultRatingSetting
+                title={UI_TEXT.defaultAiRatingTitle}
+                value={smartAlbumSettings.defaultAiRating}
+                operator={smartAlbumSettings.defaultAiRatingOperator}
+                onOperatorChange={(next) =>
+                  onSmartAlbumSettingChange("defaultAiRatingOperator", next)
+                }
+                onChange={(next) => onSmartAlbumSettingChange("defaultAiRating", next)}
+              />
+            </div>
+          </div>
           <div className={cn(settingsCustomOptionSurfaceClass("muted"), "border-l-primary/70")}>
             <h4 className="m-0 text-base font-medium text-foreground">
               {UI_TEXT.excludedImageCategoriesTitle}
             </h4>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {smartAlbumSettings.excludedImageCategories.map((category) => (
-                <span
-                  key={category}
-                  className="rounded-full border border-border bg-secondary px-2 py-1 text-sm text-muted-foreground"
+            <p className="m-0 mt-1 text-sm text-muted-foreground">
+              Checked image categories are automatically added to smart album filters (i.e. excluded from shown
+              results). These categories are identified during AI image analysis and are not available for images that
+              have not yet been analyzed.
+            </p>
+            <div className="mt-3 space-y-2">
+              {SMART_ALBUM_EXCLUDABLE_IMAGE_CATEGORY_OPTIONS.map(({ pattern, label }) => (
+                <label
+                  key={pattern}
+                  className="flex cursor-pointer items-start gap-3 rounded-md border border-border bg-secondary/40 px-3 py-2.5"
                 >
-                  {category}
-                </span>
+                  <input
+                    type="checkbox"
+                    className={SETTINGS_OPTION_CHECKBOX_CLASS}
+                    checked={smartAlbumSettings.excludedImageCategories.includes(pattern)}
+                    onChange={(event) => {
+                      const selected = new Set(smartAlbumSettings.excludedImageCategories);
+                      if (event.target.checked) {
+                        selected.add(pattern);
+                      } else {
+                        selected.delete(pattern);
+                      }
+                      const ordered = SMART_ALBUM_EXCLUDABLE_IMAGE_CATEGORY_OPTIONS.map((o) => o.pattern).filter((p) =>
+                        selected.has(p),
+                      );
+                      onSmartAlbumSettingChange("excludedImageCategories", ordered);
+                    }}
+                  />
+                  <span className="min-w-0 flex-1 text-sm leading-snug text-foreground">{label}</span>
+                </label>
               ))}
             </div>
           </div>

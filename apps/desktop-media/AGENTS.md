@@ -18,7 +18,7 @@ electron/               # Main process (Node.js)
 src/
   renderer/             # React renderer process
     App.tsx             # Root component (thin orchestrator)
-    components/         # Desktop-specific UI components
+    components/         # Desktop-specific UI (see Renderer components below)
     hooks/              # Desktop-specific React hooks
     stores/             # Zustand store composition (shared slices + DesktopSlice)
     lib/                # Utilities, formatters, constants
@@ -27,6 +27,12 @@ src/
   shared/
     ipc.ts              # IPC channel definitions and types (shared between main and renderer)
 ```
+
+### Renderer components
+
+- Prefer **thin route/workspace files** (under ~200 lines) that compose hooks and children.
+- When a screen grows past the [file size limits](../../CLAUDE.md#2-file-size-and-decomposition), extract **sub-components** into `src/renderer/components/<feature>/` (examples: `smart-albums/`, `progress-dock/`, `folder-ai-summary/`). Keep the public import path stable when it is wired from many parents (for example `SmartAlbumsWorkspace.tsx` importing from `./smart-albums/…`).
+- **Pure helpers** for UI-specific trees, labels, or toggles live in `src/renderer/lib/` with co-located `*.test.ts` files — not inside hooks unless they need React.
 
 ---
 

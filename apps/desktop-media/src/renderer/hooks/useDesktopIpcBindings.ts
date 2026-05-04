@@ -328,6 +328,8 @@ export function useDesktopSettingsPersistence(): void {
             prev.smartAlbumSettings.defaultAiRating ||
           state.smartAlbumSettings.defaultAiRatingOperator !==
             prev.smartAlbumSettings.defaultAiRatingOperator ||
+          state.smartAlbumSettings.excludedImageCategories.join("|") !==
+            prev.smartAlbumSettings.excludedImageCategories.join("|") ||
           state.aiImageSearchSettings.hideResultsBelowVlmSimilarity !==
             prev.aiImageSearchSettings.hideResultsBelowVlmSimilarity ||
           state.aiImageSearchSettings.hideResultsBelowDescriptionSimilarity !==

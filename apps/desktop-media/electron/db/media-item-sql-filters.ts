@@ -30,8 +30,8 @@ export function appendEventAndLocationPredicates(
   if (filters.locationQuery?.trim()) {
     const q = `%${filters.locationQuery.trim()}%`;
     where.push(
-      `(${t}.country LIKE ? OR ${t}.city LIKE ? OR ${t}.location_area LIKE ? OR ${t}.location_place LIKE ? OR ${t}.location_name LIKE ?)`,
+      `(${t}.country LIKE ? OR ${t}.city LIKE ? OR ${t}.location_area LIKE ? OR ${t}.location_area2 LIKE ? OR ${t}.location_place LIKE ? OR ${t}.location_name LIKE ?)`,
     );
-    args.push(q, q, q, q, q);
+    args.push(q, q, q, q, q, q);
   }
 }

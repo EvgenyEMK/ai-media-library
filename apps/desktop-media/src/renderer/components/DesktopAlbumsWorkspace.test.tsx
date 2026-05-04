@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import type { AlbumMediaItem, MediaAlbumSummary } from "@emk/shared-contracts";
 import { DesktopStoreProvider } from "../stores/desktop-store";
@@ -52,6 +52,7 @@ function installDesktopApiMock(): Record<string, ReturnType<typeof vi.fn>> {
       .mockResolvedValueOnce({ rows: [firstAlbumState], totalCount: 1 })
       .mockResolvedValue({ rows: [updatedAlbumState], totalCount: 1 }),
     listAlbumItems: vi.fn().mockResolvedValue({ rows: [albumItem], totalCount: 1 }),
+    reorderAlbumMediaItem: vi.fn().mockResolvedValue(undefined),
     removeMediaItemFromAlbum: vi.fn().mockResolvedValue(undefined),
     setAlbumCover: vi.fn().mockResolvedValue(undefined),
     addMediaItemsToAlbum: vi.fn().mockResolvedValue(undefined),
@@ -85,7 +86,9 @@ function renderWorkspace(): void {
         <DesktopAlbumsWorkspace
           mode={mode}
           onModeChange={setMode}
-          smartAlbumRootKind="country-year-city"
+          smartAlbumRootKind="country-year-area"
+          yearAreaSubView="year-city"
+          onYearAreaSubViewChange={vi.fn()}
           searchControlsOpen={searchControlsOpen}
           onSearchControlsOpenChange={setSearchControlsOpen}
         />
@@ -96,10 +99,93 @@ function renderWorkspace(): void {
   render(<WorkspaceHarness />);
 }
 
+function renderAlbumListWorkspace(desktopApi: ReturnType<typeof installDesktopApiMock>): void {
+  function ListHarness() {
+    const [mode, setMode] = useState<AlbumWorkspaceMode>("list");
+    const [searchControlsOpen, setSearchControlsOpen] = useState(true);
+    return (
+      <DesktopStoreProvider
+        initialState={{
+          albums: [],
+          selectedAlbumId: null,
+          viewMode: "grid",
+        }}
+      >
+        <DesktopAlbumsWorkspace
+          mode={mode}
+          onModeChange={setMode}
+          smartAlbumRootKind="country-year-area"
+          yearAreaSubView="year-city"
+          onYearAreaSubViewChange={vi.fn()}
+          searchControlsOpen={searchControlsOpen}
+          onSearchControlsOpenChange={setSearchControlsOpen}
+        />
+      </DesktopStoreProvider>
+    );
+  }
+
+  Object.defineProperty(window, "desktopApi", {
+    value: desktopApi,
+    configurable: true,
+  });
+  Object.defineProperty(navigator, "clipboard", {
+    value: { writeText: vi.fn().mockResolvedValue(undefined) },
+    configurable: true,
+  });
+
+  render(<ListHarness />);
+}
+
 describe("DesktopAlbumsWorkspace", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+  });
+
+  it("requests albums with personTagIds and resets offset after pagination when a person tag is toggled", async () => {
+    const rowBatch = Array.from({ length: 24 }, (_, index) =>
+      album({ id: `album-${index}`, title: `Album ${index}` }),
+    );
+    const desktopApi = {
+      listPersonTagsWithFaceCounts: vi.fn().mockResolvedValue([
+        { id: "tag-1", label: "River", pinned: true, taggedFaceCount: 3 },
+      ]),
+      listAlbums: vi
+        .fn()
+        .mockResolvedValue({ rows: rowBatch, totalCount: 48 }),
+      listAlbumItems: vi.fn().mockResolvedValue({ rows: [], totalCount: 0 }),
+      listAlbumsForMediaItem: vi.fn().mockResolvedValue([]),
+      reorderAlbumMediaItem: vi.fn().mockResolvedValue(undefined),
+      removeMediaItemFromAlbum: vi.fn().mockResolvedValue(undefined),
+      setAlbumCover: vi.fn().mockResolvedValue(undefined),
+      addMediaItemsToAlbum: vi.fn().mockResolvedValue(undefined),
+      revealItemInFolder: vi.fn().mockResolvedValue({ success: true }),
+      _logToMain: vi.fn(),
+    };
+    renderAlbumListWorkspace(desktopApi);
+
+    await waitFor(() => expect(desktopApi.listAlbums).toHaveBeenCalled());
+
+    const pagination = await screen.findByRole("navigation", { name: "Albums pagination" });
+    fireEvent.click(within(pagination).getByRole("button", { name: "Next page" }));
+
+    await waitFor(() => {
+      const last = desktopApi.listAlbums.mock.calls.at(-1)?.[0] as { offset?: number } | undefined;
+      expect(last?.offset).toBe(24);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "River" }));
+
+    await waitFor(() => {
+      const last = desktopApi.listAlbums.mock.calls.at(-1)?.[0] as {
+        offset?: number;
+        personTagIds?: string[];
+        includeUnconfirmedFaces?: boolean;
+      };
+      expect(last?.offset).toBe(0);
+      expect(last?.personTagIds).toEqual(["tag-1"]);
+      expect(last?.includeUnconfirmedFaces).toBe(true);
+    });
   });
 
   it("refreshes album list card data after removing an album item via menu", async () => {

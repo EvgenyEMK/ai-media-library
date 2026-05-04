@@ -45,6 +45,7 @@ function installDesktopApiMock(): Record<string, ReturnType<typeof vi.fn>> {
     listAlbumsForMediaItem: vi.fn(),
     addMediaItemsToAlbum: vi.fn(),
     removeMediaItemFromAlbum: vi.fn(),
+    reorderAlbumMediaItem: vi.fn(),
     setAlbumCover: vi.fn(),
   };
   Object.defineProperty(window, "desktopApi", {
@@ -130,5 +131,25 @@ describe("createDesktopAlbumActions", () => {
     expect(store.getState().markAlbumUsed).toHaveBeenCalledWith(album.id);
     expect(desktopApi.removeMediaItemFromAlbum).toHaveBeenCalledWith(album.id, "item-1");
     expect(desktopApi.setAlbumCover).toHaveBeenCalledWith(album.id, "item-1");
+  });
+
+  it("reorders album items through IPC and marks album used", async () => {
+    const desktopApi = installDesktopApiMock();
+    desktopApi.reorderAlbumMediaItem.mockResolvedValue(undefined);
+    const store = createStoreMock();
+    const actions = createDesktopAlbumActions(store);
+
+    await actions.reorderAlbumMediaItem({
+      albumId: album.id,
+      mediaItemId: "item-2",
+      insertBeforeIndex: 0,
+    });
+
+    expect(desktopApi.reorderAlbumMediaItem).toHaveBeenCalledWith({
+      albumId: album.id,
+      mediaItemId: "item-2",
+      insertBeforeIndex: 0,
+    });
+    expect(store.getState().markAlbumUsed).toHaveBeenCalledWith(album.id);
   });
 });

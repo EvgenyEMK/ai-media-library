@@ -1,6 +1,7 @@
 import { type Dispatch, type ReactElement, type RefObject, type SetStateAction } from "react";
 import { ArrowLeft, Filter, Grid3X3, List, Plus, RefreshCw, Search, Shuffle, Undo2 } from "lucide-react";
 import type { ThumbnailQuickFilterState } from "@emk/media-metadata-core";
+import type { SmartAlbumRootKind } from "@emk/shared-contracts";
 import type { DesktopStore } from "../stores/desktop-store";
 import { Input } from "./ui/input";
 import { QuickFiltersMenu } from "./QuickFiltersMenu";
@@ -28,6 +29,7 @@ export function DesktopAlbumsWorkspaceHeader({
   onCreate,
   searchControlsOpen,
   onSearchControlsOpenChange,
+  albumListSearchFiltersActiveCount,
   store,
   viewMode,
   albumQuickFiltersOpen,
@@ -43,7 +45,7 @@ export function DesktopAlbumsWorkspaceHeader({
   activeSmartTitle: string;
   selectedAlbumTitle: string | null;
   activeSmartAlbumKind: "place" | "best-of-year" | null;
-  smartAlbumRootKind: string;
+  smartAlbumRootKind: SmartAlbumRootKind;
   smartFiltersOpen: boolean;
   smartFiltersActiveCount: number;
   onSmartFiltersOpenChange: (open: boolean) => void;
@@ -58,6 +60,7 @@ export function DesktopAlbumsWorkspaceHeader({
   onCreate: () => void;
   searchControlsOpen: boolean;
   onSearchControlsOpenChange: (open: boolean) => void;
+  albumListSearchFiltersActiveCount: number;
   store: DesktopStore;
   viewMode: "grid" | "list";
   albumQuickFiltersOpen: boolean;
@@ -90,7 +93,9 @@ export function DesktopAlbumsWorkspaceHeader({
                 : "Smart albums generated from dates, places, ratings, and AI metadata."}
             </p>
           </div>
-          {smartAlbumRootKind === "best-of-year" || smartAlbumRootKind === "country-area-city" ? (
+          {smartAlbumRootKind === "best-of-year" ||
+          smartAlbumRootKind === "country-area-city" ||
+          smartAlbumRootKind === "country-year-area" ? (
             <div className="flex items-center gap-2">
               <ToolbarIconButton
                 title={smartFiltersOpen ? "Hide filters" : "Show filters"}
@@ -211,17 +216,16 @@ export function DesktopAlbumsWorkspaceHeader({
       ) : (
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="mr-auto text-xl font-semibold">Albums</h1>
-          <button
-            type="button"
-            onClick={() => onSearchControlsOpenChange(!searchControlsOpen)}
-            className={`inline-flex size-9 items-center justify-center rounded-md border border-border hover:bg-muted ${
-              searchControlsOpen ? "bg-primary/10 text-foreground" : ""
-            }`}
-            aria-label={searchControlsOpen ? "Hide album search" : "Show album search"}
+          <ToolbarIconButton
             title={searchControlsOpen ? "Hide album search" : "Show album search"}
+            ariaExpanded={searchControlsOpen}
+            ariaPressed={albumListSearchFiltersActiveCount > 0}
+            isActive={searchControlsOpen || albumListSearchFiltersActiveCount > 0}
+            badgeCount={albumListSearchFiltersActiveCount}
+            onClick={() => onSearchControlsOpenChange(!searchControlsOpen)}
           >
-            <Search size={18} aria-hidden="true" />
-          </button>
+            <Search size={16} aria-hidden="true" />
+          </ToolbarIconButton>
           <button
             type="button"
             onClick={() => {

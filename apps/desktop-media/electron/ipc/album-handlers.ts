@@ -2,6 +2,7 @@ import { ipcMain } from "electron";
 import type {
   AlbumItemsRequest,
   AlbumListRequest,
+  ReorderAlbumMediaItemParams,
   SmartAlbumItemsRequest,
   SmartAlbumPlacesRequest,
   SmartAlbumYearsRequest,
@@ -18,6 +19,7 @@ import {
   listSmartAlbumPlaces,
   listSmartAlbumYears,
   removeMediaItemFromAlbum,
+  reorderAlbumMediaItem,
   setAlbumCover,
   updateAlbumTitle,
 } from "../db/media-albums";
@@ -44,6 +46,16 @@ export function registerAlbumHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.listAlbumItems, async (_event, request: AlbumItemsRequest) => {
     return listAlbumItems(request);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.reorderAlbumMediaItem, async (_event, params: ReorderAlbumMediaItemParams) => {
+    const albumId = typeof params?.albumId === "string" ? params.albumId : "";
+    const mediaItemId = typeof params?.mediaItemId === "string" ? params.mediaItemId : "";
+    const insertBeforeIndex =
+      typeof params?.insertBeforeIndex === "number" && Number.isFinite(params.insertBeforeIndex)
+        ? params.insertBeforeIndex
+        : 0;
+    reorderAlbumMediaItem(albumId, mediaItemId, insertBeforeIndex);
   });
 
   ipcMain.handle(IPC_CHANNELS.listAlbumsForMediaItem, async (_event, mediaItemIdOrPath: string) => {

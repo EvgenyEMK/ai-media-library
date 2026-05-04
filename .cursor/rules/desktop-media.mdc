@@ -24,7 +24,7 @@ See also: `apps/desktop-media/AGENTS.md` for full conventions.
 ### Renderer Process (`src/renderer/`)
 
 - **`App.tsx`** is a thin orchestrator (~200 lines max). It composes hooks and renders sub-components.
-- **Components** in `components/` — each under 300 lines, single responsibility.
+- **Components** in `components/` — each under 300 lines, single responsibility. Split large flows into `components/<feature>/` (for example `smart-albums/`, `progress-dock/`) and keep a thin barrel component at the stable import path when useful.
 - **Hooks** in `hooks/` — each under 200 lines, one concern per hook.
 - **Utilities** in `lib/` — pure functions, formatters, constants.
 - **Types** in `types/` — desktop-specific type definitions.

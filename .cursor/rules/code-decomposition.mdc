@@ -89,7 +89,7 @@ When a component grows beyond 300 lines, extract in this order:
 2. **Constants and text** -> `lib/` directory
 3. **Pure utility functions** -> `lib/` directory
 4. **Custom hooks** (state + effects) -> `hooks/` directory
-5. **Sub-components** (self-contained JSX blocks) -> `components/` directory
+5. **Sub-components** (self-contained JSX blocks) -> `components/` directory, preferably under `components/<feature>/` when several files belong to one screen (same pattern as `progress-dock/`).
 6. **Action functions** -> `actions/` directory
 
 After extraction, the original component should be a thin orchestrator that:

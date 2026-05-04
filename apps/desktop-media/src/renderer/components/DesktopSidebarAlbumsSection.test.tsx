@@ -36,11 +36,13 @@ function installDesktopApiMock(albums: MediaAlbumSummary[]): void {
 function renderSection(options: {
   albums: MediaAlbumSummary[];
   recentAlbumIds?: string[];
+  expandRecentAlbumsByDefault?: boolean;
   onAlbumSelected?: () => void;
   onSmartAlbumSelected?: (
-    kind: "country-year-city" | "country-area-city" | "country-month-area" | "ai-countries" | "best-of-year"
+    kind: "country-year-area" | "country-area-city" | "ai-countries" | "best-of-year"
   ) => void;
   onShowAlbumList?: () => void;
+  highlightedSmartAlbumKind?: "country-year-area" | "country-area-city" | "ai-countries" | "best-of-year" | null;
 }) {
   render(
     <DesktopStoreProvider
@@ -51,9 +53,11 @@ function renderSection(options: {
     >
       <DesktopSidebarAlbumsSection
         collapsed={false}
+        expandRecentAlbumsByDefault={options.expandRecentAlbumsByDefault}
         onAlbumSelected={options.onAlbumSelected}
         onSmartAlbumSelected={options.onSmartAlbumSelected}
         onShowAlbumList={options.onShowAlbumList}
+        highlightedSmartAlbumKind={options.highlightedSmartAlbumKind ?? null}
       />
     </DesktopStoreProvider>,
   );
@@ -69,27 +73,26 @@ describe("DesktopSidebarAlbumsSection", () => {
     installDesktopApiMock([album("album-a", "Alpha"), album("album-b", "Beta")]);
   });
 
-  it("opens All albums by default when there are no recent albums", async () => {
+  it("shows search at top and hides album picks until the user types a query when there are no recent albums", async () => {
     renderSection({ albums: [album("album-a", "Alpha"), album("album-b", "Beta")] });
 
     expect(await screen.findByPlaceholderText("Search albums")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Alpha" })).toBeNull();
   });
 
-  it("keeps only one subsection open and lists All albums as search results", async () => {
+  it("lists search matches while recent albums stay visible", async () => {
     renderSection({
       albums: [album("album-a", "Alpha"), album("album-b", "Beta")],
       recentAlbumIds: ["album-b"],
     });
 
+    expect(await screen.findByPlaceholderText("Search albums")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "RECENT" }));
     expect(await screen.findByRole("button", { name: "Beta" })).toBeVisible();
-
-    fireEvent.click(screen.getByRole("button", { name: "All albums" }));
-    expect(screen.queryByRole("button", { name: "Beta" })).toBeNull();
     fireEvent.change(screen.getByPlaceholderText("Search albums"), { target: { value: "alp" } });
 
     expect(screen.getByRole("button", { name: "Alpha" })).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Beta" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Beta" })).toBeVisible();
   });
 
   it("keeps visible Recent order stable after selecting an album", async () => {
@@ -99,6 +102,8 @@ describe("DesktopSidebarAlbumsSection", () => {
       recentAlbumIds: ["album-a", "album-b"],
       onAlbumSelected,
     });
+    expect(await screen.findByPlaceholderText("Search albums")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "RECENT" }));
     expect(await screen.findByRole("button", { name: "Alpha" })).toBeVisible();
 
     fireEvent.click(screen.getByRole("button", { name: "Beta" }));
@@ -118,12 +123,35 @@ describe("DesktopSidebarAlbumsSection", () => {
       onAlbumSelected,
     });
 
-    fireEvent.click(await screen.findByRole("button", { name: "All albums" }));
+    fireEvent.click(await screen.findByRole("button", { name: "ALL ALBUMS" }));
     await waitFor(() => expect(onShowAlbumList).toHaveBeenCalledTimes(1));
     fireEvent.change(screen.getByPlaceholderText("Search albums"), { target: { value: "alp" } });
-    fireEvent.click(screen.getByRole("button", { name: "Alpha" }));
+    fireEvent.click(screen.getByTestId("desktop-sidebar-album-search-album-a"));
 
     expect(onAlbumSelected).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts with RECENT collapsed when there are recent albums", async () => {
+    renderSection({
+      albums: [album("album-a", "Alpha")],
+      recentAlbumIds: ["album-a"],
+    });
+
+    expect(await screen.findByPlaceholderText("Search albums")).toBeVisible();
+    const recentToggle = screen.getByRole("button", { name: "RECENT" });
+    expect(recentToggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "Alpha" })).toBeNull();
+  });
+
+  it("honors expandRecentAlbumsByDefault for initial RECENT state", async () => {
+    renderSection({
+      albums: [album("album-a", "Alpha")],
+      recentAlbumIds: ["album-a"],
+      expandRecentAlbumsByDefault: true,
+    });
+
+    expect(await screen.findByRole("button", { name: "Alpha" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "RECENT" })).toHaveAttribute("aria-expanded", "true");
   });
 
   it("shows smart album shortcuts below the existing album sections", async () => {
@@ -137,14 +165,28 @@ describe("DesktopSidebarAlbumsSection", () => {
     fireEvent.click(await screen.findByRole("button", { name: "SMART ALBUMS" }));
     fireEvent.click(screen.getByRole("button", { name: "Country > Year > Area" }));
     fireEvent.click(screen.getByRole("button", { name: "Country > Area > City" }));
-    fireEvent.click(screen.getByRole("button", { name: "Country > YYYY-MM Area" }));
-    fireEvent.click(screen.getByRole("button", { name: "AI countries" }));
     fireEvent.click(screen.getByRole("button", { name: "Best of Year" }));
 
-    expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(1, "country-year-city");
+    expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(1, "country-year-area");
     expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(2, "country-area-city");
-    expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(3, "country-month-area");
-    expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(4, "ai-countries");
-    expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(5, "best-of-year");
+    expect(onSmartAlbumSelected).toHaveBeenNthCalledWith(3, "best-of-year");
+  });
+
+  it("lists ALL ALBUMS before SMART ALBUMS in the sidebar", async () => {
+    renderSection({ albums: [album("album-a", "Alpha")] });
+    const allHeader = await screen.findByRole("button", { name: "ALL ALBUMS" });
+    const smartHeader = screen.getByRole("button", { name: "SMART ALBUMS" });
+    expect(allHeader.compareDocumentPosition(smartHeader) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+  });
+
+  it("highlights the active smart album when highlightedSmartAlbumKind is set", async () => {
+    renderSection({
+      albums: [album("album-a", "Alpha")],
+      highlightedSmartAlbumKind: "best-of-year",
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "SMART ALBUMS" }));
+    const bestOfYearRow = screen.getByRole("button", { name: "Best of Year" });
+    expect(bestOfYearRow).toHaveClass("bg-primary/10");
+    expect(bestOfYearRow).toHaveClass("border-primary");
   });
 });

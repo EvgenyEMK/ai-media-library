@@ -4,7 +4,7 @@ import {
   DEFAULT_THUMBNAIL_QUICK_FILTERS,
   type ThumbnailQuickFilterState,
 } from "@emk/media-metadata-core";
-import type { SmartAlbumRootKind } from "@emk/shared-contracts";
+import type { SmartAlbumRootKind, SmartAlbumYearAreaSubView } from "@emk/shared-contracts";
 import type { DesktopMediaItemMetadata } from "../shared/ipc";
 import { supportsThinkingMode } from "../shared/photo-analysis-prompt";
 import { DesktopAppMain } from "./components/DesktopAppMain";
@@ -114,7 +114,8 @@ export function App(): ReactElement {
   const [rotationReviewScope, setRotationReviewScope] = useState<RotationReviewScope | null>(null);
   const [albumWorkspaceMode, setAlbumWorkspaceMode] = useState<AlbumWorkspaceMode>("list");
   const [albumSearchControlsOpen, setAlbumSearchControlsOpen] = useState(false);
-  const [smartAlbumRootKind, setSmartAlbumRootKind] = useState<SmartAlbumRootKind>("country-year-city");
+  const [smartAlbumRootKind, setSmartAlbumRootKind] = useState<SmartAlbumRootKind>("country-year-area");
+  const [yearAreaSubView, setYearAreaSubView] = useState<SmartAlbumYearAreaSubView>("month-area");
   const [recentAlbumsHydrated, setRecentAlbumsHydrated] = useState(false);
 
   const {
@@ -363,6 +364,9 @@ export function App(): ReactElement {
         onAlbumSelected={handleAlbumSelectedFromSidebar}
         onSmartAlbumSelected={handleSmartAlbumSelectedFromSidebar}
         onShowAlbumList={handleShowAlbumListFromSidebar}
+        sidebarHighlightedSmartAlbumKind={
+          isAlbumsSectionOpen && albumWorkspaceMode === "smart" ? smartAlbumRootKind : null
+        }
         folderTree={folderTree}
       />
 
@@ -373,6 +377,8 @@ export function App(): ReactElement {
         albumWorkspaceMode={albumWorkspaceMode}
         setAlbumWorkspaceMode={setAlbumWorkspaceMode}
         smartAlbumRootKind={smartAlbumRootKind}
+        yearAreaSubView={yearAreaSubView}
+        onYearAreaSubViewChange={setYearAreaSubView}
         albumSearchControlsOpen={albumSearchControlsOpen}
         setAlbumSearchControlsOpen={setAlbumSearchControlsOpen}
         isSettingsSectionOpen={isSettingsSectionOpen}

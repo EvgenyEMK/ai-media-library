@@ -129,6 +129,23 @@ describe.skipIf(!HAS_SQLITE)("media albums DB", () => {
     expect(albums.listAlbums({ locationQuery: "Austria" }).totalCount).toBe(0);
   });
 
+  it("filters albums by location against location_area2", () => {
+    const created = albums.createAlbum("Coastal");
+    insertMediaItem({
+      id: "area2-item",
+      sourcePath: "C:/photos/coast.jpg",
+      starRating: null,
+      aiQuality: null,
+      country: "USA",
+      city: null,
+      locationArea: "CA",
+      locationArea2: "Big Sur",
+    });
+    albums.addMediaItemsToAlbum(created.id, ["area2-item"]);
+    expect(albums.listAlbums({ locationQuery: "Sur" }).totalCount).toBe(1);
+    expect(albums.listAlbums({ locationQuery: "Big" }).totalCount).toBe(1);
+  });
+
   it("filters albums by title and paginates total counts", () => {
     albums.createAlbum("Summer Trip");
     albums.createAlbum("Winter Trip");
@@ -158,6 +175,33 @@ describe.skipIf(!HAS_SQLITE)("media albums DB", () => {
 
     expect(result.totalCount).toBe(2);
     expect(result.rows.map((item) => item.id)).toEqual(["first", "third"]);
+  });
+
+  it("reorders manual album items by updating positions", () => {
+    const album = albums.createAlbum("Reorder");
+    insertMediaItem({ id: "ia", sourcePath: "C:/photos/a.jpg", starRating: null, aiQuality: null });
+    insertMediaItem({ id: "ib", sourcePath: "C:/photos/b.jpg", starRating: null, aiQuality: null });
+    insertMediaItem({ id: "ic", sourcePath: "C:/photos/c.jpg", starRating: null, aiQuality: null });
+    albums.addMediaItemsToAlbum(album.id, ["ia", "ib", "ic"]);
+    expect(albums.listAlbumItems({ albumId: album.id, limit: 10 }).rows.map((item) => item.id)).toEqual([
+      "ia",
+      "ib",
+      "ic",
+    ]);
+
+    albums.reorderAlbumMediaItem(album.id, "ic", 0);
+    expect(albums.listAlbumItems({ albumId: album.id, limit: 10 }).rows.map((item) => item.id)).toEqual([
+      "ic",
+      "ia",
+      "ib",
+    ]);
+
+    albums.reorderAlbumMediaItem(album.id, "ic", 3);
+    expect(albums.listAlbumItems({ albumId: album.id, limit: 10 }).rows.map((item) => item.id)).toEqual([
+      "ia",
+      "ib",
+      "ic",
+    ]);
   });
 
   it("ignores duplicate and unknown media ids when adding items", () => {
@@ -418,7 +462,7 @@ describe.skipIf(!HAS_SQLITE)("media albums DB", () => {
     ).toEqual(["lazio-2024"]);
   });
 
-  it("consolidates dense month-area countries into year-area entries", () => {
+  it("does not consolidate month-area: each YYYY-MM stays a separate group", () => {
     for (let month = 1; month <= 10; month += 1) {
       const monthText = String(month).padStart(2, "0");
       insertMediaItem({
@@ -433,24 +477,22 @@ describe.skipIf(!HAS_SQLITE)("media albums DB", () => {
       });
     }
 
-    const result = albums.listSmartAlbumPlaces({
-      grouping: "month-area",
-      source: "gps",
-      consolidateMonthAreaThreshold: 9,
-    });
+    const result = albums.listSmartAlbumPlaces({ grouping: "month-area", source: "gps" });
     const italy = result.countries.find((country) => country.country === "Italy");
-    expect(italy?.groups.map((group) => group.group)).toEqual(["2024"]);
-    expect(italy?.groups[0]?.entries.map((entry) => entry.label)).toEqual(["Tuscany"]);
+    const groupKeys = (italy?.groups.map((group) => group.group) ?? []).sort();
+    expect(groupKeys).toEqual(
+      ["2024-01", "2024-02", "2024-03", "2024-04", "2024-05", "2024-06", "2024-07", "2024-08", "2024-09", "2024-10"],
+    );
     expect(
       albums.listSmartAlbumItems({
         kind: "place",
         country: "Italy",
         city: "Tuscany",
-        group: "2024",
+        group: "2024-05",
         grouping: "month-area",
         source: "gps",
       }).totalCount,
-    ).toBe(10);
+    ).toBe(1);
   });
 
   it("excludes document-like, slide/diagram, and screenshot categories from place smart albums", () => {

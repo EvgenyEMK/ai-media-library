@@ -23,6 +23,8 @@ export interface AlbumListFilters {
   titleQuery?: string;
   locationQuery?: string;
   personTagIds?: string[];
+  /** When true and `personTagIds` is set, match albums linked via suggestions as well as confirmed faces. */
+  includeUnconfirmedFaces?: boolean;
   yearMonthFrom?: string;
   yearMonthTo?: string;
 }
@@ -59,20 +61,43 @@ export interface AlbumItemsResult {
   totalCount: number;
 }
 
+/** Reorder an item in a manual album (`media_album_items.position`). Not used for smart albums. */
+export interface ReorderAlbumMediaItemParams {
+  albumId: string;
+  /** Catalog media item id or a resolvable source path (desktop DB). */
+  mediaItemId: string;
+  /**
+   * Item is moved so it sits immediately before this index in the ordered album (0 = first).
+   * Use the current album length to append after the last item.
+   */
+  insertBeforeIndex: number;
+}
+
 export interface AlbumMembership {
   albumId: string;
   title: string;
 }
 
 export type SmartAlbumRootKind =
-  | "country-year-city"
+  | "country-year-area"
   | "country-area-city"
-  | "country-month-area"
   | "ai-countries"
   | "best-of-year";
 
-export type SmartAlbumPlaceGrouping = "year-city" | "area-city" | "month-area";
+/** Sub-view inside merged country date/place smart album (toolbar order: month, year+area, year hierarchy). */
+export type SmartAlbumYearAreaSubView = "month-area" | "year-area" | "year-city";
+
+export type SmartAlbumPlaceGrouping = "year-city" | "year-area" | "area-city" | "month-area";
 export type SmartAlbumPlaceSource = "gps" | "non-gps";
+
+/** Default AI `image_category` glob/literal patterns omitted from smart album queries (app settings; merged by the client). */
+export const DEFAULT_SMART_ALBUM_EXCLUDED_IMAGE_CATEGORIES = [
+  "document*",
+  "*screenshot*",
+  "invoice_or_receipt",
+  "presentation_slide",
+  "diagram",
+] as const;
 
 export interface SmartAlbumFilters {
   query?: string;
@@ -85,13 +110,17 @@ export interface SmartAlbumFilters {
   ratingLogic?: "or" | "and";
   dateFrom?: string;
   dateTo?: string;
+  /**
+   * When set, smart album SQL excludes rows whose AI image category matches any of these patterns
+   * (`*` → SQL `LIKE` `%`). Omitted on the request uses {@link DEFAULT_SMART_ALBUM_EXCLUDED_IMAGE_CATEGORIES}.
+   */
+  excludedImageCategories?: string[];
 }
 
 export interface SmartAlbumPlacesRequest {
   grouping: SmartAlbumPlaceGrouping;
   source: SmartAlbumPlaceSource;
   filters?: SmartAlbumFilters;
-  consolidateMonthAreaThreshold?: number;
 }
 
 export interface SmartAlbumPlaceEntry {

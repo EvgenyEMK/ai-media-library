@@ -212,6 +212,7 @@ const api: DesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.updateAlbumTitle, albumId, title),
   deleteAlbum: (albumId) => ipcRenderer.invoke(IPC_CHANNELS.deleteAlbum, albumId),
   listAlbumItems: (request) => ipcRenderer.invoke(IPC_CHANNELS.listAlbumItems, request),
+  reorderAlbumMediaItem: (params) => ipcRenderer.invoke(IPC_CHANNELS.reorderAlbumMediaItem, params),
   listAlbumsForMediaItem: (mediaItemIdOrPath) =>
     ipcRenderer.invoke(IPC_CHANNELS.listAlbumsForMediaItem, mediaItemIdOrPath),
   addMediaItemsToAlbum: (albumId, mediaItemIds) =>

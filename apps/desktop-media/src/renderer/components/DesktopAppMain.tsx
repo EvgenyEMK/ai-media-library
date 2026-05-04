@@ -1,7 +1,7 @@
 import type { Dispatch, ReactElement, RefObject, SetStateAction } from "react";
 import type { ImageEditSuggestionsItem } from "@emk/media-viewer";
 import type { SemanticSearchResult } from "@emk/media-store";
-import type { SmartAlbumRootKind } from "@emk/shared-contracts";
+import type { SmartAlbumRootKind, SmartAlbumYearAreaSubView } from "@emk/shared-contracts";
 import type { ThumbnailQuickFilterState } from "@emk/media-metadata-core";
 import { DesktopMainToolbar } from "./DesktopMainToolbar";
 import { DesktopMediaWorkspace } from "./DesktopMediaWorkspace";
@@ -32,6 +32,8 @@ interface DesktopAppMainProps {
   albumWorkspaceMode: AlbumWorkspaceMode;
   setAlbumWorkspaceMode: Dispatch<SetStateAction<AlbumWorkspaceMode>>;
   smartAlbumRootKind: SmartAlbumRootKind;
+  yearAreaSubView: SmartAlbumYearAreaSubView;
+  onYearAreaSubViewChange: Dispatch<SetStateAction<SmartAlbumYearAreaSubView>>;
   albumSearchControlsOpen: boolean;
   setAlbumSearchControlsOpen: Dispatch<SetStateAction<boolean>>;
   isSettingsSectionOpen: boolean;
@@ -108,6 +110,8 @@ export function DesktopAppMain({
   albumWorkspaceMode,
   setAlbumWorkspaceMode,
   smartAlbumRootKind,
+  yearAreaSubView,
+  onYearAreaSubViewChange,
   albumSearchControlsOpen,
   setAlbumSearchControlsOpen,
   isSettingsSectionOpen,
@@ -179,6 +183,8 @@ export function DesktopAppMain({
             mode={albumWorkspaceMode}
             onModeChange={setAlbumWorkspaceMode}
             smartAlbumRootKind={smartAlbumRootKind}
+            yearAreaSubView={yearAreaSubView}
+            onYearAreaSubViewChange={onYearAreaSubViewChange}
             searchControlsOpen={albumSearchControlsOpen}
             onSearchControlsOpenChange={setAlbumSearchControlsOpen}
           />
