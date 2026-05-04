@@ -1,20 +1,21 @@
 import { randomUUID } from "node:crypto";
-import type {
-  AlbumItemsRequest,
-  AlbumItemsResult,
-  AlbumListRequest,
-  AlbumListResult,
-  AlbumMembership,
-  AlbumPersonTagSummary,
-  MediaAlbumSummary,
-  SmartAlbumFilters,
-  SmartAlbumItemsRequest,
-  SmartAlbumPlacesRequest,
-  SmartAlbumPlacesResult,
-  SmartAlbumYearsRequest,
-  SmartAlbumYearsResult,
+import {
+  DEFAULT_SMART_ALBUM_EXCLUDED_IMAGE_CATEGORIES,
+  type AlbumItemsRequest,
+  type AlbumItemsResult,
+  type AlbumListRequest,
+  type AlbumListResult,
+  type AlbumMembership,
+  type AlbumPersonTagSummary,
+  type MediaAlbumSummary,
+  type SmartAlbumFilters,
+  type SmartAlbumItemsRequest,
+  type SmartAlbumPlacesRequest,
+  type SmartAlbumPlacesResult,
+  type SmartAlbumYearsRequest,
+  type SmartAlbumYearsResult,
+  normalizeAlbumDateBounds,
 } from "@emk/shared-contracts";
-import { normalizeAlbumDateBounds } from "@emk/shared-contracts";
 import { DEFAULT_LIBRARY_ID } from "./folder-analysis-status";
 import { getDesktopDatabase } from "./client";
 
@@ -76,18 +77,45 @@ const AI_AESTHETIC_SCORE_SQL = `COALESCE(
   CAST(json_extract(ai_metadata, '$.image_analysis.photo_estetic_quality') AS REAL),
   CAST(json_extract(ai_metadata, '$.photo_estetic_quality') AS REAL)
 )`;
-const AI_IMAGE_CATEGORY_SQL = `LOWER(COALESCE(
-  CAST(json_extract(ai_metadata, '$.image_analysis.image_category') AS TEXT),
-  CAST(json_extract(ai_metadata, '$.image_category') AS TEXT),
-  ''
-))`;
-const SMART_ALBUM_EXCLUDED_CATEGORY_SQL = `(
-  ${AI_IMAGE_CATEGORY_SQL} LIKE 'document%'
-  OR ${AI_IMAGE_CATEGORY_SQL} = 'invoice_or_receipt'
-  OR ${AI_IMAGE_CATEGORY_SQL} = 'presentation_slide'
-  OR ${AI_IMAGE_CATEGORY_SQL} = 'diagram'
-  OR ${AI_IMAGE_CATEGORY_SQL} LIKE '%screenshot%'
-)`;
+
+function smartAlbumImageCategoryLowerExpr(aiMetadataRef: string): string {
+  return `LOWER(COALESCE(
+  CAST(json_extract(${aiMetadataRef}, '$.image_analysis.image_category') AS TEXT),
+  CAST(json_extract(${aiMetadataRef}, '$.image_category') AS TEXT),
+  ''))`;
+}
+
+function resolveSmartAlbumExcludedImageCategoryPatterns(filters?: SmartAlbumFilters): string[] {
+  if (filters?.excludedImageCategories !== undefined) {
+    return filters.excludedImageCategories.map((p) => p.trim()).filter(Boolean);
+  }
+  return [...DEFAULT_SMART_ALBUM_EXCLUDED_IMAGE_CATEGORIES];
+}
+
+function appendSmartAlbumExcludedImageCategoryClause(
+  where: string[],
+  args: unknown[],
+  aiMetadataRef: string,
+  filters?: SmartAlbumFilters,
+): void {
+  const patterns = resolveSmartAlbumExcludedImageCategoryPatterns(filters);
+  if (patterns.length === 0) {
+    return;
+  }
+  const cat = smartAlbumImageCategoryLowerExpr(aiMetadataRef);
+  const parts: string[] = [];
+  for (const raw of patterns) {
+    const p = raw.toLowerCase();
+    if (p.includes("*")) {
+      parts.push(`${cat} LIKE ?`);
+      args.push(p.replace(/\*/g, "%"));
+    } else {
+      parts.push(`${cat} = ?`);
+      args.push(p);
+    }
+  }
+  where.push(`NOT (${parts.join(" OR ")})`);
+}
 
 function resolveMediaItemId(mediaItemIdOrPath: string, libraryId: string): string | null {
   const id = mediaItemIdOrPath.trim();
@@ -660,9 +688,14 @@ export function listSmartAlbumPlaces(
         ? "NULLIF(TRIM(location_area), '') IS NOT NULL"
         : "NULLIF(TRIM(location_area), '') IS NOT NULL",
     "(NULLIF(TRIM(city), '') IS NULL OR TRIM(country) <> TRIM(city))",
-    `NOT ${SMART_ALBUM_EXCLUDED_CATEGORY_SQL}`,
   ];
   const placeArgs: unknown[] = [libraryId];
+  appendSmartAlbumExcludedImageCategoryClause(
+    placeWhere,
+    placeArgs,
+    "ai_metadata",
+    normalizedRequest.filters,
+  );
   appendSmartAlbumCommonFilters(placeWhere, placeArgs, "media_items", libraryId, normalizedRequest.filters);
   const rows = getDesktopDatabase()
     .prepare(
@@ -801,9 +834,9 @@ export function listSmartAlbumYears(
     "deleted_at IS NULL",
     "COALESCE(photo_taken_at, file_created_at) IS NOT NULL",
     "SUBSTR(COALESCE(photo_taken_at, file_created_at), 1, 4) GLOB '[0-9][0-9][0-9][0-9]'",
-    `NOT ${SMART_ALBUM_EXCLUDED_CATEGORY_SQL}`,
   ];
   const args: unknown[] = [libraryId];
+  appendSmartAlbumExcludedImageCategoryClause(where, args, "ai_metadata", request?.filters);
   appendSmartAlbumCommonFilters(where, args, "media_items", libraryId, request?.filters);
   const rows = getDesktopDatabase()
     .prepare(
@@ -878,13 +911,12 @@ export function listSmartAlbumItems(
       request.grouping === "area-city" && leafLevel === "area2" && request.area1?.trim()
         ? "AND COALESCE(NULLIF(TRIM(mi.location_area), ''), 'Unknown area') = ?"
         : "";
-    const categoryExclusion = `NOT ${SMART_ALBUM_EXCLUDED_CATEGORY_SQL.replaceAll(
-      "ai_metadata",
-      "mi.ai_metadata",
-    )}`;
-    const commonWhere: string[] = [categoryExclusion];
+    const commonWhere: string[] = [];
     const commonArgs: unknown[] = [];
+    appendSmartAlbumExcludedImageCategoryClause(commonWhere, commonArgs, "mi.ai_metadata", request.filters);
     appendSmartAlbumCommonFilters(commonWhere, commonArgs, "mi", libraryId, request.filters);
+    const commonWhereSql =
+      commonWhere.length > 0 ? `AND ${commonWhere.join("\n           AND ")}` : "";
     const placeArgs: unknown[] = [libraryId, request.country.trim()];
     if (request.grouping === "area-city") {
       if (leafLevel === "city") {
@@ -912,7 +944,7 @@ export function listSmartAlbumItems(
            AND ${placePredicate}
            AND ${groupPredicate}
            ${area1Predicate}
-           AND ${commonWhere.join("\n           AND ")}`,
+           ${commonWhereSql}`,
       )
       .get(...placeArgs, ...commonArgs) as
       | { cnt: number }
@@ -928,7 +960,7 @@ export function listSmartAlbumItems(
            AND ${placePredicate}
            AND ${groupPredicate}
            ${area1Predicate}
-           AND ${commonWhere.join("\n           AND ")}
+           ${commonWhereSql}
          ORDER BY COALESCE(mi.photo_taken_at, mi.file_created_at) DESC, mi.source_path COLLATE NOCASE ASC
          LIMIT ? OFFSET ?`,
       )
@@ -949,11 +981,11 @@ export function listSmartAlbumItems(
     COALESCE(mi.photo_taken_at, mi.file_created_at) DESC,
     mi.source_path COLLATE NOCASE ASC`;
   const resultOrderBy = request.randomize ? "RANDOM()" : qualityOrderBy.replaceAll("mi.", "");
-  const commonWhere: string[] = [
-    `NOT ${SMART_ALBUM_EXCLUDED_CATEGORY_SQL.replaceAll("ai_metadata", "mi.ai_metadata")}`,
-  ];
+  const commonWhere: string[] = [];
   const commonArgs: unknown[] = [];
+  appendSmartAlbumExcludedImageCategoryClause(commonWhere, commonArgs, "mi.ai_metadata", request.filters);
   appendSmartAlbumCommonFilters(commonWhere, commonArgs, "mi", libraryId, request.filters);
+  const commonWhereSql = commonWhere.length > 0 ? `AND ${commonWhere.join("\n         AND ")}` : "";
   const total = db
     .prepare(
       `SELECT COUNT(*) AS cnt
@@ -961,7 +993,7 @@ export function listSmartAlbumItems(
        WHERE mi.library_id = ?
          AND mi.deleted_at IS NULL
          AND SUBSTR(COALESCE(mi.photo_taken_at, mi.file_created_at), 1, 4) = ?
-         ${commonWhere.length > 0 ? `AND ${commonWhere.join("\n         AND ")}` : ""}`,
+         ${commonWhereSql}`,
     )
     .get(libraryId, year, ...commonArgs) as { cnt: number } | undefined;
   const rows = db
@@ -973,7 +1005,7 @@ export function listSmartAlbumItems(
        WHERE mi.library_id = ?
          AND mi.deleted_at IS NULL
          AND SUBSTR(COALESCE(mi.photo_taken_at, mi.file_created_at), 1, 4) = ?
-         ${commonWhere.length > 0 ? `AND ${commonWhere.join("\n         AND ")}` : ""}
+         ${commonWhereSql}
        ORDER BY ${qualityOrderBy}
        LIMIT ?
        )

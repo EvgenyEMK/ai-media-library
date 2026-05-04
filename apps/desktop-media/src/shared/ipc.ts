@@ -14,6 +14,7 @@ import type {
   SmartAlbumPlacesResult,
   SmartAlbumYearsResult,
 } from "@emk/shared-contracts";
+import { DEFAULT_SMART_ALBUM_EXCLUDED_IMAGE_CATEGORIES } from "@emk/shared-contracts";
 import type { SemanticSearchSignalMode } from "@emk/media-store";
 import type { PipelineDesktopApi } from "./pipeline-ipc";
 import type { PipelineConcurrencyConfig } from "./pipeline-types";
@@ -583,6 +584,15 @@ export interface SmartAlbumSettings {
   excludedImageCategories: string[];
 }
 
+/** Known smart-album exclusion patterns (checkboxes in Settings). Order matches persisted defaults. */
+export const SMART_ALBUM_EXCLUDABLE_IMAGE_CATEGORY_OPTIONS: ReadonlyArray<{ pattern: string; label: string }> = [
+  { pattern: "document*", label: "Document-like images" },
+  { pattern: "*screenshot*", label: "Screenshots" },
+  { pattern: "invoice_or_receipt", label: "Invoices and receipts" },
+  { pattern: "presentation_slide", label: "Presentation slides" },
+  { pattern: "diagram", label: "Diagrams" },
+];
+
 export const DEFAULT_FACE_DETECTION_SETTINGS: FaceDetectionSettings = {
   detectorModel: "yolov12l-face",
   minConfidenceThreshold: 0.75,
@@ -642,17 +652,11 @@ export const DEFAULT_AI_IMAGE_SEARCH_SETTINGS: AiImageSearchSettings = {
 };
 
 export const DEFAULT_SMART_ALBUM_SETTINGS: SmartAlbumSettings = {
-  defaultStarRating: 4,
+  defaultStarRating: 3,
   defaultStarRatingOperator: "gte",
   defaultAiRating: 4,
   defaultAiRatingOperator: "gte",
-  excludedImageCategories: [
-    "document*",
-    "invoice_or_receipt",
-    "presentation_slide",
-    "diagram",
-    "*screenshot*",
-  ],
+  excludedImageCategories: [...DEFAULT_SMART_ALBUM_EXCLUDED_IMAGE_CATEGORIES],
 };
 
 export const DEFAULT_PATH_EXTRACTION_SETTINGS: PathExtractionSettings = {

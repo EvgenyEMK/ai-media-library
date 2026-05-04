@@ -12,6 +12,7 @@ import {
   DEFAULT_PHOTO_ANALYSIS_SETTINGS,
   DEFAULT_SMART_ALBUM_SETTINGS,
   DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS,
+  SMART_ALBUM_EXCLUDABLE_IMAGE_CATEGORY_OPTIONS,
   FACE_DETECTOR_MODEL_OPTIONS,
   type AiImageSearchSettings,
   type AppSettings,
@@ -134,9 +135,13 @@ function sanitizeSmartAlbumRatingOperator(candidate: unknown): SmartAlbumRatingO
 
 function sanitizeSmartAlbumSettings(candidate: unknown): SmartAlbumSettings {
   const value = isRecord(candidate) ? candidate : {};
-  const excludedImageCategories = Array.isArray(value.excludedImageCategories)
+  const rawExcluded = Array.isArray(value.excludedImageCategories)
     ? value.excludedImageCategories.filter((entry): entry is string => typeof entry === "string")
-    : DEFAULT_SMART_ALBUM_SETTINGS.excludedImageCategories;
+    : undefined;
+  const excludedImageCategories =
+    rawExcluded === undefined
+      ? DEFAULT_SMART_ALBUM_SETTINGS.excludedImageCategories
+      : SMART_ALBUM_EXCLUDABLE_IMAGE_CATEGORY_OPTIONS.map((o) => o.pattern).filter((p) => rawExcluded.includes(p));
   return {
     defaultStarRating:
       "defaultStarRating" in value

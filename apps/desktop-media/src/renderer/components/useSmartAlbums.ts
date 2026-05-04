@@ -10,7 +10,7 @@ import type { SmartAlbumSettings } from "../../shared/ipc";
 
 export const DEFAULT_SMART_ALBUM_FILTERS: SmartAlbumFilters = {
   includeUnconfirmedFaces: true,
-  starRatingMin: 4,
+  starRatingMin: 3,
   starRatingOperator: "gte",
   aiAestheticMin: 7,
   aiAestheticOperator: "gte",

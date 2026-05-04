@@ -133,12 +133,19 @@ export function DesktopAlbumsWorkspace({
     smartPlaceHierarchyLevels,
     setSmartPlaceHierarchyLevels,
   } = smartAlbums;
+  const smartAlbumFiltersForRpc = useMemo(
+    (): SmartAlbumFilters => ({
+      ...smartAlbumFilters,
+      excludedImageCategories: smartAlbumSettings.excludedImageCategories,
+    }),
+    [smartAlbumFilters, smartAlbumSettings.excludedImageCategories],
+  );
   const [newTitle, setNewTitle] = useState("");
   const [albumQuickFilters, setAlbumQuickFilters] = useState<ThumbnailQuickFilterState>(
     DEFAULT_THUMBNAIL_QUICK_FILTERS,
   );
   const [albumQuickFiltersOpen, setAlbumQuickFiltersOpen] = useState(false);
-  const [smartFilterPanelOpen, setSmartFilterPanelOpen] = useState(false);
+  const [smartFilterPanelOpen, setSmartFilterPanelOpen] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -191,7 +198,7 @@ export function DesktopAlbumsWorkspace({
     () => countActiveSmartAlbumFilters(smartAlbumFilters),
     [smartAlbumFilters],
   );
-  const showSmartFilterPanel = smartFilterPanelOpen || smartFiltersActiveCount === 0;
+  const showSmartFilterPanel = smartFilterPanelOpen;
 
   const loadAlbums = useCallback(async () => {
     setIsLoading(true);
@@ -239,11 +246,11 @@ export function DesktopAlbumsWorkspace({
       if (smartPlaceRequest) {
         const result = await actions.loadSmartAlbumPlaces({
           ...smartPlaceRequest,
-          filters: smartAlbumFilters,
+          filters: smartAlbumFiltersForRpc,
         });
         setSmartPlaceCountries(result.countries);
       } else {
-        const result = await actions.loadSmartAlbumYears({ filters: smartAlbumFilters });
+        const result = await actions.loadSmartAlbumYears({ filters: smartAlbumFiltersForRpc });
         setSmartYears(result.years);
       }
     } catch (error) {
@@ -251,7 +258,7 @@ export function DesktopAlbumsWorkspace({
     } finally {
       setIsLoading(false);
     }
-  }, [actions, showingSmart, smartAlbumRootKind, smartAlbumFilters, smartPlaceRequest]);
+  }, [actions, showingSmart, smartAlbumFiltersForRpc, smartPlaceRequest]);
 
   const loadSmartAlbumItems = useCallback(async () => {
     if (!activeSmartAlbum) {
@@ -273,7 +280,7 @@ export function DesktopAlbumsWorkspace({
             leafLevel: activeSmartAlbum.entry.leafLevel ?? "city",
             area1: activeSmartAlbum.entry.area1 ?? activeSmartAlbum.entry.groupParent ?? null,
             area2: activeSmartAlbum.entry.area2 ?? activeSmartAlbum.entry.group ?? null,
-            filters: smartAlbumFilters,
+            filters: smartAlbumFiltersForRpc,
             offset: smartItemsPage * ALBUM_ITEMS_PAGE_SIZE,
             limit: ALBUM_ITEMS_PAGE_SIZE,
           })
@@ -282,7 +289,7 @@ export function DesktopAlbumsWorkspace({
             year: activeSmartAlbum.year,
             randomize: randomizeEnabled,
             randomCandidateLimit,
-            filters: smartAlbumFilters,
+            filters: smartAlbumFiltersForRpc,
             offset: smartItemsPage * ALBUM_ITEMS_PAGE_SIZE,
             limit: ALBUM_ITEMS_PAGE_SIZE,
           });
@@ -299,7 +306,7 @@ export function DesktopAlbumsWorkspace({
     randomCandidateLimit,
     randomizeEnabled,
     randomRefreshKey,
-    smartAlbumFilters,
+    smartAlbumFiltersForRpc,
     smartItemsPage,
     smartPlaceRequest,
   ]);
@@ -349,6 +356,7 @@ export function DesktopAlbumsWorkspace({
     setExpandedSmartCountries([]);
     setExpandedSmartGroups([]);
     setSmartItemsPage(0);
+    setSmartFilterPanelOpen(true);
     void loadSmartRoots();
   }, [showingSmart, smartAlbumRootKind]);
 
@@ -364,20 +372,7 @@ export function DesktopAlbumsWorkspace({
       return;
     }
     void loadSmartRoots();
-  }, [
-    activeSmartAlbum,
-    loadSmartRoots,
-    showingSmart,
-    smartAlbumFilters.query,
-    smartFilterPersonTagKey,
-    smartAlbumFilters.includeUnconfirmedFaces,
-    smartAlbumFilters.starRatingMin,
-    smartAlbumFilters.aiAestheticMin,
-    smartAlbumFilters.starRatingOperator,
-    smartAlbumFilters.aiAestheticOperator,
-    smartAlbumFilters.ratingLogic,
-    smartPlaceRequest,
-  ]);
+  }, [activeSmartAlbum, loadSmartRoots, showingSmart, smartAlbumFiltersForRpc, smartPlaceRequest]);
 
   useEffect(() => {
     setAlbumPage(0);
@@ -393,16 +388,7 @@ export function DesktopAlbumsWorkspace({
 
   useEffect(() => {
     setSmartItemsPage(0);
-  }, [
-    smartAlbumFilters.query,
-    smartFilterPersonTagKey,
-    smartAlbumFilters.includeUnconfirmedFaces,
-    smartAlbumFilters.starRatingMin,
-    smartAlbumFilters.aiAestheticMin,
-    smartAlbumFilters.starRatingOperator,
-    smartAlbumFilters.aiAestheticOperator,
-    smartAlbumFilters.ratingLogic,
-  ]);
+  }, [smartAlbumFiltersForRpc]);
 
   useEffect(() => {
     if (!albumQuickFiltersOpen) {
@@ -560,6 +546,7 @@ export function DesktopAlbumsWorkspace({
           <BestOfYearFiltersPanel
             filters={smartAlbumFilters}
             personTags={personTags}
+            onClose={() => setSmartFilterPanelOpen(false)}
             onClear={() => setSmartAlbumFilters(EMPTY_SMART_ALBUM_FILTERS)}
             onFiltersChange={setSmartAlbumFilters}
             onTogglePersonTag={toggleSmartFilterPersonTag}

@@ -31,23 +31,25 @@ export function SmartAlbumRatingFilterRow({
   onChange: (next: number | null) => void;
 }): ReactElement {
   return (
-    <div className="grid min-h-9 grid-cols-[4.75rem_3.25rem_auto] items-center gap-2 text-xs text-ai-search-muted">
-      <span className="text-ai-search-text/90">{label}</span>
+    <div className="flex min-h-9 flex-wrap items-center gap-x-1 gap-y-1 text-ai-search-muted">
+      <span className="shrink-0 text-sm font-medium text-ai-search-text/90">{label}</span>
       <button
         type="button"
-        className="inline-flex h-8 min-w-11 items-center justify-center rounded-md border border-ai-search-border bg-ai-search-control px-2 text-xs font-semibold text-ai-search-text hover:bg-ai-search-control/80"
+        className="inline-flex h-8 min-w-7 shrink-0 items-center justify-center rounded-md border border-ai-search-border bg-ai-search-control px-0.5 text-sm font-semibold tabular-nums text-ai-search-text hover:bg-ai-search-control/80"
         onClick={() => onOperatorChange(operator === "gte" ? "eq" : "gte")}
         aria-label={`${label} operator`}
-        title="Click to switch between >= and ="
+        title="Click to switch between ≥ and ="
       >
-        {operator === "gte" ? ">=" : "="}
+        {operator === "gte" ? "≥" : "="}
       </button>
+      <div className="ml-2 flex min-w-0 items-center">
       <MediaItemStarRating
         starRating={value}
         onChange={(next) => onChange(next > 0 ? next : null)}
         expanded
         tone="onCard"
       />
+      </div>
     </div>
   );
 }

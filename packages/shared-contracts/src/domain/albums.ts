@@ -74,6 +74,15 @@ export type SmartAlbumRootKind =
 export type SmartAlbumPlaceGrouping = "year-city" | "area-city" | "month-area";
 export type SmartAlbumPlaceSource = "gps" | "non-gps";
 
+/** Default AI `image_category` glob/literal patterns omitted from smart album queries (app settings; merged by the client). */
+export const DEFAULT_SMART_ALBUM_EXCLUDED_IMAGE_CATEGORIES = [
+  "document*",
+  "*screenshot*",
+  "invoice_or_receipt",
+  "presentation_slide",
+  "diagram",
+] as const;
+
 export interface SmartAlbumFilters {
   query?: string;
   personTagIds?: string[];
@@ -85,6 +94,11 @@ export interface SmartAlbumFilters {
   ratingLogic?: "or" | "and";
   dateFrom?: string;
   dateTo?: string;
+  /**
+   * When set, smart album SQL excludes rows whose AI image category matches any of these patterns
+   * (`*` → SQL `LIKE` `%`). Omitted on the request uses {@link DEFAULT_SMART_ALBUM_EXCLUDED_IMAGE_CATEGORIES}.
+   */
+  excludedImageCategories?: string[];
 }
 
 export interface SmartAlbumPlacesRequest {
