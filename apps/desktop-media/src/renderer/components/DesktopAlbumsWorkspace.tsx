@@ -773,6 +773,7 @@ export function DesktopAlbumsWorkspace({
             viewMode={viewMode}
             onAlbumItemsPageChange={setAlbumItemsPage}
             onAlbumContentChanged={refreshAlbumDetailState}
+            reorderAlbumMediaItem={actions.reorderAlbumMediaItem}
           />
         </div>
       ) : (

@@ -61,6 +61,18 @@ export interface AlbumItemsResult {
   totalCount: number;
 }
 
+/** Reorder an item in a manual album (`media_album_items.position`). Not used for smart albums. */
+export interface ReorderAlbumMediaItemParams {
+  albumId: string;
+  /** Catalog media item id or a resolvable source path (desktop DB). */
+  mediaItemId: string;
+  /**
+   * Item is moved so it sits immediately before this index in the ordered album (0 = first).
+   * Use the current album length to append after the last item.
+   */
+  insertBeforeIndex: number;
+}
+
 export interface AlbumMembership {
   albumId: string;
   title: string;

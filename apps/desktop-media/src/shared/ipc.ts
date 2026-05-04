@@ -2,6 +2,7 @@ import type {
   AlbumItemsRequest,
   AlbumItemsResult,
   AlbumListRequest,
+  ReorderAlbumMediaItemParams,
   AlbumListResult,
   AlbumMembership,
   CanonicalBoundingBox,
@@ -107,6 +108,7 @@ export const IPC_CHANNELS = {
   updateAlbumTitle: "media:update-album-title",
   deleteAlbum: "media:delete-album",
   listAlbumItems: "media:list-album-items",
+  reorderAlbumMediaItem: "media:reorder-album-media-item",
   listAlbumsForMediaItem: "media:list-albums-for-media-item",
   addMediaItemsToAlbum: "media:add-media-items-to-album",
   removeMediaItemFromAlbum: "media:remove-media-item-from-album",
@@ -2127,6 +2129,7 @@ export interface DesktopApi {
   updateAlbumTitle: (albumId: string, title: string) => Promise<MediaAlbumSummary>;
   deleteAlbum: (albumId: string) => Promise<void>;
   listAlbumItems: (request: AlbumItemsRequest) => Promise<AlbumItemsResult>;
+  reorderAlbumMediaItem: (params: ReorderAlbumMediaItemParams) => Promise<void>;
   listAlbumsForMediaItem: (mediaItemIdOrPath: string) => Promise<AlbumMembership[]>;
   addMediaItemsToAlbum: (albumId: string, mediaItemIds: string[]) => Promise<void>;
   removeMediaItemFromAlbum: (albumId: string, mediaItemId: string) => Promise<void>;

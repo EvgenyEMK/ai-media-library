@@ -17,6 +17,7 @@ import {
   type SmartAlbumPlaceGrouping,
   normalizeAlbumDateBounds,
 } from "@emk/shared-contracts";
+import { moveItemIdToInsertBefore } from "../lib/reorder-ordered-ids";
 import { DEFAULT_LIBRARY_ID } from "./folder-analysis-status";
 import { getDesktopDatabase } from "./client";
 
@@ -623,6 +624,52 @@ export function removeMediaItemFromAlbum(
        WHERE media_album_id = ? AND media_item_id = ? AND library_id = ?`,
     )
     .run(albumId, mediaItemId, libraryId);
+}
+
+export function reorderAlbumMediaItem(
+  albumId: string,
+  mediaItemIdOrPath: string,
+  insertBeforeIndex: number,
+  libraryId = DEFAULT_LIBRARY_ID,
+): void {
+  const trimmedAlbum = albumId.trim();
+  if (!trimmedAlbum) {
+    return;
+  }
+  const mediaItemId = resolveMediaItemId(mediaItemIdOrPath.trim(), libraryId);
+  if (!mediaItemId) {
+    return;
+  }
+  const db = getDesktopDatabase();
+  const rows = db
+    .prepare(
+      `SELECT mai.media_item_id AS id
+       FROM media_album_items mai
+       JOIN media_items mi ON mi.id = mai.media_item_id AND mi.library_id = mai.library_id
+       WHERE mai.media_album_id = ? AND mai.library_id = ? AND mi.deleted_at IS NULL
+       ORDER BY COALESCE(mai.position, 2147483647) ASC, mai.created_at ASC`,
+    )
+    .all(trimmedAlbum, libraryId) as { id: string }[];
+
+  const orderedIds = rows.map((r) => r.id);
+  const nextOrder = moveItemIdToInsertBefore(orderedIds, mediaItemId, insertBeforeIndex);
+  if (!nextOrder) {
+    return;
+  }
+  const now = new Date().toISOString();
+  const updatePosition = db.prepare(
+    `UPDATE media_album_items SET position = ? WHERE media_album_id = ? AND library_id = ? AND media_item_id = ?`,
+  );
+  db.transaction(() => {
+    for (const [position, id] of nextOrder.entries()) {
+      updatePosition.run(position, trimmedAlbum, libraryId, id);
+    }
+    db.prepare(`UPDATE media_albums SET updated_at = ? WHERE id = ? AND library_id = ?`).run(
+      now,
+      trimmedAlbum,
+      libraryId,
+    );
+  })();
 }
 
 export function setAlbumCover(

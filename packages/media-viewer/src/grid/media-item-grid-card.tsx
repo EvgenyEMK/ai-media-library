@@ -1,7 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactElement, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type DragEvent,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { MediaItemStarRating } from "./media-item-star-rating";
+import { cleanupReorderDragPreview, installReorderDragPreview } from "./reorder-drag-preview";
+
+export interface MediaItemGridCardDragReorder {
+  onDragStart: (event: DragEvent<HTMLDivElement>) => void;
+  onDragEnd: () => void;
+}
 
 interface MediaItemGridCardProps {
   title: string;
@@ -15,6 +29,11 @@ interface MediaItemGridCardProps {
   /** When true, surface a distinct rejected (-1) badge; desktop defaults off until pick/reject UX ships. */
   starRatingShowRejected?: boolean;
   mediaType?: "image" | "video";
+  /**
+   * When set, the card is draggable for reorder except when the drag originates from the star
+   * control or the actions menu region.
+   */
+  dragReorder?: MediaItemGridCardDragReorder;
 }
 
 const styles: Record<string, CSSProperties> = {
@@ -94,6 +113,13 @@ const styles: Record<string, CSSProperties> = {
   },
 };
 
+function isTargetInside(root: HTMLElement | null, target: EventTarget | null): boolean {
+  if (!root || !target || !(target instanceof Node)) {
+    return false;
+  }
+  return root.contains(target);
+}
+
 export function MediaItemGridCard({
   title,
   imageUrl,
@@ -105,8 +131,12 @@ export function MediaItemGridCard({
   onStarRatingChange,
   starRatingShowRejected = false,
   mediaType = "image",
+  dragReorder,
 }: MediaItemGridCardProps): ReactElement {
   const cardRef = useRef<HTMLDivElement>(null);
+  const reorderDragGhostRef = useRef<HTMLDivElement | null>(null);
+  const starsChromeRef = useRef<HTMLDivElement>(null);
+  const actionsChromeRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
   const [ratingFocused, setRatingFocused] = useState(false);
   const [videoVisible, setVideoVisible] = useState(priority);
@@ -134,6 +164,12 @@ export function MediaItemGridCard({
     return () => observer.disconnect();
   }, [mediaType, priority]);
 
+  useEffect(() => {
+    return () => {
+      cleanupReorderDragPreview(reorderDragGhostRef);
+    };
+  }, []);
+
   const collapseRatingChrome = (): void => {
     setRatingFocused(false);
     const root = cardRef.current;
@@ -146,8 +182,36 @@ export function MediaItemGridCard({
   return (
     <div
       ref={cardRef}
-      style={styles.card}
+      draggable={Boolean(dragReorder)}
+      style={{
+        ...styles.card,
+        ...(dragReorder ? { cursor: "grab" } : {}),
+      }}
       onClick={onClick}
+      onDragStart={(event) => {
+        if (!dragReorder) {
+          return;
+        }
+        if (
+          isTargetInside(starsChromeRef.current, event.target) ||
+          isTargetInside(actionsChromeRef.current, event.target)
+        ) {
+          event.preventDefault();
+          return;
+        }
+        const card = cardRef.current;
+        if (card) {
+          installReorderDragPreview(event, card, reorderDragGhostRef, {
+            imageUrl,
+            mediaType: mediaType ?? "image",
+          });
+        }
+        dragReorder.onDragStart(event);
+      }}
+      onDragEnd={() => {
+        cleanupReorderDragPreview(reorderDragGhostRef);
+        dragReorder?.onDragEnd();
+      }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => {
         setIsHovered(false);
@@ -163,9 +227,11 @@ export function MediaItemGridCard({
                 muted
                 preload="metadata"
                 playsInline
+                draggable={dragReorder ? false : undefined}
                 onClick={onClick}
                 style={{
                   ...styles.image,
+                  ...(dragReorder ? { WebkitUserDrag: "none" as const } : {}),
                   ...(isHovered ? { transform: "scale(1.1)" } : {}),
                 }}
               />
@@ -191,9 +257,11 @@ export function MediaItemGridCard({
               alt={title}
               loading={priority ? "eager" : "lazy"}
               decoding="async"
+              draggable={dragReorder ? false : undefined}
               onClick={onClick}
               style={{
                 ...styles.image,
+                ...(dragReorder ? { WebkitUserDrag: "none" as const } : {}),
                 ...(isHovered ? { transform: "scale(1.1)" } : {}),
               }}
             />
@@ -210,6 +278,7 @@ export function MediaItemGridCard({
         ) : null}
         {starRating !== undefined || onStarRatingChange ? (
           <div
+            ref={starsChromeRef}
             style={{
               position: "absolute",
               top: 8,
@@ -238,6 +307,7 @@ export function MediaItemGridCard({
       </div>
       {actions ? (
         <div
+          ref={actionsChromeRef}
           style={{
             ...styles.actions,
             opacity: isHovered ? 1 : 0,

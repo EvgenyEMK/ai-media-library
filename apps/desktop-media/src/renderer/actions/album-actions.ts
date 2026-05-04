@@ -5,6 +5,7 @@ import type {
   AlbumListResult,
   AlbumMembership,
   MediaAlbumSummary,
+  ReorderAlbumMediaItemParams,
   SmartAlbumItemsRequest,
   SmartAlbumPlacesRequest,
   SmartAlbumYearsRequest,
@@ -22,6 +23,7 @@ export interface DesktopAlbumActions {
   listAlbumsForMediaItem: (mediaItemIdOrPath: string) => Promise<AlbumMembership[]>;
   addMediaItemsToAlbum: (albumId: string, mediaItemIds: string[]) => Promise<void>;
   removeMediaItemFromAlbum: (albumId: string, mediaItemId: string) => Promise<void>;
+  reorderAlbumMediaItem: (params: ReorderAlbumMediaItemParams) => Promise<void>;
   setAlbumCover: (albumId: string, mediaItemId: string | null) => Promise<void>;
   loadSmartAlbumPlaces: (request: SmartAlbumPlacesRequest) => Promise<SmartAlbumPlacesResult>;
   loadSmartAlbumYears: (request?: SmartAlbumYearsRequest) => Promise<SmartAlbumYearsResult>;
@@ -66,6 +68,10 @@ export function createDesktopAlbumActions(store: DesktopStore): DesktopAlbumActi
     },
     removeMediaItemFromAlbum(albumId, mediaItemId) {
       return window.desktopApi.removeMediaItemFromAlbum(albumId, mediaItemId);
+    },
+    async reorderAlbumMediaItem(params) {
+      await window.desktopApi.reorderAlbumMediaItem(params);
+      store.getState().markAlbumUsed(params.albumId);
     },
     setAlbumCover(albumId, mediaItemId) {
       return window.desktopApi.setAlbumCover(albumId, mediaItemId);

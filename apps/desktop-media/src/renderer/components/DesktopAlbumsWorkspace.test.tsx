@@ -52,6 +52,7 @@ function installDesktopApiMock(): Record<string, ReturnType<typeof vi.fn>> {
       .mockResolvedValueOnce({ rows: [firstAlbumState], totalCount: 1 })
       .mockResolvedValue({ rows: [updatedAlbumState], totalCount: 1 }),
     listAlbumItems: vi.fn().mockResolvedValue({ rows: [albumItem], totalCount: 1 }),
+    reorderAlbumMediaItem: vi.fn().mockResolvedValue(undefined),
     removeMediaItemFromAlbum: vi.fn().mockResolvedValue(undefined),
     setAlbumCover: vi.fn().mockResolvedValue(undefined),
     addMediaItemsToAlbum: vi.fn().mockResolvedValue(undefined),
@@ -154,6 +155,7 @@ describe("DesktopAlbumsWorkspace", () => {
         .mockResolvedValue({ rows: rowBatch, totalCount: 48 }),
       listAlbumItems: vi.fn().mockResolvedValue({ rows: [], totalCount: 0 }),
       listAlbumsForMediaItem: vi.fn().mockResolvedValue([]),
+      reorderAlbumMediaItem: vi.fn().mockResolvedValue(undefined),
       removeMediaItemFromAlbum: vi.fn().mockResolvedValue(undefined),
       setAlbumCover: vi.fn().mockResolvedValue(undefined),
       addMediaItemsToAlbum: vi.fn().mockResolvedValue(undefined),

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, type ReactElement } from "react";
 import { MediaThumbnailGrid } from "@emk/media-viewer";
+import type { ReorderAlbumMediaItemParams } from "@emk/shared-contracts";
 import {
   countActiveQuickFilters,
   getFaceDetectionMethod,
@@ -77,6 +78,7 @@ export function DesktopAlbumContentGrid({
   viewMode,
   onAlbumItemsPageChange,
   onAlbumContentChanged,
+  reorderAlbumMediaItem,
 }: {
   store: DesktopStore;
   albumId?: string;
@@ -87,6 +89,8 @@ export function DesktopAlbumContentGrid({
   viewMode: "grid" | "list";
   onAlbumItemsPageChange: (page: number) => void;
   onAlbumContentChanged?: () => void;
+  /** When set with `albumId` and no active quick filters, grid view allows drag-reorder (manual albums). */
+  reorderAlbumMediaItem?: (params: ReorderAlbumMediaItemParams) => Promise<void>;
 }): ReactElement {
   const mediaMetadataByItemId = useDesktopStore((s) => s.mediaMetadataByItemId);
   const commitStarRating = useMediaItemStarRatingChange();
@@ -103,6 +107,29 @@ export function DesktopAlbumContentGrid({
     );
   }, [albumItems, mediaMetadataByItemId, quickFilters, quickFiltersActiveCount]);
   const viewerEntries = useMemo(() => filteredAlbumItems.map(albumItemToViewerEntry), [filteredAlbumItems]);
+  const albumDragReorder =
+    albumId &&
+    reorderAlbumMediaItem &&
+    quickFiltersActiveCount === 0 &&
+    viewMode === "grid"
+      ? {
+          onMove: (fromLocal: number, insertBeforeLocal: number): void => {
+            const row = filteredAlbumItems[fromLocal];
+            if (!row || !albumId) {
+              return;
+            }
+            const base = albumItemsPage * ALBUM_ITEMS_PAGE_SIZE;
+            const globalInsertBefore = Math.min(base + insertBeforeLocal, albumItemsTotal);
+            void reorderAlbumMediaItem({
+              albumId,
+              mediaItemId: row.id,
+              insertBeforeIndex: globalInsertBefore,
+            }).then(() => {
+              onAlbumContentChanged?.();
+            });
+          },
+        }
+      : undefined;
   const onStarRatingChangeForPath = useCallback(
     (path: string) => (next: number) => {
       void commitStarRating(path, next);
@@ -158,6 +185,7 @@ export function DesktopAlbumContentGrid({
                 )
               : undefined
           }
+          dragReorder={albumDragReorder}
           priorityCount={24}
           scrollable={false}
         />

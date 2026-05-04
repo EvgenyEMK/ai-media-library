@@ -177,6 +177,33 @@ describe.skipIf(!HAS_SQLITE)("media albums DB", () => {
     expect(result.rows.map((item) => item.id)).toEqual(["first", "third"]);
   });
 
+  it("reorders manual album items by updating positions", () => {
+    const album = albums.createAlbum("Reorder");
+    insertMediaItem({ id: "ia", sourcePath: "C:/photos/a.jpg", starRating: null, aiQuality: null });
+    insertMediaItem({ id: "ib", sourcePath: "C:/photos/b.jpg", starRating: null, aiQuality: null });
+    insertMediaItem({ id: "ic", sourcePath: "C:/photos/c.jpg", starRating: null, aiQuality: null });
+    albums.addMediaItemsToAlbum(album.id, ["ia", "ib", "ic"]);
+    expect(albums.listAlbumItems({ albumId: album.id, limit: 10 }).rows.map((item) => item.id)).toEqual([
+      "ia",
+      "ib",
+      "ic",
+    ]);
+
+    albums.reorderAlbumMediaItem(album.id, "ic", 0);
+    expect(albums.listAlbumItems({ albumId: album.id, limit: 10 }).rows.map((item) => item.id)).toEqual([
+      "ic",
+      "ia",
+      "ib",
+    ]);
+
+    albums.reorderAlbumMediaItem(album.id, "ic", 3);
+    expect(albums.listAlbumItems({ albumId: album.id, limit: 10 }).rows.map((item) => item.id)).toEqual([
+      "ia",
+      "ib",
+      "ic",
+    ]);
+  });
+
   it("ignores duplicate and unknown media ids when adding items", () => {
     const album = albums.createAlbum("Deduped");
     insertMediaItem({ id: "known", sourcePath: "C:/photos/known.jpg", starRating: null, aiQuality: null });
