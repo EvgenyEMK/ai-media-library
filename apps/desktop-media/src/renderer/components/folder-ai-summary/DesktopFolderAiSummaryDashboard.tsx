@@ -96,6 +96,7 @@ export function DesktopFolderAiSummaryDashboard({
   const outdatedAfterDays = useDesktopStore(
     (state) => state.folderScanningSettings.markFolderScanOutdatedAfterDays,
   );
+  const dateFormat = useDesktopStore((state) => state.mediaViewerSettings.dateFormat);
   const pipelineRunning = useDesktopStore((state) => state.pipelineRunning);
   const pipelineQueued = useDesktopStore((state) => state.pipelineQueued);
   const visible = { ...DEFAULT_FOLDER_AI_SUMMARY_CARD_VISIBILITY, ...cardVisibility };
@@ -151,6 +152,7 @@ export function DesktopFolderAiSummaryDashboard({
             {visible.lastDataScan ? (
               <LastDataScanCard
                 scanFreshness={overview.scanFreshness}
+                dateFormat={dateFormat}
                 loading={folderScanLoading}
                 actionPending={actionPendingFolderScan}
                 outdatedAfterDays={outdatedAfterDays}

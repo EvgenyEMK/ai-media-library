@@ -239,7 +239,11 @@ export interface MediaViewerSettings {
   autoPlayVideoOnOpen: boolean;
   /** In slideshow mode, skip video slides instead of playing them to completion. */
   skipVideosInSlideshow: boolean;
+  /** Date display format used across desktop UI date labels. */
+  dateFormat: DateDisplayFormat;
 }
+
+export type DateDisplayFormat = "YYYY-MM-DD" | "DD.MM.YYYY" | "MM/DD/YYYY";
 
 export interface DatabaseLocationInfo {
   appDataPath: string;
@@ -671,6 +675,7 @@ export const DEFAULT_PATH_EXTRACTION_SETTINGS: PathExtractionSettings = {
 export const DEFAULT_MEDIA_VIEWER_SETTINGS: MediaViewerSettings = {
   autoPlayVideoOnOpen: true,
   skipVideosInSlideshow: false,
+  dateFormat: "DD.MM.YYYY",
 };
 
 export const DEFAULT_APP_SETTINGS: Omit<AppSettings, "clientId"> = {

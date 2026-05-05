@@ -1,7 +1,7 @@
 import { ListChecks, Play } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ReactElement } from "react";
-import type { FolderScanFreshness } from "../../../shared/ipc";
+import type { DateDisplayFormat, FolderScanFreshness } from "../../../shared/ipc";
 import { cn } from "../../lib/cn";
 import { formatCoveragePercent, formatGroupedInt } from "../../lib/folder-ai-summary-formatters";
 import { UI_TEXT } from "../../lib/ui-text";
@@ -40,6 +40,7 @@ export function SummaryMediaCountCard({
 
 export function LastDataScanCard({
   scanFreshness,
+  dateFormat,
   loading = false,
   actionPending = false,
   outdatedAfterDays = 7,
@@ -47,13 +48,14 @@ export function LastDataScanCard({
   onInfoClick,
 }: {
   scanFreshness: FolderScanFreshness;
+  dateFormat: DateDisplayFormat;
   loading?: boolean;
   actionPending?: boolean;
   outdatedAfterDays?: number;
   onRunFolderScan?: () => void;
   onInfoClick?: () => void;
 }): ReactElement {
-  const lastDataChange = formatOldestScanLabel(scanFreshness.lastMetadataExtractedAt);
+  const lastDataChange = formatOldestScanLabel(scanFreshness.lastMetadataExtractedAt, dateFormat);
   const title = UI_TEXT.folderAiSummaryFolderTreeScanTitle;
   const qs = scanFreshness.folderTreeQuickScan;
   const treeTotal = qs?.ultraFoldersScanned ?? 0;
@@ -143,7 +145,7 @@ export function LastDataScanCard({
   if (!loading && isAmber && isFullScanOutdated) {
     metricItems.push({
       label: `Full scan older than ${formatGroupedInt(outdatedAfterDays)} days`,
-      value: formatOldestScanLabel(scanFreshness.oldestFolderScanCompletedAt),
+      value: formatOldestScanLabel(scanFreshness.oldestFolderScanCompletedAt, dateFormat),
       valueClassName: "text-warning",
     });
   }

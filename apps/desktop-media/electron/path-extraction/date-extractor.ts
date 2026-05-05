@@ -143,8 +143,8 @@ export function extractDateFromSegment(text: string): ExtractedDate | null {
 
   // --- Single dates ---
 
-  // YYYY-MM-DD at any position
-  const isoDateRe = /\b(\d{4})-(\d{2})-(\d{2})\b/;
+  // YYYY-MM-DD at any position (allow trailing non-digit separators like "_" or space metadata suffixes).
+  const isoDateRe = /(\d{4})-(\d{2})-(\d{2})(?!\d)/;
   const isoDateMatch = text.match(isoDateRe);
   if (isoDateMatch) {
     const yn = parseInt(isoDateMatch[1], 10);
@@ -161,7 +161,8 @@ export function extractDateFromSegment(text: string): ExtractedDate | null {
   }
 
   // YYYYMMDD_HHMMSS or YYYYMMDD (8 consecutive digits, optionally after IMG_ / DSC_ etc.)
-  const compactDateRe = /(?:^|[_\-\s])(\d{4})(\d{2})(\d{2})(?:[_\s]|$)/;
+  // Accept any non-digit delimiter after DD (e.g. "-", "_", space).
+  const compactDateRe = /(?:^|[_\-\s])(\d{4})(\d{2})(\d{2})(?!\d)/;
   const compactDateMatch = text.match(compactDateRe);
   if (compactDateMatch) {
     const yn = parseInt(compactDateMatch[1], 10);

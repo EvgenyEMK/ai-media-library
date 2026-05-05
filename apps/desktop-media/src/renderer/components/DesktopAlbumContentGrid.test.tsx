@@ -160,7 +160,7 @@ describe("DesktopAlbumContentGrid", () => {
     const { openViewerSpy } = renderGrid({ viewMode: "list" });
 
     expect(screen.getByText("Lake photo")).toBeVisible();
-    expect(screen.getByText(new Date("2024-06-15T12:00:00Z").toLocaleDateString())).toBeVisible();
+    expect(screen.getByText("15.06.2024")).toBeVisible();
 
     fireEvent.click(screen.getByText("Lake photo"));
 

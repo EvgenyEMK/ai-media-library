@@ -30,6 +30,7 @@ import {
   type FaceLandmarkModelId,
   type FolderScanningSettings,
   type ImageOrientationModelId,
+  type DateDisplayFormat,
   type MediaViewerSettings,
   type PathExtractionSettings,
   type PhotoAnalysisSettings,
@@ -189,6 +190,8 @@ const UI_TEXT = {
   skipVideosInSlideshowModeTitle: "Skip videos in album auto-playback mode",
   skipVideosInSlideshowModeDescription:
     "Skips videos during album playback mode if the album includes mix of images and videos.",
+  dateFormatTitle: "Date format",
+  dateFormatDescription: "How dates are shown throughout the app.",
 };
 
 /** ~1.2× smaller than the prior 26px settings checkbox; aligns with title row. */
@@ -376,6 +379,26 @@ export function DesktopSettingsSection({
             checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
             onChange={(next) => onMediaViewerSettingChange("skipVideosInSlideshow", next)}
           />
+          <label
+            className={cn(
+              settingsCustomOptionSurfaceClass("accent-stripe"),
+              "flex flex-col gap-2 border-l-primary/70 p-3",
+            )}
+          >
+            <span className="text-sm font-medium text-foreground">{UI_TEXT.dateFormatTitle}</span>
+            <p className="m-0 text-sm text-muted-foreground">{UI_TEXT.dateFormatDescription}</p>
+            <select
+              className="h-9 w-full max-w-sm rounded-md border border-border bg-background px-2 text-base"
+              value={mediaViewerSettings.dateFormat}
+              onChange={(event) =>
+                onMediaViewerSettingChange("dateFormat", event.target.value as DateDisplayFormat)
+              }
+            >
+              <option value="DD.MM.YYYY">DD.MM.YYYY</option>
+              <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+              <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+            </select>
+          </label>
           <div className="pt-1">
             <button
               type="button"
@@ -385,7 +408,8 @@ export function DesktopSettingsSection({
                 mediaViewerSettings.autoPlayVideoOnOpen ===
                   DEFAULT_MEDIA_VIEWER_SETTINGS.autoPlayVideoOnOpen &&
                 mediaViewerSettings.skipVideosInSlideshow ===
-                  DEFAULT_MEDIA_VIEWER_SETTINGS.skipVideosInSlideshow
+                  DEFAULT_MEDIA_VIEWER_SETTINGS.skipVideosInSlideshow &&
+                mediaViewerSettings.dateFormat === DEFAULT_MEDIA_VIEWER_SETTINGS.dateFormat
               }
             >
               {UI_TEXT.resetToDefaults}

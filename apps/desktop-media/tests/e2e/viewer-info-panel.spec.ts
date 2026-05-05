@@ -24,6 +24,7 @@ test.describe("Viewer info panel (e2e-photos)", () => {
     await expect(
       mainWindow.locator(".desktop-info-field").filter({ has: mainWindow.locator("dt", { hasText: "Filename" }) }),
     ).toBeVisible();
+    await expect(mainWindow.getByText(/\d{2}\.\d{2}\.\d{4}/)).toBeVisible();
   });
 
   test("Info tab stays populated after opening Face tags then returning to Info", async ({

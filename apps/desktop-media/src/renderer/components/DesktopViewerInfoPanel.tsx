@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { AlertTriangle } from "lucide-react";
 import {
   FaceBoundingBoxOverlay,
   getFaceTagsSortedBoxesAndOrder,
   PhotoWithInfoPanel,
   type FaceOverlayImageInfo,
 } from "@emk/media-viewer";
+import { formatDateByPreference } from "@emk/shared-contracts";
 import {
   getAdditionalTopLevelFields,
   getPeopleBoundingBoxes,
@@ -17,7 +19,7 @@ import { DesktopViewerInfoRatingRow } from "./DesktopViewerInfoRatingRow";
 import { DesktopFaceTagsTabContent } from "./DesktopFaceTagsTabContent";
 import { DesktopMetadataTree } from "./DesktopMetadataTree";
 import type { DesktopViewerInfoPanelProps, DesktopViewerItem } from "../types/viewer-types";
-import type { DesktopFaceInstance, DesktopMediaItemMetadata } from "../../shared/ipc";
+import type { DateDisplayFormat, DesktopFaceInstance, DesktopMediaItemMetadata } from "../../shared/ipc";
 import { formatPhotoTakenListLabel } from "../lib/photo-date-format";
 import { useDesktopStore } from "../stores/desktop-store";
 
@@ -63,7 +65,113 @@ function primaryInfoHeadline(item: DesktopViewerItem, metadata: DesktopMediaItem
   return metadata.filename ?? item.title;
 }
 
-function buildInfoSections(metadata: DesktopMediaItemMetadata): {
+function formatFileSizeForInfoPanel(byteSize: number | null): string | null {
+  if (typeof byteSize !== "number" || !Number.isFinite(byteSize) || byteSize < 0) {
+    return null;
+  }
+  if (byteSize < 1024) return `${byteSize.toLocaleString()} bytes`;
+  const kb = byteSize / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb / 1024;
+  if (mb < 1024) return `${mb.toFixed(1)} MB`;
+  const gb = mb / 1024;
+  return `${gb.toFixed(2)} GB`;
+}
+
+function parseComparableDate(raw: string | null, precision?: "year" | "month" | "day" | "instant" | null): Date | null {
+  if (!raw) return null;
+  if (precision === "year" && /^\d{4}$/.test(raw)) return new Date(`${raw}-01-01T00:00:00Z`);
+  if (precision === "month" && /^\d{4}-\d{2}$/.test(raw)) return new Date(`${raw}-01T00:00:00Z`);
+  if (precision === "day" && /^\d{4}-\d{2}-\d{2}$/.test(raw)) return new Date(`${raw}T00:00:00Z`);
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function toYearMonthKey(raw: string | null, precision?: "year" | "month" | "day" | "instant" | null): string | null {
+  const comparable = parseComparableDate(raw, precision);
+  if (!comparable) return null;
+  const year = comparable.getUTCFullYear();
+  const month = String(comparable.getUTCMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
+function toYearKey(raw: string | null, precision?: "year" | "month" | "day" | "instant" | null): string | null {
+  const comparable = parseComparableDate(raw, precision);
+  if (!comparable) return null;
+  return String(comparable.getUTCFullYear());
+}
+
+function getPathExtractedDate(
+  metadata: DesktopMediaItemMetadata,
+): { start: string; precision: "year" | "month" | "day" | "instant" | null } | null {
+  if (!metadata.aiMetadata || typeof metadata.aiMetadata !== "object") {
+    return null;
+  }
+  const root = metadata.aiMetadata as Record<string, unknown>;
+  if (!root.path_extraction || typeof root.path_extraction !== "object") {
+    return null;
+  }
+  const pathExtraction = root.path_extraction as Record<string, unknown>;
+  if (!pathExtraction.date || typeof pathExtraction.date !== "object") {
+    return null;
+  }
+  const date = pathExtraction.date as Record<string, unknown>;
+  const start = typeof date.start === "string" ? date.start : null;
+  const precisionRaw = date.precision;
+  const precision =
+    precisionRaw === "year" || precisionRaw === "month" || precisionRaw === "day" || precisionRaw === "instant"
+      ? precisionRaw
+      : null;
+  if (!start) {
+    return null;
+  }
+  return { start, precision };
+}
+
+function getViewerTopDate(metadata: DesktopMediaItemMetadata, dateFormat: DateDisplayFormat): {
+  dateText: string;
+  showPathDateWarning: boolean;
+} {
+  const pathExtractedDate = getPathExtractedDate(metadata);
+  const pathStart = pathExtractedDate?.start ?? null;
+  const pathPrecision = pathExtractedDate?.precision ?? null;
+  const pathIsYearOnly = pathPrecision === "year" || (/^\d{4}$/.test(pathStart ?? ""));
+
+  const eventYearMonth = toYearMonthKey(pathStart, pathPrecision);
+  const eventYear = toYearKey(pathStart, pathPrecision);
+  const takenYearMonth = toYearMonthKey(metadata.photoTakenAt, metadata.photoTakenPrecision);
+  const fileYearMonth = toYearMonthKey(metadata.fileCreatedAt, "day");
+  const takenYear = toYearKey(metadata.photoTakenAt, metadata.photoTakenPrecision);
+  const fileYear = toYearKey(metadata.fileCreatedAt, "day");
+  const compareTargets = [takenYearMonth, fileYearMonth].filter((value): value is string => !!value);
+  const compareYearTargets = [takenYear, fileYear].filter((value): value is string => !!value);
+  const shouldUsePathDate = pathIsYearOnly
+    ? !!eventYear &&
+      compareYearTargets.length > 0 &&
+      compareYearTargets.every((targetYear) => eventYear < targetYear)
+    : !!eventYearMonth &&
+      compareTargets.length > 0 &&
+      compareTargets.every((targetYearMonth) => eventYearMonth < targetYearMonth);
+  if (shouldUsePathDate) {
+    return {
+      dateText:
+        formatPhotoTakenListLabel(pathStart, null, pathPrecision, dateFormat) ||
+        formatDateByPreference(pathStart ?? "", dateFormat),
+      showPathDateWarning: true,
+    };
+  }
+  return {
+    dateText: formatPhotoTakenListLabel(
+      metadata.photoTakenAt,
+      metadata.fileCreatedAt,
+      metadata.photoTakenPrecision,
+      dateFormat,
+    ),
+    showPathDateWarning: false,
+  };
+}
+
+function buildInfoSections(metadata: DesktopMediaItemMetadata, dateFormat: DateDisplayFormat): {
   fileDataFields: DesktopInfoField[];
   captureDataFields: DesktopInfoField[];
   aiAnalysisFields: DesktopInfoField[];
@@ -138,13 +246,13 @@ function buildInfoSections(metadata: DesktopMediaItemMetadata): {
     },
     {
       label: "File size",
-      value:
-        typeof metadata.byteSize === "number"
-          ? `${metadata.byteSize.toLocaleString()} bytes`
-          : null,
+      value: formatFileSizeForInfoPanel(metadata.byteSize),
     },
     { label: "Orientation", value: metadata.orientation },
-    { label: "File date", value: metadata.fileCreatedAt },
+    {
+      label: "File date",
+      value: metadata.fileCreatedAt ? formatDateByPreference(metadata.fileCreatedAt, dateFormat) : null,
+    },
     {
       label: "GPS",
       value:
@@ -165,6 +273,7 @@ function buildInfoSections(metadata: DesktopMediaItemMetadata): {
         metadata.photoTakenAt,
         null,
         metadata.photoTakenPrecision,
+        dateFormat,
       ),
     },
     { label: "Date precision", value: metadata.photoTakenPrecision },
@@ -317,6 +426,7 @@ export function DesktopViewerInfoPanel({
 }: DesktopViewerInfoPanelProps): ReactElement {
   const isVideo = item.mediaType === "video";
   const viewerActiveInfoTab = useDesktopStore((s) => s.viewerActiveInfoTab);
+  const dateFormat = useDesktopStore((s) => s.mediaViewerSettings.dateFormat);
   const setViewerShowInfoPanel = useDesktopStore((s) => s.setViewerShowInfoPanel);
   const [activeTabId, setActiveTabId] = useState("info");
   const [selectedFaceIndex, setSelectedFaceIndex] = useState<number | null>(null);
@@ -417,7 +527,8 @@ export function DesktopViewerInfoPanel({
     };
   }, [updateImageInfo, item.id, isVideo]);
 
-  const infoSections = metadata ? buildInfoSections(metadata) : null;
+  const infoSections = metadata ? buildInfoSections(metadata, dateFormat) : null;
+  const topDate = metadata ? getViewerTopDate(metadata, dateFormat) : { dateText: "", showPathDateWarning: false };
 
   const { sortedBoxes: sortedFaceOverlayBoxes, displayToOriginal: faceDisplayOrder } = useMemo(
     () => getFaceTagsSortedBoxesAndOrder(currentBoundingBoxes),
@@ -487,7 +598,23 @@ export function DesktopViewerInfoPanel({
           label: "Info",
           content: metadata ? (
             <div className="grid gap-3">
-              <DesktopViewerInfoRatingRow sourcePath={item.sourcePath} starRating={metadata.starRating} />
+              <DesktopViewerInfoRatingRow
+                sourcePath={item.sourcePath}
+                starRating={metadata.starRating}
+                leftContent={
+                  topDate.dateText ? (
+                    <span className="text-base font-semibold text-foreground">{topDate.dateText}</span>
+                  ) : null
+                }
+                belowRowContent={
+                  topDate.showPathDateWarning ? (
+                    <span className="inline-flex items-center gap-1 text-xs text-amber-500">
+                      <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+                      Date extracted from file path
+                    </span>
+                  ) : null
+                }
+              />
               <h3 className="mb-1 text-lg text-foreground">{primaryInfoHeadline(item, metadata)}</h3>
               {(() => {
                 const locLine = formatCatalogLocationLine(metadata);
