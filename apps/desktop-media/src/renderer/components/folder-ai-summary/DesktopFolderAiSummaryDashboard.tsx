@@ -72,6 +72,7 @@ interface DesktopFolderAiSummaryDashboardProps {
   actionPendingFolderScan?: boolean;
   onRunFolderScan?: () => void;
   cardVisibility?: Partial<FolderAiSummaryDashboardCardVisibility>;
+  hasSubfolders?: boolean;
 }
 
 export function DesktopFolderAiSummaryDashboard({
@@ -92,6 +93,7 @@ export function DesktopFolderAiSummaryDashboard({
   actionPendingFolderScan = false,
   onRunFolderScan,
   cardVisibility,
+  hasSubfolders = true,
 }: DesktopFolderAiSummaryDashboardProps): ReactElement {
   const outdatedAfterDays = useDesktopStore(
     (state) => state.folderScanningSettings.markFolderScanOutdatedAfterDays,
@@ -123,7 +125,7 @@ export function DesktopFolderAiSummaryDashboard({
       folderPath: coverage.folderPath,
     });
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5 pb-10">
       <SummaryCardGroup>
         {visible.imagesCount ? (
           <SummaryMediaCountCard
@@ -156,6 +158,7 @@ export function DesktopFolderAiSummaryDashboard({
                 loading={folderScanLoading}
                 actionPending={actionPendingFolderScan}
                 outdatedAfterDays={outdatedAfterDays}
+                hasSubfolders={hasSubfolders}
                 onRunFolderScan={onRunFolderScan}
                 onInfoClick={showInfoIcons && onOpenPipelineInfo ? () => onOpenPipelineInfo("folderScan") : undefined}
               />

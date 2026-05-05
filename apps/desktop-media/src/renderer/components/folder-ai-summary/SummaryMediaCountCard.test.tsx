@@ -81,6 +81,26 @@ describe("LastDataScanCard", () => {
     expect(screen.getByText("folders")).toBeVisible();
   });
 
+  it("uses single-folder copy when the dashboard is not showing a folder tree", () => {
+    render(
+      <LastDataScanCard
+        scanFreshness={scanFreshness({
+          folderTreeQuickScan: baseQuickScan({
+            ultraFoldersScanned: 1,
+            treeFoldersWithDirectMediaOnDiskCount: 1,
+            treeFoldersWithMetadataFolderScanCount: 1,
+          }),
+        })}
+        dateFormat="DD.MM.YYYY"
+        hasSubfolders={false}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Folder scan" })).toBeVisible();
+    expect(screen.getByText("Selected folder analyzed (quick scan)")).toBeVisible();
+    expect(screen.getByText("folder")).toBeVisible();
+  });
+
   it("shows added/changed files line when quick scan reports new or modified files", () => {
     render(
       <LastDataScanCard
@@ -106,5 +126,19 @@ describe("LastDataScanCard", () => {
     );
 
     expect(screen.getByText("Moved files")).toBeVisible();
+  });
+
+  it("shows a spinner in the run action while a scan is pending", () => {
+    const { container } = render(
+      <LastDataScanCard
+        scanFreshness={scanFreshness()}
+        dateFormat="DD.MM.YYYY"
+        actionPending
+        onRunFolderScan={() => undefined}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Run Folder tree scan" })).toBeDisabled();
+    expect(container.querySelector(".animate-spin")).not.toBeNull();
   });
 });

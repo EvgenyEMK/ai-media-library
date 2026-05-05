@@ -197,6 +197,19 @@ export function DesktopFolderAiSummaryView({
                       : current.selectedWithSubfolders.scanFreshness.oldestFolderScanCompletedAt,
                 },
               },
+              selectedDirectOnly: {
+                ...current.selectedDirectOnly,
+                scanFreshness: {
+                  ...current.selectedDirectOnly.scanFreshness,
+                  folderTreeQuickScan: scanSummary.quickScan,
+                  oldestFolderScanCompletedAt:
+                    scanSummary.quickScan != null && scanSummary.quickScan.ultraFoldersScanned > 0
+                      ? scanSummary.quickScan.treeFoldersWithDirectMediaOnDiskCount > 0
+                        ? scanSummary.quickScan.oldestMetadataFolderScanAtAmongWalkedFolders
+                        : current.selectedDirectOnly.scanFreshness.oldestFolderScanCompletedAt
+                      : current.selectedDirectOnly.scanFreshness.oldestFolderScanCompletedAt,
+                },
+              },
             };
           });
           setFolderScanLoading(false);
@@ -329,11 +342,8 @@ export function DesktopFolderAiSummaryView({
   const runDashboardPipeline = useCallback(
     async (pipeline: SummaryPipelineKind): Promise<void> => {
       await runPipelineForFolderWithSubfolders(pipeline);
-      if (pipeline === "rotation") {
-        await load();
-      }
     },
-    [load, runPipelineForFolderWithSubfolders],
+    [runPipelineForFolderWithSubfolders],
   );
 
   const openOnboarding = useCallback((pipeline: SummaryPipelineKind | "geo" | "folderScan"): void => {
@@ -490,6 +500,7 @@ export function DesktopFolderAiSummaryView({
             overviewLoading={overviewLoading || !dashboardOverview}
             folderScanLoading={folderScanLoading || !dashboardOverview}
             coverageLoading={coverageLoading || !dashboardCoverage}
+            hasSubfolders={hasSubfolders}
           />
         </div>
       ) : null}
@@ -516,6 +527,7 @@ export function DesktopFolderAiSummaryView({
                 }
                 actionPendingFolderScan={folderScanPending}
                 onRunFolderScan={() => void runFolderScanWithSubfolders()}
+                hasSubfolders={hasSubfolders}
               />
             </div>
           ) : null}
