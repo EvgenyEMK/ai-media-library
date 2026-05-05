@@ -79,6 +79,7 @@ export function useFilteredMediaItems(quickFilters: ThumbnailQuickFilterState): 
 } {
   const mediaItems = useDesktopStore((s) => s.mediaItems);
   const mediaMetadataByItemId = useDesktopStore((s) => s.mediaMetadataByItemId);
+  const dateFormat = useDesktopStore((s) => s.mediaViewerSettings.dateFormat);
   const viewerSource = useDesktopStore((s) => s.viewerSource);
   const semanticResults = useDesktopStore((s) => s.semanticResults);
   const hideVlm = useDesktopStore((s) => s.aiImageSearchSettings.hideResultsBelowVlmSimilarity);
@@ -114,13 +115,14 @@ export function useFilteredMediaItems(quickFilters: ThumbnailQuickFilterState): 
           metadata?.photoTakenAt ?? null,
           metadata?.fileCreatedAt ?? null,
           metadata?.photoTakenPrecision ?? null,
+          dateFormat,
         ),
         starRating: typeof metadata?.starRating === "number" ? metadata.starRating : null,
         mediaType:
           metadata?.mediaKind === "video" || item.mediaType === "video" ? "video" : "image",
       };
     });
-  }, [mediaItems, mediaMetadataByItemId]);
+  }, [mediaItems, mediaMetadataByItemId, dateFormat]);
 
   const filteredMediaItems = useMemo(() => {
     if (quickFiltersActiveCount === 0) {
@@ -159,11 +161,12 @@ export function useFilteredMediaItems(quickFilters: ThumbnailQuickFilterState): 
           metadata?.photoTakenAt ?? null,
           metadata?.fileCreatedAt ?? null,
           metadata?.photoTakenPrecision ?? null,
+          dateFormat,
         ),
         starRating: typeof metadata?.starRating === "number" ? metadata.starRating : null,
       };
     });
-  }, [filteredDisplaySemanticResults, mediaMetadataByItemId]);
+  }, [filteredDisplaySemanticResults, mediaMetadataByItemId, dateFormat]);
 
   const viewerItems = useMemo((): DesktopViewerItem[] => {
     if (viewerItemsOverride && viewerItemsOverride.length > 0) {

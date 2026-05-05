@@ -1,4 +1,6 @@
+import { formatDateByPreference } from "@emk/shared-contracts";
 import type {
+  DateDisplayFormat,
   FolderAiPipelineCounts,
   FolderAiSummaryOverview,
   FolderGeoMediaCoverage,
@@ -84,9 +86,11 @@ export function combinedGeoTone(
   return "neutral";
 }
 
-export function formatOldestScanLabel(oldestMetadataExtractedAt: string | null): string {
+export function formatOldestScanLabel(
+  oldestMetadataExtractedAt: string | null,
+  dateFormat: DateDisplayFormat,
+): string {
   if (!oldestMetadataExtractedAt) return "—";
-  const date = new Date(oldestMetadataExtractedAt);
-  if (Number.isNaN(date.getTime())) return oldestMetadataExtractedAt;
-  return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  const formatted = formatDateByPreference(oldestMetadataExtractedAt, dateFormat);
+  return formatted || oldestMetadataExtractedAt;
 }

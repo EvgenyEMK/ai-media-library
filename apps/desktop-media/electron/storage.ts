@@ -16,6 +16,7 @@ import {
   FACE_DETECTOR_MODEL_OPTIONS,
   type AiImageSearchSettings,
   type AppSettings,
+  type DateDisplayFormat,
   type AuxModelKind,
   type FaceAgeGenderModelId,
   type FaceDetectionSettings,
@@ -116,7 +117,41 @@ function sanitizeMediaViewerSettings(candidate: unknown): MediaViewerSettings {
       typeof value.skipVideosInSlideshow === "boolean"
         ? value.skipVideosInSlideshow
         : DEFAULT_MEDIA_VIEWER_SETTINGS.skipVideosInSlideshow,
+    dateFormat: sanitizeDateDisplayFormat(value.dateFormat),
   };
+}
+
+function sanitizeDateDisplayFormat(candidate: unknown): DateDisplayFormat {
+  if (candidate === "YYYY-MM-DD" || candidate === "DD.MM.YYYY" || candidate === "MM/DD/YYYY") {
+    return candidate;
+  }
+  return detectDefaultDateDisplayFormat();
+}
+
+function detectDefaultDateDisplayFormat(): DateDisplayFormat {
+  try {
+    const parts = new Intl.DateTimeFormat(undefined, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date(Date.UTC(2001, 1, 3)));
+    const tokens = parts
+      .filter((part) => part.type === "year" || part.type === "month" || part.type === "day")
+      .map((part) => part.type);
+    const order = tokens.join("-");
+    if (order === "year-month-day") {
+      return "YYYY-MM-DD";
+    }
+    if (order === "month-day-year") {
+      return "MM/DD/YYYY";
+    }
+    if (order === "day-month-year") {
+      return "DD.MM.YYYY";
+    }
+  } catch {
+    // Ignore and use fallback.
+  }
+  return "DD.MM.YYYY";
 }
 
 function sanitizeSmartAlbumRatingStars(candidate: unknown): number | null {

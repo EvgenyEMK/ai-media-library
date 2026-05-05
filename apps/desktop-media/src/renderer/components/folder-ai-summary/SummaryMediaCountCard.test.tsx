@@ -50,7 +50,11 @@ describe("LastDataScanCard", () => {
 
   it("uses neutral border while loading", () => {
     const { container } = render(
-      <LastDataScanCard scanFreshness={scanFreshness({ folderTreeQuickScan: null })} loading />,
+      <LastDataScanCard
+        scanFreshness={scanFreshness({ folderTreeQuickScan: null })}
+        dateFormat="DD.MM.YYYY"
+        loading
+      />,
     );
 
     expect(screen.getByRole("heading", { name: "Folder tree scan" })).toBeVisible();
@@ -67,6 +71,7 @@ describe("LastDataScanCard", () => {
             treeFoldersWithMetadataFolderScanCount: 7,
           }),
         })}
+        dateFormat="DD.MM.YYYY"
       />,
     );
 
@@ -82,6 +87,7 @@ describe("LastDataScanCard", () => {
         scanFreshness={scanFreshness({
           folderTreeQuickScan: baseQuickScan({ newFileCount: 2, modifiedFileCount: 1 }),
         })}
+        dateFormat="DD.MM.YYYY"
       />,
     );
 
@@ -95,6 +101,7 @@ describe("LastDataScanCard", () => {
         scanFreshness={scanFreshness({
           folderTreeQuickScan: baseQuickScan({ movedFileCount: 2 }),
         })}
+        dateFormat="DD.MM.YYYY"
       />,
     );
 

@@ -26,4 +26,21 @@ describe("formatPhotoTakenListLabel", () => {
     expect(label.length).toBeGreaterThan(0);
     expect(label).toContain("1980");
   });
+
+  it("supports explicit DD.MM.YYYY formatting", () => {
+    expect(
+      formatPhotoTakenListLabel("2024-06-15T12:00:00.000Z", null, "instant", "DD.MM.YYYY"),
+    ).toBe("15.06.2024");
+  });
+
+  it("supports explicit MM/DD/YYYY formatting", () => {
+    expect(
+      formatPhotoTakenListLabel("2024-06-15T12:00:00.000Z", null, "instant", "MM/DD/YYYY"),
+    ).toBe("06/15/2024");
+  });
+
+  it("formats month precision by selected format", () => {
+    expect(formatPhotoTakenListLabel("1980-06", null, "month", "YYYY-MM-DD")).toBe("1980-06");
+    expect(formatPhotoTakenListLabel("1980-06", null, "month", "DD.MM.YYYY")).toBe("06.1980");
+  });
 });
