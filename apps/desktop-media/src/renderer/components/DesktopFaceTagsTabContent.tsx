@@ -1,26 +1,16 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactElement } from "react";
-import { AlertCircle, Loader2, ScanFace, Tag, Trash2, UserPlus } from "lucide-react";
+import { AlertCircle, Loader2, ScanFace, Tag, Trash2 } from "lucide-react";
 import { FaceTagPersonSuggestionRow, FaceTagsEntryCard } from "@emk/media-viewer";
 import type { BeingBoundingBox } from "@emk/media-metadata-core";
 import type {
   DesktopFaceInstance,
   DesktopFacePersonTagSuggestion,
-  DesktopPersonTag,
+  DesktopPersonTagWithFaceCount,
 } from "../../shared/ipc";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
 import { Input } from "./ui/input";
 import { useDesktopStore } from "../stores/desktop-store";
 import { computeFaceBackgroundCropStyle } from "./face-cluster-utils";
-
-const SELECT_NONE = "__none__";
-const SELECT_CREATE = "__create__";
+import { FaceTagSelect, SELECT_NONE } from "./FaceTagSelect";
 
 /** Same crop math as People sidebar (`computeFaceBackgroundCropStyle` + DB ref image size). */
 function desktopFaceTagsTabThumbnailStyle(
@@ -114,7 +104,7 @@ export function DesktopFaceTagsTabContent({
   onRefreshMetadataBoxes,
 }: DesktopFaceTagsTabContentProps): ReactElement {
   const faceDetectionSettings = useDesktopStore((s) => s.faceDetectionSettings);
-  const [personTags, setPersonTags] = useState<DesktopPersonTag[]>([]);
+  const [personTags, setPersonTags] = useState<DesktopPersonTagWithFaceCount[]>([]);
   const [faceInstances, setFaceInstances] = useState<DesktopFaceInstance[]>([]);
   const [pendingFaceId, setPendingFaceId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -170,7 +160,7 @@ export function DesktopFaceTagsTabContent({
 
   useEffect(() => {
     let mounted = true;
-    void window.desktopApi.listPersonTags().then((tags) => {
+    void window.desktopApi.listPersonTagsWithFaceCounts().then((tags) => {
       if (mounted) {
         setPersonTags(tags);
       }
@@ -294,7 +284,11 @@ export function DesktopFaceTagsTabContent({
     setIsCreatingTag(true);
     try {
       const newTag = await window.desktopApi.createPersonTag(label);
-      setPersonTags((current) => [...current, newTag].sort((a, b) => a.label.localeCompare(b.label)));
+      setPersonTags((current) =>
+        [...current, { ...newTag, taggedFaceCount: 0, similarFaceCount: 0 }].sort((a, b) =>
+          a.label.localeCompare(b.label),
+        ),
+      );
       const updated = await window.desktopApi.assignPersonTagToFace(createTagFaceInstance.id, newTag.id);
       if (!updated) {
         throw new Error("Failed to assign new tag.");
@@ -450,37 +444,13 @@ export function DesktopFaceTagsTabContent({
                     className="flex items-center gap-2"
                     onClick={(event) => event.stopPropagation()}
                   >
-                    <Select
+                    <FaceTagSelect
                       value={selectValue}
-                      onValueChange={(value) => {
-                        if (value === SELECT_CREATE) {
-                          void handleCreateTag(faceInstance);
-                          return;
-                        }
-                        void handleAssignTag(faceInstance, value);
-                      }}
                       disabled={isPending}
-                    >
-                      <SelectTrigger size="sm" className="min-w-[200px] justify-between">
-                        <SelectValue placeholder="Assign person" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={SELECT_NONE}>Unassigned</SelectItem>
-                        <SelectSeparator />
-                        {personTags.map((tag) => (
-                          <SelectItem key={tag.id} value={tag.id}>
-                            {tag.label}
-                          </SelectItem>
-                        ))}
-                        <SelectSeparator />
-                        <SelectItem value={SELECT_CREATE}>
-                          <div className="flex items-center gap-2">
-                            <UserPlus className="size-4" />
-                            Create new person tag...
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                      personTags={personTags}
+                      onCreateTag={() => void handleCreateTag(faceInstance)}
+                      onAssignTag={(value) => void handleAssignTag(faceInstance, value)}
+                    />
                     <button
                       type="button"
                       className="inline-flex size-8 items-center justify-center rounded-md border border-border text-destructive hover:bg-muted disabled:opacity-50"
