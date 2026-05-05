@@ -34,4 +34,26 @@ describe("SummaryPipelineCard", () => {
     expect(screen.getByText("Failed")).toBeVisible();
     expect(screen.getByText("2")).toBeVisible();
   });
+
+  it("shows a spinner instead of the play icon while the run action is pending", () => {
+    const { container } = render(
+      <SummaryPipelineCard
+        icon={RotateCw}
+        title="Wrongly rotated images"
+        pipeline={{
+          doneCount: 0,
+          failedCount: 0,
+          totalImages: 10,
+          label: "not_done",
+          issueCount: 0,
+        }}
+        actionPipeline="rotation"
+        actionPending
+        onRunPipeline={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Wrongly rotated images is running" })).toBeDisabled();
+    expect(container.querySelector(".animate-spin")).not.toBeNull();
+  });
 });

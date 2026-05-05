@@ -31,19 +31,16 @@ export function PipelineQueueCards(): ReactElement | null {
   }
 
   return (
-    <div
-      className="flex flex-col gap-1 rounded border border-border/50 bg-[#0c1320]/40 p-2"
-      aria-label="Pipeline queue"
-    >
+    <div className="flex flex-col gap-1" aria-label="Pipeline queue">
       {running.length > 0 ? (
-        <Section title="Running" tone="running">
+        <div className="flex flex-col gap-1">
           {running.map((bundle) => (
             <BundleCard key={bundle.bundleId} bundle={bundle} variant="running" onDismissRecent={dismissRecentBundle} />
           ))}
-        </Section>
+        </div>
       ) : null}
       {queued.length > 0 ? (
-        <Section title={`Queued (${queued.length})`} tone="queued">
+        <Section title={`Queued (${queued.length})`}>
           {queued.map((bundle) => (
             <BundleCard key={bundle.bundleId} bundle={bundle} variant="queued" onDismissRecent={dismissRecentBundle} />
           ))}
@@ -75,21 +72,13 @@ export function PipelineQueueCards(): ReactElement | null {
 
 interface SectionProps {
   title: string;
-  tone: "running" | "queued" | "recent";
   children: ReactElement[];
 }
 
-function Section({ title, tone, children }: SectionProps): ReactElement {
+function Section({ title, children }: SectionProps): ReactElement {
   return (
     <div className="flex flex-col gap-1">
-      <h3
-        className={cn(
-          "text-[11px] uppercase tracking-wide text-muted-foreground",
-          tone === "recent" && "text-muted-foreground/80",
-        )}
-      >
-        {title}
-      </h3>
+      <h3 className="text-[11px] uppercase tracking-wide text-muted-foreground">{title}</h3>
       <div className="flex flex-col gap-1">{children}</div>
     </div>
   );
