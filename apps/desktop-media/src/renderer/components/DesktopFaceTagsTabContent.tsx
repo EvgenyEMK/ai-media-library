@@ -228,10 +228,26 @@ export function DesktopFaceTagsTabContent({
     return map;
   }, [faceInstances]);
 
-  const sortedFaceBoxes = useMemo(
-    () => faceDisplayOrder.map((i) => boundingBoxes[i]),
-    [boundingBoxes, faceDisplayOrder],
-  );
+  const orderedFaceRows = useMemo(() => {
+    const rows = faceDisplayOrder.map((originalIndex, displayIdx) => {
+      const faceInstance = faceIndexMap.get(originalIndex);
+      const selectValue = faceInstance?.tag?.id ?? SELECT_NONE;
+      const hasManualTag = selectValue !== SELECT_NONE;
+      const hasSuggestion =
+        !hasManualTag && faceInstance ? (embeddingSuggestions[faceInstance.id] ?? null) !== null : false;
+      const priority = hasManualTag ? 0 : hasSuggestion ? 1 : 2;
+
+      return {
+        displayIdx,
+        originalIndex,
+        box: boundingBoxes[originalIndex],
+        faceInstance,
+        priority,
+      };
+    });
+
+    return rows.sort((a, b) => a.priority - b.priority || a.displayIdx - b.displayIdx);
+  }, [faceDisplayOrder, faceIndexMap, embeddingSuggestions, boundingBoxes]);
 
   const handleAssignTag = async (faceInstance: DesktopFaceInstance | undefined, value: string) => {
     if (!faceInstance) {
@@ -406,15 +422,13 @@ export function DesktopFaceTagsTabContent({
         </div>
       ) : null}
 
-      {sortedFaceBoxes.length > 0 ? (
+      {orderedFaceRows.length > 0 ? (
         <>
           <p className="text-sm text-muted-foreground">
             Click a face entry to highlight the corresponding bounding box on the photo.
           </p>
 
-          {sortedFaceBoxes.map((box, displayIdx) => {
-            const originalIndex = faceDisplayOrder[displayIdx];
-            const faceInstance = faceIndexMap.get(originalIndex);
+          {orderedFaceRows.map(({ box, displayIdx, originalIndex, faceInstance }) => {
             const isPending = Boolean(faceInstance && pendingFaceId === faceInstance.id);
             const selectValue = faceInstance?.tag?.id ?? SELECT_NONE;
             const embeddingSuggestion =
