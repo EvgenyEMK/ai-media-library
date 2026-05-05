@@ -177,7 +177,7 @@ export function DesktopProgressDock({
     >
       <ProgressDockHeader
         collapsed={collapsed}
-        hasAnyRunningOperation={dock.hasAnyRunningOperation}
+        hasAnyRunningOperation={isAnyPipelineRunning}
         onToggleCollapsed={onToggleCollapsed}
         onOpenRunPipelinesSheet={handleOpenSheet}
       />
