@@ -7,6 +7,8 @@ import {
 } from "../../src/shared/ipc";
 import { getFolderAiCoverage } from "../db/folder-ai-coverage";
 import { readFolderChildren } from "../fs-media";
+import { readSettings } from "../storage";
+import { app } from "electron";
 import { buildFolderFaceSummaryStreamSpecs, streamFaceSummaryProcessingOrder } from "./folder-face-summary-stream";
 
 function yieldToEventLoop(): Promise<void> {
@@ -21,7 +23,12 @@ function sendProgress(sender: WebContents, payload: FolderAiSummaryStreamEvent):
   sender.send(IPC_CHANNELS.folderAiSummaryStreamProgress, payload);
 }
 
-function runAiSummaryStream(sender: WebContents, jobId: string, specs: FolderFaceSummaryStreamRowSpec[]): void {
+function runAiSummaryStream(
+  sender: WebContents,
+  jobId: string,
+  specs: FolderFaceSummaryStreamRowSpec[],
+  minRotationConfidenceThreshold: number,
+): void {
   void (async () => {
     try {
       const orderedSpecs = streamFaceSummaryProcessingOrder(specs);
@@ -34,6 +41,7 @@ function runAiSummaryStream(sender: WebContents, jobId: string, specs: FolderFac
         const coverage = getFolderAiCoverage({
           folderPath: spec.folderPath,
           recursive: spec.recursive,
+          minRotationConfidenceThreshold,
         });
         sendProgress(sender, { kind: "row", jobId, rowId: spec.rowId, coverage });
         await yieldToEventLoop();
@@ -65,9 +73,16 @@ export function registerFolderAiSummaryStreamHandlers(): void {
       }
 
       activeJobs.set(wid, { cancelled: false });
+      let minRotationConfidenceThreshold = 0.9;
+      try {
+        const settings = await readSettings(app.getPath("userData"));
+        minRotationConfidenceThreshold = settings.wrongImageRotationDetection.minConfidenceThreshold;
+      } catch {
+        // Use the shared default if settings are unavailable.
+      }
       const children = await readFolderChildren(normalized);
       const rows = buildFolderFaceSummaryStreamSpecs(normalized, children);
-      runAiSummaryStream(event.sender, wid, rows);
+      runAiSummaryStream(event.sender, wid, rows, minRotationConfidenceThreshold);
 
       return { folderPath: normalized, jobId: wid, rows };
     },

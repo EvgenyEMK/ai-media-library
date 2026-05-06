@@ -57,13 +57,40 @@ export type DesktopSemanticListItem = SemanticSearchResult & {
 
 function getOrientationDetectionRotation(
   extras: Record<string, unknown>,
-): 90 | 180 | 270 | null {
+): {
+  angle: 90 | 180 | 270;
+  confidence: number | null;
+  processedAt: string | null;
+} | null {
   const orientationNode =
     extras.orientation_detection && typeof extras.orientation_detection === "object"
       ? (extras.orientation_detection as Record<string, unknown>)
       : null;
+  const legacyDismissed =
+    extras.wrong_rotation_user_dismissed && typeof extras.wrong_rotation_user_dismissed === "object"
+      ? (extras.wrong_rotation_user_dismissed as Record<string, unknown>)
+      : null;
+  const orientationDismissed =
+    orientationNode?.user_dismissed && typeof orientationNode.user_dismissed === "object"
+      ? (orientationNode.user_dismissed as Record<string, unknown>)
+      : null;
+  if (
+    typeof legacyDismissed?.dismissed_at === "string" ||
+    typeof orientationDismissed?.dismissed_at === "string"
+  ) {
+    return null;
+  }
   const angle = orientationNode?.correction_angle_clockwise;
-  return angle === 90 || angle === 180 || angle === 270 ? angle : null;
+  if (angle !== 90 && angle !== 180 && angle !== 270) {
+    return null;
+  }
+  const confidence =
+    typeof orientationNode?.confidence === "number" && Number.isFinite(orientationNode.confidence)
+      ? orientationNode.confidence
+      : null;
+  const processedAt =
+    typeof orientationNode?.processed_at === "string" ? orientationNode.processed_at : null;
+  return { angle, confidence, processedAt };
 }
 
 export function useFilteredMediaItems(quickFilters: ThumbnailQuickFilterState): {
@@ -263,7 +290,7 @@ export function useFilteredMediaItems(quickFilters: ThumbnailQuickFilterState): 
           editType: "rotate",
           priority: "high",
           reason: "Orientation detection suggests rotating this image.",
-          rotationAngleClockwise: orientationRotation,
+          rotationAngleClockwise: orientationRotation.angle,
           cropRel: null,
         });
       }
@@ -272,6 +299,12 @@ export function useFilteredMediaItems(quickFilters: ThumbnailQuickFilterState): 
         id: item.id,
         title: item.title,
         imageUrl: item.imageUrl,
+        rotationReviewMeta: orientationRotation
+          ? {
+              confidence: orientationRotation.confidence,
+              detectionProcessedAt: orientationRotation.processedAt,
+            }
+          : null,
         suggestions,
       };
       });

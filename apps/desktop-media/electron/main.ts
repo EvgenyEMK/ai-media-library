@@ -17,6 +17,7 @@ import { registerMetadataScanHandlers } from "./ipc/metadata-scan-handlers";
 import { registerPathAnalysisHandlers } from "./ipc/path-analysis-handlers";
 import { registerFolderAiSummaryHandlers } from "./ipc/folder-ai-summary-handlers";
 import { registerMediaItemMutationHandlers } from "./ipc/media-item-mutation-handlers";
+import { registerRotationReviewHandlers } from "./ipc/rotation-review-handlers";
 import { registerGeocoderHandlers } from "./ipc/geocoder-handlers";
 import { registerAlbumHandlers } from "./ipc/album-handlers";
 import { registerPipelineOrchestrationHandlers } from "./ipc/pipeline-orchestration-handlers";
@@ -60,6 +61,7 @@ function registerAllIpcHandlers(): void {
   registerPathAnalysisHandlers();
   registerFolderAiSummaryHandlers();
   registerMediaItemMutationHandlers();
+  registerRotationReviewHandlers();
   registerGeocoderHandlers();
   registerAlbumHandlers();
   registerPipelineOrchestrationHandlers();

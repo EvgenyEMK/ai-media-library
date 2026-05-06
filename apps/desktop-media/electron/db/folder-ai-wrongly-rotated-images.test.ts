@@ -17,6 +17,7 @@ const rows = [
     ai_metadata: JSON.stringify({
       orientation_detection: {
         correction_angle_clockwise: 90,
+        confidence: 0.96,
         processed_at: "2026-05-01T12:00:00.000Z",
       },
       edit_suggestions: [
@@ -71,7 +72,27 @@ describe("getWronglyRotatedImagesPage", () => {
     expect(parts.whereSql).toContain("$.orientation_detection_error");
     expect(parts.whereSql).toContain("$.orientation_detection.processed_at");
     expect(parts.whereSql).toContain("$.orientation_detection_error.failed_at");
-    expect(parts.whereArgs).toEqual(["local-default", `${LIBRARY_ROOT}/%`]);
+    expect(parts.whereSql).toContain("$.orientation_detection.confidence");
+    expect(parts.whereSql).toContain("$.wrong_rotation_user_dismissed.dismissed_at");
+    expect(parts.whereSql).toContain("$.orientation_detection.user_dismissed.dismissed_at");
+    expect(parts.whereArgs).toEqual(["local-default", `${LIBRARY_ROOT}/%`, 0.9]);
+  });
+
+  it("uses configured confidence threshold and permanent dismissal predicate", () => {
+    const parts = buildWronglyRotatedImagesQueryParts({
+      folderPath: LIBRARY_ROOT,
+      recursive: true,
+      minConfidenceThreshold: 0.95,
+    });
+
+    expect(parts.whereSql).toContain("CAST(json_extract(mi.ai_metadata, '$.orientation_detection.confidence') AS REAL) >= ?");
+    expect(parts.whereSql).toContain(
+      "json_extract(mi.ai_metadata, '$.wrong_rotation_user_dismissed.dismissed_at') IS NULL",
+    );
+    expect(parts.whereSql).toContain(
+      "json_extract(mi.ai_metadata, '$.orientation_detection.user_dismissed.dismissed_at') IS NULL",
+    );
+    expect(parts.whereArgs).toEqual(["local-default", `${LIBRARY_ROOT}/%`, 0.95]);
   });
 
   it("returns a paginated page with rotation and crop preview data", () => {
@@ -101,10 +122,14 @@ describe("getWronglyRotatedImagesPage", () => {
           folderPathRelative,
           rotationAngleClockwise: 90,
           cropRel: { x: 0.1, y: 0.2, width: 0.7, height: 0.6 },
+          confidence: 0.96,
+          orientationDetectionProcessedAt: "2026-05-01T12:00:00.000Z",
         },
       ],
     });
     expect(getCalls[0]?.sql).toContain("COUNT(*) AS total");
+    expect(allCalls[0]?.sql).toContain("$.orientation_detection.confidence");
+    expect(allCalls[0]?.sql).toContain("DESC");
     expect(allCalls[0]?.sql).toContain("LIMIT ? OFFSET ?");
     expect(allCalls[0]?.args.slice(-2)).toEqual([12, 12]);
   });

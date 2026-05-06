@@ -111,6 +111,7 @@ export function App(): ReactElement {
   const [activeSidebarSection, setActiveSidebarSection] = useState<SidebarSectionId>("folders");
   const [expandedSidebarSection, setExpandedSidebarSection] = useState<SidebarSectionId | null>("folders");
   const [mainPaneViewMode, setMainPaneViewMode] = useState<MainPaneViewMode>("media");
+  const mainPaneReturnTargetRef = useRef<MainPaneViewMode>("media");
   const [rotationReviewScope, setRotationReviewScope] = useState<RotationReviewScope | null>(null);
   const [albumWorkspaceMode, setAlbumWorkspaceMode] = useState<AlbumWorkspaceMode>("list");
   const [albumSearchControlsOpen, setAlbumSearchControlsOpen] = useState(false);
@@ -327,13 +328,28 @@ export function App(): ReactElement {
   };
 
   const openImageEditSuggestions = useCallback((): void => {
+    setMainPaneViewMode((current) => {
+      if (current !== "imageEditSuggestions") {
+        mainPaneReturnTargetRef.current = current;
+      }
+      return "imageEditSuggestions";
+    });
     setRotationReviewScope(null);
-    setMainPaneViewMode("imageEditSuggestions");
   }, []);
 
   const openRotationReview = useCallback((folderPath: string, includeSubfolders: boolean): void => {
+    setMainPaneViewMode((current) => {
+      if (current !== "imageEditSuggestions") {
+        mainPaneReturnTargetRef.current = current;
+      }
+      return "imageEditSuggestions";
+    });
     setRotationReviewScope({ folderPath, includeSubfolders });
-    setMainPaneViewMode("imageEditSuggestions");
+  }, []);
+
+  const closeSpecialMainPaneView = useCallback((): void => {
+    setRotationReviewScope(null);
+    setMainPaneViewMode(mainPaneReturnTargetRef.current ?? "media");
   }, []);
 
   const isPeopleSectionOpen = activeSidebarSection === "people";
@@ -421,6 +437,7 @@ export function App(): ReactElement {
         setRotationReviewScope={setRotationReviewScope}
         onOpenRotationReview={openRotationReview}
         onOpenImageEditSuggestions={openImageEditSuggestions}
+        onCloseSpecialMainPaneView={closeSpecialMainPaneView}
         pipeline={pipeline}
         faceModelDownload={faceModelDownload}
         handleOpenFolderAiSummary={folderTree.handleOpenFolderAiSummary}

@@ -96,6 +96,10 @@ const api: DesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.getFolderAiFailedFiles, folderPath, pipeline, recursive),
   getFolderAiWronglyRotatedImages: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.getFolderAiWronglyRotatedImages, request),
+  applyWrongRotationToMediaItem: (request) =>
+    ipcRenderer.invoke(IPC_CHANNELS.applyWrongRotationToMediaItem, request),
+  dismissWrongRotationSuggestion: (request) =>
+    ipcRenderer.invoke(IPC_CHANNELS.dismissWrongRotationSuggestion, request),
   getFolderAiCoverage: (folderPath, recursive) =>
     ipcRenderer.invoke(IPC_CHANNELS.getFolderAiCoverage, folderPath, recursive),
   getFolderAiRollupsBatch: (folderPaths) =>

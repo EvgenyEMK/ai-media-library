@@ -23,6 +23,7 @@ export default defineConfig({
   optimizeDeps: {
     // Prevent prebundling workspace source package as immutable dependency.
     exclude: ["@emk/media-viewer"],
+    include: ["swiper/react", "swiper/modules"],
   },
   build: {
     outDir: "dist-renderer",

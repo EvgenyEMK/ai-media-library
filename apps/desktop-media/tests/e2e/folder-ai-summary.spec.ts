@@ -392,10 +392,10 @@ test.describe("Folder AI summary", () => {
     await rotationCard.getByRole("button", { name: "View wrongly rotated images" }).click();
 
     await expect(mainWindow.getByText("Include subfolders")).toBeVisible();
-    await expect(mainWindow.getByText("Showing 1-1 of 1").first()).toBeVisible();
+    await expect(mainWindow.getByText("Showing 1-1 of 1")).toHaveCount(0);
     const reviewRow = mainWindow.getByRole("article").filter({ hasText: "stays.jpg" });
     await expect(reviewRow).toBeVisible();
     await expect(reviewRow.getByText("sub-a")).toBeVisible();
-    await expect(mainWindow.getByText("Review only - apply/save coming soon.")).toBeVisible();
+    await expect(mainWindow.getByText("Review only - apply/save coming soon.")).toHaveCount(0);
   });
 });

@@ -13,6 +13,7 @@ export function useRotationReviewItems(
   scope: RotationReviewScope | null,
   page: number,
   pageSize: number,
+  refreshNonce = 0,
 ): RotationReviewItemsState {
   const [state, setState] = useState<RotationReviewItemsState>({
     items: [],
@@ -45,10 +46,15 @@ export function useRotationReviewItems(
           loading: false,
           error: null,
           items: result.items.map((item): ImageEditSuggestionsItem => ({
-            id: item.sourcePath,
+            id: item.id,
             title: item.name,
+            sourcePath: item.sourcePath,
             imageUrl: item.imageUrl,
             folderPathRelative: scope.includeSubfolders ? item.folderPathRelative : null,
+            rotationReviewMeta: {
+              confidence: item.confidence,
+              detectionProcessedAt: item.orientationDetectionProcessedAt,
+            },
             suggestions: [
               {
                 editType: "rotate",
@@ -85,7 +91,7 @@ export function useRotationReviewItems(
     return () => {
       active = false;
     };
-  }, [page, pageSize, scope]);
+  }, [page, pageSize, refreshNonce, scope]);
 
   return state;
 }

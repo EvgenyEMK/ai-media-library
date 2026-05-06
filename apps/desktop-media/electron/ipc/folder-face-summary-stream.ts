@@ -1,5 +1,5 @@
 import type { WebContents } from "electron";
-import { ipcMain } from "electron";
+import { app, ipcMain } from "electron";
 import {
   FOLDER_FACE_SUMMARY_STREAM_ROW_IDS,
   FOLDER_FACE_SUMMARY_SUBFOLDER_ROW_PREFIX,
@@ -11,6 +11,7 @@ import {
 import { getFolderAiCoverage } from "../db/folder-ai-coverage";
 import { getFolderFaceSummary } from "../db/folder-face-summary";
 import { readFolderChildren } from "../fs-media";
+import { readSettings } from "../storage";
 
 export function buildFolderFaceSummaryStreamSpecs(
   normalizedFolderPath: string,
@@ -83,7 +84,12 @@ function sendProgress(sender: WebContents, payload: FolderFaceSummaryStreamEvent
   sender.send(IPC_CHANNELS.folderFaceSummaryProgress, payload);
 }
 
-function runFaceSummaryStream(sender: WebContents, jobId: string, specs: FolderFaceSummaryStreamRowSpec[]): void {
+function runFaceSummaryStream(
+  sender: WebContents,
+  jobId: string,
+  specs: FolderFaceSummaryStreamRowSpec[],
+  minRotationConfidenceThreshold: number,
+): void {
   void (async () => {
     try {
       const orderedSpecs = streamFaceSummaryProcessingOrder(specs);
@@ -100,6 +106,7 @@ function runFaceSummaryStream(sender: WebContents, jobId: string, specs: FolderF
         const coverage = getFolderAiCoverage({
           folderPath: spec.folderPath,
           recursive: spec.recursive,
+          minRotationConfidenceThreshold,
         });
         sendProgress(sender, { kind: "row", jobId, rowId: spec.rowId, summary, coverage });
         await yieldToEventLoop();
@@ -131,9 +138,16 @@ export function registerFolderFaceSummaryStreamHandlers(): void {
       }
 
       activeJobs.set(wid, { cancelled: false });
+      let minRotationConfidenceThreshold = 0.9;
+      try {
+        const settings = await readSettings(app.getPath("userData"));
+        minRotationConfidenceThreshold = settings.wrongImageRotationDetection.minConfidenceThreshold;
+      } catch {
+        // Use the shared default if settings are unavailable.
+      }
       const children = await readFolderChildren(normalized);
       const rows = buildFolderFaceSummaryStreamSpecs(normalized, children);
-      runFaceSummaryStream(event.sender, wid, rows);
+      runFaceSummaryStream(event.sender, wid, rows, minRotationConfidenceThreshold);
 
       return { folderPath: normalized, jobId: wid, rows };
     },

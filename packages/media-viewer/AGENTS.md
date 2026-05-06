@@ -23,7 +23,6 @@ src/
   main-app-sidebar.tsx              # Sidebar shell component
   settings-controls.tsx             # Settings UI controls
   image-edit-suggestions-view.tsx   # Image edit suggestions
-  image-edit-suggestions.css        # Styles for ImageEditSuggestionsView (imported by the TSX file)
   grid/
     media-thumbnail-grid.tsx        # Thumbnail grid layout
     media-item-grid-card.tsx        # Individual thumbnail card
@@ -54,8 +53,8 @@ src/
 
 ## Styling
 
-- CSS modules or plain CSS files (e.g., `swiper-viewer.css`).
-- No Tailwind in this package (apps apply Tailwind classes via wrapper components).
+- Prefer inline Tailwind classes with theme tokens for new or migrated desktop-facing components.
+- Existing plain CSS files (e.g., `swiper-viewer.css`) may remain until migrated.
 - Inline styles only where truly necessary for dynamic values.
 
 ---

@@ -64,9 +64,14 @@ export function getFolderAiCoverage(params: {
   recursive: boolean;
   libraryId?: string;
   semanticModelVersion?: string;
+  minRotationConfidenceThreshold?: number;
 }): FolderAiCoverageReport {
   const libraryId = params.libraryId ?? DEFAULT_LIBRARY_ID;
   const modelVersion = params.semanticModelVersion ?? MULTIMODAL_EMBED_MODEL;
+  const minRotationConfidenceThreshold = Math.min(
+    1,
+    Math.max(0, params.minRotationConfidenceThreshold ?? 0.9),
+  );
   const folderPath = params.folderPath?.trim();
   if (!folderPath) {
     return emptyReport("", params.recursive);
@@ -96,6 +101,9 @@ export function getFolderAiCoverage(params: {
         )
         THEN 1 ELSE 0 END) AS rotation_done,
       SUM(CASE WHEN CAST(json_extract(mi.ai_metadata, '$.orientation_detection.correction_angle_clockwise') AS INTEGER) IN (90, 180, 270)
+        AND CAST(json_extract(mi.ai_metadata, '$.orientation_detection.confidence') AS REAL) >= ?
+        AND json_extract(mi.ai_metadata, '$.wrong_rotation_user_dismissed.dismissed_at') IS NULL
+        AND json_extract(mi.ai_metadata, '$.orientation_detection.user_dismissed.dismissed_at') IS NULL
         AND (
           json_extract(mi.ai_metadata, '$.orientation_detection_error') IS NULL
           OR json_extract(mi.ai_metadata, '$.orientation_detection.processed_at') > json_extract(mi.ai_metadata, '$.orientation_detection_error.failed_at')
@@ -137,7 +145,13 @@ export function getFolderAiCoverage(params: {
 
   const db = getDesktopDatabase();
   const stmt = db.prepare(sql);
-  const bindRecursive: unknown[] = [modelVersion, libraryId, libraryId, likePattern];
+  const bindRecursive: unknown[] = [
+    minRotationConfidenceThreshold,
+    modelVersion,
+    libraryId,
+    libraryId,
+    likePattern,
+  ];
   if (!params.recursive) {
     bindRecursive.push(folderPrefix, sep);
   }

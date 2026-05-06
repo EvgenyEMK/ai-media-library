@@ -49,6 +49,16 @@ export function createMainWindow(): BrowserWindow {
     loadRenderer(window);
   });
 
+  window.webContents.on("console-message", (_event, level, message, line, sourceId) => {
+    if (level >= 2) {
+      console.warn(`[renderer-console] ${sourceId}:${line} ${message}`);
+    }
+  });
+
+  window.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
+    console.warn(`[window] renderer failed to load ${validatedURL}: ${errorCode} ${errorDescription}`);
+  });
+
   window.on("unresponsive", () => {
     console.warn("[window] renderer became unresponsive");
   });

@@ -184,6 +184,8 @@ export const IPC_CHANNELS = {
   folderAiSummaryStreamProgress: "media:folder-ai-summary-stream-progress",
   getFolderAiFailedFiles: "media:get-folder-ai-failed-files",
   getFolderAiWronglyRotatedImages: "media:get-folder-ai-wrongly-rotated-images",
+  applyWrongRotationToMediaItem: "media:apply-wrong-rotation-to-media-item",
+  dismissWrongRotationSuggestion: "media:dismiss-wrong-rotation-suggestion",
   getFolderAiCoverage: "media:get-folder-ai-coverage",
   getFolderAiRollupsBatch: "media:get-folder-ai-rollups-batch",
   detectFolderImageRotation: "media:detect-folder-image-rotation",
@@ -471,6 +473,11 @@ export interface WrongImageRotationDetectionSettings {
    */
   enabled: boolean;
   /**
+   * Minimum classifier confidence required for an image to be treated as wrongly
+   * rotated in review views and folder summary issue counts.
+   */
+  minConfidenceThreshold: number;
+  /**
    * Fallback method: if classifier is unavailable or cannot provide a usable
    * signal, try face landmark features (when available) to infer orientation.
    */
@@ -636,6 +643,7 @@ export const DEFAULT_PHOTO_ANALYSIS_SETTINGS: PhotoAnalysisSettings = {
 
 export const DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS: WrongImageRotationDetectionSettings = {
   enabled: true,
+  minConfidenceThreshold: 0.9,
   useFaceLandmarkFeaturesFallback: true,
 };
 
@@ -1151,6 +1159,8 @@ export interface FolderAiWronglyRotatedImageItem {
   folderPathRelative: string | null;
   rotationAngleClockwise: 90 | 180 | 270;
   cropRel: RelativeCropBox | null;
+  confidence: number | null;
+  orientationDetectionProcessedAt: string | null;
 }
 
 export interface FolderAiWronglyRotatedImagesPageResult {
@@ -1159,6 +1169,19 @@ export interface FolderAiWronglyRotatedImagesPageResult {
   page: number;
   pageSize: number;
 }
+
+export interface ApplyWrongRotationToMediaItemRequest {
+  mediaItemId: string;
+  angleClockwise: 90 | 180 | 270;
+}
+
+export interface DismissWrongRotationSuggestionRequest {
+  mediaItemId: string;
+}
+
+export type RotationReviewMutationResult =
+  | { success: true }
+  | { success: false; error: string };
 
 export interface PhotoAnalysisModelInfo {
   model: string;
@@ -2001,6 +2024,12 @@ export interface DesktopApi {
   getFolderAiWronglyRotatedImages: (
     request: FolderAiWronglyRotatedImagesPageRequest,
   ) => Promise<FolderAiWronglyRotatedImagesPageResult>;
+  applyWrongRotationToMediaItem: (
+    request: ApplyWrongRotationToMediaItemRequest,
+  ) => Promise<RotationReviewMutationResult>;
+  dismissWrongRotationSuggestion: (
+    request: DismissWrongRotationSuggestionRequest,
+  ) => Promise<RotationReviewMutationResult>;
   getFolderAiCoverage: (folderPath: string, recursive: boolean) => Promise<FolderAiCoverageReport>;
   getFolderAiRollupsBatch: (folderPaths: string[]) => Promise<Record<string, FolderAiSidebarRollup>>;
   detectFolderImageRotation: (request: {

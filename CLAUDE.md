@@ -10,16 +10,18 @@ Keep both in sync; this file is the canonical reference.
 
 **ai-media-library** is a pnpm monorepo focused on a desktop-first AI media library:
 
-| App / Package | Stack | Purpose |
-|---|---|---|
-| `apps/desktop-media` | Electron, Vite, React 19, Tailwind, SQLite, Zustand | Desktop media library with local AI |
-| `packages/media-metadata-core` | TypeScript only | Metadata types, EXIF/XMP helpers, thumbnail filter logic |
-| `packages/media-store` | Zustand 5, Immer | Shared state slices for media apps |
-| `packages/media-viewer` | React (no Next.js deps) | Shared UI components for media apps |
-| `packages/shared-contracts` | TypeScript only | Domain types, adapter interfaces, sync contracts |
-| `packages/sdk-media-api` | TypeScript only | HTTP client for sync API |
-| `packages/config-eslint` | ESLint | Shared lint config |
-| `packages/config-typescript` | TypeScript | Shared tsconfig bases |
+
+| App / Package                  | Stack                                               | Purpose                                                  |
+| ------------------------------ | --------------------------------------------------- | -------------------------------------------------------- |
+| `apps/desktop-media`           | Electron, Vite, React 19, Tailwind, SQLite, Zustand | Desktop media library with local AI                      |
+| `packages/media-metadata-core` | TypeScript only                                     | Metadata types, EXIF/XMP helpers, thumbnail filter logic |
+| `packages/media-store`         | Zustand 5, Immer                                    | Shared state slices for media apps                       |
+| `packages/media-viewer`        | React (no Next.js deps)                             | Shared UI components for media apps                      |
+| `packages/shared-contracts`    | TypeScript only                                     | Domain types, adapter interfaces, sync contracts         |
+| `packages/sdk-media-api`       | TypeScript only                                     | HTTP client for sync API                                 |
+| `packages/config-eslint`       | ESLint                                              | Shared lint config                                       |
+| `packages/config-typescript`   | TypeScript                                          | Shared tsconfig bases                                    |
+
 
 The architecture keeps shared contracts, state slices, and UI components reusable across desktop and (future) web apps.
 
@@ -59,16 +61,19 @@ pnpm test:all               # Both unit + E2E
 
 **Hard limits:**
 
-| Category | Max lines | Action when exceeded |
-|---|---|---|
-| React component | 300 | Extract sub-components or hooks |
-| Custom hook | 200 | Split into focused hooks |
-| Utility / helper | 150 | Split by domain |
-| Type definitions | 200 | Split by domain |
-| IPC handler group | 200 | Split by feature |
-| Electron main entry | 100 | Delegate to modules |
+
+| Category            | Max lines | Action when exceeded            |
+| ------------------- | --------- | ------------------------------- |
+| React component     | 300       | Extract sub-components or hooks |
+| Custom hook         | 200       | Split into focused hooks        |
+| Utility / helper    | 150       | Split by domain                 |
+| Type definitions    | 200       | Split by domain                 |
+| IPC handler group   | 200       | Split by feature                |
+| Electron main entry | 100       | Delegate to modules             |
+
 
 **Decomposition rules:**
+
 - One concern per file. A component file renders UI; a hook file manages state/effects; a utility file exports pure functions.
 - Extract inline handler logic exceeding ~15 lines into a named function or hook.
 - Keep JSX return blocks readable — extract complex conditional sections into sub-components.
@@ -79,7 +84,7 @@ pnpm test:all               # Both unit + E2E
 
 All user-facing actions must be designed to be invokable **both** by direct user interaction **and** by programmatic automation (AI intent translation, scripting, testing).
 
-**Pattern:** Separate action _intent_ (what to do) from action _trigger_ (how it was initiated).
+**Pattern:** Separate action *intent* (what to do) from action *trigger* (how it was initiated).
 
 ```
 ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
@@ -92,6 +97,7 @@ All user-facing actions must be designed to be invokable **both** by direct user
 ```
 
 **Rules:**
+
 - Define each discrete user action as a **named, typed function** with explicit parameters — not as an anonymous handler bound to a button.
 - Group related actions into an **action registry** (object or module) so automation can discover and invoke them.
 - Action functions must not depend on React component state directly. They receive parameters and call store actions or IPC.
@@ -113,13 +119,15 @@ All user-facing actions must be designed to be invokable **both** by direct user
 
 All external integrations must use adapter/strategy interfaces defined in `packages/shared-contracts`:
 
-| Domain | Interface | Desktop Adapter |
-|---|---|---|
-| AI photo analysis | `AiProviderAdapter` | Ollama (local) |
-| Text/image embedding | `EmbeddingProviderAdapter` | `OllamaEmbeddingAdapter` |
-| Face detection | `FaceDetectionProviderAdapter` | RetinaFace sidecar |
-| Vector search | `VectorStoreAdapter` | `SQLiteVectorStoreAdapter` |
-| Data access | `MediaRepository` | SQLite db modules |
+
+| Domain               | Interface                      | Desktop Adapter            |
+| -------------------- | ------------------------------ | -------------------------- |
+| AI photo analysis    | `AiProviderAdapter`            | Ollama (local)             |
+| Text/image embedding | `EmbeddingProviderAdapter`     | `OllamaEmbeddingAdapter`   |
+| Face detection       | `FaceDetectionProviderAdapter` | RetinaFace sidecar         |
+| Vector search        | `VectorStoreAdapter`           | `SQLiteVectorStoreAdapter` |
+| Data access          | `MediaRepository`              | SQLite db modules          |
+
 
 Never call a provider directly from business logic — always go through the interface.
 When adding a new provider, implement the shared interface and register it in the app's adapter configuration.
@@ -211,6 +219,7 @@ Larger renderer screens are split into `apps/desktop-media/src/renderer/componen
 ## Documentation
 
 Product and architecture documentation lives in `docs/`. See:
+
 - **End-user docs:** `docs/END-USER-GUIDE/` — overview and install guide.
 - **Product features:** `docs/PRODUCT-FEATURES/` — UX specs organized by module, with a dedicated `AI/` subfolder for AI feature specs.
 - **Implementation log:** `docs/IMPLEMENTATION-LOG/` — records of feature implementations, bug fixes, and refactoring.
@@ -223,12 +232,15 @@ Product and architecture documentation lives in `docs/`. See:
 
 This project uses a dual-tool setup for AI agents:
 
-| Tool | Config Location | Scope |
-|---|---|---|
-| Claude Code | `CLAUDE.md` (this file) + `AGENTS.md` files | Root = global, nested = scoped |
-| Cursor | `.cursor/rules/*.mdc` | `alwaysApply: true` = global, globs = scoped |
+
+| Tool        | Config Location                             | Scope                                        |
+| ----------- | ------------------------------------------- | -------------------------------------------- |
+| Claude Code | `CLAUDE.md` (this file) + `AGENTS.md` files | Root = global, nested = scoped               |
+| Cursor      | `.cursor/rules/*.mdc`                       | `alwaysApply: true` = global, globs = scoped |
+
 
 `AGENTS.md` files exist at:
+
 - Root (monorepo overview)
 - `apps/desktop-media/` (Electron, IPC, SQLite patterns)
 - `packages/media-store/` (Zustand slice conventions)

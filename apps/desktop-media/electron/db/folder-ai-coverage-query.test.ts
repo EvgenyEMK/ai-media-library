@@ -79,8 +79,22 @@ describe("getFolderAiCoverage", () => {
     expect(getCalls[0]?.sql).toContain("$.orientation_detection");
     expect(getCalls[0]?.sql).toContain("$.orientation_detection_error");
     expect(getCalls[0]?.sql).toContain("correction_angle_clockwise");
+    expect(getCalls[0]?.sql).toContain("$.orientation_detection.confidence");
+    expect(getCalls[0]?.sql).toContain("$.wrong_rotation_user_dismissed.dismissed_at");
+    expect(getCalls[0]?.sql).toContain("$.orientation_detection.user_dismissed.dismissed_at");
     expect(getCalls[0]?.sql).toContain("$.orientation_detection.processed_at");
     expect(getCalls[0]?.sql).toContain("$.orientation_detection_error.failed_at");
+    expect(getCalls[0]?.args[0]).toBe(0.9);
+  });
+
+  it("uses configured confidence threshold for wrong-rotation issue counts", () => {
+    getFolderAiCoverage({
+      folderPath: "C:\\photos",
+      recursive: true,
+      minRotationConfidenceThreshold: 0.95,
+    });
+
+    expect(getCalls[0]?.args[0]).toBe(0.95);
   });
 
   it("keeps rotation failures separate while allowing progress UI to count them as processed", () => {

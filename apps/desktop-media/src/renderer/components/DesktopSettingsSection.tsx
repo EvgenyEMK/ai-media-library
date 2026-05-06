@@ -164,6 +164,9 @@ const UI_TEXT = {
     "Analyze image rotation need before running other AI pipelines",
   detectWrongImageRotationBeforePipelinesDescription:
     "Runs wrong-rotation detection before AI search index, face detection, and AI image analysis. Already-processed images are skipped automatically.",
+  wrongImageRotationMinConfidenceTitle: "Minimum AI confidence for wrong-rotation review",
+  wrongImageRotationMinConfidenceDescription:
+    "Images below this confidence are not shown in Wrongly rotated images and are not counted as wrongly rotated in folder summaries.",
   faceLandmarkFallbackTitle:
     "Use face landmark features to detect photo rotation (fallback method)",
   faceLandmarkFallbackDescription:
@@ -824,6 +827,17 @@ export function DesktopSettingsSection({
               onWrongImageRotationDetectionSettingChange("useFaceLandmarkFeaturesFallback", next)
             }
           />
+          <SettingsNumberField
+            title={UI_TEXT.wrongImageRotationMinConfidenceTitle}
+            description={UI_TEXT.wrongImageRotationMinConfidenceDescription}
+            value={wrongImageRotationDetectionSettings.minConfidenceThreshold}
+            min={0}
+            max={1}
+            step={0.01}
+            onChange={(nextValue) =>
+              onWrongImageRotationDetectionSettingChange("minConfidenceThreshold", nextValue)
+            }
+          />
           <div className="pt-1">
             <button
               type="button"
@@ -837,12 +851,18 @@ export function DesktopSettingsSection({
                   "useFaceLandmarkFeaturesFallback",
                   DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS.useFaceLandmarkFeaturesFallback,
                 );
+                onWrongImageRotationDetectionSettingChange(
+                  "minConfidenceThreshold",
+                  DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS.minConfidenceThreshold,
+                );
               }}
               disabled={
                 wrongImageRotationDetectionSettings.enabled ===
                   DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS.enabled &&
                 wrongImageRotationDetectionSettings.useFaceLandmarkFeaturesFallback ===
-                  DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS.useFaceLandmarkFeaturesFallback
+                  DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS.useFaceLandmarkFeaturesFallback &&
+                wrongImageRotationDetectionSettings.minConfidenceThreshold ===
+                  DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS.minConfidenceThreshold
               }
             >
               {UI_TEXT.resetToDefaults}

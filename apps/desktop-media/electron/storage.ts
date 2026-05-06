@@ -472,6 +472,12 @@ function sanitizeWrongImageRotationDetectionSettings(
 
   return {
     enabled,
+    minConfidenceThreshold: clampToRange(
+      asNumber(value.minConfidenceThreshold),
+      0,
+      1,
+      DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS.minConfidenceThreshold,
+    ),
     useFaceLandmarkFeaturesFallback,
   };
 }

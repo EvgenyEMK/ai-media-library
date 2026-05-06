@@ -29,6 +29,15 @@ import { MULTIMODAL_EMBED_MODEL } from "../semantic-embeddings";
 /** Set to `true` to log `[debug][folder-ai-summary]` lines in the main process. */
 const DEBUG_FOLDER_AI_SUMMARY = false;
 
+async function getRotationConfidenceThreshold(): Promise<number> {
+  try {
+    const settings = await readSettings(app.getPath("userData"));
+    return settings.wrongImageRotationDetection.minConfidenceThreshold;
+  } catch {
+    return 0.9;
+  }
+}
+
 function debugFolderAiSummary(message: string, details?: Record<string, unknown>): void {
   if (!DEBUG_FOLDER_AI_SUMMARY) return;
   console.log("[debug][folder-ai-summary]", message, details ?? {});
@@ -162,13 +171,27 @@ export function registerFolderAiSummaryHandlers(): void {
         };
       }
 
-      const selectedWithSubfolders = getFolderAiCoverage({ folderPath: normalized, recursive: true });
-      const selectedDirectOnly = getFolderAiCoverage({ folderPath: normalized, recursive: false });
+      const minRotationConfidenceThreshold = await getRotationConfidenceThreshold();
+      const coverageParams = { minRotationConfidenceThreshold };
+      const selectedWithSubfolders = getFolderAiCoverage({
+        folderPath: normalized,
+        recursive: true,
+        ...coverageParams,
+      });
+      const selectedDirectOnly = getFolderAiCoverage({
+        folderPath: normalized,
+        recursive: false,
+        ...coverageParams,
+      });
       const children = await readFolderChildren(normalized);
       const subfolders = children.map((node) => ({
         folderPath: node.path,
         name: node.name,
-        coverage: getFolderAiCoverage({ folderPath: node.path, recursive: true }),
+        coverage: getFolderAiCoverage({
+          folderPath: node.path,
+          recursive: true,
+          ...coverageParams,
+        }),
       }));
 
       return { selectedWithSubfolders, selectedDirectOnly, subfolders };
@@ -197,7 +220,11 @@ export function registerFolderAiSummaryHandlers(): void {
     IPC_CHANNELS.getFolderAiCoverage,
     async (_event, folderPath: string, recursive: boolean) => {
       const normalized = folderPath?.trim() ?? "";
-      return getFolderAiCoverage({ folderPath: normalized, recursive: recursive === true });
+      return getFolderAiCoverage({
+        folderPath: normalized,
+        recursive: recursive === true,
+        minRotationConfidenceThreshold: await getRotationConfidenceThreshold(),
+      });
     },
   );
 
@@ -308,6 +335,7 @@ export function registerFolderAiSummaryHandlers(): void {
         recursive: request.recursive === true,
         page: request.page,
         pageSize: request.pageSize,
+        minConfidenceThreshold: await getRotationConfidenceThreshold(),
       });
     },
   );
