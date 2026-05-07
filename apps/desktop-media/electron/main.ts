@@ -32,6 +32,7 @@ import { readSettings } from "./storage";
 import { DEFAULT_FACE_DETECTION_SETTINGS } from "../src/shared/ipc";
 import {
   IPC_CHANNELS,
+  type FaceDetectorModelId,
   type FaceModelDownloadProgressEvent,
 } from "../src/shared/ipc";
 import { exiftool } from "exiftool-vendored";
@@ -42,6 +43,7 @@ import {
   detectAiInferenceGpuOptions,
 } from "./ai-inference-gpu";
 import { setSemanticIndexDebugLogPath } from "./semantic-index-debug-log";
+import { shouldSkipStartupAiModelsDownload } from "./startup-ai-models";
 
 const configuredUserDataPath = resolveInstalledUserDataPath();
 if (configuredUserDataPath) {
@@ -80,38 +82,14 @@ function emitFaceModelDownloadProgress(event: FaceModelDownloadProgressEvent): v
   }
 }
 
-app.whenReady().then(async () => {
-  initDesktopDatabase(app.getPath("userData"));
-  setSemanticIndexDebugLogPath(app.getPath("userData"));
-  setDatabaseProvider(() => getDesktopDatabase());
-  clearAllInProgressFlags();
-
-  setModelsDirectory(resolveModelsPath(app));
-
-  semanticEmbeddingStatusRef.current = await probeMultimodalEmbeddingSupport();
-
-  console.log("[emk-face][startup] using native ONNX pipeline");
+function beginStartupNativeFaceModelEnsure(activeDetectorId: FaceDetectorModelId): void {
   const modelsStart = Date.now();
-  console.log("[emk-face][models] ensure-start");
   emitFaceModelDownloadProgress({
     type: "started",
     filename: null,
     message: "Downloading AI face detection and recognition models...",
     startedAtIso: new Date().toISOString(),
   });
-  const activeDetectorId = await (async () => {
-    try {
-      const s = await readSettings(app.getPath("userData"));
-      const gpuOptions = await detectAiInferenceGpuOptions();
-      applyAiInferenceGpuPreference(s.aiInferencePreferredGpuId, gpuOptions);
-      // Hydrate the scheduler's concurrency config from saved settings.
-      setPipelineConcurrencyConfig(s.pipelineConcurrency);
-      return s.faceDetection.detectorModel;
-    } catch {
-      return DEFAULT_FACE_DETECTION_SETTINGS.detectorModel;
-    }
-  })();
-
   void ensureActiveModels(activeDetectorId, (progress) => {
     emitFaceModelDownloadProgress({
       type: "progress",
@@ -128,9 +106,6 @@ app.whenReady().then(async () => {
         durationMs: Date.now() - modelsStart,
         message: "AI face detection and recognition models are ready.",
       });
-      console.log(
-        `[emk-face][models] ensure-done durationMs=${Date.now() - modelsStart}`,
-      );
     })
     .catch((error) => {
       const msg = error instanceof Error ? error.message : String(error);
@@ -140,13 +115,40 @@ app.whenReady().then(async () => {
         error: msg,
         message: "Failed to download AI face detection and recognition models.",
       });
-      console.log(
+      console.error(
         `[emk-face][models] ensure-fail durationMs=${Date.now() - modelsStart} error=${JSON.stringify(msg)}`,
       );
     });
+}
 
-  ipcMain.on("renderer:log", (_event, msg: string) => {
-    console.log(msg);
+app.whenReady().then(async () => {
+  initDesktopDatabase(app.getPath("userData"));
+  setSemanticIndexDebugLogPath(app.getPath("userData"));
+  setDatabaseProvider(() => getDesktopDatabase());
+  clearAllInProgressFlags();
+
+  setModelsDirectory(resolveModelsPath(app));
+
+  semanticEmbeddingStatusRef.current = await probeMultimodalEmbeddingSupport();
+
+  const skipStartupAiModels = shouldSkipStartupAiModelsDownload();
+  try {
+    const s = await readSettings(app.getPath("userData"));
+    const gpuOptions = await detectAiInferenceGpuOptions();
+    applyAiInferenceGpuPreference(s.aiInferencePreferredGpuId, gpuOptions);
+    // Hydrate the scheduler's concurrency config from saved settings.
+    setPipelineConcurrencyConfig(s.pipelineConcurrency);
+    if (!skipStartupAiModels) {
+      beginStartupNativeFaceModelEnsure(s.faceDetection.detectorModel);
+    }
+  } catch {
+    if (!skipStartupAiModels) {
+      beginStartupNativeFaceModelEnsure(DEFAULT_FACE_DETECTION_SETTINGS.detectorModel);
+    }
+  }
+
+  ipcMain.on("renderer:log", () => {
+    /* Renderer log relay disabled — avoid console.log noise in main. */
   });
 
   registerAllIpcHandlers();

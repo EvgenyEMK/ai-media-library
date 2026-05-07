@@ -78,6 +78,8 @@ export const IPC_CHANNELS = {
   folderMediaProgress: "media:folder-media-progress",
   getSettings: "media:get-settings",
   getDatabaseLocation: "media:get-database-location",
+  /** Main-process runtime flags (e.g. E2E-only UI). */
+  getDesktopRuntimeFlags: "media:get-desktop-runtime-flags",
   saveSettings: "media:save-settings",
   getAiInferenceGpuOptions: "media:get-ai-inference-gpu-options",
   getFolderAnalysisStatuses: "media:get-folder-analysis-statuses",
@@ -258,6 +260,12 @@ export interface DatabaseLocationInfo {
   /** Temporary troubleshooting signal for packaged legacy DB compatibility checks. */
   mediaEmbeddingsCompatStatus?: string;
   semanticDebugLogPath?: string | null;
+}
+
+/** Values derived from main-process env at IPC time (no secrets). */
+export interface DesktopRuntimeFlags {
+  /** When true, show E2E-only “Run pipelines” controls (`EMK_E2E_RUN_PIPELINES_UI=1`). */
+  showRunPipelinesTestUi: boolean;
 }
 
 export interface PathExtractionSettings {
@@ -1990,6 +1998,7 @@ export interface DesktopApi {
   onFolderMediaProgress: (listener: FolderMediaProgressListener) => () => void;
   getSettings: () => Promise<AppSettings>;
   getDatabaseLocation: () => Promise<DatabaseLocationInfo>;
+  getDesktopRuntimeFlags: () => Promise<DesktopRuntimeFlags>;
   getAiInferenceGpuOptions: () => Promise<AiInferenceGpuOption[]>;
   saveSettings: (settings: AppSettings) => Promise<void>;
   getFolderAnalysisStatuses: () => Promise<Record<string, FolderAnalysisStatus>>;

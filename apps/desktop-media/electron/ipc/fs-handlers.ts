@@ -4,6 +4,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import {
   IPC_CHANNELS,
   type AppSettings,
+  type DesktopRuntimeFlags,
   type FolderAnalysisStatus,
 } from "../../src/shared/ipc";
 import {
@@ -246,6 +247,12 @@ export function registerFsHandlers(): void {
       cachePath: cachePath ?? path.join(appDataPath, "EMK Desktop Media", "cache"),
       mediaEmbeddingsCompatStatus: getMediaEmbeddingsCompatStatus(),
       semanticDebugLogPath: getSemanticIndexDebugLogPath(),
+    };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.getDesktopRuntimeFlags, async (): Promise<DesktopRuntimeFlags> => {
+    return {
+      showRunPipelinesTestUi: process.env.EMK_E2E_RUN_PIPELINES_UI === "1",
     };
   });
 

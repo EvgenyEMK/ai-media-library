@@ -42,6 +42,7 @@ function hasRequiredAssets(expectations: UnconfirmedFaceExpectations): boolean {
 }
 
 test.describe("Unconfirmed face search", () => {
+  test.use({ e2eSkipStartupAiModelsDownload: false });
   test.setTimeout(600_000);
 
   test("toggle expands person-tag filter to include unconfirmed similar faces", async ({
