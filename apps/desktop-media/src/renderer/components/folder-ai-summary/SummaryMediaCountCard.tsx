@@ -1,16 +1,54 @@
 import { ListChecks, Loader2, Play } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ReactElement } from "react";
-import type { DateDisplayFormat, FolderScanFreshness } from "../../../shared/ipc";
+import type { DateDisplayFormat, FolderScanFreshness, ScanFolderMetadataScope } from "../../../shared/ipc";
 import { cn } from "../../lib/cn";
-import { formatCoveragePercent, formatGroupedInt } from "../../lib/folder-ai-summary-formatters";
+import {
+  formatFolderTreeScanCoveragePercentDisplay,
+  formatGroupedInt,
+} from "../../lib/folder-ai-summary-formatters";
 import { UI_TEXT } from "../../lib/ui-text";
+import { FolderTreeScanPlayMenu } from "./FolderTreeScanPlayMenu";
 import { SummaryActionCard } from "./SummaryActionCard";
 import { SummaryCardStatusStack } from "./SummaryCardStatusStack";
 import { SummaryMetricGrid, type SummaryMetricGridItem } from "./SummaryMetricGrid";
 import { PendingSpinner, SummaryCardStatusIndicator } from "./SummaryStatusPrimitives";
 import { formatOldestScanLabel } from "./summary-card-formatters";
 import type { SummaryStatusTone } from "./summary-card-types";
+
+function FolderScanDirectPlayButton({
+  ariaLabel,
+  disabled,
+  pending,
+  playToneClass,
+  onClick,
+}: {
+  ariaLabel: string;
+  disabled: boolean;
+  pending: boolean;
+  playToneClass: string;
+  onClick: () => void;
+}): ReactElement {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "inline-flex h-10 w-10 shrink-0 appearance-none items-center justify-center border-0 bg-transparent p-0 shadow-none outline-none ring-0 transition-all duration-150 ease-out hover:scale-125 disabled:cursor-not-allowed disabled:opacity-50",
+        playToneClass,
+      )}
+      title="Run folder scan"
+      aria-label={ariaLabel}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {pending ? (
+        <Loader2 size={25} className="animate-spin" aria-hidden="true" />
+      ) : (
+        <Play size={25} aria-hidden="true" />
+      )}
+    </button>
+  );
+}
 
 export function SummaryMediaCountCard({
   icon: Icon,
@@ -54,13 +92,12 @@ export function LastDataScanCard({
   actionPending?: boolean;
   outdatedAfterDays?: number;
   hasSubfolders?: boolean;
-  onRunFolderScan?: () => void;
+  onRunFolderScan?: (scope: ScanFolderMetadataScope) => void;
   onInfoClick?: () => void;
 }): ReactElement {
   const lastDataChange = formatOldestScanLabel(scanFreshness.lastMetadataExtractedAt, dateFormat);
   const title = hasSubfolders ? UI_TEXT.folderAiSummaryFolderTreeScanTitle : UI_TEXT.folderAiSummaryFolderScanTitle;
   const qs = scanFreshness.folderTreeQuickScan;
-  const treeTotal = qs?.ultraFoldersScanned ?? 0;
   const treeNeed = qs?.treeFoldersWithDirectMediaOnDiskCount ?? 0;
   const treeCovered = qs?.treeFoldersWithMetadataFolderScanCount ?? 0;
   const foldersMissingFullScan = Math.max(treeNeed - treeCovered, 0);
@@ -94,8 +131,7 @@ export function LastDataScanCard({
           ? "amber"
           : "green";
 
-  const folderPercent =
-    treeNeed === 0 ? "100%" : formatCoveragePercent(treeCovered, Math.max(treeNeed, 1));
+  const folderPercent = formatFolderTreeScanCoveragePercentDisplay(treeCovered, treeNeed, addedChanged);
 
   const statusCountLine =
     qs != null && treeNeed > 0
@@ -153,21 +189,32 @@ export function LastDataScanCard({
   }
   metricItems.push({ label: "Last file change", value: lastDataChange });
 
+  /** Partial folder-level coverage: show incremental vs full menu; at 0%/100% run full scan immediately on Play. */
+  const folderTreePlayOpensMenu =
+    hasSubfolders &&
+    qs != null &&
+    !loading &&
+    folderPercent !== "100%" &&
+    folderPercent !== "0%";
+
   const actionSlot = onRunFolderScan ? (
-    <button
-      type="button"
-      className={cn("inline-flex h-10 w-10 shrink-0 appearance-none items-center justify-center border-0 bg-transparent p-0 shadow-none outline-none ring-0 transition-all duration-150 ease-out hover:scale-125 disabled:cursor-not-allowed disabled:opacity-50", playToneClass)}
-      title="Run folder scan"
-      aria-label={`Run ${title}`}
-      disabled={actionPending}
-      onClick={onRunFolderScan}
-    >
-      {actionPending ? (
-        <Loader2 size={25} className="animate-spin" aria-hidden="true" />
-      ) : (
-        <Play size={25} aria-hidden="true" />
-      )}
-    </button>
+    hasSubfolders && folderTreePlayOpensMenu ? (
+      <FolderTreeScanPlayMenu
+        ariaLabel={`Run ${title}`}
+        disabled={actionPending}
+        pending={actionPending}
+        playToneClass={playToneClass}
+        onChoose={onRunFolderScan}
+      />
+    ) : (
+      <FolderScanDirectPlayButton
+        ariaLabel={`Run ${title}`}
+        disabled={actionPending}
+        pending={actionPending}
+        playToneClass={playToneClass}
+        onClick={() => onRunFolderScan("full")}
+      />
+    )
   ) : undefined;
 
   return (

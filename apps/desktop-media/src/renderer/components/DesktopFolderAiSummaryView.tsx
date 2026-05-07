@@ -6,6 +6,8 @@ import type {
   FolderAiFailedFileItem,
   FolderAiPipelineKind,
   FolderAiSummaryOverviewReport,
+  FolderTreeQuickScanBreakdown,
+  ScanFolderMetadataScope,
 } from "../../shared/ipc";
 import { useFolderAiSummaryPipelineActions } from "../hooks/use-folder-ai-summary-pipeline-actions";
 import { cn } from "../lib/cn";
@@ -17,6 +19,7 @@ import { UI_TEXT } from "../lib/ui-text";
 import type { FailedListContext, SummaryPipelineKind } from "../types/folder-ai-summary-types";
 import { DesktopFolderAiFailedList } from "./DesktopFolderAiFailedList";
 import { DesktopFolderAiSummaryDashboard } from "./DesktopFolderAiSummaryDashboard";
+import { DesktopFolderQuickScanSummaryTable } from "./DesktopFolderQuickScanSummaryTable";
 import { DesktopFolderAiSummaryTable } from "./DesktopFolderAiSummaryTable";
 import { DesktopFolderGeoSummaryTable } from "./DesktopFolderGeoSummaryTable";
 import { DesktopFolderFaceSummaryTable } from "./DesktopFolderFaceSummaryTable";
@@ -121,6 +124,8 @@ export function DesktopFolderAiSummaryView({
   const [failedListItems, setFailedListItems] = useState<FolderAiFailedFileItem[]>([]);
   const [failedListMetaByPath, setFailedListMetaByPath] = useState<Record<string, DesktopMediaItemMetadata>>({});
   const [folderScanPending, setFolderScanPending] = useState(false);
+  const [quickScanBreakdown, setQuickScanBreakdown] = useState<FolderTreeQuickScanBreakdown | null>(null);
+  const [aiSubfoldersDetailTab, setAiSubfoldersDetailTab] = useState<"pipelines" | "quick">("pipelines");
   const [onboardingSlideId, setOnboardingSlideId] = useState<PipelineOnboardingSlideId>("face");
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const {
@@ -146,6 +151,7 @@ export function DesktopFolderAiSummaryView({
     setOverviewReport(null);
     setSelectedWithSubfolders(null);
     setSelectedDirectOnly(null);
+    setQuickScanBreakdown(null);
     try {
       const overviewStartedAt = performance.now();
       const overviewPromise = window.desktopApi.getFolderAiSummaryOverview(folderPath, { includeSubfolders: false });
@@ -179,6 +185,7 @@ export function DesktopFolderAiSummaryView({
       const folderScanUpdate = folderScanPromise
         .then((scanSummary) => {
           if (loadSequenceRef.current !== loadSequence) return;
+          setQuickScanBreakdown(scanSummary.quickScanBreakdown ?? null);
           setOverviewReport((current) => {
             if (!current) return current;
             return {
@@ -270,6 +277,10 @@ export function DesktopFolderAiSummaryView({
   }, [load]);
 
   useEffect(() => {
+    setAiSubfoldersDetailTab("pipelines");
+  }, [folderPath]);
+
+  useEffect(() => {
     if (shouldRefreshFolderAiSummaryAfterScan(folderPath, lastMetadataScanCompletion)) {
       void load();
     }
@@ -328,16 +339,19 @@ export function DesktopFolderAiSummaryView({
     [loadFailedList],
   );
 
-  const runFolderScanWithSubfolders = useCallback(async (): Promise<void> => {
-    if (!folderPath || folderScanPending) return;
-    setFolderScanPending(true);
-    try {
-      await window.desktopApi.scanFolderMetadata({ folderPath, recursive: true });
-      await load();
-    } finally {
-      setFolderScanPending(false);
-    }
-  }, [folderPath, folderScanPending, load]);
+  const runFolderScanWithSubfolders = useCallback(
+    async (scope: ScanFolderMetadataScope): Promise<void> => {
+      if (!folderPath || folderScanPending) return;
+      setFolderScanPending(true);
+      try {
+        await window.desktopApi.scanFolderMetadata({ folderPath, recursive: true, scanScope: scope });
+        await load();
+      } finally {
+        setFolderScanPending(false);
+      }
+    },
+    [folderPath, folderScanPending, load],
+  );
 
   const runDashboardPipeline = useCallback(
     async (pipeline: SummaryPipelineKind): Promise<void> => {
@@ -518,7 +532,7 @@ export function DesktopFolderAiSummaryView({
                 actionPendingPipeline={actionPendingPipeline}
                 onRunPipeline={(pipeline) => void runDashboardPipeline(pipeline)}
                 actionPendingGeoLocation={folderScanPending}
-                onRunGeoLocation={() => void runFolderScanWithSubfolders()}
+                onRunGeoLocation={() => void runFolderScanWithSubfolders("full")}
                 onOpenPipelineInfo={openOnboarding}
                 onViewRotationResults={
                   (dashboardCoverage.rotation.issueCount ?? 0) > 0 && onOpenRotationReview
@@ -526,7 +540,7 @@ export function DesktopFolderAiSummaryView({
                     : undefined
                 }
                 actionPendingFolderScan={folderScanPending}
-                onRunFolderScan={() => void runFolderScanWithSubfolders()}
+                onRunFolderScan={(scope) => void runFolderScanWithSubfolders(scope)}
                 hasSubfolders={hasSubfolders}
               />
             </div>
@@ -556,6 +570,69 @@ export function DesktopFolderAiSummaryView({
               <p className="m-0 text-sm text-red-400">{aiGeoStream.streamError}</p>
             ) : aiGeoStream.rowSpecs.length === 0 ? (
               <DetailsLoadingSpinner />
+            ) : quickScanBreakdown ? (
+              <>
+                <div
+                  className="inline-flex w-fit flex-wrap gap-2 border-b border-border"
+                  role="tablist"
+                  aria-label={UI_TEXT.folderAiSummaryTabAiPipelines}
+                >
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={aiSubfoldersDetailTab === "pipelines"}
+                    className={cn(
+                      "m-0 rounded-none border-0 border-b-2 bg-transparent px-3 py-2 text-lg font-semibold shadow-none",
+                      aiSubfoldersDetailTab === "pipelines"
+                        ? "border-primary text-primary"
+                        : "border-transparent text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => setAiSubfoldersDetailTab("pipelines")}
+                  >
+                    {UI_TEXT.folderAiSummarySubfoldersNestedTabAiPipelines}
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={aiSubfoldersDetailTab === "quick"}
+                    className={cn(
+                      "m-0 rounded-none border-0 border-b-2 bg-transparent px-3 py-2 text-lg font-semibold shadow-none",
+                      aiSubfoldersDetailTab === "quick"
+                        ? "border-primary text-primary"
+                        : "border-transparent text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => setAiSubfoldersDetailTab("quick")}
+                  >
+                    {UI_TEXT.folderAiSummarySubfoldersNestedTabQuickScan}
+                  </button>
+                </div>
+                <div className="h-3 shrink-0 bg-background" aria-hidden />
+                {aiSubfoldersDetailTab === "pipelines" ? (
+                  <DesktopFolderAiSummaryTable
+                    folderPath={folderPath}
+                    selectedWithSubfolders={aiGeoStream.selectedWithSubfolders}
+                    selectedDirectOnly={aiGeoStream.selectedDirectOnly}
+                    subfolders={aiGeoStream.subfolders}
+                    streamRowsIncomplete={!aiGeoStream.allDone}
+                    streamError={aiGeoStream.streamError}
+                    onRunPipeline={(pipeline) => void runPipelineForFolderWithSubfolders(pipeline)}
+                    actionPendingPipeline={actionPendingPipeline}
+                    onOpenFolderSummary={onOpenFolderSummary}
+                    onOpenFailedList={openFailedList}
+                    onOpenWronglyRotatedImages={
+                      onOpenRotationReview
+                        ? (reviewFolderPath) => onOpenRotationReview(reviewFolderPath, true)
+                        : undefined
+                    }
+                  />
+                ) : (
+                  <DesktopFolderQuickScanSummaryTable
+                    folderPath={folderPath}
+                    breakdown={quickScanBreakdown}
+                    hasSubfolders={hasSubfolders}
+                  />
+                )}
+              </>
             ) : (
               <DesktopFolderAiSummaryTable
                 folderPath={folderPath}

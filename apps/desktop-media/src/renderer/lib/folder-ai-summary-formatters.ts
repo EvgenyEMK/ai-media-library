@@ -31,6 +31,22 @@ export function formatCoveragePercent(doneCount: number, totalCount: number): st
   return formatPartialPercent(doneCount, totalCount);
 }
 
+/**
+ * Folder tree scan card: when there are pending catalog updates but folder-level coverage rounds to 100%, avoid showing a misleading "100%" in a warning state.
+ */
+export function formatFolderTreeScanCoveragePercentDisplay(
+  treeCovered: number,
+  treeNeed: number,
+  filesToAddOrUpdateCount: number,
+): string {
+  if (treeNeed <= 0) return "100%";
+  const pct = formatCoveragePercent(treeCovered, Math.max(treeNeed, 1));
+  if (filesToAddOrUpdateCount > 0 && pct === "100%") {
+    return "99%";
+  }
+  return pct;
+}
+
 export function pipelineIsComplete(pipeline: FolderAiPipelineCounts): boolean {
   return pipeline.totalImages > 0 && pipeline.doneCount + pipeline.failedCount === pipeline.totalImages;
 }

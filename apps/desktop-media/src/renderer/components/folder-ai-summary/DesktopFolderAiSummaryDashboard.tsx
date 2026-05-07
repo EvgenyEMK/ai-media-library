@@ -1,6 +1,6 @@
 import { Brain, Image as ImageIcon, RotateCw, Search, Users, Video } from "lucide-react";
 import type { ReactElement } from "react";
-import type { FolderAiCoverageReport, FolderAiSummaryOverview } from "../../../shared/ipc";
+import type { FolderAiCoverageReport, FolderAiSummaryOverview, ScanFolderMetadataScope } from "../../../shared/ipc";
 import { formatCoveragePercent, formatGroupedInt } from "../../lib/folder-ai-summary-formatters";
 import { getFolderAiPipelineQueueStatus } from "../../lib/folder-ai-pipeline-queue-status";
 import { UI_TEXT } from "../../lib/ui-text";
@@ -70,7 +70,7 @@ interface DesktopFolderAiSummaryDashboardProps {
   showInfoIcons?: boolean;
   onViewRotationResults?: () => void;
   actionPendingFolderScan?: boolean;
-  onRunFolderScan?: () => void;
+  onRunFolderScan?: (scope: ScanFolderMetadataScope) => void;
   cardVisibility?: Partial<FolderAiSummaryDashboardCardVisibility>;
   hasSubfolders?: boolean;
 }

@@ -11,10 +11,12 @@ import {
   type FolderAiSummaryReport,
   type FolderAiWronglyRotatedImagesPageRequest,
   type FolderAiWronglyRotatedImagesPageResult,
+  type FolderTreeQuickScanBreakdown,
   type FolderTreeQuickScanResult,
   type FolderTreeScanSummary,
 } from "../../src/shared/ipc";
-import { runFolderTreeQuickScans } from "../lib/folder-tree-quick-scan-engine";
+import { computeFolderTreeQuickScanDiff, folderTreeQuickScanResultFromDiff } from "../lib/folder-tree-quick-scan-engine";
+import { buildFolderTreeQuickScanBreakdown } from "../lib/folder-tree-quick-scan-subfolder-rows";
 import { readSettings } from "../storage";
 import { getDesktopDatabase } from "../db/client";
 import { getFolderAiCoverage, getFolderAiRollupsForPaths } from "../db/folder-ai-coverage";
@@ -136,12 +138,15 @@ export function registerFolderAiSummaryHandlers(): void {
       });
 
       let quickScan: FolderTreeQuickScanResult | null = null;
+      let quickScanBreakdown: FolderTreeQuickScanBreakdown | undefined;
       try {
         const settings = await readSettings(app.getPath("userData"));
-        quickScan = await runFolderTreeQuickScans({
+        const diff = await computeFolderTreeQuickScanDiff({
           rootFolderPath: normalized,
           movedMatchMode: settings.folderScanning.quickScanMovedFileMatchMode,
         });
+        quickScan = folderTreeQuickScanResultFromDiff(diff);
+        quickScanBreakdown = buildFolderTreeQuickScanBreakdown(normalized, children, diff);
       } catch (err) {
         console.warn("[debug][folder-tree-scan] quick scan failed", err);
       }
@@ -155,6 +160,7 @@ export function registerFolderAiSummaryHandlers(): void {
       return {
         hasDirectSubfolders: children.length > 0,
         quickScan,
+        quickScanBreakdown,
       };
     },
   );

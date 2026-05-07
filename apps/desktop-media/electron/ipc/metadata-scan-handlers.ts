@@ -43,6 +43,7 @@ import {
 } from "../geocoder/reverse-geocoder";
 import { getMediaItemsNeedingGpsGeocoding, updateMediaItemLocationFromGps } from "../db/media-item-geocoding";
 import { resolveGeonamesPath } from "../app-paths";
+import { buildIncrementalMetadataScanPlan } from "../lib/folder-tree-quick-scan-incremental-metadata";
 
 const FOLDER_SCAN_TIMESTAMP_BATCH_SIZE = 25;
 
@@ -64,15 +65,33 @@ export function registerMetadataScanHandlers(): void {
     IPC_CHANNELS.scanFolderMetadata,
     async (
       _event,
-      request: { folderPath: string; recursive?: boolean },
+      request: { folderPath: string; recursive?: boolean; scanScope?: "full" | "incremental" },
     ): Promise<{ jobId: string; total: number }> => {
       const folderPath = request.folderPath?.trim();
       if (!folderPath) {
         throw new Error("Folder path is required for metadata scan");
       }
+      const recursive = request.recursive === true;
+      const scanScope = request.scanScope ?? "full";
+      if (scanScope === "incremental") {
+        const userDataPath = app.getPath("userData");
+        const appSettings = await readSettings(userDataPath);
+        const plan = await buildIncrementalMetadataScanPlan({
+          rootFolderPath: folderPath,
+          movedMatchMode: appSettings.folderScanning.quickScanMovedFileMatchMode,
+        });
+        return runMetadataScanJob({
+          folderPath,
+          recursive,
+          triggerSource: "manual",
+          knownCatalogEntries: plan.knownCatalogEntries,
+          incrementalReconcileObservedByFolder: plan.incrementalReconcileObservedByFolder,
+          skipFolderSubtreeAnalysisPrune: true,
+        });
+      }
       return runMetadataScanJob({
         folderPath,
-        recursive: request.recursive === true,
+        recursive,
         triggerSource: "manual",
       });
     },
@@ -115,6 +134,15 @@ export async function runMetadataScanJob(params: {
   folderPath: string;
   recursive: boolean;
   knownCatalogEntries?: Array<{ folderPath: string; path: string; name: string }>;
+  /**
+   * When set, reconciliation uses these full per-folder disk observations instead of deriving only
+   * from scan entries (required for incremental scope so unrelated files are not soft-deleted).
+   */
+  incrementalReconcileObservedByFolder?: Map<string, Set<string>>;
+  /**
+   * When true, skip pruning folder analysis rows not seen in this run (incremental does not observe the whole subtree).
+   */
+  skipFolderSubtreeAnalysisPrune?: boolean;
   /** Menu-driven scan vs folder-selection auto scan; controls detailed result UI on the renderer. */
   triggerSource?: MetadataScanTriggerSource;
   /** Optional stable job id (for scheduler-managed runs). */
@@ -532,23 +560,34 @@ export async function runMetadataScanJob(params: {
     emitFinalizingProgress(0);
 
     if (prepareCompletedFully) {
-      const observedByFolder = new Map<string, Set<string>>();
-      for (const entry of scanEntries) {
-        const current = observedByFolder.get(entry.folderPath);
-        if (current) {
-          current.add(entry.path);
-        } else {
-          observedByFolder.set(entry.folderPath, new Set([entry.path]));
-        }
-      }
       let totalSoftDeleted = 0;
       let totalResurrected = 0;
-      for (const [folder, paths] of observedByFolder.entries()) {
-        const result = reconcileFolder(folder, paths);
-        totalSoftDeleted += result.softDeleted;
-        totalResurrected += result.resurrected;
-        for (const row of result.softDeletedItems) {
-          filesDeleted.push({ id: row.id, sourcePath: row.sourcePath });
+      if (params.incrementalReconcileObservedByFolder !== undefined) {
+        for (const [folder, pathsSet] of params.incrementalReconcileObservedByFolder.entries()) {
+          const result = reconcileFolder(folder, pathsSet);
+          totalSoftDeleted += result.softDeleted;
+          totalResurrected += result.resurrected;
+          for (const row of result.softDeletedItems) {
+            filesDeleted.push({ id: row.id, sourcePath: row.sourcePath });
+          }
+        }
+      } else {
+        const observedByFolder = new Map<string, Set<string>>();
+        for (const entry of scanEntries) {
+          const current = observedByFolder.get(entry.folderPath);
+          if (current) {
+            current.add(entry.path);
+          } else {
+            observedByFolder.set(entry.folderPath, new Set([entry.path]));
+          }
+        }
+        for (const [folder, paths] of observedByFolder.entries()) {
+          const result = reconcileFolder(folder, paths);
+          totalSoftDeleted += result.softDeleted;
+          totalResurrected += result.resurrected;
+          for (const row of result.softDeletedItems) {
+            filesDeleted.push({ id: row.id, sourcePath: row.sourcePath });
+          }
         }
       }
       if (totalSoftDeleted > 0 || totalResurrected > 0) {
@@ -559,7 +598,7 @@ export async function runMetadataScanJob(params: {
     }
     emitFinalizingProgress(1);
 
-    if (!job.cancelled && params.recursive) {
+    if (!job.cancelled && params.recursive && !params.skipFolderSubtreeAnalysisPrune) {
       for (const folderPath of scanFolders) {
         observedFolders.add(folderPath);
       }

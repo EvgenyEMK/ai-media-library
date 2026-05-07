@@ -1106,9 +1106,32 @@ export interface FolderAiSummaryOverviewRequestOptions {
   includeSubfolderOverviews?: boolean;
 }
 
+/** Per-row stats for Quick folder scan breakdown under Subfolders. */
+export interface FolderTreeQuickScanSubfolderStats {
+  newFileCount: number;
+  modifiedFileCount: number;
+  deletedFileCount: number;
+  movedFileCount: number;
+  foldersWithDirectMediaOnDisk: number;
+  foldersWithFolderScanRecord: number;
+}
+
+export interface FolderTreeQuickScanSubfolderRow extends FolderTreeQuickScanSubfolderStats {
+  folderPath: string;
+  name: string;
+}
+
+export interface FolderTreeQuickScanBreakdown {
+  selectedTree: FolderTreeQuickScanSubfolderStats;
+  selectedDirectOnly: FolderTreeQuickScanSubfolderStats;
+  subfolders: FolderTreeQuickScanSubfolderRow[];
+}
+
 export interface FolderTreeScanSummary {
   hasDirectSubfolders: boolean;
   quickScan: FolderTreeQuickScanResult | null;
+  /** Present when the folder tree has direct subfolders and quick scan succeeded. */
+  quickScanBreakdown?: FolderTreeQuickScanBreakdown | null;
 }
 
 export type ImageRotationProgressEvent =
@@ -1505,9 +1528,17 @@ export interface MetadataScanItemState {
   error?: string;
 }
 
+export type ScanFolderMetadataScope = "full" | "incremental";
+
 export interface ScanFolderMetadataRequest {
   folderPath: string;
   recursive?: boolean;
+  /**
+   * `incremental` runs metadata scan only on paths flagged by a fresh folder-tree quick scan
+   * (new/changed/moved files), with reconcile scoped per folder so unrelated files are not soft-deleted.
+   * Omit or `full` preserves legacy behavior (enumerate entire subtree).
+   */
+  scanScope?: ScanFolderMetadataScope;
 }
 
 export interface ScanFolderMetadataResult {

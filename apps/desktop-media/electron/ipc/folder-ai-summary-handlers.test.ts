@@ -47,8 +47,33 @@ vi.mock("../storage", () => ({
   })),
 }));
 
+const mockBreakdown = {
+  selectedTree: {
+    newFileCount: 0,
+    modifiedFileCount: 0,
+    deletedFileCount: 0,
+    movedFileCount: 0,
+    foldersWithDirectMediaOnDisk: 10,
+    foldersWithFolderScanRecord: 8,
+  },
+  selectedDirectOnly: {
+    newFileCount: 0,
+    modifiedFileCount: 0,
+    deletedFileCount: 0,
+    movedFileCount: 0,
+    foldersWithDirectMediaOnDisk: 1,
+    foldersWithFolderScanRecord: 1,
+  },
+  subfolders: [] as Array<{ folderPath: string; name: string }>,
+};
+
+vi.mock("../lib/folder-tree-quick-scan-subfolder-rows", () => ({
+  buildFolderTreeQuickScanBreakdown: vi.fn(() => mockBreakdown),
+}));
+
 vi.mock("../lib/folder-tree-quick-scan-engine", () => ({
-  runFolderTreeQuickScans: vi.fn(async () => ({ ...mockQuickScan })),
+  computeFolderTreeQuickScanDiff: vi.fn(async () => ({})),
+  folderTreeQuickScanResultFromDiff: vi.fn(() => ({ ...mockQuickScan })),
 }));
 
 vi.mock("../fs-media", () => ({
@@ -140,6 +165,7 @@ describe("registerFolderAiSummaryHandlers", () => {
     expect(summary).toEqual({
       hasDirectSubfolders: true,
       quickScan: { ...mockQuickScan },
+      quickScanBreakdown: mockBreakdown,
     });
   });
 });

@@ -141,4 +141,45 @@ describe("LastDataScanCard", () => {
     expect(screen.getByRole("button", { name: "Run Folder tree scan" })).toBeDisabled();
     expect(container.querySelector(".animate-spin")).not.toBeNull();
   });
+
+  it("shows scan menu on Play only when folder-level coverage is partial (not 0% or 100%)", () => {
+    const onRun = (): void => undefined;
+    const { rerender } = render(
+      <LastDataScanCard scanFreshness={scanFreshness()} dateFormat="DD.MM.YYYY" onRunFolderScan={onRun} />,
+    );
+    expect(screen.getByRole("button", { name: "Run Folder tree scan" })).not.toHaveAttribute("aria-haspopup", "menu");
+
+    rerender(
+      <LastDataScanCard
+        scanFreshness={scanFreshness({
+          folderTreeQuickScan: baseQuickScan({
+            treeFoldersWithDirectMediaOnDiskCount: 10,
+            treeFoldersWithMetadataFolderScanCount: 4,
+          }),
+        })}
+        dateFormat="DD.MM.YYYY"
+        onRunFolderScan={onRun}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Run Folder tree scan" })).toHaveAttribute("aria-haspopup", "menu");
+  });
+
+  it("shows quick-scan folder coverage as 99% when pending file updates round to 100%", () => {
+    const { container } = render(
+      <LastDataScanCard
+        scanFreshness={scanFreshness({
+          folderTreeQuickScan: baseQuickScan({
+            treeFoldersWithDirectMediaOnDiskCount: 2489,
+            treeFoldersWithMetadataFolderScanCount: 2489,
+            newFileCount: 2,
+            modifiedFileCount: 1,
+          }),
+        })}
+        dateFormat="DD.MM.YYYY"
+      />,
+    );
+
+    expect(container.textContent).toContain("99%");
+    expect(container.textContent).not.toContain("100%");
+  });
 });
