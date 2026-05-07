@@ -8,6 +8,7 @@ import { RunPipelinesSheet } from "./RunPipelinesSheet";
 import type { DescEmbedBackfillState } from "./progress-dock/types";
 import { useDesktopProgressDockState } from "./progress-dock/use-desktop-progress-dock-state";
 import { useDesktopStore } from "../stores/desktop-store";
+import { useShowRunPipelinesTestUi } from "../hooks/use-show-run-pipelines-test-ui";
 import type { AnalysisEtaState, FaceEtaState, MetadataProgressState, SemanticIndexEtaState } from "../hooks/use-eta-tracking";
 
 export type { DescEmbedBackfillState };
@@ -74,6 +75,7 @@ export function DesktopProgressDock({
     pipelineRunning.length > 0 || pipelineQueued.length > 0 || pipelineRecent.length > 0;
   const isAnyPipelineRunning = pipelineRunning.length > 0 || dock.hasAnyRunningOperation;
 
+  const showRunPipelinesTestUi = useShowRunPipelinesTestUi();
   const [sheetOpen, setSheetOpen] = useState<boolean>(false);
 
   const shouldShow = !viewerOpen && (hasAnyQualifyingCard || hasPipelineQueueActivity);
@@ -128,19 +130,20 @@ export function DesktopProgressDock({
   };
 
   if (!shouldShow) {
-    // Idle state: render a slim, low-profile strip with just the
-    // "Run pipelines…" affordance. The dock is primarily a progress
-    // surface; the idle bar exists only so users can launch a bundle from
-    // a cold app state without hunting in folder context menus. Hidden
-    // entirely while the photo viewer is open to preserve immersive view.
+    // E2E-only idle strip + "Run pipelines" (EMK_E2E_RUN_PIPELINES_UI=1). Production shows nothing here.
+    const allowRunPipelinesAffordance =
+      showRunPipelinesTestUi || Boolean(onOpenRunPipelinesSheet);
     if (viewerOpen) {
-      return sheetOpen ? (
+      return sheetOpen && allowRunPipelinesAffordance ? (
         <RunPipelinesSheet
           defaultFolderPath={selectedFolder}
           isAnyPipelineRunning={isAnyPipelineRunning}
           onClose={() => setSheetOpen(false)}
         />
       ) : null;
+    }
+    if (!allowRunPipelinesAffordance) {
+      return null;
     }
     return (
       <>
@@ -179,7 +182,9 @@ export function DesktopProgressDock({
         collapsed={collapsed}
         hasAnyRunningOperation={isAnyPipelineRunning}
         onToggleCollapsed={onToggleCollapsed}
-        onOpenRunPipelinesSheet={handleOpenSheet}
+        onOpenRunPipelinesSheet={
+          showRunPipelinesTestUi || onOpenRunPipelinesSheet ? handleOpenSheet : undefined
+        }
       />
       {sheetOpen ? (
         <RunPipelinesSheet

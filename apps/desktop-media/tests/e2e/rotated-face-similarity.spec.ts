@@ -21,6 +21,7 @@ function hasAssets(): boolean {
 }
 
 test.describe("Rotated face similarity suggestion", () => {
+  test.use({ e2eSkipStartupAiModelsDownload: false });
   test.setTimeout(600_000);
 
   test("rotated and non-rotated group images show person-tag suggestion in Face tags tab", async ({

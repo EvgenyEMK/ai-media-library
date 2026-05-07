@@ -204,11 +204,29 @@ export type DownloadProgressCallback = (info: {
   percent: number | null;
 }) => void;
 
+const activeModelDownloads = new Map<string, Promise<string>>();
+
 /**
  * Download a single model file. Tries each mirror URL in order.
  * Returns the local path on success.
  */
 export async function downloadModel(
+  filename: string,
+  onProgress?: DownloadProgressCallback,
+  signal?: AbortSignal,
+): Promise<string> {
+  const activeDownload = activeModelDownloads.get(filename);
+  if (activeDownload) {
+    return activeDownload;
+  }
+  const download = downloadModelUncached(filename, onProgress, signal).finally(() => {
+    activeModelDownloads.delete(filename);
+  });
+  activeModelDownloads.set(filename, download);
+  return download;
+}
+
+async function downloadModelUncached(
   filename: string,
   onProgress?: DownloadProgressCallback,
   signal?: AbortSignal,

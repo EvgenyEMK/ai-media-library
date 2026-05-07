@@ -108,7 +108,7 @@ describe("geocoder cache detection", () => {
 
     expect(fs.existsSync(path.join(citiesDir, "cities1000.txt"))).toBe(true);
     expect(fs.existsSync(path.join(admin1Dir, "admin1CodesASCII.txt"))).toBe(true);
-    expect(fs.existsSync(path.join(admin2Dir, "admin2CodesASCII.txt"))).toBe(true);
+    expect(fs.existsSync(path.join(admin2Dir, "admin2Codes.txt"))).toBe(true);
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   });
 
@@ -122,13 +122,13 @@ describe("geocoder cache detection", () => {
     fs.mkdirSync(admin2Dir, { recursive: true });
     fs.writeFileSync(path.join(citiesDir, "cities1000.txt"), "cities");
     fs.writeFileSync(path.join(admin1Dir, "admin1CodesASCII.txt"), "admin1");
-    fs.writeFileSync(path.join(admin2Dir, "admin2CodesASCII.txt"), "admin2");
+    fs.writeFileSync(path.join(admin2Dir, "admin2Codes.txt"), "admin2");
 
     await initGeocoder(tmpRoot, { forceRefresh: true });
 
     expect(fs.existsSync(path.join(citiesDir, "cities1000.txt"))).toBe(false);
     expect(fs.existsSync(path.join(admin1Dir, "admin1CodesASCII.txt"))).toBe(false);
-    expect(fs.existsSync(path.join(admin2Dir, "admin2CodesASCII.txt"))).toBe(false);
+    expect(fs.existsSync(path.join(admin2Dir, "admin2Codes.txt"))).toBe(false);
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   });
 });

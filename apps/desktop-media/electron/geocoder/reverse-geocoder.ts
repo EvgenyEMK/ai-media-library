@@ -72,13 +72,13 @@ let downloadProgressInterval: NodeJS.Timeout | null = null;
 const GEOCODER_CACHE_DATASETS = [
   { dirName: "cities1000", baseName: "cities1000" },
   { dirName: "admin1_codes", baseName: "admin1CodesASCII" },
-  { dirName: "admin2_codes", baseName: "admin2CodesASCII" },
+  { dirName: "admin2_codes", baseName: "admin2Codes", legacyBaseNames: ["admin2CodesASCII"] },
 ];
 
 function datasetDownloadProgress(geonamesPath: string): { progressPercent: number; progressLabel: string } {
   const totalDatasets = GEOCODER_CACHE_DATASETS.length;
   const cachedDatasets = GEOCODER_CACHE_DATASETS.filter(
-    ({ dirName, baseName }) => getCachedDatasetPath(path.join(geonamesPath, dirName), baseName) !== null,
+    (dataset) => getCachedDatasetPathForDataset(geonamesPath, dataset) !== null,
   ).length;
   // Keep a small headroom for parse/finalize before "ready".
   const progressPercent = Math.min(95, Math.round((cachedDatasets / totalDatasets) * 95));
@@ -150,6 +150,21 @@ function getCachedDatasetPath(datasetDir: string, baseName: string): string | nu
   return datedFiles.length > 0 ? path.join(datasetDir, datedFiles[0]) : null;
 }
 
+function getCachedDatasetPathForDataset(
+  geonamesPath: string,
+  dataset: (typeof GEOCODER_CACHE_DATASETS)[number],
+): string | null {
+  const datasetDir = path.join(geonamesPath, dataset.dirName);
+  const baseNames = [dataset.baseName, ...(dataset.legacyBaseNames ?? [])];
+  for (const baseName of baseNames) {
+    const cachedPath = getCachedDatasetPath(datasetDir, baseName);
+    if (cachedPath !== null) {
+      return cachedPath;
+    }
+  }
+  return null;
+}
+
 /**
  * local-reverse-geocoder refreshes dated cache files daily. For the desktop app,
  * keep an already-downloaded GeoNames cache stable so later scans do not pull
@@ -157,13 +172,13 @@ function getCachedDatasetPath(datasetDir: string, baseName: string): string | nu
  */
 function stabilizeCachedGeocoderData(dumpDir: string): boolean {
   let allRequiredDataCached = true;
-  for (const { dirName, baseName } of GEOCODER_CACHE_DATASETS) {
-    const datasetDir = path.join(dumpDir, dirName);
-    const barePath = path.join(datasetDir, `${baseName}.txt`);
+  for (const dataset of GEOCODER_CACHE_DATASETS) {
+    const datasetDir = path.join(dumpDir, dataset.dirName);
+    const barePath = path.join(datasetDir, `${dataset.baseName}.txt`);
     if (fs.existsSync(barePath)) {
       continue;
     }
-    const cachedPath = getCachedDatasetPath(datasetDir, baseName);
+    const cachedPath = getCachedDatasetPathForDataset(dumpDir, dataset);
     if (!cachedPath) {
       allRequiredDataCached = false;
       continue;
@@ -174,8 +189,8 @@ function stabilizeCachedGeocoderData(dumpDir: string): boolean {
 }
 
 export function hasCachedGeocoderData(geonamesPath: string): boolean {
-  return GEOCODER_CACHE_DATASETS.every(({ dirName, baseName }) =>
-    getCachedDatasetPath(path.join(geonamesPath, dirName), baseName) !== null,
+  return GEOCODER_CACHE_DATASETS.every(
+    (dataset) => getCachedDatasetPathForDataset(geonamesPath, dataset) !== null,
   );
 }
 
