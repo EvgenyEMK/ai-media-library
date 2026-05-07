@@ -81,6 +81,7 @@ interface DesktopAppMainProps {
   setRotationReviewScope: Dispatch<SetStateAction<RotationReviewScope | null>>;
   onOpenRotationReview: (folderPath: string, includeSubfolders: boolean) => void;
   onOpenImageEditSuggestions: () => void;
+  onCloseSpecialMainPaneView: () => void;
   pipeline: DesktopPipelineHandlers;
   faceModelDownload: DesktopStoreState["faceModelDownload"];
   handleOpenFolderAiSummary: (folderPath: string) => void;
@@ -154,6 +155,7 @@ export function DesktopAppMain({
   setRotationReviewScope,
   onOpenRotationReview,
   onOpenImageEditSuggestions,
+  onCloseSpecialMainPaneView,
   pipeline,
   faceModelDownload,
   handleOpenFolderAiSummary,
@@ -247,7 +249,7 @@ export function DesktopAppMain({
         </div>
       ) : (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          {mainPaneViewMode !== "folderAiSummary" ? (
+          {mainPaneViewMode !== "folderAiSummary" && mainPaneViewMode !== "imageEditSuggestions" ? (
             <DesktopMainToolbar
               store={store}
               selectedFolderLabel={selectedFolderLabel}
@@ -284,6 +286,7 @@ export function DesktopAppMain({
             rotationReviewScope={rotationReviewScope}
             setRotationReviewScope={setRotationReviewScope}
             onOpenRotationReview={onOpenRotationReview}
+            onCloseSpecialMainPaneView={onCloseSpecialMainPaneView}
             selectedFolder={selectedFolder}
             semanticPanelOpen={semanticPanelOpen}
             faceModelDownload={faceModelDownload}

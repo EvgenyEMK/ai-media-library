@@ -1,4 +1,4 @@
-import { Info, MapPin, Play } from "lucide-react";
+import { Hourglass, Info, Loader2, MapPin, Play } from "lucide-react";
 import type { ReactElement } from "react";
 import type { FolderAiCoverageReport, FolderAiPipelineCounts, FolderGeoMediaCoverage } from "../../../shared/ipc";
 import { cn } from "../../lib/cn";
@@ -88,10 +88,11 @@ export function SummaryGeoLocationCard({
   const analyzedPipeline = locationPipeline(coverage);
   const tone = loading ? "neutral" : withGps === 0 ? "neutral" : statusTone(analyzedPipeline);
   const hasGps = withGps > 0;
+  const visualQueueStatus = actionPending ? "running" : queueStatus;
   const playTitle =
-    queueStatus === "running"
+    visualQueueStatus === "running"
       ? "Geo-location is running"
-      : queueStatus === "queued"
+      : visualQueueStatus === "queued"
         ? "Geo-location is waiting in queue"
         : "Run geo-location extraction";
   return (
@@ -134,7 +135,13 @@ export function SummaryGeoLocationCard({
               disabled={actionPending || queueStatus !== null}
               onClick={onRunPipeline}
             >
-              <Play size={25} aria-hidden="true" />
+              {visualQueueStatus === "running" ? (
+                <Loader2 size={25} className="animate-spin" aria-hidden="true" />
+              ) : visualQueueStatus === "queued" ? (
+                <Hourglass size={25} aria-hidden="true" />
+              ) : (
+                <Play size={25} aria-hidden="true" />
+              )}
             </button>
           ) : (
             <span aria-hidden="true" className="h-10 w-10" />

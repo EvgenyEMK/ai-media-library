@@ -93,6 +93,7 @@ export function DesktopAlbumContentGrid({
   reorderAlbumMediaItem?: (params: ReorderAlbumMediaItemParams) => Promise<void>;
 }): ReactElement {
   const mediaMetadataByItemId = useDesktopStore((s) => s.mediaMetadataByItemId);
+  const dateFormat = useDesktopStore((s) => s.mediaViewerSettings.dateFormat);
   const commitStarRating = useMediaItemStarRatingChange();
   const quickFiltersActiveCount = useMemo(() => countActiveQuickFilters(quickFilters), [quickFilters]);
   const filteredAlbumItems = useMemo(() => {
@@ -205,6 +206,7 @@ export function DesktopAlbumContentGrid({
                     metadata?.photoTakenAt ?? null,
                     metadata?.fileCreatedAt ?? null,
                     metadata?.photoTakenPrecision ?? null,
+                    dateFormat,
                   )}
                   filePath={item.sourcePath}
                   mediaType={item.mediaKind}

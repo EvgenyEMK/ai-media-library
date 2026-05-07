@@ -14,11 +14,13 @@ interface WronglyRotatedImageRow {
 interface ParsedAiMetadata {
   rotationAngleClockwise: 90 | 180 | 270 | null;
   cropRel: RelativeCropBox | null;
+  confidence: number | null;
+  processedAt: string | null;
 }
 
 export interface WronglyRotatedImagesQueryParts {
   whereSql: string;
-  whereArgs: string[];
+  whereArgs: Array<string | number>;
 }
 
 function escapeLikePattern(value: string): string {
@@ -43,8 +45,10 @@ export function buildWronglyRotatedImagesQueryParts(params: {
   folderPath: string;
   recursive: boolean;
   libraryId?: string;
+  minConfidenceThreshold?: number;
 }): WronglyRotatedImagesQueryParts {
   const libraryId = params.libraryId ?? DEFAULT_LIBRARY_ID;
+  const minConfidenceThreshold = Math.min(1, Math.max(0, params.minConfidenceThreshold ?? 0.9));
   const sep = separatorForFolderPath(params.folderPath);
   const folderPrefix = params.folderPath.endsWith(sep) ? params.folderPath : `${params.folderPath}${sep}`;
   const likePattern = `${escapeLikePattern(folderPrefix)}%`;
@@ -60,14 +64,17 @@ export function buildWronglyRotatedImagesQueryParts(params: {
         AND mi.source_path LIKE ? ESCAPE '~'
         ${depthClause}
         AND CAST(json_extract(mi.ai_metadata, '$.orientation_detection.correction_angle_clockwise') AS INTEGER) IN (90, 180, 270)
+        AND CAST(json_extract(mi.ai_metadata, '$.orientation_detection.confidence') AS REAL) >= ?
         AND (
           json_extract(mi.ai_metadata, '$.orientation_detection_error') IS NULL
           OR json_extract(mi.ai_metadata, '$.orientation_detection.processed_at') > json_extract(mi.ai_metadata, '$.orientation_detection_error.failed_at')
         )
+        AND json_extract(mi.ai_metadata, '$.wrong_rotation_user_dismissed.dismissed_at') IS NULL
+        AND json_extract(mi.ai_metadata, '$.orientation_detection.user_dismissed.dismissed_at') IS NULL
     `,
     whereArgs: params.recursive
-      ? [libraryId, likePattern]
-      : [libraryId, likePattern, folderPrefix, sep],
+      ? [libraryId, likePattern, minConfidenceThreshold]
+      : [libraryId, likePattern, folderPrefix, sep, minConfidenceThreshold],
   };
 }
 
@@ -92,12 +99,12 @@ function parseCropRel(value: unknown): RelativeCropBox | null {
 
 function parseAiMetadata(raw: string | null): ParsedAiMetadata {
   if (!raw) {
-    return { rotationAngleClockwise: null, cropRel: null };
+    return { rotationAngleClockwise: null, cropRel: null, confidence: null, processedAt: null };
   }
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") {
-      return { rotationAngleClockwise: null, cropRel: null };
+      return { rotationAngleClockwise: null, cropRel: null, confidence: null, processedAt: null };
     }
     const metadata = parsed as Record<string, unknown>;
     const orientation =
@@ -106,6 +113,10 @@ function parseAiMetadata(raw: string | null): ParsedAiMetadata {
         : null;
     const angle = orientation?.correction_angle_clockwise;
     const rotationAngleClockwise = angle === 90 || angle === 180 || angle === 270 ? angle : null;
+    const confidence = typeof orientation?.confidence === "number" && Number.isFinite(orientation.confidence)
+      ? orientation.confidence
+      : null;
+    const processedAt = typeof orientation?.processed_at === "string" ? orientation.processed_at : null;
     const suggestions = Array.isArray(metadata.edit_suggestions) ? metadata.edit_suggestions : [];
     const cropSuggestion = suggestions.find(
       (entry): entry is Record<string, unknown> =>
@@ -117,9 +128,11 @@ function parseAiMetadata(raw: string | null): ParsedAiMetadata {
     return {
       rotationAngleClockwise,
       cropRel: parseCropRel(cropSuggestion?.crop_rel),
+      confidence,
+      processedAt,
     };
   } catch {
-    return { rotationAngleClockwise: null, cropRel: null };
+    return { rotationAngleClockwise: null, cropRel: null, confidence: null, processedAt: null };
   }
 }
 
@@ -134,6 +147,7 @@ export function getWronglyRotatedImagesPage(params: {
   page: number;
   pageSize: number;
   libraryId?: string;
+  minConfidenceThreshold?: number;
 }): FolderAiWronglyRotatedImagesPageResult {
   const folderPath = params.folderPath.trim();
   const pageSize = Math.min(100, Math.max(1, Math.round(params.pageSize) || 24));
@@ -147,6 +161,7 @@ export function getWronglyRotatedImagesPage(params: {
     folderPath,
     recursive: params.recursive,
     libraryId: params.libraryId,
+    minConfidenceThreshold: params.minConfidenceThreshold,
   });
   const totalRow = db.prepare(`SELECT COUNT(*) AS total FROM media_items mi ${whereSql}`).get(...whereArgs) as
     | { total?: number | bigint | null }
@@ -158,7 +173,8 @@ export function getWronglyRotatedImagesPage(params: {
       `SELECT mi.id, mi.source_path, mi.filename, mi.ai_metadata
        FROM media_items mi
        ${whereSql}
-       ORDER BY mi.source_path COLLATE NOCASE ASC
+       ORDER BY CAST(json_extract(mi.ai_metadata, '$.orientation_detection.confidence') AS REAL) DESC,
+                mi.source_path COLLATE NOCASE ASC
        LIMIT ? OFFSET ?`,
     )
     .all(...whereArgs, pageSize, offset) as WronglyRotatedImageRow[];
@@ -181,6 +197,8 @@ export function getWronglyRotatedImagesPage(params: {
           folderPathRelative: relativeFolderPath(folderPath, row.source_path),
           rotationAngleClockwise: parsed.rotationAngleClockwise,
           cropRel: parsed.cropRel,
+          confidence: parsed.confidence,
+          orientationDetectionProcessedAt: parsed.processedAt,
         },
       ];
     }),

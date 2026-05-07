@@ -8,6 +8,20 @@ import {
   type MoveChurnFixture,
 } from "./fixtures/test-images";
 
+/**
+ * Folder AI analysis summary (sidebar folder → "Folder AI analysis summary"):
+ * folder-tree scan card after metadata scan,
+ * AI search index control when semantic-index is already running (play button disabled — no modal),
+ * photo pipeline enqueue from the summary,
+ * wrongly-rotated precheck progress/cancel in Background operations,
+ * and opening paginated rotation review from the summary card.
+ * Uses a temp fixture tree from `createMoveChurnFixture`.
+ */
+
+/** Matches {@link formatDateByPreference} outputs (Settings → viewer date format). */
+const FORMATTED_VIEWER_DATE_RE =
+  /\d{4}-\d{2}-\d{2}|\d{2}\.\d{2}\.\d{4}|\d{2}\/\d{2}\/\d{4}/;
+
 let fixture: MoveChurnFixture;
 
 test.beforeAll(() => {
@@ -82,10 +96,10 @@ test.describe("Folder AI summary", () => {
     await expect(folderTreeScanCard).not.toContainText("Folders missing full scan");
     await expect(folderTreeScanCard).toHaveClass(/border-success/);
     await expect(folderTreeScanCard.getByText("Last file change")).toBeVisible();
-    await expect(folderTreeScanCard.locator(".inline-grid").getByText(/\d{1,2} \w+ \d{4}/)).toBeVisible();
+    await expect(folderTreeScanCard.locator(".inline-grid").getByText(FORMATTED_VIEWER_DATE_RE)).toBeVisible();
   });
 
-  test.skip("shows blocking dialog when trying to start another pipeline", async ({
+  test("AI search index play is disabled while semantic-index is running for this folder", async ({
     electronApp,
     mainWindow,
   }) => {
@@ -113,54 +127,48 @@ test.describe("Folder AI summary", () => {
     await expect(mainWindow.getByRole("tab", { name: "Summary" })).toHaveAttribute("aria-selected", "true");
     await expect(mainWindow.getByRole("heading", { name: "Wrongly rotated images" })).toBeVisible();
 
-    await electronApp.evaluate(async ({ ipcMain }) => {
-      let firstCall = true;
-      ipcMain.removeHandler("pipelines:get-snapshot");
-      ipcMain.handle("pipelines:get-snapshot", async () => {
-        const running = firstCall
-          ? [
-              {
-                bundleId: "e2e-running-bundle",
-                displayName: "E2E Running",
-                state: "running",
-                jobs: [
-                  {
-                    jobId: "e2e-running-photo",
-                    pipelineId: "photo-analysis",
-                    state: "running",
-                    progress: {
-                      phase: "analyzing",
-                      processed: 0,
-                      total: null,
-                      message: null,
-                      details: null,
-                      lastUpdatedAt: Date.now(),
-                    },
-                    error: null,
-                    startedAt: Date.now(),
-                    finishedAt: null,
-                  },
-                ],
-                enqueuedAt: Date.now(),
-                startedAt: Date.now(),
-                finishedAt: null,
+    const now = Date.now();
+    const snapshot = {
+      running: [
+        {
+          bundleId: "e2e-semantic-running-bundle",
+          displayName: "E2E semantic index",
+          state: "running" as const,
+          jobs: [
+            {
+              jobId: "e2e-semantic-running-job",
+              pipelineId: "semantic-index",
+              params: { folderPath: normalizedRoot, recursive: true },
+              state: "running" as const,
+              progress: {
+                phase: "indexing",
+                processed: 0,
+                total: 10,
+                message: null,
+                details: null,
+                lastUpdatedAt: now,
               },
-            ]
-          : [];
-        firstCall = false;
-        return { running, queued: [], recent: [] };
-      });
-    });
+              error: null,
+              startedAt: now,
+              finishedAt: null,
+            },
+          ],
+          enqueuedAt: now,
+          startedAt: now,
+          finishedAt: null,
+        },
+      ],
+      queued: [] as const,
+      recent: [] as const,
+    };
 
-    await mainWindow.getByRole("button", { name: /^Run AI search index$/ }).click();
+    await mainWindow.evaluate(async (payload: typeof snapshot) => {
+      await window.desktopApi.pipelines.e2ePushQueueSnapshot(payload);
+    }, snapshot);
 
-    const dialog = mainWindow.getByRole("dialog", { name: "Pipeline already running" });
-    await expect(dialog).toBeVisible();
-    await expect(
-      dialog.getByText("Please cancel currently running process or wait until it finishes"),
-    ).toBeVisible();
-    await dialog.getByRole("button", { name: "Close dialog" }).click();
-    await expect(dialog).toBeHidden();
+    const semanticControl = mainWindow.getByRole("button", { name: "AI search index is running" });
+    await expect(semanticControl).toBeVisible();
+    await expect(semanticControl).toBeDisabled();
   });
 
   test("summary play enqueues photo-analysis pipeline with expected folder scope", async ({
@@ -240,7 +248,7 @@ test.describe("Folder AI summary", () => {
     expect(params.mode).toBe("missing");
   });
 
-  test.skip("wrongly rotated images play button shows Background operations progress", async ({
+  test("wrongly rotated images play button shows Background operations progress", async ({
     electronApp,
     mainWindow,
   }) => {
@@ -282,7 +290,7 @@ test.describe("Folder AI summary", () => {
     });
   });
 
-  test.skip("cancelling wrongly rotated images does not restart the progress card", async ({
+  test("cancelling wrongly rotated images does not restart the progress card", async ({
     electronApp,
     mainWindow,
   }) => {
@@ -392,10 +400,10 @@ test.describe("Folder AI summary", () => {
     await rotationCard.getByRole("button", { name: "View wrongly rotated images" }).click();
 
     await expect(mainWindow.getByText("Include subfolders")).toBeVisible();
-    await expect(mainWindow.getByText("Showing 1-1 of 1").first()).toBeVisible();
+    await expect(mainWindow.getByText("Showing 1-1 of 1")).toHaveCount(0);
     const reviewRow = mainWindow.getByRole("article").filter({ hasText: "stays.jpg" });
     await expect(reviewRow).toBeVisible();
     await expect(reviewRow.getByText("sub-a")).toBeVisible();
-    await expect(mainWindow.getByText("Review only - apply/save coming soon.")).toBeVisible();
+    await expect(mainWindow.getByText("Review only - apply/save coming soon.")).toHaveCount(0);
   });
 });

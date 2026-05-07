@@ -17,6 +17,17 @@ import {
   pipelinePresetRegistry,
 } from "../pipelines/preset-registry";
 
+function broadcast(channel: string, payload: unknown): void {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (window.isDestroyed()) continue;
+    try {
+      window.webContents.send(channel, payload);
+    } catch {
+      // Renderer frame may be disposed (sleep/lock); safe to ignore.
+    }
+  }
+}
+
 /**
  * Wires the {@link pipelineScheduler} singleton to Electron IPC.
  *
@@ -100,6 +111,18 @@ export function registerPipelineOrchestrationHandlers(): void {
     return pipelineScheduler.getSnapshot();
   });
 
+  ipcMain.handle(
+    PIPELINE_IPC_CHANNELS.e2ePushQueueSnapshot,
+    (_event, snapshot: PipelineQueueSnapshot): { ok: true } => {
+      const userDataPath = process.env.EMK_DESKTOP_USER_DATA_PATH ?? "";
+      if (!userDataPath.includes("emk-e2e-userdata")) {
+        throw new Error("pipelines:e2e-push-queue-snapshot is only allowed under Playwright temp userData.");
+      }
+      broadcast(PIPELINE_IPC_CHANNELS.queueChanged, snapshot);
+      return { ok: true };
+    },
+  );
+
   // Forward scheduler events to all windows. We intentionally broadcast (rather
   // than only sending to the originator) because the dock should reflect queue
   // state across all open windows.
@@ -112,15 +135,4 @@ export function registerPipelineOrchestrationHandlers(): void {
   pipelineScheduler.on("lifecycle", (event: PipelineLifecycleEvent) => {
     broadcast(PIPELINE_IPC_CHANNELS.lifecycle, event);
   });
-}
-
-function broadcast(channel: string, payload: unknown): void {
-  for (const window of BrowserWindow.getAllWindows()) {
-    if (window.isDestroyed()) continue;
-    try {
-      window.webContents.send(channel, payload);
-    } catch {
-      // Renderer frame may be disposed (sleep/lock); safe to ignore.
-    }
-  }
 }

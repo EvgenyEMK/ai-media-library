@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { IPC_CHANNELS, type DesktopApi } from "../src/shared/ipc";
 import { PIPELINE_IPC_CHANNELS } from "../src/shared/pipeline-ipc";
+import type { PipelineQueueSnapshot } from "../src/shared/pipeline-types";
 
 const api: DesktopApi = {
   selectLibraryFolder: () => ipcRenderer.invoke(IPC_CHANNELS.selectLibraryFolder),
@@ -48,6 +49,7 @@ const api: DesktopApi = {
   },
   getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.getSettings),
   getDatabaseLocation: () => ipcRenderer.invoke(IPC_CHANNELS.getDatabaseLocation),
+  getDesktopRuntimeFlags: () => ipcRenderer.invoke(IPC_CHANNELS.getDesktopRuntimeFlags),
   getAiInferenceGpuOptions: () => ipcRenderer.invoke(IPC_CHANNELS.getAiInferenceGpuOptions),
   saveSettings: (settings) => ipcRenderer.invoke(IPC_CHANNELS.saveSettings, settings),
   getFolderAnalysisStatuses: () =>
@@ -96,6 +98,10 @@ const api: DesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.getFolderAiFailedFiles, folderPath, pipeline, recursive),
   getFolderAiWronglyRotatedImages: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.getFolderAiWronglyRotatedImages, request),
+  applyWrongRotationToMediaItem: (request) =>
+    ipcRenderer.invoke(IPC_CHANNELS.applyWrongRotationToMediaItem, request),
+  dismissWrongRotationSuggestion: (request) =>
+    ipcRenderer.invoke(IPC_CHANNELS.dismissWrongRotationSuggestion, request),
   getFolderAiCoverage: (folderPath, recursive) =>
     ipcRenderer.invoke(IPC_CHANNELS.getFolderAiCoverage, folderPath, recursive),
   getFolderAiRollupsBatch: (folderPaths) =>
@@ -468,6 +474,9 @@ const api: DesktopApi = {
         ipcRenderer.removeListener(PIPELINE_IPC_CHANNELS.lifecycle, wrapped);
       };
     },
+    /** Only handled in main when `NODE_ENV=test` (see pipeline orchestration IPC). */
+    e2ePushQueueSnapshot: (snapshot: PipelineQueueSnapshot) =>
+      ipcRenderer.invoke(PIPELINE_IPC_CHANNELS.e2ePushQueueSnapshot, snapshot) as Promise<{ ok: true }>,
   },
   _logToMain: (msg: string) => ipcRenderer.send("renderer:log", msg),
 };

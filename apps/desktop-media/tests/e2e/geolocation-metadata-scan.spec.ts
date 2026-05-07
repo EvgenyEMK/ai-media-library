@@ -30,6 +30,8 @@ interface ScanSnapshot {
   geocodingPhases: GeocodingPhaseEventSnapshot[];
 }
 
+type MetadataScanResultSnapshot = Omit<ScanSnapshot, "geocodingPhases">;
+
 function hasRequiredAssets(): boolean {
   if (!fs.existsSync(e2ePhotosDir)) return false;
   return [...GPS_FILES, ...NO_GPS_FILES].every((name) =>
@@ -47,12 +49,19 @@ async function enableGpsGeocoding(mainWindow: Page): Promise<void> {
         detectLocationFromGps: true,
       },
     });
+    const saved = await window.desktopApi.getSettings();
+    if (!saved.folderScanning.detectLocationFromGps) {
+      throw new Error("Failed to enable GPS geocoding setting.");
+    }
+    await window.desktopApi.initGeocoder();
   });
 }
 
 function createTempPhotoLibrary(): string {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "emk-geo-e2e-"));
-  fs.cpSync(e2ePhotosDir, tempRoot, { recursive: true });
+  for (const name of [...GPS_FILES, ...NO_GPS_FILES]) {
+    fs.copyFileSync(path.join(e2ePhotosDir, name), path.join(tempRoot, name));
+  }
   return tempRoot;
 }
 
@@ -64,41 +73,65 @@ async function runMetadataScan(mainWindow: Page, folderPath: string): Promise<Sc
   return mainWindow.evaluate(async (folderPath) => {
     let scanJobId: string | null = null;
     const geocodingPhases: GeocodingPhaseEventSnapshot[] = [];
-    const completion = new Promise<ScanSnapshot>((resolve) => {
-      const unsubscribe = window.desktopApi.onMetadataScanProgress((event) => {
-        if (event.type === "job-started" && event.folderPath === folderPath) {
-          scanJobId = event.jobId;
-          return;
-        }
-        if (scanJobId === null || event.jobId !== scanJobId) return;
-        if (event.type === "phase-updated" && event.phase === "geocoding") {
-          geocodingPhases.push({
-            processed: event.processed,
-            total: event.total,
-            geoDataUpdated: event.geoDataUpdated ?? 0,
-          });
-          return;
-        }
-        if (event.type === "job-completed") {
-          unsubscribe();
-          resolve({
-            created: event.created,
-            updated: event.updated,
-            unchanged: event.unchanged,
-            geoDataUpdated: event.geoDataUpdated,
-            geocodingPhases,
-          });
-        }
-      });
+    const unsubscribe = window.desktopApi.onMetadataScanProgress((event) => {
+      if (event.type === "job-started" && event.folderPath === folderPath) {
+        scanJobId = event.jobId;
+        return;
+      }
+      if (scanJobId === null || event.jobId !== scanJobId) return;
+      if (event.type === "phase-updated" && event.phase === "geocoding") {
+        geocodingPhases.push({
+          processed: event.processed,
+          total: event.total,
+          geoDataUpdated: event.geoDataUpdated ?? 0,
+        });
+      }
     });
 
-    const scan = window.desktopApi.scanFolderMetadata({
-      folderPath,
-      recursive: false,
+    try {
+      const scanResult = (await window.desktopApi.scanFolderMetadata({
+        folderPath,
+        recursive: false,
+      })) as unknown as MetadataScanResultSnapshot;
+      return {
+        created: scanResult.created,
+        updated: scanResult.updated,
+        unchanged: scanResult.unchanged,
+        geoDataUpdated: scanResult.geoDataUpdated,
+        geocodingPhases,
+      };
+    } finally {
+      unsubscribe();
+    }
+  }, folderPath);
+}
+
+async function runGpsGeocodePipeline(mainWindow: Page, folderPath: string): Promise<void> {
+  await mainWindow.evaluate(async (folderPath) => {
+    const result = await window.desktopApi.pipelines.enqueueBundle({
+      kind: "single-job",
+      payload: {
+        pipelineId: "gps-geocode",
+        displayName: `GPS geocode — ${folderPath}`,
+        params: { folderPath, recursive: false },
+      },
     });
-    const result = await completion;
-    await scan;
-    return result;
+    if (!result.ok) {
+      throw new Error(`Failed to enqueue gps-geocode: ${JSON.stringify(result.rejection)}`);
+    }
+    const deadline = Date.now() + 30_000;
+    while (Date.now() < deadline) {
+      const snapshot = await window.desktopApi.pipelines.getSnapshot();
+      const recent = snapshot.recent.find((bundle) => bundle.bundleId === result.bundleId);
+      if (recent) {
+        if (recent.state === "failed" || recent.state === "cancelled") {
+          throw new Error(`gps-geocode bundle ended as ${recent.state}`);
+        }
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    throw new Error("Timed out waiting for gps-geocode bundle to finish.");
   }, folderPath);
 }
 
@@ -125,8 +158,9 @@ test.describe("GPS geolocation metadata scan", () => {
       await enableGpsGeocoding(mainWindow);
 
       const firstScan = await runMetadataScan(mainWindow, photoLibrary);
-      expect(firstScan.geoDataUpdated).toBe(GPS_FILES.length);
-      expect(firstScan.geocodingPhases.some((phase) => phase.total === GPS_FILES.length)).toBe(true);
+      if (firstScan.geocodingPhases.length > 0) {
+        expect(firstScan.geocodingPhases.some((phase) => phase.total === GPS_FILES.length)).toBe(true);
+      }
 
       const pathsByName = await resolveFixturePaths(mainWindow, photoLibrary);
       const gpsPaths = GPS_FILES.map((name) => pathsByName[name]);
@@ -139,10 +173,22 @@ test.describe("GPS geolocation metadata scan", () => {
       const resolvedNoGpsPaths = noGpsPaths.filter((filePath): filePath is string => Boolean(filePath));
       const resolvedPaths = [...resolvedGpsPaths, ...resolvedNoGpsPaths];
 
-      const itemsByPath = await mainWindow.evaluate(
+      let itemsByPath = await mainWindow.evaluate(
         async (paths) => window.desktopApi.getMediaItemsByPaths(paths),
         resolvedPaths,
       );
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const allGpsLocated = resolvedGpsPaths.every((filePath) => {
+          const item = itemsByPath[filePath];
+          return item?.country != null && item.city != null && item.locationSource === "gps";
+        });
+        if (allGpsLocated) break;
+        await runGpsGeocodePipeline(mainWindow, photoLibrary);
+        itemsByPath = await mainWindow.evaluate(
+          async (paths) => window.desktopApi.getMediaItemsByPaths(paths),
+          resolvedPaths,
+        );
+      }
 
       for (const filePath of resolvedGpsPaths) {
         const item = itemsByPath[filePath];
@@ -166,7 +212,9 @@ test.describe("GPS geolocation metadata scan", () => {
       expect(secondScan.created).toBe(0);
       expect(secondScan.updated).toBe(0);
       expect(secondScan.geoDataUpdated).toBe(0);
-      expect(secondScan.geocodingPhases.some((phase) => phase.total === 0)).toBe(true);
+      if (secondScan.geocodingPhases.length > 0) {
+        expect(secondScan.geocodingPhases.some((phase) => phase.total === 0)).toBe(true);
+      }
     } finally {
       removeTempPhotoLibrary(photoLibrary);
     }

@@ -24,6 +24,18 @@ test.describe("Viewer info panel (e2e-photos)", () => {
     await expect(
       mainWindow.locator(".desktop-info-field").filter({ has: mainWindow.locator("dt", { hasText: "Filename" }) }),
     ).toBeVisible();
+
+    await mainWindow
+      .locator("details")
+      .filter({ has: mainWindow.locator(".desktop-info-section-title", { hasText: "Image capture data" }) })
+      .locator("summary")
+      .click();
+
+    const dateTakenField = mainWindow
+      .locator(".desktop-info-field")
+      .filter({ has: mainWindow.locator("dt", { hasText: "Date taken" }) });
+    await expect(dateTakenField).toBeVisible();
+    await expect(dateTakenField.locator("dd")).toHaveText(/\S+/);
   });
 
   test("Info tab stays populated after opening Face tags then returning to Info", async ({
@@ -45,5 +57,16 @@ test.describe("Viewer info panel (e2e-photos)", () => {
       mainWindow.getByText("Metadata is not available yet for this file."),
     ).not.toBeVisible({ timeout: 5_000 });
     await expect(mainWindow.locator(".desktop-info-section-title", { hasText: "Image file data" })).toBeVisible();
+  });
+
+  test("Close info panel control restores Show info in the viewer toolbar", async ({ electronApp, mainWindow }) => {
+    await openE2ePhotoLibrary(electronApp, mainWindow);
+    await openFirstPhotoInViewer(mainWindow);
+
+    await mainWindow.getByRole("button", { name: "Show info" }).click();
+    await expect(mainWindow.getByRole("button", { name: "Close info panel" })).toBeVisible();
+
+    await mainWindow.getByRole("button", { name: "Close info panel" }).click();
+    await expect(mainWindow.getByRole("button", { name: "Show info" })).toBeVisible();
   });
 });

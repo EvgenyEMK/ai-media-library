@@ -34,6 +34,8 @@ export const PIPELINE_IPC_CHANNELS = {
   removeQueued: "pipelines:remove-queued",
   clearQueue: "pipelines:clear-queue",
   getSnapshot: "pipelines:get-snapshot",
+  /** Test-only (`NODE_ENV=test`): broadcast a synthetic snapshot to all windows (E2E). */
+  e2ePushQueueSnapshot: "pipelines:e2e-push-queue-snapshot",
   /** Push event: full queue snapshot whenever scheduler state changes. */
   queueChanged: "pipelines:queue-changed",
   /** Push event: per-job progress updates. */
@@ -110,4 +112,9 @@ export interface PipelineDesktopApi {
   onQueueChanged: (listener: (snapshot: PipelineQueueSnapshot) => void) => () => void;
   onJobProgress: (listener: (event: JobProgressPushEvent) => void) => () => void;
   onLifecycle: (listener: (event: PipelineLifecycleEvent) => void) => () => void;
+  /**
+   * Test helper: main only implements the IPC when `NODE_ENV=test` (no-op / error in production if called).
+   * @internal
+   */
+  e2ePushQueueSnapshot: (snapshot: PipelineQueueSnapshot) => Promise<{ ok: true }>;
 }

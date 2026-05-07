@@ -7,6 +7,7 @@ import {
   getAlreadyFaceDetectedPhotoPaths,
   mergeRotationEditSuggestion,
   parseAiVisionLocation,
+  roundOrientationDetectionConfidenceForStorage,
   upsertPhotoAnalysisResult,
 } from "./media-analysis";
 import { __closeDesktopDatabaseForTesting, getDesktopDatabase, initDesktopDatabase } from "./client";
@@ -137,6 +138,21 @@ describe("mergeRotationEditSuggestion", () => {
     const result = mergeRotationEditSuggestion(existing, upright, "face_landmarks");
     expect(result).toHaveLength(1);
     expect(((result as Record<string, unknown>[])[0]).source).toBe("photo-analysis");
+  });
+});
+
+describe("roundOrientationDetectionConfidenceForStorage", () => {
+  it("rounds to 3 decimal places", () => {
+    expect(roundOrientationDetectionConfidenceForStorage(0.9226819767752613)).toBe(0.923);
+  });
+
+  it("returns null for null", () => {
+    expect(roundOrientationDetectionConfidenceForStorage(null)).toBe(null);
+  });
+
+  it("returns null for non-finite numbers", () => {
+    expect(roundOrientationDetectionConfidenceForStorage(Number.NaN)).toBe(null);
+    expect(roundOrientationDetectionConfidenceForStorage(Number.POSITIVE_INFINITY)).toBe(null);
   });
 });
 

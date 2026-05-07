@@ -179,6 +179,15 @@ describe("extractDateFromPath", () => {
     expect(r).toBeNull();
   });
 
+  it("extracts full date from mixed filename with underscore and camera suffix", () => {
+    const r = extractDateFromPath(
+      "C:\\EMK-Media\\_BEST_EMK\\2018-02-10_16 IMG-20180213-WA0001.jpg",
+    );
+    expect(r?.start).toBe("2018-02-10");
+    expect(r?.precision).toBe("day");
+    expect(r?.source).toBe("script_filename");
+  });
+
   it("extracts year-month from direct parent folder", () => {
     const r = extractDateFromPath("C:\\Photos\\1994-09\\image.jpg");
     expect(r?.start).toBe("1994-09");

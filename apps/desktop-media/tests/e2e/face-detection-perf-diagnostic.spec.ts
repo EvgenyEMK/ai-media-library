@@ -85,10 +85,22 @@ test.describe("Face detection perf diagnostic", () => {
         `\n[face-perf] model=${detectorModel} folder=${sample.folder} images=${sample.images.length}`,
       );
       for (const imagePath of sample.images) {
-        const result = await mainWindow.evaluate(async (p) => {
+        const result = await mainWindow.evaluate(async ({ imagePath, detectorModel }) => {
           const t0 = performance.now();
           const settings = await window.desktopApi.getSettings();
-          const out = (await window.desktopApi.detectFacesForMediaItem(p, settings.faceDetection)) as {
+          const faceDetectionSettings = {
+            ...settings.faceDetection,
+            detectorModel,
+            faceLandmarkRefinement: {
+              ...settings.faceDetection.faceLandmarkRefinement,
+              enabled: false,
+            },
+            faceAgeGenderDetection: {
+              ...settings.faceDetection.faceAgeGenderDetection,
+              enabled: false,
+            },
+          };
+          const out = (await window.desktopApi.detectFacesForMediaItem(imagePath, faceDetectionSettings)) as {
             success: boolean;
             faceCount: number;
             debugTimings?: {
@@ -100,7 +112,7 @@ test.describe("Face detection perf diagnostic", () => {
           };
           const elapsedMs = performance.now() - t0;
           return { elapsedMs, out };
-        }, imagePath);
+        }, { imagePath, detectorModel });
 
         const sec = (result.elapsedMs / 1000).toFixed(2);
         const faceCount = result.out.success ? result.out.faceCount : -1;

@@ -4,6 +4,7 @@ import {
   ImageEditSuggestionsView,
   MediaThumbnailGrid,
   type ImageEditSuggestionsItem,
+  type RotationReviewSaveSelection,
 } from "@emk/media-viewer";
 import type { SemanticSearchResult } from "@emk/media-store";
 import type {
@@ -22,6 +23,7 @@ import { formatSemanticCosinePercent } from "../lib/format-semantic-similarity";
 import { MEDIA_PANE_EMPTY_STATE_CLASS } from "../lib/media-pane-ui";
 import { lookupMediaMetadataByItemId } from "../lib/media-metadata-lookup";
 import { UI_TEXT } from "../lib/ui-text";
+import { discardWrongRotation, saveWrongRotation } from "../actions/rotation-review-actions";
 import type { DesktopMediaItemMetadata } from "../../shared/ipc";
 import { useDesktopStore, type DesktopStore, type DesktopStoreState } from "../stores/desktop-store";
 import type { MainPaneViewMode, RotationReviewScope } from "../types/app-types";
@@ -73,6 +75,7 @@ interface DesktopMediaWorkspaceProps {
   rotationReviewScope: RotationReviewScope | null;
   setRotationReviewScope: Dispatch<SetStateAction<RotationReviewScope | null>>;
   onOpenRotationReview: (folderPath: string, includeSubfolders: boolean) => void;
+  onCloseSpecialMainPaneView: () => void;
   selectedFolder: string | null;
   semanticPanelOpen: boolean;
   faceModelDownload: DesktopStoreState["faceModelDownload"];
@@ -100,6 +103,7 @@ export function DesktopMediaWorkspace({
   rotationReviewScope,
   setRotationReviewScope,
   onOpenRotationReview,
+  onCloseSpecialMainPaneView,
   selectedFolder,
   semanticPanelOpen,
   faceModelDownload,
@@ -127,6 +131,17 @@ export function DesktopMediaWorkspace({
     selectedFolder ? (s.childrenByPath[selectedFolder]?.length ?? 0) : 0,
   );
   const [rotationReviewPage, setRotationReviewPage] = useState(1);
+  const [rotationActionState, setRotationActionState] = useState<{
+    savingItemId: string | null;
+    discardingItemId: string | null;
+    errorByItemId: Record<string, string | undefined>;
+    confirmationByItemId: Record<string, { status: "saved" | "discarded"; revision: number } | undefined>;
+  }>({
+    savingItemId: null,
+    discardingItemId: null,
+    errorByItemId: {},
+    confirmationByItemId: {},
+  });
   const rotationReviewItems = useRotationReviewItems(
     rotationReviewScope,
     rotationReviewPage,
@@ -134,6 +149,12 @@ export function DesktopMediaWorkspace({
   );
   useEffect(() => {
     setRotationReviewPage(1);
+    setRotationActionState({
+      savingItemId: null,
+      discardingItemId: null,
+      errorByItemId: {},
+      confirmationByItemId: {},
+    });
   }, [rotationReviewScope?.folderPath, rotationReviewScope?.includeSubfolders]);
   const commitStarRating = useMediaItemStarRatingChange();
   const onStarRatingChangeForPath = useCallback(
@@ -180,7 +201,7 @@ export function DesktopMediaWorkspace({
         itemListOverride: [
           {
             id: item.id,
-            sourcePath: item.id,
+            sourcePath: item.sourcePath ?? item.id,
             title: item.title,
             storage_url: item.imageUrl,
             thumbnail_url: item.imageUrl,
@@ -190,6 +211,81 @@ export function DesktopMediaWorkspace({
       });
     },
     [store],
+  );
+  const handleRotationSave = useCallback(
+    async (item: ImageEditSuggestionsItem, selection: RotationReviewSaveSelection): Promise<void> => {
+      setRotationActionState((current) => ({
+        ...current,
+        savingItemId: item.id,
+        errorByItemId: { ...current.errorByItemId, [item.id]: undefined },
+      }));
+      try {
+        await saveWrongRotation({
+          mediaItemId: item.id,
+          angleClockwise: selection.rotationAngleClockwise,
+        });
+        setRotationActionState((current) => ({
+          ...current,
+          confirmationByItemId: {
+            ...current.confirmationByItemId,
+            [item.id]: {
+              status: "saved",
+              revision: (current.confirmationByItemId[item.id]?.revision ?? 0) + 1,
+            },
+          },
+        }));
+      } catch (error) {
+        setRotationActionState((current) => ({
+          ...current,
+          errorByItemId: {
+            ...current.errorByItemId,
+            [item.id]: error instanceof Error ? error.message : "Unable to save rotated image.",
+          },
+        }));
+      } finally {
+        setRotationActionState((current) => ({
+          ...current,
+          savingItemId: current.savingItemId === item.id ? null : current.savingItemId,
+        }));
+      }
+    },
+    [],
+  );
+  const handleRotationDiscard = useCallback(
+    async (item: ImageEditSuggestionsItem): Promise<void> => {
+      setRotationActionState((current) => ({
+        ...current,
+        discardingItemId: item.id,
+        errorByItemId: { ...current.errorByItemId, [item.id]: undefined },
+      }));
+      try {
+        await discardWrongRotation({ mediaItemId: item.id });
+        setRotationActionState((current) => ({
+          ...current,
+          confirmationByItemId: {
+            ...current.confirmationByItemId,
+            [item.id]: {
+              status: "discarded",
+              revision: (current.confirmationByItemId[item.id]?.revision ?? 0) + 1,
+            },
+          },
+        }));
+      } catch (error) {
+        setRotationActionState((current) => ({
+          ...current,
+          errorByItemId: {
+            ...current.errorByItemId,
+            [item.id]: error instanceof Error ? error.message : "Unable to discard rotation suggestion.",
+          },
+        }));
+      } finally {
+        setRotationActionState((current) => ({
+          ...current,
+          discardingItemId: current.discardingItemId === item.id ? null : current.discardingItemId,
+        }));
+      }
+    },
+    [],
   );
   const showEmptyFolderSummaryCta =
     Boolean(selectedFolder) &&
@@ -233,44 +329,46 @@ export function DesktopMediaWorkspace({
               hasFolderSelected
               variant="rotationReview"
               title="Wrongly rotated images"
+              folderPathLabel={rotationReviewScope.folderPath}
               suggestedSummaryLabel="Wrongly rotated images"
               noSuggestionsMessage="No wrongly rotated images found for this folder."
-              applyChangesNote="Review only - apply/save coming soon."
               items={rotationReviewItems.items}
               loading={rotationReviewItems.loading}
               error={rotationReviewItems.error}
-              pagination={{
+              headerPagination={{
                 page: rotationReviewPage,
                 pageSize: ROTATION_REVIEW_PAGE_SIZE,
                 total: rotationReviewItems.total,
                 onPageChange: setRotationReviewPage,
               }}
-              headerExtra={
-                <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    checked={rotationReviewScope.includeSubfolders}
-                    onChange={(event) =>
-                      setRotationReviewScope({
-                        folderPath: rotationReviewScope.folderPath,
-                        includeSubfolders: event.currentTarget.checked,
-                      })
-                    }
-                  />
-                  <span>Include subfolders</span>
-                </label>
-              }
+              includeSubfoldersToggle={{
+                checked: rotationReviewScope.includeSubfolders,
+                label: "Include subfolders",
+                onChange: (checked) =>
+                  setRotationReviewScope({
+                    folderPath: rotationReviewScope.folderPath,
+                    includeSubfolders: checked,
+                  }),
+              }}
               onOriginalImageClick={openRotationReviewItemInViewer}
+              onRotationSave={handleRotationSave}
+              onRotationDiscard={handleRotationDiscard}
+              rotationActionState={rotationActionState}
+              onClose={() => {
+                setRotationReviewScope(null);
+                onCloseSpecialMainPaneView();
+              }}
+              closeAriaLabel="Close wrongly rotated images"
               onBackToPhotos={() => {
                 setRotationReviewScope(null);
-                setMainPaneViewMode("media");
+                onCloseSpecialMainPaneView();
               }}
             />
           ) : (
             <ImageEditSuggestionsView
               hasFolderSelected={Boolean(selectedFolder)}
               items={imageEditSuggestionItems}
-              onBackToPhotos={() => setMainPaneViewMode("media")}
+              onBackToPhotos={onCloseSpecialMainPaneView}
             />
           )
         ) : mainPaneViewMode === "folderAiSummary" && selectedFolder ? (

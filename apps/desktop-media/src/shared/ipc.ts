@@ -78,6 +78,8 @@ export const IPC_CHANNELS = {
   folderMediaProgress: "media:folder-media-progress",
   getSettings: "media:get-settings",
   getDatabaseLocation: "media:get-database-location",
+  /** Main-process runtime flags (e.g. E2E-only UI). */
+  getDesktopRuntimeFlags: "media:get-desktop-runtime-flags",
   saveSettings: "media:save-settings",
   getAiInferenceGpuOptions: "media:get-ai-inference-gpu-options",
   getFolderAnalysisStatuses: "media:get-folder-analysis-statuses",
@@ -184,6 +186,8 @@ export const IPC_CHANNELS = {
   folderAiSummaryStreamProgress: "media:folder-ai-summary-stream-progress",
   getFolderAiFailedFiles: "media:get-folder-ai-failed-files",
   getFolderAiWronglyRotatedImages: "media:get-folder-ai-wrongly-rotated-images",
+  applyWrongRotationToMediaItem: "media:apply-wrong-rotation-to-media-item",
+  dismissWrongRotationSuggestion: "media:dismiss-wrong-rotation-suggestion",
   getFolderAiCoverage: "media:get-folder-ai-coverage",
   getFolderAiRollupsBatch: "media:get-folder-ai-rollups-batch",
   detectFolderImageRotation: "media:detect-folder-image-rotation",
@@ -239,7 +243,11 @@ export interface MediaViewerSettings {
   autoPlayVideoOnOpen: boolean;
   /** In slideshow mode, skip video slides instead of playing them to completion. */
   skipVideosInSlideshow: boolean;
+  /** Date display format used across desktop UI date labels. */
+  dateFormat: DateDisplayFormat;
 }
+
+export type DateDisplayFormat = "YYYY-MM-DD" | "DD.MM.YYYY" | "MM/DD/YYYY";
 
 export interface DatabaseLocationInfo {
   appDataPath: string;
@@ -252,6 +260,12 @@ export interface DatabaseLocationInfo {
   /** Temporary troubleshooting signal for packaged legacy DB compatibility checks. */
   mediaEmbeddingsCompatStatus?: string;
   semanticDebugLogPath?: string | null;
+}
+
+/** Values derived from main-process env at IPC time (no secrets). */
+export interface DesktopRuntimeFlags {
+  /** When true, show E2E-only “Run pipelines” controls (`EMK_E2E_RUN_PIPELINES_UI=1`). */
+  showRunPipelinesTestUi: boolean;
 }
 
 export interface PathExtractionSettings {
@@ -467,6 +481,11 @@ export interface WrongImageRotationDetectionSettings {
    */
   enabled: boolean;
   /**
+   * Minimum classifier confidence required for an image to be treated as wrongly
+   * rotated in review views and folder summary issue counts.
+   */
+  minConfidenceThreshold: number;
+  /**
    * Fallback method: if classifier is unavailable or cannot provide a usable
    * signal, try face landmark features (when available) to infer orientation.
    */
@@ -632,6 +651,7 @@ export const DEFAULT_PHOTO_ANALYSIS_SETTINGS: PhotoAnalysisSettings = {
 
 export const DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS: WrongImageRotationDetectionSettings = {
   enabled: true,
+  minConfidenceThreshold: 0.9,
   useFaceLandmarkFeaturesFallback: true,
 };
 
@@ -671,6 +691,7 @@ export const DEFAULT_PATH_EXTRACTION_SETTINGS: PathExtractionSettings = {
 export const DEFAULT_MEDIA_VIEWER_SETTINGS: MediaViewerSettings = {
   autoPlayVideoOnOpen: true,
   skipVideosInSlideshow: false,
+  dateFormat: "DD.MM.YYYY",
 };
 
 export const DEFAULT_APP_SETTINGS: Omit<AppSettings, "clientId"> = {
@@ -1146,6 +1167,8 @@ export interface FolderAiWronglyRotatedImageItem {
   folderPathRelative: string | null;
   rotationAngleClockwise: 90 | 180 | 270;
   cropRel: RelativeCropBox | null;
+  confidence: number | null;
+  orientationDetectionProcessedAt: string | null;
 }
 
 export interface FolderAiWronglyRotatedImagesPageResult {
@@ -1154,6 +1177,19 @@ export interface FolderAiWronglyRotatedImagesPageResult {
   page: number;
   pageSize: number;
 }
+
+export interface ApplyWrongRotationToMediaItemRequest {
+  mediaItemId: string;
+  angleClockwise: 90 | 180 | 270;
+}
+
+export interface DismissWrongRotationSuggestionRequest {
+  mediaItemId: string;
+}
+
+export type RotationReviewMutationResult =
+  | { success: true }
+  | { success: false; error: string };
 
 export interface PhotoAnalysisModelInfo {
   model: string;
@@ -1962,6 +1998,7 @@ export interface DesktopApi {
   onFolderMediaProgress: (listener: FolderMediaProgressListener) => () => void;
   getSettings: () => Promise<AppSettings>;
   getDatabaseLocation: () => Promise<DatabaseLocationInfo>;
+  getDesktopRuntimeFlags: () => Promise<DesktopRuntimeFlags>;
   getAiInferenceGpuOptions: () => Promise<AiInferenceGpuOption[]>;
   saveSettings: (settings: AppSettings) => Promise<void>;
   getFolderAnalysisStatuses: () => Promise<Record<string, FolderAnalysisStatus>>;
@@ -1996,6 +2033,12 @@ export interface DesktopApi {
   getFolderAiWronglyRotatedImages: (
     request: FolderAiWronglyRotatedImagesPageRequest,
   ) => Promise<FolderAiWronglyRotatedImagesPageResult>;
+  applyWrongRotationToMediaItem: (
+    request: ApplyWrongRotationToMediaItemRequest,
+  ) => Promise<RotationReviewMutationResult>;
+  dismissWrongRotationSuggestion: (
+    request: DismissWrongRotationSuggestionRequest,
+  ) => Promise<RotationReviewMutationResult>;
   getFolderAiCoverage: (folderPath: string, recursive: boolean) => Promise<FolderAiCoverageReport>;
   getFolderAiRollupsBatch: (folderPaths: string[]) => Promise<Record<string, FolderAiSidebarRollup>>;
   detectFolderImageRotation: (request: {

@@ -8,7 +8,6 @@ const cwd = process.cwd();
 const pnpmCmd = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const distElectronDir = path.join(cwd, "dist-electron");
 const distMain = path.join(cwd, "dist-electron", "main.js");
-const viteCacheDir = path.join(cwd, "node_modules", ".vite");
 const defaultRendererPort = 5174;
 const configuredRendererPort = process.env.EMK_DESKTOP_RENDERER_PORT?.trim();
 const parsedConfiguredPort = configuredRendererPort ? Number.parseInt(configuredRendererPort, 10) : null;
@@ -118,7 +117,6 @@ process.on("exit", shutdown);
 // Avoid launching Electron with stale outputs from a previous run.
 try {
   fs.rmSync(distElectronDir, { recursive: true, force: true });
-  fs.rmSync(viteCacheDir, { recursive: true, force: true });
 } catch {
   // Non-fatal cleanup best effort.
 }
@@ -146,7 +144,6 @@ runPnpm([
   "vite",
   "--config",
   "vite.renderer.config.ts",
-  "--force",
   "--port",
   String(rendererPort),
 ]);
@@ -159,6 +156,19 @@ const rendererReady = await waitForRendererServer(rendererUrl);
 if (!rendererReady) {
   console.error(
     `[desktop-media dev] Renderer server not reachable at ${rendererUrl}. Aborting Electron launch to avoid empty window.`,
+  );
+  shutdown();
+  process.exit(1);
+}
+
+// The first request can trigger Vite dependency optimization and a client reload
+// (`optimized dependencies changed`). Give the dev server a short settle window
+// and verify it still serves the app before Electron loads the page.
+await sleep(2_000);
+const rendererStillReady = await waitForRendererServer(rendererUrl, 5_000);
+if (!rendererStillReady) {
+  console.error(
+    `[desktop-media dev] Renderer server stopped responding at ${rendererUrl}. Aborting Electron launch to avoid empty window.`,
   );
   shutdown();
   process.exit(1);

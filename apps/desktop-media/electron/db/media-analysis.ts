@@ -764,6 +764,15 @@ export function upsertFaceDetectionResult(
   return mediaItem.id;
 }
 
+/** Persist `orientation_detection.confidence` with at most 3 fractional digits. */
+export function roundOrientationDetectionConfidenceForStorage(
+  value: number | null,
+): number | null {
+  if (value === null) return null;
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return Math.round(value * 1000) / 1000;
+}
+
 export function upsertOrientationDetectionResult(
   photoPath: string,
   input: {
@@ -802,7 +811,7 @@ export function upsertOrientationDetectionResult(
     merged.orientation_detection = {
       source: input.source,
       correction_angle_clockwise: input.correctionAngleClockwise,
-      confidence: input.confidence,
+      confidence: roundOrientationDetectionConfidenceForStorage(input.confidence),
       model: input.model ?? null,
       processed_at: now,
     };

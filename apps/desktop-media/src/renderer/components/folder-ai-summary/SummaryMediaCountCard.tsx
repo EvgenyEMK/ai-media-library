@@ -1,7 +1,7 @@
-import { ListChecks, Play } from "lucide-react";
+import { ListChecks, Loader2, Play } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ReactElement } from "react";
-import type { FolderScanFreshness } from "../../../shared/ipc";
+import type { DateDisplayFormat, FolderScanFreshness } from "../../../shared/ipc";
 import { cn } from "../../lib/cn";
 import { formatCoveragePercent, formatGroupedInt } from "../../lib/folder-ai-summary-formatters";
 import { UI_TEXT } from "../../lib/ui-text";
@@ -40,21 +40,25 @@ export function SummaryMediaCountCard({
 
 export function LastDataScanCard({
   scanFreshness,
+  dateFormat,
   loading = false,
   actionPending = false,
   outdatedAfterDays = 7,
+  hasSubfolders = true,
   onRunFolderScan,
   onInfoClick,
 }: {
   scanFreshness: FolderScanFreshness;
+  dateFormat: DateDisplayFormat;
   loading?: boolean;
   actionPending?: boolean;
   outdatedAfterDays?: number;
+  hasSubfolders?: boolean;
   onRunFolderScan?: () => void;
   onInfoClick?: () => void;
 }): ReactElement {
-  const lastDataChange = formatOldestScanLabel(scanFreshness.lastMetadataExtractedAt);
-  const title = UI_TEXT.folderAiSummaryFolderTreeScanTitle;
+  const lastDataChange = formatOldestScanLabel(scanFreshness.lastMetadataExtractedAt, dateFormat);
+  const title = hasSubfolders ? UI_TEXT.folderAiSummaryFolderTreeScanTitle : UI_TEXT.folderAiSummaryFolderScanTitle;
   const qs = scanFreshness.folderTreeQuickScan;
   const treeTotal = qs?.ultraFoldersScanned ?? 0;
   const treeNeed = qs?.treeFoldersWithDirectMediaOnDiskCount ?? 0;
@@ -98,7 +102,7 @@ export function LastDataScanCard({
       ? (
           <span className="flex flex-col items-center">
             <span>{formatGroupedInt(treeCovered)}</span>
-            <span>folders</span>
+            <span>{treeNeed === 1 ? "folder" : "folders"}</span>
           </span>
         )
       : undefined;
@@ -135,7 +139,7 @@ export function LastDataScanCard({
   }
   if (!loading && qs != null && treeNeed > 0) {
     metricItems.push({
-      label: "Folders analyzed (quick scan)",
+      label: hasSubfolders ? "Folders analyzed (quick scan)" : "Selected folder analyzed (quick scan)",
       value: formatGroupedInt(treeNeed),
       valueClassName: "text-muted-foreground",
     });
@@ -143,7 +147,7 @@ export function LastDataScanCard({
   if (!loading && isAmber && isFullScanOutdated) {
     metricItems.push({
       label: `Full scan older than ${formatGroupedInt(outdatedAfterDays)} days`,
-      value: formatOldestScanLabel(scanFreshness.oldestFolderScanCompletedAt),
+      value: formatOldestScanLabel(scanFreshness.oldestFolderScanCompletedAt, dateFormat),
       valueClassName: "text-warning",
     });
   }
@@ -158,7 +162,11 @@ export function LastDataScanCard({
       disabled={actionPending}
       onClick={onRunFolderScan}
     >
-      <Play size={25} aria-hidden="true" />
+      {actionPending ? (
+        <Loader2 size={25} className="animate-spin" aria-hidden="true" />
+      ) : (
+        <Play size={25} aria-hidden="true" />
+      )}
     </button>
   ) : undefined;
 

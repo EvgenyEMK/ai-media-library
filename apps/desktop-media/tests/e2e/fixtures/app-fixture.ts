@@ -24,6 +24,17 @@ interface AppOptions {
   e2eGeocoderCachedData?: boolean;
   /** Force model download failure path for ensureDetectorModel in test mode. */
   e2eFailFaceModelDownload?: boolean;
+  /**
+   * When true (default), sets `EMK_E2E_SKIP_STARTUP_AI_MODELS_DOWNLOAD=1` so main skips
+   * bundled startup ONNX/native AI downloads. Set false for specs that need cold ArcFace/core
+   * models from startup (e.g. `waitForArcFaceModelReady` before explicit `ensureDetectorModel`).
+   */
+  e2eSkipStartupAiModelsDownload?: boolean;
+  /**
+   * Optional persistent runtime root for opt-in tests that intentionally download large runtime
+   * data, such as real GeoNames. Default E2E tests keep using a disposable temp runtime.
+   */
+  e2eRuntimeRootPath?: string;
 }
 
 /**
@@ -39,6 +50,8 @@ export const test = base.extend<AppFixtures & AppOptions>({
   e2eGeocoderStub: [false, { option: true }],
   e2eGeocoderCachedData: [false, { option: true }],
   e2eFailFaceModelDownload: [false, { option: true }],
+  e2eSkipStartupAiModelsDownload: [true, { option: true }],
+  e2eRuntimeRootPath: [undefined, { option: true }],
 
   electronApp: async (
     {
@@ -47,11 +60,17 @@ export const test = base.extend<AppFixtures & AppOptions>({
       e2eGeocoderStub,
       e2eGeocoderCachedData,
       e2eFailFaceModelDownload,
+      e2eSkipStartupAiModelsDownload,
+      e2eRuntimeRootPath,
     },
     use,
   ) => {
     const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), "emk-e2e-userdata-"));
-    const runtimeRootPath = fs.mkdtempSync(path.join(os.tmpdir(), "emk-e2e-runtime-"));
+    const runtimeRootPath =
+      e2eRuntimeRootPath ?? fs.mkdtempSync(path.join(os.tmpdir(), "emk-e2e-runtime-"));
+    if (e2eRuntimeRootPath) {
+      fs.mkdirSync(runtimeRootPath, { recursive: true });
+    }
     if (e2eGeocoderCachedData) {
       const citiesDir = path.join(runtimeRootPath, "geonames", "cities1000");
       const admin1Dir = path.join(runtimeRootPath, "geonames", "admin1_codes");
@@ -72,6 +91,10 @@ export const test = base.extend<AppFixtures & AppOptions>({
         EMK_DESKTOP_USER_DATA_PATH: userDataPath,
         EMK_DESKTOP_RUNTIME_ROOT_PATH: runtimeRootPath,
         EMK_OLLAMA_BASE_URL: ollama.baseUrl,
+        EMK_E2E_RUN_PIPELINES_UI: "1",
+        ...(e2eSkipStartupAiModelsDownload
+          ? { EMK_E2E_SKIP_STARTUP_AI_MODELS_DOWNLOAD: "1" }
+          : {}),
         ...(e2eFilenameInAnalysisPrompt ? { EMK_E2E_ANALYSIS_APPENDED_BASENAME: "1" } : {}),
         ...(e2eGeocoderStub ? { EMK_E2E_GEOCODER_STUB: "1" } : {}),
         ...(e2eFailFaceModelDownload ? { EMK_E2E_FAIL_FACE_MODEL_DOWNLOAD: "1" } : {}),
@@ -84,7 +107,9 @@ export const test = base.extend<AppFixtures & AppOptions>({
       await app.close();
       await ollama.close();
       fs.rmSync(userDataPath, { recursive: true, force: true });
-      fs.rmSync(runtimeRootPath, { recursive: true, force: true });
+      if (!e2eRuntimeRootPath) {
+        fs.rmSync(runtimeRootPath, { recursive: true, force: true });
+      }
     }
   },
 

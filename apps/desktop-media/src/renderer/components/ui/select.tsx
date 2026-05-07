@@ -48,14 +48,22 @@ function SelectContent({
   position = "popper",
   align = "center",
   sideOffset = 4,
+  useNativeScroll = false,
+  nativeScrollHeader,
+  nativeScrollViewportClassName,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Content>) {
+}: React.ComponentProps<typeof SelectPrimitive.Content> & {
+  useNativeScroll?: boolean;
+  nativeScrollHeader?: React.ReactNode;
+  nativeScrollViewportClassName?: string;
+}) {
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
         data-slot="select-content"
         className={cn(
-          "bg-background text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative max-h-(--radix-select-content-available-height) min-w-[8rem] origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border shadow-md pointer-events-auto",
+          "bg-background text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 relative max-h-(--radix-select-content-available-height) min-w-[8rem] origin-(--radix-select-content-transform-origin) overflow-x-hidden rounded-md border shadow-md pointer-events-auto",
+          "overflow-y-hidden",
           position === "popper"
             ? "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1"
             : undefined,
@@ -71,18 +79,47 @@ function SelectContent({
         sideOffset={sideOffset}
         {...props}
       >
-        <SelectScrollUpButton />
-        <SelectPrimitive.Viewport
-          className={cn(
-            "p-1",
-            position === "popper"
-              ? "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1"
-              : undefined,
-          )}
-        >
-          {children}
-        </SelectPrimitive.Viewport>
-        <SelectScrollDownButton />
+        {useNativeScroll ? null : <SelectScrollUpButton />}
+        {nativeScrollHeader}
+        {useNativeScroll ? (
+          <div
+            className={cn(
+              "h-[14rem] overflow-y-scroll [scrollbar-gutter:stable]",
+              "[&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-muted/40",
+              "[&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/60",
+              "[&::-webkit-scrollbar-thumb:hover]:bg-muted-foreground/80",
+              nativeScrollViewportClassName,
+            )}
+            style={{
+              scrollbarWidth: "thin",
+              scrollbarColor:
+                "hsl(var(--muted-foreground, 0 0% 63.9%) / 0.6) hsl(var(--muted, 0 0% 14.9%) / 0.4)",
+            }}
+          >
+            <SelectPrimitive.Viewport
+              className={cn(
+                "p-1",
+                position === "popper"
+                  ? "w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1"
+                  : undefined,
+              )}
+            >
+              {children}
+            </SelectPrimitive.Viewport>
+          </div>
+        ) : (
+          <SelectPrimitive.Viewport
+            className={cn(
+              "p-1",
+              position === "popper"
+                ? "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1"
+                : undefined,
+            )}
+          >
+            {children}
+          </SelectPrimitive.Viewport>
+        )}
+        {useNativeScroll ? null : <SelectScrollDownButton />}
       </SelectPrimitive.Content>
     </SelectPrimitive.Portal>
   );

@@ -1,3 +1,4 @@
+import { formatDateByPreference, type DateDisplayFormat } from "@emk/shared-contracts";
 import type { DesktopPhotoTakenPrecision } from "../../shared/ipc";
 
 /**
@@ -8,22 +9,37 @@ export function formatPhotoTakenListLabel(
   photoTakenAt: string | null,
   fileCreatedAt: string | null,
   photoTakenPrecision?: DesktopPhotoTakenPrecision | null,
+  dateFormat?: DateDisplayFormat,
 ): string {
   if (photoTakenAt) {
-    const partial = formatPartialPhotoTaken(photoTakenAt, photoTakenPrecision ?? null);
+    const partial = formatPartialPhotoTaken(photoTakenAt, photoTakenPrecision ?? null, dateFormat);
     if (partial) {
       return partial;
     }
-    const d = new Date(photoTakenAt);
-    if (!Number.isNaN(d.getTime())) {
-      return d.toLocaleDateString();
+    if (dateFormat) {
+      const formattedTaken = formatDateByPreference(photoTakenAt, dateFormat);
+      if (formattedTaken) {
+        return formattedTaken;
+      }
+    } else {
+      const parsedTaken = new Date(photoTakenAt);
+      if (!Number.isNaN(parsedTaken.getTime())) {
+        return parsedTaken.toLocaleDateString();
+      }
     }
   }
 
   if (fileCreatedAt) {
-    const d = new Date(fileCreatedAt);
-    if (!Number.isNaN(d.getTime())) {
-      return d.toLocaleDateString();
+    if (dateFormat) {
+      const formattedCreated = formatDateByPreference(fileCreatedAt, dateFormat);
+      if (formattedCreated) {
+        return formattedCreated;
+      }
+    } else {
+      const parsedCreated = new Date(fileCreatedAt);
+      if (!Number.isNaN(parsedCreated.getTime())) {
+        return parsedCreated.toLocaleDateString();
+      }
     }
   }
 
@@ -33,6 +49,7 @@ export function formatPhotoTakenListLabel(
 function formatPartialPhotoTaken(
   raw: string,
   precision: DesktopPhotoTakenPrecision | null,
+  dateFormat?: DateDisplayFormat,
 ): string | null {
   if (precision === "year" && /^\d{4}$/.test(raw)) {
     return raw;
@@ -41,15 +58,24 @@ function formatPartialPhotoTaken(
     const [y, m] = raw.split("-");
     const monthNum = parseInt(m, 10);
     if (monthNum >= 1 && monthNum <= 12) {
-      return new Date(`${y}-${m}-01T12:00:00Z`).toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "short",
-      });
+      if (!dateFormat) {
+        return new Date(`${y}-${m}-01T12:00:00Z`).toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "short",
+        });
+      }
+      if (dateFormat === "YYYY-MM-DD") return `${y}-${m}`;
+      if (dateFormat === "MM/DD/YYYY") return `${m}/${y}`;
+      return `${m}.${y}`;
     }
   }
   if (precision === "day" && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-    const d = new Date(`${raw}T12:00:00Z`);
-    return Number.isNaN(d.getTime()) ? raw : d.toLocaleDateString();
+    if (dateFormat) {
+      const formatted = formatDateByPreference(`${raw}T12:00:00Z`, dateFormat);
+      return formatted || raw;
+    }
+    const parsedDay = new Date(`${raw}T12:00:00Z`);
+    return Number.isNaN(parsedDay.getTime()) ? raw : parsedDay.toLocaleDateString();
   }
   return null;
 }

@@ -346,6 +346,8 @@ export function useDesktopSettingsPersistence(): void {
             prev.mediaViewerSettings.autoPlayVideoOnOpen ||
           state.mediaViewerSettings.skipVideosInSlideshow !==
             prev.mediaViewerSettings.skipVideosInSlideshow ||
+          state.mediaViewerSettings.dateFormat !==
+            prev.mediaViewerSettings.dateFormat ||
           state.pathExtractionSettings.extractDates !==
             prev.pathExtractionSettings.extractDates ||
           state.pathExtractionSettings.useLlm !==
