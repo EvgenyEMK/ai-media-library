@@ -2,7 +2,10 @@ import { Brain, Image as ImageIcon, RotateCw, Search, Users, Video } from "lucid
 import type { ReactElement } from "react";
 import type { FolderAiCoverageReport, FolderAiSummaryOverview, ScanFolderMetadataScope } from "../../../shared/ipc";
 import { formatCoveragePercent, formatGroupedInt } from "../../lib/folder-ai-summary-formatters";
-import { getFolderAiPipelineQueueStatus } from "../../lib/folder-ai-pipeline-queue-status";
+import {
+  getFolderAiPipelineQueueStatus,
+  getFolderGeoPipelineQueueStatus,
+} from "../../lib/folder-ai-pipeline-queue-status";
 import { UI_TEXT } from "../../lib/ui-text";
 import { useDesktopStore } from "../../stores/desktop-store";
 import type { SummaryPipelineKind } from "../../types/folder-ai-summary-types";
@@ -64,8 +67,11 @@ interface DesktopFolderAiSummaryDashboardProps {
   actionPendingPipeline?: SummaryPipelineKind | null;
   onRunPipeline?: (pipeline: SummaryPipelineKind) => void;
   actionPendingGeoLocation?: boolean;
-  geoQueueStatus?: ReturnType<typeof getFolderAiPipelineQueueStatus>;
   onRunGeoLocation?: () => void;
+  /** When true, Folder tree scan Play is disabled (geo flow may still be active). */
+  lockFolderScanInteraction?: boolean;
+  /** When true, Geo-location Play is disabled (folder metadata scan running). */
+  lockGeoLocationInteraction?: boolean;
   onOpenPipelineInfo?: (pipeline: SummaryPipelineKind | "geo" | "folderScan") => void;
   showInfoIcons?: boolean;
   onViewRotationResults?: () => void;
@@ -85,8 +91,9 @@ export function DesktopFolderAiSummaryDashboard({
   actionPendingPipeline = null,
   onRunPipeline,
   actionPendingGeoLocation = false,
-  geoQueueStatus = null,
   onRunGeoLocation,
+  lockFolderScanInteraction = false,
+  lockGeoLocationInteraction = false,
   onOpenPipelineInfo,
   showInfoIcons = true,
   onViewRotationResults,
@@ -124,6 +131,11 @@ export function DesktopFolderAiSummaryDashboard({
       pipeline,
       folderPath: coverage.folderPath,
     });
+  const geoQueueStatus = getFolderGeoPipelineQueueStatus({
+    running: pipelineRunning,
+    queued: pipelineQueued,
+    folderPath: coverage.folderPath,
+  });
   return (
     <div className="flex flex-col gap-5 pb-10">
       <SummaryCardGroup>
@@ -157,6 +169,7 @@ export function DesktopFolderAiSummaryDashboard({
                 dateFormat={dateFormat}
                 loading={folderScanLoading}
                 actionPending={actionPendingFolderScan}
+                lockInteraction={lockFolderScanInteraction}
                 outdatedAfterDays={outdatedAfterDays}
                 hasSubfolders={hasSubfolders}
                 onRunFolderScan={onRunFolderScan}
@@ -169,6 +182,7 @@ export function DesktopFolderAiSummaryDashboard({
                 loading={coverageLoading}
                 actionPending={actionPendingGeoLocation}
                 queueStatus={geoQueueStatus}
+                interactionLocked={lockGeoLocationInteraction}
                 onRunPipeline={onRunGeoLocation}
                 onInfoClick={showInfoIcons && onOpenPipelineInfo ? () => onOpenPipelineInfo("geo") : undefined}
               />

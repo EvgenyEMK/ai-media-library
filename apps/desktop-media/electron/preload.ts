@@ -405,6 +405,8 @@ const api: DesktopApi = {
     };
   },
   getGeocoderCacheStatus: () => ipcRenderer.invoke(IPC_CHANNELS.getGeocoderCacheStatus),
+  getGpsGeocodePendingCount: (request: { folderPath: string; recursive?: boolean }) =>
+    ipcRenderer.invoke(IPC_CHANNELS.getGpsGeocodePendingCount, request),
   initGeocoder: (options) => ipcRenderer.invoke(IPC_CHANNELS.initGeocoder, options),
   onGeocoderInitProgress: (listener) => {
     const wrapped = (

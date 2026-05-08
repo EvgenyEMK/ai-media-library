@@ -39,7 +39,7 @@ export interface MetadataScanCompletionSignal {
 export interface AiPipelineCompletionSignal {
   jobId: string;
   folderPath: string;
-  kind: "photo" | "face" | "semantic" | "rotation" | "path-llm";
+  kind: "photo" | "face" | "semantic" | "rotation" | "path-llm" | "geo";
   completedAt: string;
 }
 
@@ -107,6 +107,8 @@ export interface DesktopSlice {
   geocoderInitProgressPercent: number | null;
   geocoderInitProgressLabel: string | null;
   geocoderInitPanelVisible: boolean;
+  /** Successful geocoder init shown under Pipeline queue → Completed until dismissed. */
+  geocoderInitRecentCompletionAt: string | null;
 
   /** Background job: live similar-untyped face counts for People list (paginated tags). */
   similarUntaggedCountsJobId: string | null;
@@ -188,6 +190,7 @@ export interface DesktopSlice {
     progressLabel?: string | null,
   ) => void;
   setGeocoderInitPanelVisible: (visible: boolean) => void;
+  dismissGeocoderRecentCompletion: () => void;
   setImageRotationPanelVisible: (visible: boolean) => void;
 
   resetSimilarUntaggedCountsJob: () => void;
@@ -256,6 +259,7 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   geocoderInitProgressPercent: null,
   geocoderInitProgressLabel: null,
   geocoderInitPanelVisible: false,
+  geocoderInitRecentCompletionAt: null,
 
   similarUntaggedCountsJobId: null,
   similarUntaggedCountsStatus: "idle",
@@ -515,12 +519,22 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
       state.geocoderInitProgressLabel = progressLabel ?? null;
       if (status === "downloading" || status === "loading-cache" || status === "parsing") {
         state.geocoderInitPanelVisible = true;
+        state.geocoderInitRecentCompletionAt = null;
+      }
+      if (status === "ready") {
+        state.geocoderInitPanelVisible = false;
+        state.geocoderInitRecentCompletionAt = new Date().toISOString();
       }
     }),
 
   setGeocoderInitPanelVisible: (visible) =>
     set((state) => {
       state.geocoderInitPanelVisible = visible;
+    }),
+
+  dismissGeocoderRecentCompletion: () =>
+    set((state) => {
+      state.geocoderInitRecentCompletionAt = null;
     }),
 
   setImageRotationPanelVisible: (visible) =>

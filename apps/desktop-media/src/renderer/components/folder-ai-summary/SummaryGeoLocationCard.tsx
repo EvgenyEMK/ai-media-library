@@ -70,6 +70,7 @@ export function SummaryGeoLocationCard({
   loading = false,
   actionPending = false,
   queueStatus = null,
+  interactionLocked = false,
   onRunPipeline,
   onInfoClick,
 }: {
@@ -77,6 +78,8 @@ export function SummaryGeoLocationCard({
   loading?: boolean;
   actionPending?: boolean;
   queueStatus?: FolderAiPipelineQueueStatus;
+  /** Disables Play without showing this card's spinner (e.g. folder metadata scan running). */
+  interactionLocked?: boolean;
   onRunPipeline?: () => void;
   onInfoClick?: () => void;
 }): ReactElement {
@@ -132,7 +135,7 @@ export function SummaryGeoLocationCard({
               )}
               title={playTitle}
               aria-label={playTitle}
-              disabled={actionPending || queueStatus !== null}
+              disabled={actionPending || queueStatus !== null || interactionLocked}
               onClick={onRunPipeline}
             >
               {visualQueueStatus === "running" ? (
@@ -165,7 +168,10 @@ export function SummaryGeoLocationCard({
                     items={[
                       {
                         label: "Files with GPS",
-                        value: `${formatCoveragePercent(withGps, totalMedia)} (${formatGroupedInt(withGps)})`,
+                        value:
+                          withGps === 0
+                            ? "0"
+                            : `${formatCoveragePercent(withGps, totalMedia)} (${formatGroupedInt(withGps)})`,
                         labelClassName: "font-medium",
                         valueClassName: "font-medium text-muted-foreground",
                       },

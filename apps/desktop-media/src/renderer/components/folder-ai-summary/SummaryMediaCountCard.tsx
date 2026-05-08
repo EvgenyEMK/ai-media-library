@@ -81,6 +81,8 @@ export function LastDataScanCard({
   dateFormat,
   loading = false,
   actionPending = false,
+  /** Disables Play without showing this card's spinner (e.g. geo-location flow running). */
+  lockInteraction = false,
   outdatedAfterDays = 7,
   hasSubfolders = true,
   onRunFolderScan,
@@ -90,6 +92,7 @@ export function LastDataScanCard({
   dateFormat: DateDisplayFormat;
   loading?: boolean;
   actionPending?: boolean;
+  lockInteraction?: boolean;
   outdatedAfterDays?: number;
   hasSubfolders?: boolean;
   onRunFolderScan?: (scope: ScanFolderMetadataScope) => void;
@@ -197,11 +200,13 @@ export function LastDataScanCard({
     folderPercent !== "100%" &&
     folderPercent !== "0%";
 
+  const playLocked = actionPending || lockInteraction;
+
   const actionSlot = onRunFolderScan ? (
     hasSubfolders && folderTreePlayOpensMenu ? (
       <FolderTreeScanPlayMenu
         ariaLabel={`Run ${title}`}
-        disabled={actionPending}
+        disabled={playLocked}
         pending={actionPending}
         playToneClass={playToneClass}
         onChoose={onRunFolderScan}
@@ -209,7 +214,7 @@ export function LastDataScanCard({
     ) : (
       <FolderScanDirectPlayButton
         ariaLabel={`Run ${title}`}
-        disabled={actionPending}
+        disabled={playLocked}
         pending={actionPending}
         playToneClass={playToneClass}
         onClick={() => onRunFolderScan("full")}

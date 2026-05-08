@@ -14,6 +14,8 @@ import {
 import { UI_TEXT } from "../lib/ui-text";
 import { CellSpinner } from "./desktop-folder-face-summary-table-cells";
 import { PipelineStatusCell } from "./DesktopFolderAiPipelineStatusCell";
+import { statusTone, toneText } from "./folder-ai-summary/summary-card-formatters";
+import type { SummaryStatusTone } from "./folder-ai-summary/summary-card-types";
 import { PendingSpinner } from "./folder-ai-summary/SummaryStatusPrimitives";
 
 interface DesktopFolderGeoSummaryTableProps {
@@ -34,11 +36,15 @@ function CoverageBar({
   title,
   doneCount,
   total,
+  countToneClassName,
 }: {
   title: string;
   doneCount: number;
   total: number;
+  /** When `doneCount > 0`, matches “GPS Location extracted” (red / amber / green / neutral). */
+  countToneClassName: string;
 }): ReactElement {
+  const countClass = doneCount > 0 ? countToneClassName : "text-muted-foreground";
   if (total === 0) {
     return (
       <div>
@@ -46,10 +52,23 @@ function CoverageBar({
       </div>
     );
   }
+  if (doneCount === 0) {
+    return (
+      <div>
+        <div className="mb-1 font-semibold text-muted-foreground">
+          {title} <span className={countClass}>0</span>
+        </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+          <div className="h-full rounded-full bg-muted-foreground" style={{ width: "0%" }} />
+        </div>
+      </div>
+    );
+  }
   return (
     <div>
       <div className="mb-1 font-semibold text-muted-foreground">
-        {title} {formatCoveragePercent(doneCount, total)} ({formatGroupedInt(doneCount)})
+        {title} {formatCoveragePercent(doneCount, total)}{" "}
+        <span className={countClass}>({formatGroupedInt(doneCount)})</span>
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
         <div className="h-full rounded-full bg-muted-foreground" style={{ width: `${Math.min(100, (doneCount / total) * 100)}%` }} />
@@ -61,17 +80,20 @@ function CoverageBar({
 function FileGpsCoverageCell({
   images,
   videos,
+  locationStatusTone,
 }: {
   images: FolderGeoMediaCoverage;
   videos: FolderGeoMediaCoverage;
+  locationStatusTone: SummaryStatusTone;
 }): ReactElement {
   if (images.total + videos.total === 0) {
     return <span className="text-muted-foreground">—</span>;
   }
+  const countToneClassName = toneText(locationStatusTone);
   return (
     <div className="min-w-[220px] space-y-2 text-sm">
-      <CoverageBar title="Images" doneCount={images.withGpsCount} total={images.total} />
-      <CoverageBar title="Videos" doneCount={videos.withGpsCount} total={videos.total} />
+      <CoverageBar title="Images" doneCount={images.withGpsCount} total={images.total} countToneClassName={countToneClassName} />
+      <CoverageBar title="Videos" doneCount={videos.withGpsCount} total={videos.total} countToneClassName={countToneClassName} />
     </div>
   );
 }
@@ -79,21 +101,30 @@ function FileGpsCoverageCell({
 function PathLlmCoverageCell({ detail }: { detail: FolderGeoPathLlmCoverage | undefined }): ReactElement {
   const totalImages = detail?.totalImages ?? 0;
   const doneCount = detail?.doneCount ?? 0;
+  const filesWithCountry = detail?.filesWithCountry ?? 0;
+  const filesWithArea = detail?.filesWithArea ?? 0;
+  const filesWithCity = detail?.filesWithCity ?? 0;
+  const hasLocationBreakdown = filesWithCountry + filesWithArea + filesWithCity > 0;
   if (totalImages === 0) {
     return <span className="text-muted-foreground">—</span>;
   }
   return (
     <div className="min-w-[190px] text-sm">
       <div className="mb-1 font-semibold text-muted-foreground">
-        {formatCoveragePercent(doneCount, totalImages)} ({formatGroupedInt(doneCount)})
+        {doneCount === 0 ? "0" : (
+          <>
+            {formatCoveragePercent(doneCount, totalImages)} ({formatGroupedInt(doneCount)})
+          </>
+        )}
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
         <div className="h-full rounded-full bg-muted-foreground" style={{ width: `${Math.min(100, (doneCount / totalImages) * 100)}%` }} />
       </div>
-      <div className="mt-1.5 text-xs text-muted-foreground">
-        Files with Country: {formatGroupedInt(detail?.filesWithCountry ?? 0)}, Area: {formatGroupedInt(detail?.filesWithArea ?? 0)}, City:{" "}
-        {formatGroupedInt(detail?.filesWithCity ?? 0)}
-      </div>
+      {hasLocationBreakdown ? (
+        <div className="mt-1.5 text-xs text-muted-foreground">
+          Files with Country: {formatGroupedInt(filesWithCountry)}, Area: {formatGroupedInt(filesWithArea)}, City: {formatGroupedInt(filesWithCity)}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -155,16 +186,23 @@ function GeoRow({
     );
   }
 
+  const locationPipeline = locationDetailsAsPipeline(coverage.geo.locationDetails);
+  const locationStatusTone = statusTone(locationPipeline);
+
   return (
     <tr className={highlighted ? "bg-primary/12" : undefined}>
       <td className={cn("border-b border-border px-3 py-2.5 text-left align-top font-medium", noBottomBorder && "border-b-0", highlighted && "text-sm font-semibold")}>
         <FolderCell label={label} subfolderPath={subfolderPath} onSubfolderClick={onSubfolderClick} />
       </td>
       <td className={cn("border-b border-border px-3 py-2.5 text-left align-top", noBottomBorder && "border-b-0")}>
-        <PipelineStatusCell pipeline={locationDetailsAsPipeline(coverage.geo.locationDetails)} />
+        <PipelineStatusCell pipeline={locationPipeline} />
       </td>
       <td className={cn("border-b border-border px-3 py-2.5 text-left align-top", noBottomBorder && "border-b-0")}>
-        <FileGpsCoverageCell images={coverage.geo.images} videos={coverage.geo.videos} />
+        <FileGpsCoverageCell
+          images={coverage.geo.images}
+          videos={coverage.geo.videos}
+          locationStatusTone={locationStatusTone}
+        />
       </td>
       <td className={cn("border-b border-border px-3 py-2.5 text-left align-top", noBottomBorder && "border-b-0")}>
         <PathLlmCoverageCell detail={coverage.geo.pathLlmLocationDetails} />

@@ -91,6 +91,10 @@ export const UI_TEXT = {
   folderAiSummaryFileScanMetadataSection: "File scan and metadata",
   folderAiSummaryDashboardPrototypeVariants: "Card style variants",
   folderAiSummaryGeoLocation: "Geo-location",
+  folderAiSummaryGeoDownloadDialogTitle: "Download geolocation database?",
+  folderAiSummaryGeoDownloadDialogBody:
+    "Reverse geocoding uses a local GeoNames database of about 2 GB. Download progress appears in Background operations. Continue?",
+  folderAiSummaryGeoDownloadConfirm: "OK",
   folderAiSummaryGpsWith: "With GPS",
   folderAiSummaryGpsWithout: "Without GPS",
   folderAiSummaryLocationDetailsDone: "Location details extracted",
@@ -204,7 +208,7 @@ export const UI_TEXT = {
   revealInFileExplorer: "Show in File Explorer",
   copyFilePath: "Copy file path",
   videoAiUnavailable: "AI analysis is not available for videos yet",
-  gpsLocationDetectionTitle: "Detect Country / City from GPS coordinates",
+  gpsLocationDetectionTitle: "Detect Country / City from GPS coordinates on folder scan",
   gpsLocationDetectionDescription: `When enabled, images with GPS coordinates are reverse-geocoded during metadata scan to fill in Country, State/Province, and City. This data is used in search filters, folder/album views, and smart albums.
 
 First-time setup downloads ~2 GB of GeoNames geographic data (cached locally for future use).`,

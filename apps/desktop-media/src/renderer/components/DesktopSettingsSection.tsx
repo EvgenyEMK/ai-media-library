@@ -174,7 +174,7 @@ const UI_TEXT = {
   extractInvoiceDataTitle: "Extract invoice data",
   extractInvoiceDataDescription:
     "When an image is an invoice or receipt, run a second prompt to store issuer, invoice number/date, totals, currency, and VAT as structured fields.",
-  gpsLocationDetectionTitle: "Detect Country / City from GPS coordinates",
+  gpsLocationDetectionTitle: "Detect Country / City from GPS coordinates on folder scan",
   gpsLocationDetectionDescription:
     "During metadata scan, GPS coordinates are matched against offline GeoNames data to fill Country, State/Province, and City for search filters and folder views. First-time setup downloads about 2 GB of cached geographic data.",
   gpsLocationDetectionConfirmTitle: "Download location data?",

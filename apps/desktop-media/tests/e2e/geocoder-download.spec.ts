@@ -48,14 +48,15 @@ test.describe("GPS location database download flow", () => {
 
       await expect(mainWindow.getByRole("region", { name: /Background operations/i })).toBeVisible();
 
+      await expect(mainWindow.getByLabel("Pipeline queue")).toContainText("Completed (1)", {
+        timeout: 15_000,
+      });
       await expect(
         mainWindow.getByRole("heading", { name: "GPS location database" }),
       ).toBeVisible({
         timeout: 15_000,
       });
-      await expect(
-        mainWindow.getByText("Location database ready.", { exact: true }),
-      ).toBeVisible({
+      await expect(mainWindow.getByText(/Location database ready/i)).toBeVisible({
         timeout: 15_000,
       });
 
@@ -102,14 +103,15 @@ test.describe("GPS location database local-copy flow", () => {
     await useLocalCopyButton.click();
     await expect(gpsCheckbox).toBeChecked();
 
+    await expect(mainWindow.getByLabel("Pipeline queue")).toContainText("Completed (1)", {
+      timeout: 15_000,
+    });
     await expect(
       mainWindow.getByRole("heading", { name: "GPS location database" }),
     ).toBeVisible({
       timeout: 15_000,
     });
-    await expect(
-      mainWindow.getByText("Location database ready.", { exact: true }),
-    ).toBeVisible({
+    await expect(mainWindow.getByText(/Location database ready/i)).toBeVisible({
       timeout: 15_000,
     });
   });

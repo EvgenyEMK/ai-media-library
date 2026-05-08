@@ -205,6 +205,7 @@ export const IPC_CHANNELS = {
   cancelPathAnalysis: "media:cancel-path-analysis",
   pathAnalysisProgress: "media:path-analysis-progress",
   getGeocoderCacheStatus: "media:get-geocoder-cache-status",
+  getGpsGeocodePendingCount: "media:get-gps-geocode-pending-count",
   initGeocoder: "media:init-geocoder",
   geocoderInitProgress: "media:geocoder-init-progress",
   /** Push: auto-update state for optional renderer UI (discriminated by `type`). */
@@ -2377,6 +2378,8 @@ export interface DesktopApi {
   cancelPathAnalysis: (jobId: string) => Promise<boolean>;
   onPathAnalysisProgress: (listener: PathAnalysisProgressListener) => () => void;
   getGeocoderCacheStatus: () => Promise<GeocoderCacheStatus>;
+  /** Items under folderPath that have GPS coords but still need reverse-geocoding into catalog fields. */
+  getGpsGeocodePendingCount: (request: { folderPath: string; recursive?: boolean }) => Promise<number>;
   initGeocoder: (options?: { forceRefresh?: boolean }) => Promise<void>;
   onGeocoderInitProgress: (listener: (event: GeocoderInitProgressEvent) => void) => () => void;
   // TEMPORARY: description embedding backfill — remove after migration

@@ -59,6 +59,31 @@ describe("syncSummaryPipelineCompletionsFromQueueSnapshot", () => {
     });
   });
 
+  it("publishes a completion signal for gps-geocode so geo-location summaries refresh", () => {
+    const store = createDesktopStore();
+    const seenJobIds = new Set<string>();
+
+    syncSummaryPipelineCompletionsFromQueueSnapshot(
+      store,
+      snapshotWithRecentJob(
+        job({
+          jobId: "gps-job",
+          pipelineId: "gps-geocode",
+          state: "succeeded",
+          params: { folderPath: "C:\\photos\\trip", recursive: true },
+        }),
+      ),
+      seenJobIds,
+    );
+
+    expect(store.getState().lastAiPipelineCompletion).toEqual({
+      jobId: "gps-job",
+      folderPath: "C:\\photos\\trip",
+      kind: "geo",
+      completedAt: "2026-05-01T12:01:00.000Z",
+    });
+  });
+
   it("publishes a completion signal for path LLM analysis so folder summaries refresh", () => {
     const store = createDesktopStore();
     const seenJobIds = new Set<string>();
