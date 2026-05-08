@@ -70,9 +70,13 @@ export function DesktopProgressDock({
   const pipelineRunning = useDesktopStore((s) => s.pipelineRunning);
   const pipelineQueued = useDesktopStore((s) => s.pipelineQueued);
   const pipelineRecent = useDesktopStore((s) => s.pipelineRecent);
+  const geocoderInitRecentCompletionAt = useDesktopStore((s) => s.geocoderInitRecentCompletionAt);
   const selectedFolder = useDesktopStore((s) => s.selectedFolder);
   const hasPipelineQueueActivity =
-    pipelineRunning.length > 0 || pipelineQueued.length > 0 || pipelineRecent.length > 0;
+    pipelineRunning.length > 0 ||
+    pipelineQueued.length > 0 ||
+    pipelineRecent.length > 0 ||
+    geocoderInitRecentCompletionAt !== null;
   const isAnyPipelineRunning = pipelineRunning.length > 0 || dock.hasAnyRunningOperation;
 
   const showRunPipelinesTestUi = useShowRunPipelinesTestUi();

@@ -9,6 +9,7 @@ import type {
   FolderTreeQuickScanBreakdown,
   ScanFolderMetadataScope,
 } from "../../shared/ipc";
+import { useFolderAiSummaryGeoPlay } from "../hooks/use-folder-ai-summary-geo-play";
 import { useFolderAiSummaryPipelineActions } from "../hooks/use-folder-ai-summary-pipeline-actions";
 import { cn } from "../lib/cn";
 import {
@@ -27,6 +28,7 @@ import { PendingSpinner } from "./folder-ai-summary/SummaryStatusPrimitives";
 import { useDesktopStore } from "../stores/desktop-store";
 import { useFolderAiSummaryTableStream } from "../hooks/use-folder-ai-summary-table-stream";
 import { useFolderFaceSummaryStream } from "../hooks/use-folder-face-summary-stream";
+import { ConfirmActionDialog } from "./ConfirmActionDialog";
 import { PipelineOnboardingModal, type PipelineOnboardingSlideId } from "./folder-ai-summary/PipelineOnboardingModal";
 
 type SummaryTab = "summary" | "face" | "ai" | "geo";
@@ -109,6 +111,7 @@ export function DesktopFolderAiSummaryView({
   const folderScanOutdatedAfterDays = useDesktopStore(
     (state) => state.folderScanningSettings.markFolderScanOutdatedAfterDays,
   );
+  const detectLocationFromGps = useDesktopStore((state) => state.folderScanningSettings.detectLocationFromGps);
   const loadSequenceRef = useRef(0);
   const [overviewLoading, setOverviewLoading] = useState(true);
   const [folderScanLoading, setFolderScanLoading] = useState(true);
@@ -382,6 +385,23 @@ export function DesktopFolderAiSummaryView({
   const summaryTitle = hasSubfolders ? UI_TEXT.folderAiSummaryTreeTitle : UI_TEXT.folderAiSummaryFolderTitle;
   const dashboardCoverage = hasSubfolders ? selectedWithSubfolders : selectedDirectOnly;
   const dashboardOverview = hasSubfolders ? overviewReport?.selectedWithSubfolders : overviewReport?.selectedDirectOnly;
+  const {
+    geoPlayPending,
+    runGeoLocation,
+    geoDownloadDialogOpen,
+    geoDownloadBusy,
+    confirmGeoDownload,
+    cancelGeoDownloadDialog,
+  } = useFolderAiSummaryGeoPlay({
+    folderPath,
+    hasSubfolders,
+    dashboardOverview,
+    folderScanLoading,
+    overviewLoading,
+    folderScanOutdatedAfterDays,
+    detectLocationFromGps,
+    load,
+  });
   const failedListPipelineLabel =
     failedListContext?.pipeline === "photo"
       ? UI_TEXT.folderAiSummaryColumnPhoto
@@ -531,8 +551,14 @@ export function DesktopFolderAiSummaryView({
                 coverageLoading={coverageLoading}
                 actionPendingPipeline={actionPendingPipeline}
                 onRunPipeline={(pipeline) => void runDashboardPipeline(pipeline)}
-                actionPendingGeoLocation={folderScanPending}
-                onRunGeoLocation={() => void runFolderScanWithSubfolders("full")}
+                actionPendingGeoLocation={geoPlayPending}
+                onRunGeoLocation={
+                  dashboardCoverage.geo.locationDetails.totalWithGps > 0
+                    ? () => void runGeoLocation()
+                    : undefined
+                }
+                lockFolderScanInteraction={geoPlayPending}
+                lockGeoLocationInteraction={folderScanPending}
                 onOpenPipelineInfo={openOnboarding}
                 onViewRotationResults={
                   (dashboardCoverage.rotation.issueCount ?? 0) > 0 && onOpenRotationReview
@@ -681,6 +707,20 @@ export function DesktopFolderAiSummaryView({
           metaByPath={failedListMetaByPath}
         />
       ) : null}
+
+      <ConfirmActionDialog
+        open={geoDownloadDialogOpen}
+        title={UI_TEXT.folderAiSummaryGeoDownloadDialogTitle}
+        confirmLabel={UI_TEXT.folderAiSummaryGeoDownloadConfirm}
+        cancelLabel="Cancel"
+        isBusy={geoDownloadBusy}
+        tone="default"
+        emphasizeCancel
+        onConfirm={() => void confirmGeoDownload()}
+        onCancel={cancelGeoDownloadDialog}
+      >
+        {UI_TEXT.folderAiSummaryGeoDownloadDialogBody}
+      </ConfirmActionDialog>
 
       <PipelineOnboardingModal
         open={onboardingOpen}

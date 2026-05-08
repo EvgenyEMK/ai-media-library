@@ -91,6 +91,10 @@ export const UI_TEXT = {
   folderAiSummaryFileScanMetadataSection: "File scan and metadata",
   folderAiSummaryDashboardPrototypeVariants: "Card style variants",
   folderAiSummaryGeoLocation: "Geo-location",
+  folderAiSummaryGeoDownloadDialogTitle: "Download geolocation database?",
+  folderAiSummaryGeoDownloadDialogBody:
+    "Reverse geocoding uses a local GeoNames database of about 2 GB. Download progress appears in Background operations. Continue?",
+  folderAiSummaryGeoDownloadConfirm: "OK",
   folderAiSummaryGpsWith: "With GPS",
   folderAiSummaryGpsWithout: "Without GPS",
   folderAiSummaryLocationDetailsDone: "Location details extracted",

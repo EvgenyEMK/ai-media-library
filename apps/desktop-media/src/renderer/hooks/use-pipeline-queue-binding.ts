@@ -11,6 +11,7 @@ const summaryPipelineKindByPipelineId: Partial<Record<PipelineId, AiPipelineComp
   "semantic-index": "semantic",
   "image-rotation-precheck": "rotation",
   "path-llm-analysis": "path-llm",
+  "gps-geocode": "geo",
 };
 
 function folderPathFromJobParams(params: unknown): string | null {

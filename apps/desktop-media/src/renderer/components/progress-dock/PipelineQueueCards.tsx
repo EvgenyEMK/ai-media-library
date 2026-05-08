@@ -1,10 +1,11 @@
-import { useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { useDesktopStore } from "../../stores/desktop-store";
 import { cn } from "../../lib/cn";
 import type { BundleView, JobView } from "../../../shared/pipeline-types";
 import { ProgressDockCloseButton } from "./ProgressDockCloseButton";
 import { ProgressCardBody } from "./cards/ProgressCardBody";
+import { GeocoderQueueRecentCard } from "./cards/GeocoderQueueRecentCard";
 import { buildPipelineQueueRightText, buildPipelineQueueStatsText } from "../../lib/pipeline-queue-progress-stats";
 
 /**
@@ -24,9 +25,21 @@ export function PipelineQueueCards(): ReactElement | null {
   const queued = useDesktopStore((s) => s.pipelineQueued);
   const recent = useDesktopStore((s) => s.pipelineRecent);
   const dismissRecentBundle = useDesktopStore((s) => s.dismissRecentBundle);
+  const geocoderRecentCompletionAt = useDesktopStore((s) => s.geocoderInitRecentCompletionAt);
   const [recentExpanded, setRecentExpanded] = useState(false);
 
-  if (running.length === 0 && queued.length === 0 && recent.length === 0) {
+  const completedBundleCount = recent.length;
+  const hasGeocoderRecent = geocoderRecentCompletionAt !== null;
+  const completedTotalCount = completedBundleCount + (hasGeocoderRecent ? 1 : 0);
+  const hasCompletedSection = completedTotalCount > 0;
+
+  useEffect(() => {
+    if (hasGeocoderRecent) {
+      setRecentExpanded(true);
+    }
+  }, [hasGeocoderRecent]);
+
+  if (running.length === 0 && queued.length === 0 && !hasCompletedSection) {
     return null;
   }
 
@@ -46,7 +59,7 @@ export function PipelineQueueCards(): ReactElement | null {
           ))}
         </Section>
       ) : null}
-      {recent.length > 0 ? (
+      {hasCompletedSection ? (
         <div className="flex flex-col gap-1">
           <button
             type="button"
@@ -55,10 +68,11 @@ export function PipelineQueueCards(): ReactElement | null {
             onClick={() => setRecentExpanded((expanded) => !expanded)}
           >
             {recentExpanded ? <ChevronDown size={12} aria-hidden="true" /> : <ChevronRight size={12} aria-hidden="true" />}
-            <span>{`Completed (${recent.length})`}</span>
+            <span>{`Completed (${completedTotalCount})`}</span>
           </button>
           {recentExpanded ? (
             <div className="flex flex-col gap-1">
+              {hasGeocoderRecent ? <GeocoderQueueRecentCard /> : null}
               {recent.slice(0, 3).map((bundle) => (
                 <BundleCard key={bundle.bundleId} bundle={bundle} variant="recent" onDismissRecent={dismissRecentBundle} />
               ))}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BundleView, JobView, PipelineId } from "../../shared/pipeline-types";
-import { getFolderAiPipelineQueueStatus } from "./folder-ai-pipeline-queue-status";
+import { getFolderAiPipelineQueueStatus, getFolderGeoPipelineQueueStatus } from "./folder-ai-pipeline-queue-status";
 
 function jobView(options: {
   pipelineId: PipelineId;
@@ -74,5 +74,55 @@ describe("getFolderAiPipelineQueueStatus", () => {
         folderPath: "C:/Photos/Trip",
       }),
     ).toBe("queued");
+  });
+});
+
+describe("getFolderGeoPipelineQueueStatus", () => {
+  it("returns running when a gps-geocode job targets the folder", () => {
+    const running = [
+      bundleView(
+        jobView({ pipelineId: "gps-geocode", folderPath: "C:/Photos/Trip", recursive: true, state: "running" }),
+        "running",
+      ),
+    ];
+    expect(
+      getFolderGeoPipelineQueueStatus({
+        running,
+        queued: [],
+        folderPath: "C:/Photos/Trip",
+      }),
+    ).toBe("running");
+  });
+
+  it("returns queued when the geo bundle is queued", () => {
+    const queued = [
+      bundleView(
+        jobView({ pipelineId: "gps-geocode", folderPath: "C:/Photos/Trip", recursive: true, state: "pending" }),
+        "queued",
+      ),
+    ];
+    expect(
+      getFolderGeoPipelineQueueStatus({
+        running: [],
+        queued,
+        folderPath: "C:/Photos/Trip",
+      }),
+    ).toBe("queued");
+  });
+
+  it("returns null when gps-geocode applies to another folder", () => {
+    const running = [
+      bundleView(
+        jobView({ pipelineId: "gps-geocode", folderPath: "C:/Photos/Other", recursive: true, state: "running" }),
+        "running",
+      ),
+    ];
+    expect(
+      getFolderGeoPipelineQueueStatus({
+        running,
+        queued: [],
+        folderPath: "C:/Photos/Trip",
+      }),
+    ).toBe(null);
   });
 });

@@ -31,10 +31,9 @@ export interface GeocoderInitOutput {
  * Pipeline definition that wraps {@link initGeocoder} so it can run as part of
  * a bundle. Concurrency group is "io" (download + parse).
  *
- * Cancellation: `initGeocoder` itself does not currently honour an
- * AbortSignal, but the operation typically completes within seconds when
- * cached data exists. When a download is required, callers can dismiss the
- * resulting card; the underlying operation will finish in the background.
+ * Cancellation: `initGeocoder` does not honour `AbortSignal` yet — cancelling
+ * the scheduler bundle may remove UI feedback while a large GeoNames download
+ * continues in the background until completion or error.
  */
 export const geocoderInitDefinition: PipelineDefinition<GeocoderInitParams, GeocoderInitOutput> = {
   id: "geocoder-init",

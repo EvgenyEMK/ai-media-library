@@ -77,14 +77,24 @@ const GEOCODER_CACHE_DATASETS = [
 
 function datasetDownloadProgress(geonamesPath: string): { progressPercent: number; progressLabel: string } {
   const totalDatasets = GEOCODER_CACHE_DATASETS.length;
-  const cachedDatasets = GEOCODER_CACHE_DATASETS.filter(
-    (dataset) => getCachedDatasetPathForDataset(geonamesPath, dataset) !== null,
-  ).length;
+  let cachedDatasets = 0;
+  let nextMissing: string | null = null;
+  for (const dataset of GEOCODER_CACHE_DATASETS) {
+    if (getCachedDatasetPathForDataset(geonamesPath, dataset) !== null) {
+      cachedDatasets += 1;
+    } else if (nextMissing === null) {
+      nextMissing = dataset.dirName;
+    }
+  }
   // Keep a small headroom for parse/finalize before "ready".
   const progressPercent = Math.min(95, Math.round((cachedDatasets / totalDatasets) * 95));
+  const progressLabel =
+    nextMissing !== null
+      ? `Downloaded datasets: ${cachedDatasets}/${totalDatasets} — fetching ${nextMissing}…`
+      : `Downloaded datasets: ${cachedDatasets}/${totalDatasets}`;
   return {
     progressPercent,
-    progressLabel: `Downloaded datasets: ${cachedDatasets}/${totalDatasets}`,
+    progressLabel,
   };
 }
 

@@ -114,6 +114,17 @@ export function getMediaItemsNeedingGpsGeocoding(
  * Same row predicate as the ID-based variant: items with GPS coordinates
  * whose GPS-derived location is missing or incomplete.
  */
+/**
+ * Count of media rows that would be returned by {@link getAllMediaItemsNeedingGpsGeocoding}
+ * (same folder scope and predicates).
+ */
+export function countMediaItemsNeedingGpsGeocoding(
+  options: { folderPath?: string; recursive?: boolean } = {},
+  libraryId: string = DEFAULT_LIBRARY_ID,
+): number {
+  return getAllMediaItemsNeedingGpsGeocoding(options, libraryId).length;
+}
+
 export function getAllMediaItemsNeedingGpsGeocoding(
   options: { folderPath?: string; recursive?: boolean } = {},
   libraryId: string = DEFAULT_LIBRARY_ID,
