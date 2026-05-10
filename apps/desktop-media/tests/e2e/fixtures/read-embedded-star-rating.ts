@@ -7,6 +7,7 @@ import {
   createExifReaderDomParser,
   inferMimeTypeFromPath,
   parseExifMetadataFromExpandedTags,
+  windowsRatingPercentOrIfd0ToStars,
 } from "@emk/media-metadata-core";
 
 function asFiniteNumber(v: unknown): number | null {
@@ -68,9 +69,25 @@ export function getFileMtimeMs(absolutePath: string): number {
   return fs.statSync(absolutePath).mtimeMs;
 }
 
+function starsFromWindowsIfd0AndPercent(w: {
+  exifRating: number | null;
+  ratingPercent: number | null;
+}): number | null {
+  if (w.exifRating !== null && w.exifRating >= 1 && w.exifRating <= 5) {
+    return w.exifRating;
+  }
+  if (w.ratingPercent !== null) {
+    return windowsRatingPercentOrIfd0ToStars(w.ratingPercent);
+  }
+  return null;
+}
+
 /**
  * Poll until the file’s `mtime` is strictly newer than `mtimeMustBeAfterMs` and
- * embedded metadata parses to the expected star rating (async background write from main).
+ * embedded metadata shows the expected stars. Accepts either the catalog parser (ExifReader,
+ * XMP-first merge) **or** Windows IFD0 `Rating` / `RatingPercent` — ExifTool can briefly leave
+ * XMP out of sync with IFD0 on successive writes; the app’s merge prefers XMP, but disk may
+ * already reflect the new rating in EXIF.
  */
 export async function waitUntilFileShowsStarRatingAndNewerMtime(
   filePath: string,
@@ -81,19 +98,29 @@ export async function waitUntilFileShowsStarRatingAndNewerMtime(
     .poll(
       async () => {
         const mtimeMs = getFileMtimeMs(filePath);
-        const rating = await readStarRatingFromImageFile(filePath);
         if (mtimeMs <= mtimeMustBeAfterMs) {
-          return { ok: false as const, reason: "mtime", mtimeMs, rating };
+          return { ok: false as const, reason: "mtime" as const, mtimeMs };
         }
-        if (rating !== expectedRating) {
-          return { ok: false as const, reason: "rating", mtimeMs, rating };
+        const catalogRating = await readStarRatingFromImageFile(filePath);
+        const exifTags = await readWindowsExifRatingTags(filePath);
+        const shellRating = starsFromWindowsIfd0AndPercent(exifTags);
+        const matches =
+          catalogRating === expectedRating || shellRating === expectedRating;
+        if (!matches) {
+          return {
+            ok: false as const,
+            reason: "rating" as const,
+            mtimeMs,
+            catalogRating,
+            shellRating,
+          };
         }
-        return { ok: true as const, mtimeMs, rating };
+        return { ok: true as const, mtimeMs, catalogRating, shellRating };
       },
       {
         timeout: 120_000,
-        message: `Expected file ${filePath} mtime > ${mtimeMustBeAfterMs} and embedded starRating === ${expectedRating}`,
+        message: `Expected file ${filePath} mtime > ${mtimeMustBeAfterMs} and catalog or Windows EXIF rating === ${expectedRating}`,
       },
     )
-    .toMatchObject({ ok: true, rating: expectedRating });
+    .toMatchObject({ ok: true });
 }

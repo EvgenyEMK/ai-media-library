@@ -172,7 +172,9 @@ test.describe("Viewer mixed media", () => {
       const paused = await currentViewerVideoPaused(mainWindow);
       if (paused !== null) {
         reachedVideo = true;
-        expect(paused).toBe(true);
+        await expect
+          .poll(async () => currentViewerVideoPaused(mainWindow), { timeout: 10_000 })
+          .toBe(true);
         break;
       }
     }

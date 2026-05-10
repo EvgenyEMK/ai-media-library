@@ -8,6 +8,7 @@ import {
 } from "../db/media-item-metadata";
 import { DEFAULT_LIBRARY_ID } from "../db/folder-analysis-status";
 import { refreshObservedStateForPaths } from "../db/file-identity";
+import { canonicalPathKeyForEmbeddedWriteQueue } from "../lib/embedded-write-path-key";
 import { writeStarRatingToMediaFile } from "../lib/write-star-rating-exiftool";
 import { readSettings } from "../storage";
 
@@ -15,7 +16,7 @@ import { readSettings } from "../storage";
 const embeddedStarWriteTailByPath = new Map<string, Promise<void>>();
 
 function enqueueEmbeddedStarWrite(sourcePath: string, starRating: number): Promise<void> {
-  const key = path.normalize(sourcePath);
+  const key = canonicalPathKeyForEmbeddedWriteQueue(sourcePath);
   const prev = embeddedStarWriteTailByPath.get(key) ?? Promise.resolve();
   const next = prev.catch(() => undefined).then(() => writeStarRatingToMediaFile(sourcePath, starRating));
   embeddedStarWriteTailByPath.set(key, next);
