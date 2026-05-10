@@ -44,7 +44,8 @@ import {
 } from "../src/shared/ipc";
 import { exiftool } from "exiftool-vendored";
 import { resolveInstalledUserDataPath } from "./install-config";
-import { resolveModelsPath, resolveSessionDataPath } from "./app-paths";
+import { resolveOnnxModelsPath, resolveSessionDataPath } from "./app-paths";
+import { migrateAiModelsLayout } from "./migrate-ai-models-layout";
 import {
   applyAiInferenceGpuPreference,
   detectAiInferenceGpuOptions,
@@ -137,7 +138,8 @@ app.whenReady().then(async () => {
   setDatabaseProvider(() => getDesktopDatabase());
   clearAllInProgressFlags();
 
-  setModelsDirectory(resolveModelsPath(app));
+  await migrateAiModelsLayout(app);
+  setModelsDirectory(resolveOnnxModelsPath(app));
 
   semanticEmbeddingStatusRef.current = await probeMultimodalEmbeddingSupport();
 

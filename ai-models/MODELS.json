@@ -4,7 +4,7 @@
   "models": [
     {
       "id": "arcface-w600k-r50",
-      "paths": ["w600k_r50.onnx"],
+      "paths": ["onnx/w600k_r50.onnx"],
       "purpose": "ArcFace face embedding (512-D) for similarity / person clustering.",
       "sources": [
         "https://huggingface.co/maze/faceX/resolve/main/w600k_r50.onnx",
@@ -14,7 +14,7 @@
     },
     {
       "id": "retinaface-mv2",
-      "paths": ["retinaface_mv2.onnx"],
+      "paths": ["onnx/retinaface_mv2.onnx"],
       "purpose": "RetinaFace face detection (optional detector backend).",
       "sources": [
         "https://github.com/yakhyo/retinaface-pytorch/releases/download/v0.0.1/retinaface_mv2.onnx"
@@ -24,10 +24,10 @@
     {
       "id": "yolov12-face",
       "paths": [
-        "yolov12n-face.onnx",
-        "yolov12s-face.onnx",
-        "yolov12m-face.onnx",
-        "yolov12l-face.onnx"
+        "onnx/yolov12n-face.onnx",
+        "onnx/yolov12s-face.onnx",
+        "onnx/yolov12m-face.onnx",
+        "onnx/yolov12l-face.onnx"
       ],
       "purpose": "YOLOv12 face detection variants (user-selectable detector).",
       "sources": [
@@ -40,7 +40,7 @@
     },
     {
       "id": "deep-image-orientation",
-      "paths": ["deep-image-orientation.onnx"],
+      "paths": ["onnx/deep-image-orientation.onnx"],
       "purpose": "Full-image orientation classifier (auxiliary; suggests rotation before face pipeline).",
       "sources": [
         "https://huggingface.co/DuarteBarbosa/deep-image-orientation-detection/resolve/main/orientation_model_v2_0.9882.onnx"
@@ -49,7 +49,7 @@
     },
     {
       "id": "pfld-landmarks",
-      "paths": ["pfld_ghostone.onnx"],
+      "paths": ["onnx/pfld_ghostone.onnx"],
       "purpose": "PFLD-style 98-point landmarks → reduced 5-point alignment for ArcFace (auxiliary).",
       "sources": [
         "https://huggingface.co/shadow-cann/hispark-modelzoo-pfld/resolve/main/pfld-sim.onnx",
@@ -60,7 +60,7 @@
     },
     {
       "id": "age-gender-onnx",
-      "paths": ["age-gender.onnx"],
+      "paths": ["onnx/age-gender.onnx"],
       "purpose": "Age / gender estimation on face crops (auxiliary; Face Tags).",
       "sources": [
         "https://huggingface.co/onnx-community/age-gender-prediction-ONNX/resolve/main/onnx/model.onnx"
@@ -70,9 +70,9 @@
     {
       "id": "nomic-embed-vision-v1.5",
       "paths": [
-        "nomic-embed-vision-v1.5/config.json",
-        "nomic-embed-vision-v1.5/preprocessor_config.json",
-        "nomic-embed-vision-v1.5/onnx/model_quantized.onnx"
+        "huggingface/models/nomic-ai/nomic-embed-vision-v1.5/config.json",
+        "huggingface/models/nomic-ai/nomic-embed-vision-v1.5/preprocessor_config.json",
+        "huggingface/models/nomic-ai/nomic-embed-vision-v1.5/onnx/model_quantized.onnx"
       ],
       "purpose": "Image feature vectors for semantic search / vision-side indexing (@huggingface/transformers, quantized ONNX).",
       "sources": [
@@ -86,16 +86,16 @@
     {
       "id": "nomic-embed-text-v1.5",
       "paths": [
-        "nomic-embed-text-v1.5/config.json",
-        "nomic-embed-text-v1.5/config_sentence_transformers.json",
-        "nomic-embed-text-v1.5/modules.json",
-        "nomic-embed-text-v1.5/sentence_bert_config.json",
-        "nomic-embed-text-v1.5/special_tokens_map.json",
-        "nomic-embed-text-v1.5/tokenizer.json",
-        "nomic-embed-text-v1.5/tokenizer_config.json",
-        "nomic-embed-text-v1.5/vocab.txt",
-        "nomic-embed-text-v1.5/1_Pooling/config.json",
-        "nomic-embed-text-v1.5/onnx/model_quantized.onnx"
+        "huggingface/models/nomic-ai/nomic-embed-text-v1.5/config.json",
+        "huggingface/models/nomic-ai/nomic-embed-text-v1.5/config_sentence_transformers.json",
+        "huggingface/models/nomic-ai/nomic-embed-text-v1.5/modules.json",
+        "huggingface/models/nomic-ai/nomic-embed-text-v1.5/sentence_bert_config.json",
+        "huggingface/models/nomic-ai/nomic-embed-text-v1.5/special_tokens_map.json",
+        "huggingface/models/nomic-ai/nomic-embed-text-v1.5/tokenizer.json",
+        "huggingface/models/nomic-ai/nomic-embed-text-v1.5/tokenizer_config.json",
+        "huggingface/models/nomic-ai/nomic-embed-text-v1.5/vocab.txt",
+        "huggingface/models/nomic-ai/nomic-embed-text-v1.5/1_Pooling/config.json",
+        "huggingface/models/nomic-ai/nomic-embed-text-v1.5/onnx/model_quantized.onnx"
       ],
       "purpose": "Text (and text-pair) embeddings for semantic search / keyword rerank (@huggingface/transformers, quantized ONNX).",
       "sources": [

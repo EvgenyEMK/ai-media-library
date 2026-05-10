@@ -152,6 +152,23 @@ export function listCoreModelFilenames(): string[] {
   return Object.keys(CORE_MODEL_URLS);
 }
 
+/** Filenames downloaded/managed under the ONNX models directory (no path segments). */
+export function listAllManagedOnnxFilenames(): string[] {
+  const names = new Set<string>();
+  for (const key of Object.keys(CORE_MODEL_URLS)) {
+    names.add(key);
+  }
+  for (const descriptor of Object.values(DETECTOR_MODELS)) {
+    names.add(descriptor.filename);
+  }
+  for (const byKind of Object.values(AUX_MODELS)) {
+    for (const descriptor of Object.values(byKind)) {
+      names.add(descriptor.filename);
+    }
+  }
+  return [...names];
+}
+
 export function getAuxModelDescriptor(
   kind: AuxModelKind,
   modelId: AuxModelId,

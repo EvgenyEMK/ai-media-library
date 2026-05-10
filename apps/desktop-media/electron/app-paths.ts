@@ -28,6 +28,16 @@ export function resolveModelsPath(app: App): string {
   return path.join(resolveRuntimeRoot(app), "ai-models");
 }
 
+/** Native face/aux ONNX weights (flat files managed by `native-face/model-manager`). */
+export function resolveOnnxModelsPath(app: App): string {
+  return path.join(resolveModelsPath(app), "onnx");
+}
+
+/** Transformers.js Hugging Face cache + local model roots (`cache/` + `models/` inside). */
+export function resolveHuggingfaceModelsRoot(app: App): string {
+  return path.join(resolveModelsPath(app), "huggingface");
+}
+
 export function resolveGeonamesPath(app: App): string {
   return path.join(resolveRuntimeRoot(app), "geonames");
 }

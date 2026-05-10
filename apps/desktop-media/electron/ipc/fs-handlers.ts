@@ -27,8 +27,13 @@ import {
 import { emitFolderImagesProgress, emitFolderMediaProgress } from "./progress-emitters";
 import { runMetadataScanJob } from "./metadata-scan-handlers";
 import { runningMetadataScanJobs } from "./state";
-import { getModelsDirectory } from "../native-face/model-manager";
-import { resolveCacheRoot, resolveGeonamesPath } from "../app-paths";
+import {
+  resolveCacheRoot,
+  resolveGeonamesPath,
+  resolveHuggingfaceModelsRoot,
+  resolveModelsPath,
+  resolveOnnxModelsPath,
+} from "../app-paths";
 import { getMediaEmbeddingsCompatStatus } from "../db/client";
 import { getSemanticIndexDebugLogPath } from "../semantic-index-debug-log";
 import { releasePowerSave } from "./power-save-manager";
@@ -225,26 +230,23 @@ export function registerFsHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.getDatabaseLocation, async () => {
     const userDataPath = app.getPath("userData");
     const appDataPath = app.getPath("appData");
-    let modelsPath: string | null = null;
-    try {
-      modelsPath = getModelsDirectory();
-    } catch {
-      modelsPath = null;
-    }
     let cachePath: string | null = null;
     try {
       cachePath = resolveCacheRoot(app);
     } catch {
       cachePath = null;
     }
+    const runtimeFallback = path.join(appDataPath, "EMK Desktop Media");
     return {
       appDataPath,
       userDataPath,
       dbFileName: "desktop-media.db",
       dbPath: path.join(userDataPath, "desktop-media.db"),
-      modelsPath: modelsPath ?? path.join(appDataPath, "EMK Desktop Media", "ai-models"),
+      modelsPath: resolveModelsPath(app),
+      onnxModelsPath: resolveOnnxModelsPath(app),
+      huggingfaceModelsPath: resolveHuggingfaceModelsRoot(app),
       geonamesPath: resolveGeonamesPath(app),
-      cachePath: cachePath ?? path.join(appDataPath, "EMK Desktop Media", "cache"),
+      cachePath: cachePath ?? path.join(runtimeFallback, "cache"),
       mediaEmbeddingsCompatStatus: getMediaEmbeddingsCompatStatus(),
       semanticDebugLogPath: getSemanticIndexDebugLogPath(),
     };

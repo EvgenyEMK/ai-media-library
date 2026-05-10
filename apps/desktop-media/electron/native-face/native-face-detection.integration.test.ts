@@ -5,8 +5,8 @@
  * when models are not available (CI without pre-downloaded models).
  *
  * To run:
- *   1. Download models: npx tsx electron/native-face/model-manager.ts
- *   2. Set EMK_NATIVE_FACE_MODELS_DIR to the models directory
+ *   1. Download models: `pnpm download-ai-models` (writes to repo `ai-models/onnx/`).
+ *   2. Set EMK_NATIVE_FACE_MODELS_DIR to that **onnx** folder (directory containing `.onnx` files).
  *   3. Run: pnpm test -- electron/native-face/native-face-detection.integration.test.ts
  */
 

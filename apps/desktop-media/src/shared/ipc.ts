@@ -270,7 +270,12 @@ export interface DatabaseLocationInfo {
   userDataPath: string;
   dbFileName: string;
   dbPath: string;
+  /** Consolidated AI weights root (`ai-models`). */
   modelsPath: string;
+  /** Native face/aux ONNX files (`ai-models/onnx`). */
+  onnxModelsPath: string;
+  /** Transformers.js Hugging Face cache root (`ai-models/huggingface`). */
+  huggingfaceModelsPath: string;
   geonamesPath: string;
   cachePath: string;
   /** Temporary troubleshooting signal for packaged legacy DB compatibility checks. */

@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * Downloads ONNX face / aux weights into ./ai-models/ at the repo root.
+ * Downloads ONNX face / aux weights into ./ai-models/onnx/ at the repo root
+ * (matches packaged runtime: EMK Desktop Media/ai-models/onnx).
  * Keep URL lists in sync with apps/desktop-media/electron/native-face/model-manager.ts
  *
  * Does not fetch: Ollama LLM weights, or @huggingface/transformers caches for
- * Nomic vision/text (those load on first use into HF cache).
+ * Nomic vision/text (those load on first use under ai-models/huggingface).
  *
  * Usage: node scripts/download-ai-models.mjs [--force]
  */
@@ -18,7 +19,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
-const OUT_DIR = path.join(REPO_ROOT, "ai-models");
+const OUT_DIR = path.join(REPO_ROOT, "ai-models", "onnx");
 
 /** @type {{ filename: string; urls: string[] }[]} */
 const MODELS = [

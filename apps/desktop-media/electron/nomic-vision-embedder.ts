@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { app } from "electron";
-import { resolveCacheRoot } from "./app-paths";
+import { resolveHuggingfaceModelsRoot } from "./app-paths";
 import { embedImageWithDecodeFallback } from "./nomic-vision-image-decode";
 
 let visionPipelineInstance: ReturnType<typeof createVisionPipeline> | null = null;
@@ -12,8 +12,7 @@ let loadError: string | null = null;
 let transformersEnvConfigured: Promise<void> | null = null;
 
 function getTransformersCacheDirs(): { cacheDir: string; localModelPath: string } {
-  const runtimeCacheRoot = resolveCacheRoot(app);
-  const hfRoot = path.join(runtimeCacheRoot, "huggingface");
+  const hfRoot = resolveHuggingfaceModelsRoot(app);
   return {
     cacheDir: path.join(hfRoot, "cache"),
     localModelPath: path.join(hfRoot, "models"),

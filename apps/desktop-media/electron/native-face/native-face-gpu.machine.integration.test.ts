@@ -1,3 +1,6 @@
+/**
+ * Set EMK_NATIVE_FACE_MODELS_DIR to an **onnx** directory (flat `.onnx` files), e.g. repo `ai-models/onnx` after `pnpm download-ai-models`.
+ */
 import path from "node:path";
 import os from "node:os";
 import { beforeAll, describe, expect, it } from "vitest";
