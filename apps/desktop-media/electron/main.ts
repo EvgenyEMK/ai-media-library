@@ -20,6 +20,7 @@ import { registerFaceDetectionHandlers } from "./ipc/face-detection-handlers";
 import { registerFaceTagsHandlers } from "./ipc/face-tags-handlers";
 import { registerFaceEmbeddingHandlers } from "./ipc/face-embedding-handlers";
 import { registerSemanticSearchHandlers } from "./ipc/semantic-search-handlers";
+import { registerSimilarImagesHandlers } from "./ipc/similar-images-handlers";
 import { registerMetadataScanHandlers } from "./ipc/metadata-scan-handlers";
 import { registerPathAnalysisHandlers } from "./ipc/path-analysis-handlers";
 import { registerFolderAiSummaryHandlers } from "./ipc/folder-ai-summary-handlers";
@@ -70,6 +71,7 @@ function registerAllIpcHandlers(): void {
   registerFaceTagsHandlers();
   registerFaceEmbeddingHandlers();
   registerSemanticSearchHandlers();
+  registerSimilarImagesHandlers();
   registerMetadataScanHandlers();
   registerPathAnalysisHandlers();
   registerFolderAiSummaryHandlers();

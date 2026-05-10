@@ -94,6 +94,7 @@ interface DesktopMediaWorkspaceProps {
   filteredSemanticListItems: DesktopSemanticListItem[];
   quickFiltersActiveCount: number;
   openFolderViewerById: (itemId: string) => void;
+  onFindSimilar?: (filePath: string) => void;
 }
 
 export function DesktopMediaWorkspace({
@@ -122,6 +123,7 @@ export function DesktopMediaWorkspace({
   filteredSemanticListItems,
   quickFiltersActiveCount,
   openFolderViewerById: _openFolderViewerById,
+  onFindSimilar,
 }: DesktopMediaWorkspaceProps): ReactElement {
   const mediaMetadataByItemId = useDesktopStore((s) => s.mediaMetadataByItemId);
   const showSummaryOnEmptyFolderSelection = useDesktopStore(
@@ -444,7 +446,11 @@ export function DesktopMediaWorkspace({
                   }}
                   showActionsMenu={false}
                   renderActions={(item) => (
-                    <DesktopMediaItemActionsMenu filePath={item.id} mediaType={item.mediaType} />
+                    <DesktopMediaItemActionsMenu
+                      filePath={item.id}
+                      mediaType={item.mediaType}
+                      onFindSimilar={onFindSimilar}
+                    />
                   )}
                   priorityCount={24}
                   scrollable={false}
@@ -472,7 +478,13 @@ export function DesktopMediaWorkspace({
                   })}
                   onItemClick={(index) => store.getState().openViewer(index, "search")}
                   showActionsMenu={false}
-                  renderActions={(item) => <DesktopMediaItemActionsMenu filePath={item.id} />}
+                  renderActions={(item) => (
+                    <DesktopMediaItemActionsMenu
+                      filePath={item.id}
+                      mediaType={item.mediaType}
+                      onFindSimilar={onFindSimilar}
+                    />
+                  )}
                   priorityCount={24}
                   scrollable={false}
                 />
@@ -506,6 +518,7 @@ export function DesktopMediaWorkspace({
                     onStarRatingChange={onStarRatingChangeForPath(image.id)}
                     starRatingShowRejected={STAR_RATING_SHOW_REJECTED_UI}
                     thumbnail={renderListThumbnail(image.imageUrl, image.title, image.mediaType)}
+                    onFindSimilar={onFindSimilar}
                   />
                 ))}
               </div>
@@ -535,6 +548,7 @@ export function DesktopMediaWorkspace({
                       onStarRatingChange={onStarRatingChangeForPath(image.id)}
                       starRatingShowRejected={STAR_RATING_SHOW_REJECTED_UI}
                       thumbnail={renderListThumbnail(image.imageUrl, image.title, rowMediaType)}
+                      onFindSimilar={onFindSimilar}
                     />
                   );
                 })}

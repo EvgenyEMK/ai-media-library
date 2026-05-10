@@ -41,6 +41,8 @@ interface DesktopMediaItemActionsMenuProps {
   filePath: string;
   mediaType?: "image" | "video";
   onOpenChange?: (open: boolean) => void;
+  /** When set, shows “Find similar” for images (opens similar-images pane). */
+  onFindSimilar?: (filePath: string) => void;
   albumContext?: {
     albumId: string;
     onAlbumChanged?: () => void;
@@ -166,6 +168,7 @@ export function DesktopMediaItemActionsMenu({
   filePath,
   mediaType = "image",
   onOpenChange,
+  onFindSimilar,
   albumContext,
 }: DesktopMediaItemActionsMenuProps): ReactElement {
   const [albumsPanelOpen, setAlbumsPanelOpen] = useState(false);
@@ -186,6 +189,18 @@ export function DesktopMediaItemActionsMenu({
         },
       ]
     : [];
+  const findSimilarAction =
+    mediaType !== "video" && onFindSimilar
+      ? [
+          {
+            id: "find-similar",
+            label: "Find similar",
+            onSelect: () => {
+              onFindSimilar(filePath);
+            },
+          },
+        ]
+      : [];
   const albumContextActions = albumContext
     ? [
         {
@@ -223,6 +238,7 @@ export function DesktopMediaItemActionsMenu({
               closeOnSelect: false,
               onSelect: () => setAlbumsPanelOpen(true),
             },
+            ...findSimilarAction,
             {
               id: "reveal",
               label: UI_TEXT.revealInFileExplorer,

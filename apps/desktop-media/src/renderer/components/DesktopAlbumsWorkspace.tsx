@@ -95,6 +95,7 @@ interface DesktopAlbumsWorkspaceProps {
   onYearAreaSubViewChange: (next: SmartAlbumYearAreaSubView) => void;
   searchControlsOpen: boolean;
   onSearchControlsOpenChange: (open: boolean) => void;
+  onFindSimilar?: (filePath: string) => void;
 }
 
 export function DesktopAlbumsWorkspace({
@@ -105,6 +106,7 @@ export function DesktopAlbumsWorkspace({
   onYearAreaSubViewChange,
   searchControlsOpen,
   onSearchControlsOpenChange,
+  onFindSimilar,
 }: DesktopAlbumsWorkspaceProps): ReactElement {
   const store = useDesktopStoreApi();
   const albums = useDesktopStore((s) => s.albums);
@@ -760,6 +762,7 @@ export function DesktopAlbumsWorkspace({
           onSmartPlaceHierarchyLevelsChange={setSmartPlaceHierarchyLevels}
           onActiveSmartAlbumChange={setActiveSmartAlbum}
           onSmartItemsPageChange={setSmartItemsPage}
+          onFindSimilar={onFindSimilar}
         />
       ) : showingCreate ? null : showingDetail ? (
         <div className="min-h-0 flex-1 overflow-auto">
@@ -774,6 +777,7 @@ export function DesktopAlbumsWorkspace({
             onAlbumItemsPageChange={setAlbumItemsPage}
             onAlbumContentChanged={refreshAlbumDetailState}
             reorderAlbumMediaItem={actions.reorderAlbumMediaItem}
+            onFindSimilar={onFindSimilar}
           />
         </div>
       ) : (
