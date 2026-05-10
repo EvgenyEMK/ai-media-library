@@ -2,7 +2,8 @@
  * Integration test using a downloaded real face image.
  * Downloads a small CC0 test image from a public URL on first run.
  *
- * Run: EMK_NATIVE_FACE_MODELS_DIR=~/.emk-test-models pnpm test -- native-face-real-image
+ * Run: EMK_NATIVE_FACE_MODELS_DIR=<path-to-onnx-folder> pnpm test -- native-face-real-image
+ * (`pnpm download-ai-models` uses repo `ai-models/onnx/`.)
  */
 
 import fs from "node:fs/promises";

@@ -131,9 +131,11 @@ const UI_TEXT = {
   databaseLocation: "Application data files",
   databaseFolder: "Database folder",
   databaseFile: "Database file",
-  modelsPath: "AI models folder",
+  modelsPath: "AI models folder (root)",
+  onnxModelsPath: "ONNX weights folder (face detection & aux)",
+  huggingfaceModelsPath: "Hugging Face cache (semantic embedding models)",
   geonamesPath: "Geo-location database folder (GPS coordinates decoding to country, area, city)",
-  cachePath: "Disposable cache folder",
+  cachePath: "Disposable cache folder (sessions and other non-model cache)",
   notAvailable: "Not available",
   faceDetection: "Face detection",
   faceRecognition: "Face recognition",
@@ -302,6 +304,8 @@ export function DesktopSettingsSection({
     dbFileName: string;
     dbPath: string;
     modelsPath: string;
+    onnxModelsPath: string;
+    huggingfaceModelsPath: string;
     geonamesPath: string;
     cachePath: string;
   } | null>(null);
@@ -1616,6 +1620,28 @@ export function DesktopSettingsSection({
             <p className="m-0 text-sm text-muted-foreground">{UI_TEXT.modelsPath}</p>
             <p className="mt-1 break-all font-mono text-sm text-foreground">
               {databaseLocation?.modelsPath ?? UI_TEXT.notAvailable}
+            </p>
+          </div>
+          <div
+            className={cn(
+              settingsCustomOptionSurfaceClass("accent-stripe"),
+              "border-l-primary/70",
+            )}
+          >
+            <p className="m-0 text-sm text-muted-foreground">{UI_TEXT.onnxModelsPath}</p>
+            <p className="mt-1 break-all font-mono text-sm text-foreground">
+              {databaseLocation?.onnxModelsPath ?? UI_TEXT.notAvailable}
+            </p>
+          </div>
+          <div
+            className={cn(
+              settingsCustomOptionSurfaceClass("accent-stripe"),
+              "border-l-primary/70",
+            )}
+          >
+            <p className="m-0 text-sm text-muted-foreground">{UI_TEXT.huggingfaceModelsPath}</p>
+            <p className="mt-1 break-all font-mono text-sm text-foreground">
+              {databaseLocation?.huggingfaceModelsPath ?? UI_TEXT.notAvailable}
             </p>
           </div>
           <div

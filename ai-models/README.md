@@ -1,5 +1,10 @@
 # Local AI model weights (`ai-models/`)
 
+Layout mirrors the packaged app under `%AppData%/Roaming/EMK Desktop Media/ai-models/`:
+
+- **`onnx/`** — native face / aux ONNX weights (same files `pnpm download-ai-models` fetches).
+- **`huggingface/`** — Transformers.js Hugging Face cache + hub model trees (`cache/` and `models/` inside).
+
 This directory holds **optional local copies** of ONNX and related files used by **desktop-media** (face pipeline, aux models, and Nomic embedding assets). Large binaries are **gitignored**; this `README.md` and `MODELS.json` are **tracked** so the inventory stays in version control.
 
 ## Refresh face / aux ONNX files
@@ -12,17 +17,17 @@ pnpm download-ai-models
 
 ## Nomic vision & text (Transformers.js)
 
-The app loads **`nomic-ai/nomic-embed-vision-v1.5`** and **`nomic-ai/nomic-embed-text-v1.5`** with **quantized ONNX** (`pipeline(..., { quantized: true })`). Subfolders here mirror the **minimum** files needed for that layout:
+The app loads **`nomic-ai/nomic-embed-vision-v1.5`** and **`nomic-ai/nomic-embed-text-v1.5`** with **quantized ONNX** (`pipeline(..., { quantized: true })`). Under **`huggingface/models/`**, Hub repos mirror the **minimum** files needed:
 
-- `nomic-embed-vision-v1.5/` — `config.json`, `preprocessor_config.json`, `onnx/model_quantized.onnx`
-- `nomic-embed-text-v1.5/` — tokenizer + sentence-transformers configs + `onnx/model_quantized.onnx`
+- `huggingface/models/nomic-ai/nomic-embed-vision-v1.5/` — `config.json`, `preprocessor_config.json`, `onnx/model_quantized.onnx`
+- `huggingface/models/nomic-ai/nomic-embed-text-v1.5/` — tokenizer + sentence-transformers configs + `onnx/model_quantized.onnx`
 
 **Source hubs (canonical):**
 
 - Vision: [nomic-ai/nomic-embed-vision-v1.5](https://huggingface.co/nomic-ai/nomic-embed-vision-v1.5)
 - Text: [nomic-ai/nomic-embed-text-v1.5](https://huggingface.co/nomic-ai/nomic-embed-text-v1.5)
 
-**Runtime:** `@huggingface/transformers` normally caches models under the Hugging Face cache directory. Copying into this folder is for **your backup / offline archive**; wiring the app to read only from here would require setting Transformers `env.localModelPath` / local paths (not the default today).
+**Runtime:** The Electron app sets Transformers `env.cacheDir` / `env.localModelPath` under `ai-models/huggingface/` (see `nomic-vision-embedder.ts`). Copying hub layouts into `huggingface/models/` is useful for **offline / backup** archives alongside `onnx/`.
 
 ## Machine-readable inventory
 

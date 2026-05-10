@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   resolveCacheRoot,
   resolveGeonamesPath,
+  resolveHuggingfaceModelsRoot,
   resolveModelsPath,
+  resolveOnnxModelsPath,
   resolveRuntimeRoot,
   resolveSessionDataPath,
 } from "./app-paths";
@@ -34,6 +36,10 @@ describe("app-paths", () => {
     expect(resolveCacheRoot(app)).toBe(path.join(runtimeRoot, "cache"));
     expect(resolveSessionDataPath(app)).toBe(path.join(runtimeRoot, "cache", "session-data"));
     expect(resolveModelsPath(app)).toBe(path.join(runtimeRoot, "ai-models"));
+    expect(resolveOnnxModelsPath(app)).toBe(path.join(runtimeRoot, "ai-models", "onnx"));
+    expect(resolveHuggingfaceModelsRoot(app)).toBe(
+      path.join(runtimeRoot, "ai-models", "huggingface"),
+    );
     expect(resolveGeonamesPath(app)).toBe(path.join(runtimeRoot, "geonames"));
   });
 
@@ -43,6 +49,10 @@ describe("app-paths", () => {
 
     expect(resolveRuntimeRoot(app)).toBe("D:/EMK/runtime");
     expect(resolveModelsPath(app)).toBe(path.join("D:/EMK/runtime", "ai-models"));
+    expect(resolveOnnxModelsPath(app)).toBe(path.join("D:/EMK/runtime", "ai-models", "onnx"));
+    expect(resolveHuggingfaceModelsRoot(app)).toBe(
+      path.join("D:/EMK/runtime", "ai-models", "huggingface"),
+    );
     expect(resolveGeonamesPath(app)).toBe(path.join("D:/EMK/runtime", "geonames"));
   });
 });
