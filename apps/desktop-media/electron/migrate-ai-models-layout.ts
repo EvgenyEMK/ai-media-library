@@ -6,6 +6,7 @@ import type { App } from "electron";
 import {
   resolveCacheRoot,
   resolveHuggingfaceModelsRoot,
+  resolveLegacyRuntimeRoot,
   resolveModelsPath,
   resolveOnnxModelsPath,
 } from "./app-paths";
@@ -46,6 +47,8 @@ export interface MigrateAiModelsLayoutPaths {
   cacheRoot: string;
   onnxDir: string;
   huggingfaceRoot: string;
+  legacyAiModelsRoot?: string;
+  legacyCacheRoot?: string;
 }
 
 /**
@@ -55,7 +58,19 @@ export interface MigrateAiModelsLayoutPaths {
 export async function migrateAiModelsLayoutPaths(
   paths: MigrateAiModelsLayoutPaths,
 ): Promise<void> {
-  const { aiModelsRoot, cacheRoot, onnxDir, huggingfaceRoot } = paths;
+  const {
+    aiModelsRoot,
+    cacheRoot,
+    onnxDir,
+    huggingfaceRoot,
+    legacyAiModelsRoot,
+    legacyCacheRoot,
+  } = paths;
+
+  if (legacyAiModelsRoot && legacyAiModelsRoot !== aiModelsRoot && existsSync(legacyAiModelsRoot)) {
+    await fs.mkdir(aiModelsRoot, { recursive: true });
+    await mergeDirectoryContents(legacyAiModelsRoot, aiModelsRoot);
+  }
 
   await fs.mkdir(onnxDir, { recursive: true });
 
@@ -67,32 +82,46 @@ export async function migrateAiModelsLayoutPaths(
     }
   }
 
+  const migratedCurrentCache = await migrateHuggingfaceCache(cacheRoot, huggingfaceRoot);
+  const migratedLegacyCache =
+    legacyCacheRoot && legacyCacheRoot !== cacheRoot
+      ? await migrateHuggingfaceCache(legacyCacheRoot, huggingfaceRoot)
+      : false;
+
+  if (!migratedCurrentCache && !migratedLegacyCache) {
+    await fs.mkdir(huggingfaceRoot, { recursive: true });
+  }
+}
+
+async function migrateHuggingfaceCache(cacheRoot: string, huggingfaceRoot: string): Promise<boolean> {
   const oldHuggingface = path.join(cacheRoot, "huggingface");
   if (!existsSync(oldHuggingface)) {
-    await fs.mkdir(huggingfaceRoot, { recursive: true });
-    return;
+    return false;
   }
-
   if (!existsSync(huggingfaceRoot)) {
     await fs.rename(oldHuggingface, huggingfaceRoot);
-    return;
+    return true;
   }
 
   if (await isDirectoryEmpty(huggingfaceRoot)) {
     await fs.rm(huggingfaceRoot, { recursive: true });
     await fs.rename(oldHuggingface, huggingfaceRoot);
-    return;
+    return true;
   }
 
   await mergeDirectoryContents(oldHuggingface, huggingfaceRoot);
   await fs.rm(oldHuggingface, { recursive: true, force: true });
+  return true;
 }
 
 export async function migrateAiModelsLayout(app: App): Promise<void> {
+  const legacyRuntimeRoot = resolveLegacyRuntimeRoot(app);
   await migrateAiModelsLayoutPaths({
     aiModelsRoot: resolveModelsPath(app),
     cacheRoot: resolveCacheRoot(app),
     onnxDir: resolveOnnxModelsPath(app),
     huggingfaceRoot: resolveHuggingfaceModelsRoot(app),
+    legacyAiModelsRoot: path.join(legacyRuntimeRoot, "ai-models"),
+    legacyCacheRoot: path.join(legacyRuntimeRoot, "cache"),
   });
 }

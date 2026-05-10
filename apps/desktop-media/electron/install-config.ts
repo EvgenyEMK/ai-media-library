@@ -2,16 +2,17 @@ import fs from "node:fs";
 import path from "node:path";
 import { app } from "electron";
 
-const INSTALL_CONFIG_DIR_NAME = "EMK Desktop Media";
+const INSTALL_CONFIG_DIR_NAME = "AI Media Library";
+const LEGACY_INSTALL_CONFIG_DIR_NAME = "EMK Desktop Media";
 const INSTALL_CONFIG_FILE_NAME = "install-config.ini";
 const USER_DATA_CONFIG_FILE_NAME = "install-user-data-path.txt";
 
-function getLegacyInstallConfigFilePath(): string {
-  return path.join(app.getPath("appData"), INSTALL_CONFIG_DIR_NAME, USER_DATA_CONFIG_FILE_NAME);
+function getLegacyTxtInstallConfigFilePath(dirName: string): string {
+  return path.join(app.getPath("appData"), dirName, USER_DATA_CONFIG_FILE_NAME);
 }
 
-function getIniInstallConfigFilePath(): string {
-  return path.join(app.getPath("appData"), INSTALL_CONFIG_DIR_NAME, INSTALL_CONFIG_FILE_NAME);
+function getIniInstallConfigFilePath(dirName: string): string {
+  return path.join(app.getPath("appData"), dirName, INSTALL_CONFIG_FILE_NAME);
 }
 
 function readIniUserDataPath(filePath: string): string | null {
@@ -53,17 +54,24 @@ export function resolveInstalledUserDataPath(): string | null {
     return configuredPath;
   }
   try {
-    const iniConfiguredPath = readIniUserDataPath(getIniInstallConfigFilePath());
-    if (iniConfiguredPath) {
-      return iniConfiguredPath;
+    for (const dirName of [INSTALL_CONFIG_DIR_NAME, LEGACY_INSTALL_CONFIG_DIR_NAME]) {
+      const iniConfiguredPath = readIniUserDataPath(getIniInstallConfigFilePath(dirName));
+      if (iniConfiguredPath) {
+        return iniConfiguredPath;
+      }
     }
 
-    const configFilePath = getLegacyInstallConfigFilePath();
-    if (!fs.existsSync(configFilePath)) {
-      return null;
+    for (const dirName of [INSTALL_CONFIG_DIR_NAME, LEGACY_INSTALL_CONFIG_DIR_NAME]) {
+      const configFilePath = getLegacyTxtInstallConfigFilePath(dirName);
+      if (!fs.existsSync(configFilePath)) {
+        continue;
+      }
+      const rawValue = fs.readFileSync(configFilePath, "utf8").trim();
+      if (rawValue.length > 0) {
+        return rawValue;
+      }
     }
-    const rawValue = fs.readFileSync(configFilePath, "utf8").trim();
-    return rawValue.length > 0 ? rawValue : null;
+    return null;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`[desktop-install] Failed to read install userData path config: ${message}`);

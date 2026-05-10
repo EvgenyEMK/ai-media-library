@@ -274,7 +274,7 @@ export function useDesktopSettingsPersistence(): void {
           return;
         }
         if (
-          state.libraryRoots !== prev.libraryRoots ||
+          !stringArraysEqual(state.libraryRoots, prev.libraryRoots) ||
           state.sidebarCollapsed !== prev.sidebarCollapsed ||
           state.faceDetectionSettings.minConfidenceThreshold !==
             prev.faceDetectionSettings.minConfidenceThreshold ||
@@ -415,6 +415,14 @@ function pipelineConcurrencyChanged(
     if ((a as Record<string, string>)[k] !== (b as Record<string, string>)[k]) return true;
   }
   return false;
+}
+
+function stringArraysEqual(next: readonly string[], prev: readonly string[]): boolean {
+  if (next.length !== prev.length) return false;
+  for (let i = 0; i < next.length; i += 1) {
+    if (next[i] !== prev[i]) return false;
+  }
+  return true;
 }
 
 export { refreshFolderAnalysisStatuses, refreshMetadataForItems } from "./ipc-binding-helpers";

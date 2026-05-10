@@ -1,7 +1,8 @@
 import path from "node:path";
 import type { App } from "electron";
 
-const RUNTIME_ROOT_DIR_NAME = "EMK Desktop Media";
+const RUNTIME_ROOT_DIR_NAME = "AI Media Library";
+const LEGACY_RUNTIME_ROOT_DIR_NAME = "EMK Desktop Media";
 const RUNTIME_ROOT_ENV_NAME = "EMK_DESKTOP_RUNTIME_ROOT_PATH";
 
 /**
@@ -14,6 +15,10 @@ export function resolveRuntimeRoot(app: App): string {
     return configuredRoot;
   }
   return path.join(app.getPath("appData"), RUNTIME_ROOT_DIR_NAME);
+}
+
+export function resolveLegacyRuntimeRoot(app: App): string {
+  return path.join(app.getPath("appData"), LEGACY_RUNTIME_ROOT_DIR_NAME);
 }
 
 export function resolveCacheRoot(app: App): string {

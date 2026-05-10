@@ -38,9 +38,9 @@ const lockedAsarPath = path.join(releaseDir, "win-unpacked", "resources", "app.a
 await removeWithRetries(lockedAsarPath, { required: false, maxAttempts: 3 });
 await removeWithRetries(path.join(releaseDir, "win-unpacked"), { required: false, maxAttempts: 3 });
 await removeWithRetries(path.join(releaseDir, "artifacts"));
-await removeWithRetries(path.join(releaseDir, "EMK Desktop Media-0.1.0-Windows-x64.exe"), {
+await removeWithRetries(path.join(releaseDir, "AI Media Library-0.1.0-Windows-x64.exe"), {
   required: false,
 });
-await removeWithRetries(path.join(releaseDir, "EMK Desktop Media-0.1.0-Windows-x64.exe.blockmap"), {
+await removeWithRetries(path.join(releaseDir, "AI Media Library-0.1.0-Windows-x64.exe.blockmap"), {
   required: false,
 });
