@@ -892,6 +892,19 @@ export interface SetMediaItemStarRatingResult {
   /** Populated when ExifTool / refresh failed after DB update. */
   fileWriteError?: string;
   metadata?: DesktopMediaItemMetadata;
+  /**
+   * Diagnostic surface for E2E and debugging: tells callers whether the embedded write
+   * was attempted, skipped (and why), or failed. The catalog write outcome is reflected
+   * in {@link success} and {@link error}.
+   */
+  embeddedWrite?: {
+    attempted: boolean;
+    /** "off" if the user disabled embedded writes; "no-source" / "validation" / "internal" otherwise. */
+    skippedReason?: "off" | "no-source" | "validation" | "internal";
+    awaited: boolean;
+    /** Diagnostic write log; populated only under EMK_E2E_RUN_PIPELINES_UI when the write was skipped. */
+    e2eWriteLog?: string;
+  };
 }
 
 export type FolderAnalysisState = "not_scanned" | "in_progress" | "analyzed";

@@ -78,40 +78,70 @@ export function registerMediaItemMutationHandlers(): void {
       const metadata = updated.metadata;
 
       const settings = await readSettings(app.getPath("userData"));
-      if (settings.folderScanning.writeEmbeddedMetadataOnUserEdit) {
-        const runEmbeddedWrite = async (): Promise<void> => {
+      const e2eAwait = process.env.EMK_E2E_RUN_PIPELINES_UI === "1";
+      if (!settings.folderScanning.writeEmbeddedMetadataOnUserEdit) {
+        let writeLog: string | undefined;
+        if (e2eAwait) {
           try {
-            await enqueueEmbeddedStarWrite(sourcePath, starRating);
-            const refreshed = await refreshObservedStateForPaths([sourcePath], libraryId);
-            const observedState = refreshed[sourcePath];
-            await upsertMediaItemFromFilePath({
-              filePath: sourcePath,
-              libraryId,
-              observedState,
-              overrideStarRating: starRating,
-              trustedEmbeddedMetadataWrite: observedState?.strongHash == null,
-            });
-            notifyRendererMetadataRefresh(sourcePath, libraryId);
-          } catch (err) {
-            console.warn(
-              `[star-rating] background file write failed for ${sourcePath}:`,
-              err instanceof Error ? err.message : err,
-            );
-            if (process.env.EMK_E2E_RUN_PIPELINES_UI === "1") {
-              throw err;
-            }
+            const fs = await import("node:fs/promises");
+            const p = await import("node:path");
+            const logPath = p.join(app.getPath("userData"), "settings-writes.log");
+            writeLog = await fs.readFile(logPath, "utf-8");
+          } catch {
+            writeLog = "(no log)";
           }
-        };
-        // In Playwright, await so rapid successive rating changes cannot race ExifTool.
-        // In production, keep fire-and-forget so the grid updates immediately.
-        if (process.env.EMK_E2E_RUN_PIPELINES_UI === "1") {
-          await runEmbeddedWrite();
-        } else {
-          void runEmbeddedWrite();
         }
+        return {
+          success: true,
+          metadata,
+          embeddedWrite: {
+            attempted: false,
+            skippedReason: "off",
+            awaited: false,
+            ...(writeLog ? { e2eWriteLog: writeLog } : {}),
+          },
+        };
       }
 
-      return { success: true, metadata };
+      const runEmbeddedWrite = async (): Promise<void> => {
+        try {
+          await enqueueEmbeddedStarWrite(sourcePath, starRating);
+          const refreshed = await refreshObservedStateForPaths([sourcePath], libraryId);
+          const observedState = refreshed[sourcePath];
+          await upsertMediaItemFromFilePath({
+            filePath: sourcePath,
+            libraryId,
+            observedState,
+            overrideStarRating: starRating,
+            trustedEmbeddedMetadataWrite: observedState?.strongHash == null,
+          });
+          notifyRendererMetadataRefresh(sourcePath, libraryId);
+        } catch (err) {
+          console.warn(
+            `[star-rating] background file write failed for ${sourcePath}:`,
+            err instanceof Error ? err.message : err,
+          );
+          if (e2eAwait) {
+            throw err;
+          }
+        }
+      };
+      // In Playwright, await so rapid successive rating changes cannot race ExifTool.
+      // In production, keep fire-and-forget so the grid updates immediately.
+      if (e2eAwait) {
+        await runEmbeddedWrite();
+        return {
+          success: true,
+          metadata,
+          embeddedWrite: { attempted: true, awaited: true },
+        };
+      }
+      void runEmbeddedWrite();
+      return {
+        success: true,
+        metadata,
+        embeddedWrite: { attempted: true, awaited: false },
+      };
     },
   );
 }

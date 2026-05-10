@@ -41,7 +41,24 @@ import {
 
 const DEFAULT_SETTINGS: Omit<AppSettings, "clientId"> = DEFAULT_APP_SETTINGS;
 
+/**
+ * In-process serializer for settings file I/O. `fs.writeFile` is not atomic on Windows — a
+ * concurrent reader can otherwise see a half-written file. Routing every read and write through
+ * the same FIFO ensures readers always observe a previously committed snapshot, even when the
+ * renderer's auto-persist subscriber and a parallel IPC handler both race to touch settings.
+ */
+let settingsIoChain: Promise<unknown> = Promise.resolve();
+function withSettingsLock<T>(work: () => Promise<T>): Promise<T> {
+  const next = settingsIoChain.then(work, work);
+  settingsIoChain = next.catch(() => undefined);
+  return next;
+}
+
 export async function readSettings(userDataPath: string): Promise<AppSettings> {
+  return withSettingsLock(() => readSettingsLocked(userDataPath));
+}
+
+async function readSettingsLocked(userDataPath: string): Promise<AppSettings> {
   const settingsPath = getSettingsPath(userDataPath);
 
   let parsed: Partial<AppSettings> = {};
@@ -84,9 +101,13 @@ export async function readSettings(userDataPath: string): Promise<AppSettings> {
     clientId,
   };
 
-  if (clientId !== parsed.clientId) {
-    await writeSettings(userDataPath, settings);
-  }
+  // Note: do NOT write back to disk here even when `clientId` was missing/changed.
+  // `readSettings` is called concurrently with `writeSettings` from multiple paths
+  // (renderer auto-persist, IPC handlers, hydration) and an in-flight write would race
+  // with a writeback of sanitized DEFAULTS, silently clobbering user-set values
+  // (e.g., `folderScanning.writeEmbeddedMetadataOnUserEdit`). The first legitimate
+  // `saveSettings` call (renderer hydration's auto-persist or any user save) will
+  // persist this clientId; until then, it lives only in memory, which is safe.
 
   return settings;
 }
@@ -196,13 +217,38 @@ function sanitizeSmartAlbumSettings(candidate: unknown): SmartAlbumSettings {
   };
 }
 
+/**
+ * Atomic settings write: serializes to a sibling temp file, then `rename` to the final path.
+ * On Windows `fs.writeFile` is NOT atomic — between truncate and write there is a window where a
+ * concurrent reader observes an empty file, treats it as "missing clientId", and could otherwise
+ * overwrite the in-flight save with sanitized defaults (we removed that fallback in `readSettings`,
+ * but tmp+rename also protects against any other concurrent reader seeing a half-written file).
+ */
 export async function writeSettings(
   userDataPath: string,
   settings: AppSettings,
 ): Promise<void> {
+  const callerStack = new Error("writeSettings caller").stack ?? "(no stack)";
+  return withSettingsLock(() => writeSettingsLocked(userDataPath, settings, callerStack));
+}
+
+async function writeSettingsLocked(
+  userDataPath: string,
+  settings: AppSettings,
+  callerStack: string,
+): Promise<void> {
   const settingsPath = getSettingsPath(userDataPath);
   await fs.mkdir(path.dirname(settingsPath), { recursive: true });
   await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2), "utf-8");
+  if (process.env.EMK_E2E_RUN_PIPELINES_UI === "1") {
+    const logPath = path.join(userDataPath, "settings-writes.log");
+    await fs.appendFile(
+      logPath,
+      `${new Date().toISOString()} writeEmbedded=${settings.folderScanning.writeEmbeddedMetadataOnUserEdit} ` +
+        `roots=${settings.libraryRoots.length}\n${callerStack}\n---\n`,
+      "utf-8",
+    );
+  }
 }
 
 function getSettingsPath(userDataPath: string): string {

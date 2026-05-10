@@ -72,7 +72,6 @@ export async function writeStarRatingToImageFile(
       } as Record<string, string | number>,
       {
         writeArgs: ["-overwrite_original"],
-        useMWG: true,
         ignoreMinorErrors: true,
       },
     ),
@@ -104,7 +103,6 @@ export async function writeStarRatingToMediaFile(
         } as Record<string, string | number>,
         {
           writeArgs: ["-overwrite_original"],
-          useMWG: true,
           ignoreMinorErrors: true,
         },
       ),

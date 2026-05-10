@@ -50,7 +50,7 @@ Grid, list, and photo viewer **Info** use **`MediaItemStarRating`** from **`@emk
 
 ## Automated verification
 
-Desktop E2E covers catalog updates, optional on-disk **rating + mtime** after embedded writes, and **ExifTool**-visible **RatingPercent** / IFD0 **Rating** pairs for 1–5 stars (`apps/desktop-media/tests/e2e/star-rating.spec.ts`).
+Desktop E2E covers catalog updates, optional on-disk **rating + mtime** after embedded writes, and **ExifTool**-visible **RatingPercent** / IFD0 **Rating** pairs for 1–5 stars (`apps/desktop-media/tests/e2e-standalone/star-rating.spec.ts`). The suite runs as a **standalone** Playwright project (`pnpm --filter @emk/desktop-media test:e2e:star-rating`) — it is intentionally excluded from the default smoke and full E2E suites because it shares process settings state with other specs and can be order-corrupted by the renderer's auto-persist subscriber when run alongside them.
 
 ## Planning archive
 

@@ -14,7 +14,7 @@
     "test:e2e-real-geocoder": "pnpm --filter @emk/desktop-media test:e2e-real-geocoder",
     "test:e2e-all": "pnpm --filter @emk/desktop-media test:e2e",
     "test:e2e-smoke": "pnpm --filter @emk/desktop-media test:e2e:no-build -- tests/e2e/app-launch.spec.ts tests/e2e/folder-browsing.spec.ts tests/e2e/sidebar-navigation.spec.ts",
-    "test:e2e-metadata-scan": "pnpm --filter @emk/desktop-media test:e2e:no-build -- tests/e2e/metadata-scan-edited-file-reset.spec.ts tests/e2e/metadata-scan-file-churn.spec.ts tests/e2e/metadata-scan-manual-continuation.spec.ts",  
+    "test:e2e-metadata-scan": "pnpm --filter @emk/desktop-media test:e2e:no-build -- tests/e2e/metadata-scan-edited-file-reset.spec.ts tests/e2e/metadata-scan-file-churn.spec.ts tests/e2e/metadata-scan-manual-continuation.spec.ts",
     "test:e2e-geo-location": "pnpm --filter @emk/desktop-media test:e2e:no-build -- tests/e2e/geocoder-download.spec.ts tests/e2e/geolocation-metadata-scan.spec.ts",
     "test:e2e-ai-search": "pnpm --filter @emk/desktop-media test:e2e:no-build -- tests/e2e/semantic-search.spec.ts tests/e2e/quick-filters.spec.ts tests/e2e/search-timing-diag.spec.ts",
     "test:e2e-face-pipeline": "pnpm --filter @emk/desktop-media test:e2e:no-build -- tests/e2e/face-detection-yolo12s.spec.ts tests/e2e/face-detection-aux-models.spec.ts tests/e2e/rotated-face-similarity.spec.ts tests/e2e/unconfirmed-face-search.spec.ts",
@@ -23,10 +23,14 @@
     "download-ai-models": "node scripts/download-ai-models.mjs"
   },
   "devDependencies": {
+    "source-map": "^0.7.6",
     "turbo": "^2.8.14",
     "typescript": "^5"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["electron", "better-sqlite3"]
+    "onlyBuiltDependencies": [
+      "electron",
+      "better-sqlite3"
+    ]
   }
 }

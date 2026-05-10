@@ -1,14 +1,15 @@
-import { expect, test } from "./fixtures/app-fixture";
-import { clickSidebarLibraryRoot } from "./fixtures/desktop-sidebar";
-import { mockFolderDialog } from "./fixtures/mock-dialog";
+import { expect, test } from "../e2e/fixtures/app-fixture";
+import { clickSidebarLibraryRoot } from "../e2e/fixtures/desktop-sidebar";
+import { mockFolderDialog } from "../e2e/fixtures/mock-dialog";
 import {
   getFileMtimeMs,
   readWindowsExifRatingTags,
   shutdownExiftoolForE2E,
   waitUntilFileShowsStarRatingAndNewerMtime,
-} from "./fixtures/read-embedded-star-rating";
-import { setWriteEmbeddedMetadataOnUserEdit } from "./fixtures/folder-scanning-e2e-helpers";
-import { createTestImageFolder, removeTestImageFolder } from "./fixtures/test-images";
+  warmupExiftoolForE2E,
+} from "../e2e/fixtures/read-embedded-star-rating";
+import { setWriteEmbeddedMetadataOnUserEdit } from "../e2e/fixtures/folder-scanning-e2e-helpers";
+import { createTestImageFolder, removeTestImageFolder } from "../e2e/fixtures/test-images";
 
 /** Embedded + ExifTool may need two writes in one test; allow generous headroom on cold runners. */
 test.describe.configure({ mode: "serial", timeout: 600_000 });
@@ -66,8 +67,10 @@ async function addLibraryAndScan(
 }
 
 /**
- * One embedded rewrite retry: cold Windows runners occasionally leave IFD0/XMP briefly inconsistent;
- * a second ExifTool write usually stabilizes tags before the IFD0 assertions.
+ * Set rating via IPC, then wait until disk reflects it. If the resident `exiftool-vendored`
+ * process silently no-ops (rare on cold Windows runners with `ignoreMinorErrors`), the wait
+ * helper re-issues the IPC every ~15 s as a self-heal. Diagnostic state is included in
+ * the failure message if the wait still times out.
  */
 async function setStarRatingAndWaitEmbedded(
   mainWindow: import("@playwright/test").Page,
@@ -81,18 +84,33 @@ async function setStarRatingAndWaitEmbedded(
         window.desktopApi.setMediaItemStarRating({ sourcePath: p, starRating: s }),
       { path: imgPath, stars },
     );
-    expect(result.success).toBe(true);
+    expect(result.success, `setMediaItemStarRating IPC failed: ${result.error ?? "unknown"}`).toBe(
+      true,
+    );
+    expect(
+      result.embeddedWrite?.attempted,
+      `Embedded write not attempted (skippedReason=${result.embeddedWrite?.skippedReason ?? "missing"}). ` +
+        `Did writeEmbeddedMetadataOnUserEdit get persisted before the IPC ran?\n` +
+        `--- settings-writes.log ---\n${result.embeddedWrite?.e2eWriteLog ?? "(none)"}`,
+    ).toBe(true);
+    expect(
+      result.embeddedWrite?.awaited,
+      `Embedded write not awaited; expected EMK_E2E_RUN_PIPELINES_UI=1 in main process.`,
+    ).toBe(true);
   };
   await invoke();
-  try {
-    await waitUntilFileShowsStarRatingAndNewerMtime(imgPath, stars, mtimeBaseline);
-  } catch {
-    await invoke();
-    await waitUntilFileShowsStarRatingAndNewerMtime(imgPath, stars, mtimeBaseline);
-  }
+  await waitUntilFileShowsStarRatingAndNewerMtime(imgPath, stars, mtimeBaseline, {
+    timeoutMs: 240_000,
+    rewriteIntervalMs: 15_000,
+    onStaleRewrite: invoke,
+  });
 }
 
 test.describe("Star rating", () => {
+  test.beforeAll(async () => {
+    await warmupExiftoolForE2E();
+  });
+
   test("setMediaItemStarRating with embedded write off updates catalog only", async ({
     electronApp,
     mainWindow,
@@ -135,6 +153,10 @@ test.describe("Star rating", () => {
 
       expect(result.success).toBe(true);
       expect(result.metadata?.starRating).toBe(4);
+      expect(
+        result.embeddedWrite,
+        `4-star embedded write should be attempted+awaited; got ${JSON.stringify(result.embeddedWrite)}`,
+      ).toMatchObject({ attempted: true, awaited: true });
 
       const starFromDbRoundTrip = await mainWindow.evaluate(async (p) => {
         const m = await window.desktopApi.getMediaItemsByPaths([p]);
@@ -152,6 +174,10 @@ test.describe("Star rating", () => {
       }, imgPath);
       expect(resultSecond.success).toBe(true);
       expect(resultSecond.metadata?.starRating).toBe(2);
+      expect(
+        resultSecond.embeddedWrite,
+        `2-star embedded write should be attempted+awaited; got ${JSON.stringify(resultSecond.embeddedWrite)}`,
+      ).toMatchObject({ attempted: true, awaited: true });
 
       await waitUntilFileShowsStarRatingAndNewerMtime(imgPath, 2, mtimeAfterFourStars);
     } finally {

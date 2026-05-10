@@ -30,9 +30,11 @@ async function openViewerFromGridByTitle(mainWindow: import("@playwright/test").
 
 async function currentViewerVideoPaused(mainWindow: import("@playwright/test").Page): Promise<boolean | null> {
   return mainWindow.evaluate(() => {
-    const video = document.querySelector(".media-swiper-theme .swiper-slide-active video") as
-      | HTMLVideoElement
-      | null;
+    // `[controls]` pins to the main viewer's slide video; the thumb rail's active <video>
+    // also lives under `.swiper-slide-active` but is muted/aria-hidden without controls.
+    const video = document.querySelector(
+      ".media-swiper-theme .swiper-slide-active video[controls]",
+    ) as HTMLVideoElement | null;
     return video ? video.paused : null;
   });
 }
