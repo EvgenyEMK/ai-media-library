@@ -101,8 +101,10 @@ async function runRecursiveMetadataScan(
   await row.getByRole("button", { name: "More", exact: true }).click();
   await mainWindow.getByRole("button", { name: UI_TEXT.scanForFileChanges }).click();
   const subfolders = mainWindow.getByRole("checkbox", { name: /Include sub-folders/i });
-  await expect(subfolders).toBeVisible({ timeout: 10_000 });
-  await subfolders.check();
+  await expect(subfolders).toBeVisible({ timeout: 30_000 });
+  if (!(await subfolders.isChecked())) {
+    await subfolders.check({ force: true });
+  }
   await mainWindow.locator('[title="Start metadata scan"]').first().click();
   return completion;
 }

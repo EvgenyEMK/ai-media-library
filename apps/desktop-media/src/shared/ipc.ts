@@ -81,6 +81,8 @@ export const IPC_CHANNELS = {
   /** Main-process runtime flags (e.g. E2E-only UI). */
   getDesktopRuntimeFlags: "media:get-desktop-runtime-flags",
   saveSettings: "media:save-settings",
+  /** Main broadcasts persisted settings after every successful save so the renderer Zustand store stays aligned with disk. */
+  settingsSaved: "media:settings-saved",
   getAiInferenceGpuOptions: "media:get-ai-inference-gpu-options",
   getFolderAnalysisStatuses: "media:get-folder-analysis-statuses",
   analyzeFolderPhotos: "media:analyze-folder-photos",
@@ -2053,6 +2055,8 @@ export interface DesktopApi {
   getDesktopRuntimeFlags: () => Promise<DesktopRuntimeFlags>;
   getAiInferenceGpuOptions: () => Promise<AiInferenceGpuOption[]>;
   saveSettings: (settings: AppSettings) => Promise<void>;
+  /** Fired when settings were written from any source (including IPC saveSettings) so UI state matches disk. */
+  onSettingsSaved: (listener: (settings: AppSettings) => void) => () => void;
   getFolderAnalysisStatuses: () => Promise<Record<string, FolderAnalysisStatus>>;
   getFolderAiSummaryOverview: (
     folderPath: string,

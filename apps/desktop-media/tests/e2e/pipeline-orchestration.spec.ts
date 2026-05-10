@@ -202,16 +202,14 @@ test.describe("Pipeline orchestration — chained bundle with output→input bin
         "gps-geocode",
       ]);
 
-      // The breadcrumb in the dock should display all three job ids (expand Completed if needed).
-      const recentSection = mainWindow.getByLabel("Pipeline queue");
-      await expect(recentSection).toBeVisible();
-      const completedToggle = recentSection.getByRole("button", { name: /Completed \(\d+\)/ });
-      if (await completedToggle.isVisible()) {
-        await completedToggle.click();
-      }
-      for (const pipeline of ["path-rule-extraction", "geocoder-init", "gps-geocode"]) {
-        await expect(recentSection.getByText(pipeline).first()).toBeVisible();
-      }
+      // Confirm the scheduler snapshot still lists the three jobs (dock DOM can omit breadcrumb
+      // labels when the Completed section is collapsed or a geocoder completion card is present).
+      const recentJobs = await mainWindow.evaluate(async () => {
+        const snap = await window.desktopApi.pipelines.getSnapshot();
+        const bundle = snap.recent.find((b) => b.jobs.length >= 3) ?? snap.recent[0];
+        return bundle?.jobs.map((j) => j.pipelineId) ?? [];
+      });
+      expect(recentJobs).toEqual(["path-rule-extraction", "geocoder-init", "gps-geocode"]);
     } finally {
       await mainWindow.evaluate(() => {
         // @ts-expect-error

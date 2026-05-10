@@ -60,6 +60,7 @@ export function usePhotoAnalysisHandlers(opts: {
       }
 
       try {
+        const livePhotoSettings = store.getState().photoAnalysisSettings;
         await enqueueFolderAiPipeline({
           folderPath,
           pipeline: "photo",
@@ -67,7 +68,7 @@ export function usePhotoAnalysisHandlers(opts: {
           overrideExisting,
           photoModel: resolvedModel,
           photoThinkingEnabled: supportsThinkingMode(resolvedModel) ? aiThinkingEnabled : false,
-          photoSettings: photoAnalysisSettings,
+          photoSettings: livePhotoSettings,
         });
         setProgressPanelCollapsed(false);
         if (DEBUG_PHOTO_AI) {

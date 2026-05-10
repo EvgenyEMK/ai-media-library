@@ -445,6 +445,7 @@ function TreeNode({
           <button
             type="button"
             className="flex min-w-0 flex-1 items-center justify-start gap-2 border-0 bg-transparent p-0 text-left shadow-none rounded-none"
+            aria-label={label}
             onClick={() => {
               if (canExpand && !isExpanded) {
                 onToggleExpand(folderPath);

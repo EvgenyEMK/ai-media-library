@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import { DEFAULT_PHOTO_ANALYSIS_SETTINGS } from "../../shared/ipc";
 import { useDesktopStoreApi } from "../stores/desktop-store";
+import { applyPersistedAppSettingsToStore } from "../lib/apply-persisted-app-settings";
 import {
   bindPhotoAnalysisProgress,
   bindFaceDetectionProgress,
@@ -101,37 +101,16 @@ export function useDesktopInitialization(): void {
     if (initialized.current) return;
     initialized.current = true;
 
-    void window.desktopApi
-      .getSettings()
-      .then((settings) => {
-        store.setState((s) => {
-          s.clientId = settings.clientId;
-          s.libraryRoots = settings.libraryRoots;
-          s.sidebarCollapsed = settings.sidebarCollapsed;
-          s.hideAdvancedSettings = settings.hideAdvancedSettings;
-          s.wrongImageRotationDetectionSettings = settings.wrongImageRotationDetection;
-          s.faceDetectionSettings = settings.faceDetection;
-          s.photoAnalysisSettings = {
-            ...DEFAULT_PHOTO_ANALYSIS_SETTINGS,
-            ...(settings.photoAnalysis ?? {}),
-          };
-          // Keep the global AI slice selection in sync with settings (model is now configured in Settings).
-          if (settings.photoAnalysis?.model) {
-            s.aiSelectedModel = settings.photoAnalysis.model;
-          }
-          s.folderScanningSettings = settings.folderScanning;
-          s.smartAlbumSettings = settings.smartAlbums;
-          s.aiImageSearchSettings = settings.aiImageSearch;
-          s.mediaViewerSettings = settings.mediaViewer;
-          s.pathExtractionSettings = settings.pathExtraction;
-          s.aiInferencePreferredGpuId = settings.aiInferencePreferredGpuId;
-          s.pipelineConcurrencySettings = settings.pipelineConcurrency;
-        });
-        // Initial refreshFolderAnalysisStatuses runs before libraryRoots are loaded from settings,
-        // so rollup batch was empty and sidebar icons stayed on the loading spinner until interaction.
-        void refreshFolderAiRollups(store);
-      })
-      .catch(() => undefined);
+    // Defer hydration slightly so an early Playwright `saveSettings` can persist before we read disk,
+    // and so `settingsSaved` broadcasts can land before a stale first `getSettings` overwrites Zustand.
+    const hydrationTimer = window.setTimeout(() => {
+      void window.desktopApi
+        .getSettings()
+        .then((settings) => {
+          applyPersistedAppSettingsToStore(store, settings);
+        })
+        .catch(() => undefined);
+    }, 50);
 
     void refreshFolderAnalysisStatuses(store);
     void window.desktopApi
@@ -216,6 +195,24 @@ export function useDesktopInitialization(): void {
           s.semanticCapabilityLabel = "Embedding capability status unavailable.";
         });
       });
+
+    return () => {
+      window.clearTimeout(hydrationTimer);
+    };
+  }, [store]);
+}
+
+/**
+ * When the main process persists settings (any code path that calls `saveSettings` / `writeSettings`),
+ * it broadcasts the final payload so Zustand cannot overwrite newer disk state on the next auto-persist.
+ */
+export function useDesktopSettingsSyncFromMain(): void {
+  const store = useDesktopStoreApi();
+
+  useEffect(() => {
+    return window.desktopApi.onSettingsSaved((settings) => {
+      applyPersistedAppSettingsToStore(store, settings);
+    });
   }, [store]);
 }
 
@@ -260,10 +257,22 @@ export function useDesktopFaceServicePolling(): void {
 
 export function useDesktopSettingsPersistence(): void {
   const store = useDesktopStoreApi();
+  /** Suppress subscriber-driven saves during early hydration so defaults / stale reads cannot clobber disk. */
+  const allowAutoPersist = useRef(false);
+
+  useEffect(() => {
+    const unlock = window.setTimeout(() => {
+      allowAutoPersist.current = true;
+    }, 120);
+    return () => window.clearTimeout(unlock);
+  }, []);
 
   useEffect(() => {
     return store.subscribe(
       (state, prev) => {
+        if (!allowAutoPersist.current) {
+          return;
+        }
         if (
           state.libraryRoots !== prev.libraryRoots ||
           state.sidebarCollapsed !== prev.sidebarCollapsed ||

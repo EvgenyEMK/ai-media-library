@@ -276,6 +276,11 @@ export function registerFsHandlers(): void {
     resetLandmarkRefiner("pfld-ghostone");
     resetAgeGenderEstimator("onnx-age-gender-v1");
     await writeSettings(app.getPath("userData"), settings);
+    // Keep every renderer window aligned with disk — otherwise Zustand can still hold stale
+    // folderScanning (etc.) and the next subscriber-driven saveSettings would overwrite IPC writes.
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send(IPC_CHANNELS.settingsSaved, settings);
+    }
     // Push the latest pipeline-concurrency limits into the scheduler so the
     // next scheduling pass picks them up without an app restart.
     setPipelineConcurrencyConfig(settings.pipelineConcurrency);

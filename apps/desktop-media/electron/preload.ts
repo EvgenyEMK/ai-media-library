@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import {
   IPC_CHANNELS,
+  type AppSettings,
   type AppUpdateUiEvent,
   type DesktopApi,
 } from "../src/shared/ipc";
@@ -56,6 +57,15 @@ const api: DesktopApi = {
   getDesktopRuntimeFlags: () => ipcRenderer.invoke(IPC_CHANNELS.getDesktopRuntimeFlags),
   getAiInferenceGpuOptions: () => ipcRenderer.invoke(IPC_CHANNELS.getAiInferenceGpuOptions),
   saveSettings: (settings) => ipcRenderer.invoke(IPC_CHANNELS.saveSettings, settings),
+  onSettingsSaved: (listener) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, payload: AppSettings) => {
+      listener(payload);
+    };
+    ipcRenderer.on(IPC_CHANNELS.settingsSaved, wrapped);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.settingsSaved, wrapped);
+    };
+  },
   getFolderAnalysisStatuses: () =>
     ipcRenderer.invoke(IPC_CHANNELS.getFolderAnalysisStatuses),
   getFolderAiSummaryOverview: (folderPath, options) =>

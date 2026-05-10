@@ -23,6 +23,7 @@ import {
   useDesktopInitialization,
   useDesktopIpcBindings,
   useDesktopSettingsPersistence,
+  useDesktopSettingsSyncFromMain,
 } from "./hooks/useDesktopIpcBindings";
 import { usePipelineQueueBinding } from "./hooks/use-pipeline-queue-binding";
 import { useFilteredMediaItems } from "./hooks/use-filtered-media-items";
@@ -40,6 +41,7 @@ export function App(): ReactElement {
   const store = useDesktopStoreApi();
 
   useDesktopIpcBindings();
+  useDesktopSettingsSyncFromMain();
   useDesktopInitialization();
   useDesktopFaceServicePolling();
   useDesktopSettingsPersistence();

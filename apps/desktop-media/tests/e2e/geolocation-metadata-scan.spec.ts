@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import type { Page } from "@playwright/test";
 import { test, expect } from "./fixtures/app-fixture";
+import { enableGpsGeocodingSetting } from "./fixtures/folder-scanning-e2e-helpers";
 
 const configuredAssetsDir = process.env.EMK_E2E_PHOTOS_DIR?.trim();
 const defaultAssetsDir = path.resolve(__dirname, "../../test-assets-local/e2e-photos");
@@ -37,24 +38,6 @@ function hasRequiredAssets(): boolean {
   return [...GPS_FILES, ...NO_GPS_FILES].every((name) =>
     fs.existsSync(path.join(e2ePhotosDir, name)),
   );
-}
-
-async function enableGpsGeocoding(mainWindow: Page): Promise<void> {
-  await mainWindow.evaluate(async () => {
-    const settings = await window.desktopApi.getSettings();
-    await window.desktopApi.saveSettings({
-      ...settings,
-      folderScanning: {
-        ...settings.folderScanning,
-        detectLocationFromGps: true,
-      },
-    });
-    const saved = await window.desktopApi.getSettings();
-    if (!saved.folderScanning.detectLocationFromGps) {
-      throw new Error("Failed to enable GPS geocoding setting.");
-    }
-    await window.desktopApi.initGeocoder();
-  });
 }
 
 function createTempPhotoLibrary(): string {
@@ -155,7 +138,7 @@ test.describe("GPS geolocation metadata scan", () => {
     const photoLibrary = createTempPhotoLibrary();
 
     try {
-      await enableGpsGeocoding(mainWindow);
+      await enableGpsGeocodingSetting(mainWindow);
 
       const firstScan = await runMetadataScan(mainWindow, photoLibrary);
       if (firstScan.geocodingPhases.length > 0) {

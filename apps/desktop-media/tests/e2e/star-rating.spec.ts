@@ -7,6 +7,7 @@ import {
   shutdownExiftoolForE2E,
   waitUntilFileShowsStarRatingAndNewerMtime,
 } from "./fixtures/read-embedded-star-rating";
+import { setWriteEmbeddedMetadataOnUserEdit } from "./fixtures/folder-scanning-e2e-helpers";
 import { createTestImageFolder, removeTestImageFolder } from "./fixtures/test-images";
 
 /** Embedded + ExifTool may need two writes in one test; allow generous headroom on cold runners. */
@@ -50,32 +51,6 @@ async function waitForCatalogItem(
     .not.toBeNull();
 }
 
-async function enableWriteEmbeddedMetadata(mainWindow: import("@playwright/test").Page): Promise<void> {
-  await mainWindow.evaluate(async () => {
-    const s = await window.desktopApi.getSettings();
-    await window.desktopApi.saveSettings({
-      ...s,
-      folderScanning: {
-        ...s.folderScanning,
-        writeEmbeddedMetadataOnUserEdit: true,
-      },
-    });
-  });
-}
-
-async function disableWriteEmbeddedMetadata(mainWindow: import("@playwright/test").Page): Promise<void> {
-  await mainWindow.evaluate(async () => {
-    const s = await window.desktopApi.getSettings();
-    await window.desktopApi.saveSettings({
-      ...s,
-      folderScanning: {
-        ...s.folderScanning,
-        writeEmbeddedMetadataOnUserEdit: false,
-      },
-    });
-  });
-}
-
 async function addLibraryAndScan(
   electronApp: import("@playwright/test").ElectronApplication,
   mainWindow: import("@playwright/test").Page,
@@ -101,7 +76,7 @@ test.describe("Star rating", () => {
 
       const resolvedPath = await electronImagePath(mainWindow, tempFolder, "test-photo-2.jpg");
       await waitForCatalogItem(mainWindow, resolvedPath);
-      await disableWriteEmbeddedMetadata(mainWindow);
+      await setWriteEmbeddedMetadataOnUserEdit(mainWindow, false, [tempFolder]);
 
       const result = await mainWindow.evaluate(async (p) => {
         return window.desktopApi.setMediaItemStarRating({ sourcePath: p, starRating: 5 });
@@ -125,7 +100,7 @@ test.describe("Star rating", () => {
       const imgPath = await electronImagePath(mainWindow, tempFolder, "test-photo-1.jpg");
       await waitForCatalogItem(mainWindow, imgPath);
       const mtimeBeforeEmbeddedWrites = getFileMtimeMs(imgPath);
-      await enableWriteEmbeddedMetadata(mainWindow);
+      await setWriteEmbeddedMetadataOnUserEdit(mainWindow, true, [tempFolder]);
 
       const result = await mainWindow.evaluate(async (p) => {
         return window.desktopApi.setMediaItemStarRating({ sourcePath: p, starRating: 4 });
@@ -143,6 +118,7 @@ test.describe("Star rating", () => {
       await waitUntilFileShowsStarRatingAndNewerMtime(imgPath, 4, mtimeBeforeEmbeddedWrites);
 
       const mtimeAfterFourStars = getFileMtimeMs(imgPath);
+      await setWriteEmbeddedMetadataOnUserEdit(mainWindow, true, [tempFolder]);
 
       const resultSecond = await mainWindow.evaluate(async (p) => {
         return window.desktopApi.setMediaItemStarRating({ sourcePath: p, starRating: 2 });
@@ -166,7 +142,7 @@ test.describe("Star rating", () => {
 
       const imgPath = await electronImagePath(mainWindow, tempFolder, "test-photo-1.jpg");
       await waitForCatalogItem(mainWindow, imgPath);
-      await enableWriteEmbeddedMetadata(mainWindow);
+      await setWriteEmbeddedMetadataOnUserEdit(mainWindow, true, [tempFolder]);
 
       let mtimeBaseline = getFileMtimeMs(imgPath);
 
@@ -210,7 +186,7 @@ test.describe("Star rating", () => {
 
       const imgPath = await electronImagePath(mainWindow, uiFolder, "test-photo-1.jpg");
       await waitForCatalogItem(mainWindow, imgPath);
-      await enableWriteEmbeddedMetadata(mainWindow);
+      await setWriteEmbeddedMetadataOnUserEdit(mainWindow, true, [uiFolder]);
 
       const mtimeBeforeThreeStars = getFileMtimeMs(imgPath);
       await mainWindow.evaluate(async (p) => {

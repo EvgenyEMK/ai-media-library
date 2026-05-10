@@ -1,3 +1,4 @@
+import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { IPC_CHANNELS, type SetMediaItemStarRatingRequest } from "../../src/shared/ipc";
 import { updateMediaItemStarRatingInDb } from "../db/media-item-star-rating-update";
@@ -9,6 +10,22 @@ import { DEFAULT_LIBRARY_ID } from "../db/folder-analysis-status";
 import { refreshObservedStateForPaths } from "../db/file-identity";
 import { writeStarRatingToMediaFile } from "../lib/write-star-rating-exiftool";
 import { readSettings } from "../storage";
+
+/** Serialize ExifTool writes per path so overlapping async writes cannot leave an older star rating on disk. */
+const embeddedStarWriteTailByPath = new Map<string, Promise<void>>();
+
+function enqueueEmbeddedStarWrite(sourcePath: string, starRating: number): Promise<void> {
+  const key = path.normalize(sourcePath);
+  const prev = embeddedStarWriteTailByPath.get(key) ?? Promise.resolve();
+  const next = prev.catch(() => undefined).then(() => writeStarRatingToMediaFile(sourcePath, starRating));
+  embeddedStarWriteTailByPath.set(key, next);
+  void next.finally(() => {
+    if (embeddedStarWriteTailByPath.get(key) === next) {
+      embeddedStarWriteTailByPath.delete(key);
+    }
+  });
+  return next;
+}
 
 /**
  * After a background file-metadata write completes, push the refreshed catalog
@@ -62,11 +79,9 @@ export function registerMediaItemMutationHandlers(): void {
 
       const settings = await readSettings(app.getPath("userData"));
       if (settings.folderScanning.writeEmbeddedMetadataOnUserEdit) {
-        // Fire-and-forget: write file metadata in background so the IPC returns
-        // instantly and the renderer can update the grid immediately.
-        void (async () => {
+        const runEmbeddedWrite = async (): Promise<void> => {
           try {
-            await writeStarRatingToMediaFile(sourcePath, starRating);
+            await enqueueEmbeddedStarWrite(sourcePath, starRating);
             const refreshed = await refreshObservedStateForPaths([sourcePath], libraryId);
             const observedState = refreshed[sourcePath];
             await upsertMediaItemFromFilePath({
@@ -82,8 +97,18 @@ export function registerMediaItemMutationHandlers(): void {
               `[star-rating] background file write failed for ${sourcePath}:`,
               err instanceof Error ? err.message : err,
             );
+            if (process.env.EMK_E2E_RUN_PIPELINES_UI === "1") {
+              throw err;
+            }
           }
-        })();
+        };
+        // In Playwright, await so rapid successive rating changes cannot race ExifTool.
+        // In production, keep fire-and-forget so the grid updates immediately.
+        if (process.env.EMK_E2E_RUN_PIPELINES_UI === "1") {
+          await runEmbeddedWrite();
+        } else {
+          void runEmbeddedWrite();
+        }
       }
 
       return { success: true, metadata };

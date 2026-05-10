@@ -1,6 +1,7 @@
 import path from "node:path";
 import { test, expect } from "./fixtures/app-fixture";
 import { mainDesktopSidebar } from "./fixtures/desktop-sidebar";
+import { waitForPhotoDownscaleSetting } from "./fixtures/folder-scanning-e2e-helpers";
 import { mockFolderDialog } from "./fixtures/mock-dialog";
 import {
   createMoveChurnFixture,
@@ -126,6 +127,7 @@ test.describe("AI image analysis LLM downscale settings", () => {
     await expect(downscaleCheckbox).toBeVisible();
     await downscaleCheckbox.uncheck();
     await expect(downscaleCheckbox).not.toBeChecked();
+    await waitForPhotoDownscaleSetting(mainWindow, false);
 
     await mainWindow.getByRole("button", { name: "Folders" }).click();
     await subAFolderButton.click();

@@ -40,6 +40,36 @@ function hasRequiredAssets(): boolean {
   return REQUIRED_FILES.every((name) => fs.existsSync(path.join(e2ePhotosDir, name)));
 }
 
+async function setAiSearchThresholdsToHideAllResults(
+  mainWindow: import("@playwright/test").Page,
+): Promise<void> {
+  await mainWindow.evaluate(async () => {
+    const deadline = Date.now() + 20_000;
+    while (Date.now() < deadline) {
+      const settings = await window.desktopApi.getSettings();
+      await window.desktopApi.saveSettings({
+        ...settings,
+        aiImageSearch: {
+          ...settings.aiImageSearch,
+          hideResultsBelowVlmSimilarity: 1,
+          hideResultsBelowDescriptionSimilarity: 1,
+        },
+      });
+      const saved = await window.desktopApi.getSettings();
+      if (
+        saved.aiImageSearch.hideResultsBelowVlmSimilarity === 1 &&
+        saved.aiImageSearch.hideResultsBelowDescriptionSimilarity === 1
+      ) {
+        return;
+      }
+      await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, 100);
+      });
+    }
+    throw new Error("Failed to persist AI search threshold settings.");
+  });
+}
+
 test.describe("Semantic image search", () => {
   test.setTimeout(600_000);
 
@@ -362,6 +392,7 @@ test.describe("Semantic image search", () => {
     await thresholdInputs.nth(0).press("Enter");
     await thresholdInputs.nth(1).fill("1");
     await thresholdInputs.nth(1).press("Enter");
+    await setAiSearchThresholdsToHideAllResults(mainWindow);
 
     await mainWindow.getByRole("navigation").getByText("Folders", { exact: true }).click();
 
