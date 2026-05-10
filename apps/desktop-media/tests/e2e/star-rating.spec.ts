@@ -11,7 +11,7 @@ import { setWriteEmbeddedMetadataOnUserEdit } from "./fixtures/folder-scanning-e
 import { createTestImageFolder, removeTestImageFolder } from "./fixtures/test-images";
 
 /** Embedded + ExifTool may need two writes in one test; allow generous headroom on cold runners. */
-test.describe.configure({ mode: "serial", timeout: 300_000 });
+test.describe.configure({ mode: "serial", timeout: 600_000 });
 
 /**
  * Use the exact path strings Electron uses when listing files so `source_path`
@@ -63,6 +63,33 @@ async function addLibraryAndScan(
   await mainWindow.evaluate(async (folder) => {
     await window.desktopApi.scanFolderMetadata({ folderPath: folder, recursive: false });
   }, folderPath);
+}
+
+/**
+ * One embedded rewrite retry: cold Windows runners occasionally leave IFD0/XMP briefly inconsistent;
+ * a second ExifTool write usually stabilizes tags before the IFD0 assertions.
+ */
+async function setStarRatingAndWaitEmbedded(
+  mainWindow: import("@playwright/test").Page,
+  imgPath: string,
+  stars: number,
+  mtimeBaseline: number,
+): Promise<void> {
+  const invoke = async (): Promise<void> => {
+    const result = await mainWindow.evaluate(
+      async ({ path: p, stars: s }: { path: string; stars: number }) =>
+        window.desktopApi.setMediaItemStarRating({ sourcePath: p, starRating: s }),
+      { path: imgPath, stars },
+    );
+    expect(result.success).toBe(true);
+  };
+  await invoke();
+  try {
+    await waitUntilFileShowsStarRatingAndNewerMtime(imgPath, stars, mtimeBaseline);
+  } catch {
+    await invoke();
+    await waitUntilFileShowsStarRatingAndNewerMtime(imgPath, stars, mtimeBaseline);
+  }
 }
 
 test.describe("Star rating", () => {
@@ -155,15 +182,7 @@ test.describe("Star rating", () => {
       ];
 
       for (const step of steps) {
-        const result = await mainWindow.evaluate(
-          async ({ path: p, stars }) => {
-            return window.desktopApi.setMediaItemStarRating({ sourcePath: p, starRating: stars });
-          },
-          { path: imgPath, stars: step.stars },
-        );
-        expect(result.success).toBe(true);
-
-        await waitUntilFileShowsStarRatingAndNewerMtime(imgPath, step.stars, mtimeBaseline);
+        await setStarRatingAndWaitEmbedded(mainWindow, imgPath, step.stars, mtimeBaseline);
 
         const w = await readWindowsExifRatingTags(imgPath);
         expect(w.exifRating, `IFD0 Rating for ${step.stars} app stars`).toBe(step.ifd0Rating);

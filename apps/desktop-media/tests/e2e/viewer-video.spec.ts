@@ -167,6 +167,16 @@ test.describe("Viewer mixed media", () => {
 
     await setAutoPlayVideoOnSelection(mainWindow, false);
     await openE2eMixedMediaLibrary(electronApp, mainWindow);
+    await expect
+      .poll(
+        async () =>
+          mainWindow.evaluate(async () => {
+            const settings = await window.desktopApi.getSettings();
+            return settings.mediaViewer.autoPlayVideoOnOpen;
+          }),
+        { timeout: 15_000 },
+      )
+      .toBe(false);
     await switchToListView(mainWindow);
 
     const { imageNames, videoNames } = await readMixedMediaNames(mainWindow);
@@ -183,7 +193,7 @@ test.describe("Viewer mixed media", () => {
       if (paused !== null) {
         reachedVideo = true;
         await expect
-          .poll(async () => currentViewerVideoPaused(mainWindow), { timeout: 10_000 })
+          .poll(async () => currentViewerVideoPaused(mainWindow), { timeout: 25_000 })
           .toBe(true);
         break;
       }

@@ -1,4 +1,3 @@
-import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
 import { IPC_CHANNELS, type SetMediaItemStarRatingRequest } from "../../src/shared/ipc";
 import { updateMediaItemStarRatingInDb } from "../db/media-item-star-rating-update";
