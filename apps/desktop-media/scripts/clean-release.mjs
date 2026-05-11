@@ -1,7 +1,23 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const releaseDir = path.resolve(import.meta.dirname, "..", "release");
+const appRoot = path.resolve(import.meta.dirname, "..");
+const releaseDir = path.join(appRoot, "release");
+
+async function readWindowsInstallerBasenames() {
+  const [pkgRaw, builderRaw] = await Promise.all([
+    fs.readFile(path.join(appRoot, "package.json"), "utf8"),
+    fs.readFile(path.join(appRoot, "electron-builder.yml"), "utf8"),
+  ]);
+  const { version } = JSON.parse(pkgRaw);
+  const productMatch = builderRaw.match(/^productName:\s*(.+)$/m);
+  if (!productMatch) {
+    throw new Error("electron-builder.yml: missing productName");
+  }
+  const productName = productMatch[1].trim().replace(/^["']|["']$/g, "");
+  const exeName = `${productName}-${version}-Windows-x64.exe`;
+  return { exeName, blockmapName: `${exeName}.blockmap` };
+}
 
 async function sleep(ms) {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -38,9 +54,7 @@ const lockedAsarPath = path.join(releaseDir, "win-unpacked", "resources", "app.a
 await removeWithRetries(lockedAsarPath, { required: false, maxAttempts: 3 });
 await removeWithRetries(path.join(releaseDir, "win-unpacked"), { required: false, maxAttempts: 3 });
 await removeWithRetries(path.join(releaseDir, "artifacts"));
-await removeWithRetries(path.join(releaseDir, "AI Media Library-0.1.0-Windows-x64.exe"), {
-  required: false,
-});
-await removeWithRetries(path.join(releaseDir, "AI Media Library-0.1.0-Windows-x64.exe.blockmap"), {
-  required: false,
-});
+
+const { exeName, blockmapName } = await readWindowsInstallerBasenames();
+await removeWithRetries(path.join(releaseDir, exeName), { required: false });
+await removeWithRetries(path.join(releaseDir, blockmapName), { required: false });
