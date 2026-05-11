@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { rcedit } from "rcedit";
 
 async function removePath(targetPath) {
   await fs.rm(targetPath, { recursive: true, force: true });
@@ -29,11 +30,24 @@ async function removeMatchingFiles(rootDir, matcher) {
   }
 }
 
+async function embedWindowsExecutableIcon(context) {
+  const productFilename = context.packager?.appInfo?.productFilename;
+  if (!productFilename) {
+    throw new Error("Unable to resolve product filename for Windows executable icon embedding.");
+  }
+
+  const exePath = path.join(context.appOutDir, `${productFilename}.exe`);
+  const iconPath = path.join(context.packager.projectDir, "build-resources", "app-icon.ico");
+  await rcedit(exePath, { icon: iconPath });
+}
+
 export default async function afterPack(context) {
   const isX64Arch = context.arch === 1 || context.arch === "x64";
   if (context.electronPlatformName !== "win32" || !isX64Arch) {
     return;
   }
+
+  await embedWindowsExecutableIcon(context);
 
   const unpackedNodeModulesPath = path.join(
     context.appOutDir,

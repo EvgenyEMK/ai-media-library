@@ -1,5 +1,7 @@
 /** Central URLs and display name for menus, shell.openExternal, and packaging docs. */
 
+export const APP_ID = "com.emk.aimedialibrary";
+
 export const APP_DISPLAY_NAME = "AI Media Library";
 
 /** Primary landing doc (overview, install, capabilities). */

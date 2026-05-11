@@ -32,6 +32,11 @@ files:
   - "!**/node_modules/**/{test,tests,__tests__,docs,doc,example,examples}/**"
 
 asar: true
+extraResources:
+  - from: build-resources/app-icon.png
+    to: app-icon.png
+  - from: build-resources/app-icon.ico
+    to: app-icon.ico
 asarUnpack:
   - "**/*.node"
   - "**/node_modules/exiftool-vendored/**/*"
@@ -41,7 +46,9 @@ asarUnpack:
 afterPack: scripts/electron-builder-after-pack.mjs
 
 win:
-  # Unsigned builds: avoids winCodeSign bundle extraction (symlinks require admin on Windows).
+  icon: build-resources/app-icon.ico
+  # Unsigned local builds: avoid winCodeSign extraction, which requires symlink
+  # privileges on Windows. Runtime app details provide the taskbar icon instead.
   signAndEditExecutable: false
   target:
     - target: nsis

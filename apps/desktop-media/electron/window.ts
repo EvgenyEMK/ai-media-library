@@ -1,10 +1,27 @@
 import path from "node:path";
-import { BrowserWindow } from "electron";
-import { APP_DISPLAY_NAME } from "./app-links";
+import { app, BrowserWindow } from "electron";
+import { APP_DISPLAY_NAME, APP_ID } from "./app-links";
 import { resetFrameSendErrorFlag } from "./ipc/progress-emitters";
 
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const isDev = Boolean(DEV_SERVER_URL);
+const APP_ICON_PNG_FILE_NAME = "app-icon.png";
+const APP_ICON_ICO_FILE_NAME = "app-icon.ico";
+
+function resolveAppIconPaths(): { pngPath: string; icoPath: string } {
+  if (app.isPackaged) {
+    return {
+      pngPath: path.join(process.resourcesPath, APP_ICON_PNG_FILE_NAME),
+      icoPath: path.join(process.resourcesPath, APP_ICON_ICO_FILE_NAME),
+    };
+  }
+
+  const buildResourcesPath = path.resolve(__dirname, "../build-resources");
+  return {
+    pngPath: path.join(buildResourcesPath, APP_ICON_PNG_FILE_NAME),
+    icoPath: path.join(buildResourcesPath, APP_ICON_ICO_FILE_NAME),
+  };
+}
 
 function loadRenderer(window: BrowserWindow): void {
   if (isDev && DEV_SERVER_URL) {
@@ -25,10 +42,10 @@ function loadRenderer(window: BrowserWindow): void {
 }
 
 export function createMainWindow(): BrowserWindow {
-  const iconPath = path.resolve(__dirname, "../build-resources/app-icon.png");
+  const { pngPath, icoPath } = resolveAppIconPaths();
   const window = new BrowserWindow({
     title: APP_DISPLAY_NAME,
-    icon: iconPath,
+    icon: pngPath,
     width: 1400,
     height: 900,
     minWidth: 1024,
@@ -44,6 +61,16 @@ export function createMainWindow(): BrowserWindow {
       webSecurity: !isDev,
     },
   });
+
+  if (process.platform === "win32") {
+    window.setAppDetails({
+      appId: APP_ID,
+      appIconPath: icoPath,
+      appIconIndex: 0,
+      relaunchCommand: process.execPath,
+      relaunchDisplayName: APP_DISPLAY_NAME,
+    });
+  }
 
   window.webContents.on("render-process-gone", (_event, details) => {
     console.warn(

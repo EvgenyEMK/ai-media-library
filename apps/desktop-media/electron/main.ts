@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain } from "electron";
-import { APP_DISPLAY_NAME } from "./app-links";
+import { APP_DISPLAY_NAME, APP_ID } from "./app-links";
 import { installApplicationMenu } from "./application-menu";
 import {
   configureAutoUpdater,
@@ -62,6 +62,9 @@ if (configuredUserDataPath) {
 app.setPath("sessionData", resolveSessionDataPath(app));
 
 app.setName(APP_DISPLAY_NAME);
+if (process.platform === "win32") {
+  app.setAppUserModelId(APP_ID);
+}
 
 function registerAllIpcHandlers(): void {
   registerAllPipelineDefinitions();
