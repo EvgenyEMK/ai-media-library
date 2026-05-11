@@ -1599,7 +1599,7 @@ export function DesktopSettingsSection({
         ) : null}
       </SettingsSectionCard>
 
-      <PipelineConcurrencySettings />
+      <PipelineConcurrencySettings hideAdvancedSettings={hideAdvancedSettings} />
 
       <SettingsSectionCard
         title={UI_TEXT.databaseLocation}
