@@ -1405,6 +1405,15 @@ export function DesktopSettingsSection({
               ))}
             </div>
           </div>
+          <SettingsCheckboxField
+            title={UI_TEXT.extractInvoiceDataTitle}
+            description={UI_TEXT.extractInvoiceDataDescription}
+            checked={photoAnalysisSettings.extractInvoiceData}
+            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+            onChange={(next) =>
+              onPhotoAnalysisSettingChange("extractInvoiceData", next)
+            }
+          />
           {showAdvancedSettings ? (
           <div
             className={cn(
@@ -1543,15 +1552,6 @@ export function DesktopSettingsSection({
             ) : null}
           </div>
           ) : null}
-          <SettingsCheckboxField
-            title={UI_TEXT.extractInvoiceDataTitle}
-            description={UI_TEXT.extractInvoiceDataDescription}
-            checked={photoAnalysisSettings.extractInvoiceData}
-            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
-            onChange={(next) =>
-              onPhotoAnalysisSettingChange("extractInvoiceData", next)
-            }
-          />
           <div className="pt-1">
             <button
               type="button"
