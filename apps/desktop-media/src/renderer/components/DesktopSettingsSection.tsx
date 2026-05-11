@@ -356,6 +356,14 @@ export function DesktopSettingsSection({
     setShowGpsConfirm(false);
   };
 
+  const ensureOrientationModel = (): void => {
+    void window.desktopApi
+      .ensureAuxModel("orientation", faceDetectionSettings.imageOrientationDetection.model)
+      .catch(() => {
+        // Errors surface via the face-model-download-progress channel.
+      });
+  };
+
   return (
     <div className="mx-auto w-full max-w-7xl space-y-3 px-4 py-6 md:px-8">
       <h1 className="m-0 text-3xl font-bold text-foreground md:text-4xl">{UI_TEXT.title}</h1>
@@ -820,7 +828,12 @@ export function DesktopSettingsSection({
             description={UI_TEXT.detectWrongImageRotationBeforePipelinesDescription}
             checked={wrongImageRotationDetectionSettings.enabled}
             checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
-            onChange={(next) => onWrongImageRotationDetectionSettingChange("enabled", next)}
+            onChange={(next) => {
+              onWrongImageRotationDetectionSettingChange("enabled", next);
+              if (next) {
+                ensureOrientationModel();
+              }
+            }}
           />
           <SettingsCheckboxField
             title={UI_TEXT.faceLandmarkFallbackTitle}
@@ -859,6 +872,9 @@ export function DesktopSettingsSection({
                   "minConfidenceThreshold",
                   DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS.minConfidenceThreshold,
                 );
+                if (DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS.enabled) {
+                  ensureOrientationModel();
+                }
               }}
               disabled={
                 wrongImageRotationDetectionSettings.enabled ===

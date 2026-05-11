@@ -90,6 +90,7 @@ export function useDesktopProgressDockState({
   const geocoderInitProgressPercent = useDesktopStore((s) => s.geocoderInitProgressPercent);
   const geocoderInitProgressLabel = useDesktopStore((s) => s.geocoderInitProgressLabel);
   const geocoderInitPanelVisible = useDesktopStore((s) => s.geocoderInitPanelVisible);
+  const faceModelDownload = useDesktopStore((s) => s.faceModelDownload);
   const isAnalyzing = aiStatus === "running";
   const isDetectingFaces = faceStatus === "running";
   const isMetadataScanning = metadataStatus === "running";
@@ -154,6 +155,10 @@ export function useDesktopProgressDockState({
   /** Legacy dock card: active download / cache load / parse, or error (success moves to pipeline Completed). */
   const geocoderQualifies =
     geocoderInitPanelVisible && (isGeocoderInitRunning || geocoderInitStatus === "error");
+  const isFaceModelDownloading = faceModelDownload.status === "running";
+  const faceModelDownloadQualifies =
+    faceModelDownload.visible &&
+    (isFaceModelDownloading || faceModelDownload.status === "failed");
 
   const isPathAnalysisRunning = pathAnalysisStatus === "running";
   const isImageRotationRunning = imageRotationStatus === "running";
@@ -193,7 +198,8 @@ export function useDesktopProgressDockState({
     similarUntaggedCountsQualifies ||
     pathAnalysisQualifies ||
     imageRotationQualifies ||
-    geocoderQualifies;
+    geocoderQualifies ||
+    faceModelDownloadQualifies;
   const hasAnyRunningOperation =
     isAnalyzing ||
     isDetectingFaces ||
@@ -204,7 +210,8 @@ export function useDesktopProgressDockState({
     isSimilarUntaggedCountsRunning ||
     isPathAnalysisRunning ||
     isImageRotationRunning ||
-    isGeocoderInitRunning;
+    isGeocoderInitRunning ||
+    isFaceModelDownloading;
 
   return {
     store,
@@ -217,6 +224,7 @@ export function useDesktopProgressDockState({
     pathAnalysisPanelVisible,
     imageRotationPanelVisible,
     geocoderInitPanelVisible,
+    faceModelDownload,
     metadataPanelVisible,
     hasAnyQualifyingCard,
     hasAnyRunningOperation,
@@ -230,12 +238,14 @@ export function useDesktopProgressDockState({
     pathAnalysisQualifies,
     imageRotationQualifies,
     geocoderQualifies,
+    faceModelDownloadQualifies,
     isAnalyzing,
     isDetectingFaces,
     isMetadataScanning,
     isSemanticIndexing,
     isFaceClusteringRunning,
     isGeocoderInitRunning,
+    isFaceModelDownloading,
     isPathAnalysisRunning,
     isImageRotationRunning,
     isSimilarUntaggedCountsRunning,

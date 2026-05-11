@@ -92,7 +92,6 @@ export function App(): ReactElement {
   const semanticIndexStatus = useDesktopStore((s) => s.semanticIndexStatus);
   const pathAnalysisStatus = useDesktopStore((s) => s.pathAnalysisStatus);
   const pathAnalysisJobId = useDesktopStore((s) => s.pathAnalysisJobId);
-  const faceModelDownload = useDesktopStore((s) => s.faceModelDownload);
   const recentAlbumIds = useDesktopStore((s) => s.recentAlbumIds);
 
   const [quickFilters, setQuickFilters] = useState<ThumbnailQuickFilterState>(DEFAULT_THUMBNAIL_QUICK_FILTERS);
@@ -471,7 +470,6 @@ export function App(): ReactElement {
         onOpenImageEditSuggestions={openImageEditSuggestions}
         onCloseSpecialMainPaneView={closeSpecialMainPaneView}
         pipeline={pipeline}
-        faceModelDownload={faceModelDownload}
         handleOpenFolderAiSummary={folderTree.handleOpenFolderAiSummary}
         imageEditSuggestionItems={imageEditSuggestionItems}
         isFolderLoading={isFolderLoading}

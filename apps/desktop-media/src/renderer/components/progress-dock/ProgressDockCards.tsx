@@ -6,6 +6,7 @@ import { AnalysisCard } from "./cards/AnalysisCard";
 import { DescEmbedBackfillCard } from "./cards/DescEmbedBackfillCard";
 import { FaceClusteringCard } from "./cards/FaceClusteringCard";
 import { FaceDetectionCard } from "./cards/FaceDetectionCard";
+import { FaceModelDownloadCard } from "./cards/FaceModelDownloadCard";
 import { GeocoderInitCard } from "./cards/GeocoderInitCard";
 import { ImageRotationCard } from "./cards/ImageRotationCard";
 import { MetadataScanCard } from "./cards/MetadataScanCard";
@@ -175,6 +176,13 @@ export function ProgressDockCards({
           geocoderInitError={d.geocoderInitError}
           geocoderInitProgressPercent={d.geocoderInitProgressPercent}
           geocoderInitProgressLabel={d.geocoderInitProgressLabel}
+        />
+      ) : null}
+
+      {d.faceModelDownloadQualifies ? (
+        <FaceModelDownloadCard
+          store={store}
+          faceModelDownload={d.faceModelDownload}
         />
       ) : null}
 
