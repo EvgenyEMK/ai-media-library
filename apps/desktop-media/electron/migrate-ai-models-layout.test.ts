@@ -22,9 +22,9 @@ describe("migrateAiModelsLayoutPaths", () => {
   it("moves managed ONNX files from ai-models root into onnx/", async () => {
     const root = await mkFixtureRoot();
     roots.push(root);
-    const aiModelsRoot = path.join(root, "EMK Desktop Media", "ai-models");
+    const aiModelsRoot = path.join(root, "AI Media Library", "ai-models");
     const onnxDir = path.join(aiModelsRoot, "onnx");
-    const cacheRoot = path.join(root, "EMK Desktop Media", "cache");
+    const cacheRoot = path.join(root, "AI Media Library", "cache");
     const huggingfaceRoot = path.join(aiModelsRoot, "huggingface");
 
     await fs.mkdir(aiModelsRoot, { recursive: true });
@@ -45,9 +45,9 @@ describe("migrateAiModelsLayoutPaths", () => {
   it("renames cache/huggingface to ai-models/huggingface when destination is absent", async () => {
     const root = await mkFixtureRoot();
     roots.push(root);
-    const aiModelsRoot = path.join(root, "EMK Desktop Media", "ai-models");
+    const aiModelsRoot = path.join(root, "AI Media Library", "ai-models");
     const onnxDir = path.join(aiModelsRoot, "onnx");
-    const cacheRoot = path.join(root, "EMK Desktop Media", "cache");
+    const cacheRoot = path.join(root, "AI Media Library", "cache");
     const huggingfaceRoot = path.join(aiModelsRoot, "huggingface");
     const oldHf = path.join(cacheRoot, "huggingface");
 
@@ -69,9 +69,9 @@ describe("migrateAiModelsLayoutPaths", () => {
   it("is a no-op when onnx files are already under onnx and cache huggingface is gone", async () => {
     const root = await mkFixtureRoot();
     roots.push(root);
-    const aiModelsRoot = path.join(root, "EMK Desktop Media", "ai-models");
+    const aiModelsRoot = path.join(root, "AI Media Library", "ai-models");
     const onnxDir = path.join(aiModelsRoot, "onnx");
-    const cacheRoot = path.join(root, "EMK Desktop Media", "cache");
+    const cacheRoot = path.join(root, "AI Media Library", "cache");
     const huggingfaceRoot = path.join(aiModelsRoot, "huggingface");
 
     await fs.mkdir(onnxDir, { recursive: true });
@@ -89,5 +89,32 @@ describe("migrateAiModelsLayoutPaths", () => {
     expect(existsSync(path.join(onnxDir, "w600k_r50.onnx"))).toBe(true);
     expect(existsSync(path.join(huggingfaceRoot, "models", "keep.txt"))).toBe(true);
     expect(existsSync(path.join(cacheRoot, "huggingface"))).toBe(false);
+  });
+
+  it("moves model caches from the legacy EMK Desktop Media runtime root", async () => {
+    const root = await mkFixtureRoot();
+    roots.push(root);
+    const aiModelsRoot = path.join(root, "AI Media Library", "ai-models");
+    const onnxDir = path.join(aiModelsRoot, "onnx");
+    const cacheRoot = path.join(root, "AI Media Library", "cache");
+    const huggingfaceRoot = path.join(aiModelsRoot, "huggingface");
+    const legacyAiModelsRoot = path.join(root, "EMK Desktop Media", "ai-models");
+
+    await fs.mkdir(path.join(legacyAiModelsRoot, "onnx"), { recursive: true });
+    await fs.writeFile(path.join(legacyAiModelsRoot, "onnx", "yolov12l-face.onnx"), "yolo");
+    await fs.mkdir(path.join(legacyAiModelsRoot, "huggingface", "cache"), { recursive: true });
+    await fs.writeFile(path.join(legacyAiModelsRoot, "huggingface", "cache", "model.onnx"), "hf");
+
+    await migrateAiModelsLayoutPaths({
+      aiModelsRoot,
+      cacheRoot,
+      onnxDir,
+      huggingfaceRoot,
+      legacyAiModelsRoot,
+    });
+
+    expect(existsSync(path.join(onnxDir, "yolov12l-face.onnx"))).toBe(true);
+    expect(existsSync(path.join(huggingfaceRoot, "cache", "model.onnx"))).toBe(true);
+    expect(existsSync(path.join(legacyAiModelsRoot, "onnx", "yolov12l-face.onnx"))).toBe(false);
   });
 });

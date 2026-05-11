@@ -84,7 +84,6 @@ interface DesktopAppMainProps {
   onOpenImageEditSuggestions: () => void;
   onCloseSpecialMainPaneView: () => void;
   pipeline: DesktopPipelineHandlers;
-  faceModelDownload: DesktopStoreState["faceModelDownload"];
   handleOpenFolderAiSummary: (folderPath: string) => void;
   imageEditSuggestionItems: ImageEditSuggestionsItem[];
   isFolderLoading: boolean;
@@ -164,7 +163,6 @@ export function DesktopAppMain({
   onOpenImageEditSuggestions,
   onCloseSpecialMainPaneView,
   pipeline,
-  faceModelDownload,
   handleOpenFolderAiSummary,
   imageEditSuggestionItems,
   isFolderLoading,
@@ -314,7 +312,6 @@ export function DesktopAppMain({
             onCloseSpecialMainPaneView={onCloseSpecialMainPaneView}
             selectedFolder={selectedFolder}
             semanticPanelOpen={semanticPanelOpen}
-            faceModelDownload={faceModelDownload}
             pipeline={pipeline}
             handleOpenFolderAiSummary={handleOpenFolderAiSummary}
             imageEditSuggestionItems={imageEditSuggestionItems}

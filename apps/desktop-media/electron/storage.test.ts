@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { readSettings, writeSettings } from "./storage";
-import { DEFAULT_APP_SETTINGS } from "../src/shared/ipc";
+import { DEFAULT_APP_SETTINGS, DEFAULT_FACE_DETECTION_SETTINGS } from "../src/shared/ipc";
 
 let userDataPath: string;
 
@@ -118,5 +118,38 @@ describe("writeSettings (atomic via tmpfile + rename)", () => {
       }
     })();
     await Promise.all([writer, reader]);
+  });
+});
+
+describe("readSettings face landmark refinement", () => {
+  it("forces faceLandmarkRefinement.enabled to true even when the file had it disabled", async () => {
+    const userDataPath = await fs.mkdtemp(path.join(os.tmpdir(), "emk-storage-face-lm-"));
+    try {
+      const settingsPath = path.join(userDataPath, "media-settings.json");
+      await fs.mkdir(userDataPath, { recursive: true });
+      await fs.writeFile(
+        settingsPath,
+        JSON.stringify({
+          ...DEFAULT_APP_SETTINGS,
+          clientId: "test-client-face-lm",
+          faceDetection: {
+            ...DEFAULT_FACE_DETECTION_SETTINGS,
+            faceLandmarkRefinement: {
+              ...DEFAULT_FACE_DETECTION_SETTINGS.faceLandmarkRefinement,
+              enabled: false,
+            },
+          },
+        }),
+        "utf-8",
+      );
+
+      const read = await readSettings(userDataPath);
+      expect(read.faceDetection.faceLandmarkRefinement.enabled).toBe(true);
+      expect(read.faceDetection.faceLandmarkRefinement.model).toBe(
+        DEFAULT_FACE_DETECTION_SETTINGS.faceLandmarkRefinement.model,
+      );
+    } finally {
+      await fs.rm(userDataPath, { recursive: true, force: true }).catch(() => undefined);
+    }
   });
 });

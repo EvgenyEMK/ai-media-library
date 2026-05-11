@@ -95,7 +95,8 @@ export function DesktopProgressDock({
       dock.similarUntaggedCountsPanelVisible ||
       dock.pathAnalysisPanelVisible ||
       dock.imageRotationPanelVisible ||
-      dock.geocoderInitPanelVisible;
+      dock.geocoderInitPanelVisible ||
+      dock.faceModelDownload.visible;
     if (!anyVisible) return;
     store.setState((s) => {
       s.metadataPanelVisible = false;
@@ -107,6 +108,7 @@ export function DesktopProgressDock({
       s.pathAnalysisPanelVisible = false;
       s.imageRotationPanelVisible = false;
       s.geocoderInitPanelVisible = false;
+      s.faceModelDownload.visible = false;
     });
   }, [
     viewerOpen,
@@ -120,6 +122,7 @@ export function DesktopProgressDock({
     dock.pathAnalysisPanelVisible,
     dock.imageRotationPanelVisible,
     dock.geocoderInitPanelVisible,
+    dock.faceModelDownload.visible,
     store,
   ]);
 

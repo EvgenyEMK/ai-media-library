@@ -11,7 +11,6 @@ import type {
   DesktopFilteredMediaItem,
   DesktopSemanticListItem,
 } from "../hooks/use-filtered-media-items";
-import { DesktopFaceModelDownloadBanner } from "./DesktopFaceModelDownloadBanner";
 import { DesktopMediaItemActionsMenu } from "./DesktopMediaItemActionsMenu";
 import { DesktopMediaItemListRow } from "./DesktopMediaItemListRow";
 import { DesktopFolderAiSummaryView } from "./DesktopFolderAiSummaryView";
@@ -78,7 +77,6 @@ interface DesktopMediaWorkspaceProps {
   onCloseSpecialMainPaneView: () => void;
   selectedFolder: string | null;
   semanticPanelOpen: boolean;
-  faceModelDownload: DesktopStoreState["faceModelDownload"];
   pipeline: DesktopPipelineHandlers;
   handleOpenFolderAiSummary: (folderPath: string) => void;
   imageEditSuggestionItems: ImageEditSuggestionsItem[];
@@ -107,7 +105,6 @@ export function DesktopMediaWorkspace({
   onCloseSpecialMainPaneView,
   selectedFolder,
   semanticPanelOpen,
-  faceModelDownload,
   pipeline,
   handleOpenFolderAiSummary,
   imageEditSuggestionItems,
@@ -298,28 +295,6 @@ export function DesktopMediaWorkspace({
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-      {faceModelDownload.visible && faceModelDownload.status === "running" ? (
-        <div className="shrink-0">
-          <DesktopFaceModelDownloadBanner
-            message={faceModelDownload.message || "Downloading AI face detection and recognition models..."}
-            filename={faceModelDownload.filename}
-            percent={faceModelDownload.percent}
-            downloadedBytes={faceModelDownload.downloadedBytes}
-            totalBytes={faceModelDownload.totalBytes}
-          />
-        </div>
-      ) : null}
-      {faceModelDownload.visible && faceModelDownload.status === "failed" ? (
-        <div className="mx-4 my-2 shrink-0 rounded-lg border border-red-500/60 bg-red-950/30 px-3 py-2 text-sm text-red-200">
-          <div className="font-medium">
-            {faceModelDownload.message || "Failed to download AI face detection model."}
-          </div>
-          {faceModelDownload.error ? (
-            <div className="mt-1 text-xs text-red-300/90">{faceModelDownload.error}</div>
-          ) : null}
-        </div>
-      ) : null}
-
       {mainPaneViewMode === "media" && semanticPanelOpen ? (
         <SemanticSearchPanel onSearch={() => void pipeline.handleSemanticSearch()} />
       ) : null}

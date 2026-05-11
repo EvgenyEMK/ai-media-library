@@ -4,6 +4,7 @@ import {
   resolveCacheRoot,
   resolveGeonamesPath,
   resolveHuggingfaceModelsRoot,
+  resolveLegacyRuntimeRoot,
   resolveModelsPath,
   resolveOnnxModelsPath,
   resolveRuntimeRoot,
@@ -28,11 +29,12 @@ describe("app-paths", () => {
     delete process.env.EMK_DESKTOP_RUNTIME_ROOT_PATH;
   });
 
-  it("places runtime folders under appData/EMK Desktop Media", () => {
+  it("places runtime folders under appData/AI Media Library", () => {
     const appData = "C:/Users/test/AppData/Roaming";
     const app = createAppMock(appData) as never;
-    const runtimeRoot = path.join(appData, "EMK Desktop Media");
+    const runtimeRoot = path.join(appData, "AI Media Library");
     expect(resolveRuntimeRoot(app)).toBe(runtimeRoot);
+    expect(resolveLegacyRuntimeRoot(app)).toBe(path.join(appData, "EMK Desktop Media"));
     expect(resolveCacheRoot(app)).toBe(path.join(runtimeRoot, "cache"));
     expect(resolveSessionDataPath(app)).toBe(path.join(runtimeRoot, "cache", "session-data"));
     expect(resolveModelsPath(app)).toBe(path.join(runtimeRoot, "ai-models"));
