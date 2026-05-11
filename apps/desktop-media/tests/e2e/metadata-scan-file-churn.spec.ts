@@ -95,10 +95,10 @@ async function runRecursiveMetadataScan(
   const completion = awaitNextManualMetadataScanForFolder(mainWindow, normalized);
   const sidebar = mainDesktopSidebar(mainWindow);
   const rootRow = sidebar.getByRole("button", { name: normalized, exact: true });
-  /** Row container: `SidebarTree` wraps the folder label button in `div.group.relative`. */
-  const row = rootRow.locator("..").locator("..");
-  await row.hover();
-  await row.getByRole("button", { name: "More", exact: true }).click();
+  await rootRow.scrollIntoViewIfNeeded();
+  await expect(rootRow).toBeVisible({ timeout: 60_000 });
+  /** `SidebarTree` opens the same folder menu on right-click as the More button (avoids flaky `group-hover`). */
+  await rootRow.click({ button: "right" });
   await mainWindow.getByRole("button", { name: UI_TEXT.scanForFileChanges }).click();
   const subfolders = mainWindow.getByRole("checkbox", { name: /Include sub-folders/i });
   await expect(subfolders).toBeVisible({ timeout: 30_000 });

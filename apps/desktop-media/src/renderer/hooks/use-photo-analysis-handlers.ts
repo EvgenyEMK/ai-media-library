@@ -61,6 +61,7 @@ export function usePhotoAnalysisHandlers(opts: {
 
       try {
         const livePhotoSettings = store.getState().photoAnalysisSettings;
+        const persisted = await window.desktopApi.getSettings();
         await enqueueFolderAiPipeline({
           folderPath,
           pipeline: "photo",
@@ -68,7 +69,12 @@ export function usePhotoAnalysisHandlers(opts: {
           overrideExisting,
           photoModel: resolvedModel,
           photoThinkingEnabled: supportsThinkingMode(resolvedModel) ? aiThinkingEnabled : false,
-          photoSettings: livePhotoSettings,
+          photoSettings: {
+            ...livePhotoSettings,
+            downscaleBeforeLlm: persisted.photoAnalysis.downscaleBeforeLlm,
+            downscaleLongestSidePx: persisted.photoAnalysis.downscaleLongestSidePx,
+            extractInvoiceData: persisted.photoAnalysis.extractInvoiceData,
+          },
         });
         setProgressPanelCollapsed(false);
         if (DEBUG_PHOTO_AI) {

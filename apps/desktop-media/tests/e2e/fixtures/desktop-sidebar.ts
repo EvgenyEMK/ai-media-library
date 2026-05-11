@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { Locator, Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 /** Desktop shell uses `<aside>` without a `.sidebar` class; landmark role is complementary. */
 export function mainDesktopSidebar(page: Page): Locator {
@@ -12,5 +12,9 @@ export function mainDesktopSidebar(page: Page): Locator {
  */
 export async function clickSidebarLibraryRoot(page: Page, libraryRootPath: string): Promise<void> {
   const normalized = path.normalize(libraryRootPath);
-  await mainDesktopSidebar(page).getByRole("button", { name: normalized, exact: true }).click();
+  const btn = mainDesktopSidebar(page).getByRole("button", { name: normalized, exact: true });
+  await btn.waitFor({ state: "visible" });
+  await expect(async () => {
+    await btn.click({ timeout: 15_000 });
+  }).toPass({ timeout: 60_000 });
 }

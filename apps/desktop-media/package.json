@@ -1,6 +1,6 @@
 {
   "name": "@emk/desktop-media",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "AI Media Library — desktop-first local photo library with semantic search and offline AI (Electron + React + SQLite)",
   "license": "MIT",

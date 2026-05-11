@@ -21,6 +21,9 @@ export async function openE2eMixedMediaLibrary(
   await mockFolderDialog(electronApp, E2E_MEDIA_MIXED_DIR);
   await mainWindow.getByText("Add library folder").click();
   await clickSidebarLibraryRoot(mainWindow, E2E_MEDIA_MIXED_DIR);
+  await expect(mainWindow.getByTestId("desktop-folder-thumbnails-grid")).toBeVisible({
+    timeout: 20_000,
+  });
 }
 
 export async function readMixedMediaNames(mainWindow: Page): Promise<{
