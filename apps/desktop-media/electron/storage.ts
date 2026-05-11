@@ -337,11 +337,15 @@ function sanitizeFaceDetectionSettings(candidate: unknown): FaceDetectionSetting
         { enabled: true, model: DEFAULT_FACE_DETECTION_SETTINGS.imageOrientationDetection.model },
       ).model,
     },
-    faceLandmarkRefinement: sanitizeAuxToggle(
-      value.faceLandmarkRefinement,
-      "landmarks",
-      DEFAULT_FACE_DETECTION_SETTINGS.faceLandmarkRefinement,
-    ),
+    faceLandmarkRefinement: (() => {
+      const refined = sanitizeAuxToggle(
+        value.faceLandmarkRefinement,
+        "landmarks",
+        DEFAULT_FACE_DETECTION_SETTINGS.faceLandmarkRefinement,
+      );
+      // Landmark refinement stays on; Settings UI toggle is hidden (see DesktopSettingsSection).
+      return { ...refined, enabled: true };
+    })(),
     faceAgeGenderDetection: sanitizeAuxToggle(
       value.faceAgeGenderDetection,
       "age-gender",

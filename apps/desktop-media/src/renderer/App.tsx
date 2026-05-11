@@ -8,6 +8,7 @@ import type { SmartAlbumRootKind, SmartAlbumYearAreaSubView } from "@emk/shared-
 import type { DesktopMediaItemMetadata } from "../shared/ipc";
 import { supportsThinkingMode } from "../shared/photo-analysis-prompt";
 import { DesktopAppMain } from "./components/DesktopAppMain";
+import type { SimilarImagesSession } from "./components/similar-images/desktop-similar-images-workspace";
 import { DesktopAppSidebar } from "./components/DesktopAppSidebar";
 import { DesktopSwiperInfoPanel } from "./components/DesktopSwiperInfoPanel";
 import { useAppStoreSideEffects } from "./hooks/use-app-store-side-effects";
@@ -91,7 +92,6 @@ export function App(): ReactElement {
   const semanticIndexStatus = useDesktopStore((s) => s.semanticIndexStatus);
   const pathAnalysisStatus = useDesktopStore((s) => s.pathAnalysisStatus);
   const pathAnalysisJobId = useDesktopStore((s) => s.pathAnalysisJobId);
-  const faceModelDownload = useDesktopStore((s) => s.faceModelDownload);
   const recentAlbumIds = useDesktopStore((s) => s.recentAlbumIds);
 
   const [quickFilters, setQuickFilters] = useState<ThumbnailQuickFilterState>(DEFAULT_THUMBNAIL_QUICK_FILTERS);
@@ -120,6 +120,8 @@ export function App(): ReactElement {
   const [smartAlbumRootKind, setSmartAlbumRootKind] = useState<SmartAlbumRootKind>("country-year-area");
   const [yearAreaSubView, setYearAreaSubView] = useState<SmartAlbumYearAreaSubView>("month-area");
   const [recentAlbumsHydrated, setRecentAlbumsHydrated] = useState(false);
+  const [similarImagesSession, setSimilarImagesSession] = useState<SimilarImagesSession | null>(null);
+  const [similarImagesPage, setSimilarImagesPage] = useState(0);
 
   const {
     actionsMenuOpen,
@@ -276,8 +278,14 @@ export function App(): ReactElement {
     );
   };
 
+  const closeSimilarImagesView = useCallback((): void => {
+    setSimilarImagesSession(null);
+    setSimilarImagesPage(0);
+  }, []);
+
   const handleSidebarSectionToggle = (sectionId: string): void => {
     if (sectionId === "folders" || sectionId === "albums" || sectionId === "people" || sectionId === "settings") {
+      closeSimilarImagesView();
       if (sectionId === "albums" && activeSidebarSection !== "albums") {
         setAlbumSearchControlsOpen(false);
       }
@@ -296,6 +304,7 @@ export function App(): ReactElement {
   };
 
   const openAlbumsSection = (): void => {
+    closeSimilarImagesView();
     setActiveSidebarSection("albums");
     setExpandedSidebarSection("albums");
     if (sidebarCollapsed) {
@@ -354,6 +363,16 @@ export function App(): ReactElement {
     setMainPaneViewMode(mainPaneReturnTargetRef.current ?? "media");
   }, []);
 
+  const handleFindSimilar = useCallback((sourcePath: string): void => {
+    setSimilarImagesSession({ sourcePath, minSimilarity: 0.9 });
+    setSimilarImagesPage(0);
+  }, []);
+
+  const handleSimilarImagesMinSimilarityChange = useCallback((minSimilarity: number): void => {
+    setSimilarImagesSession((session) => (session ? { ...session, minSimilarity } : null));
+    setSimilarImagesPage(0);
+  }, []);
+
   const isPeopleSectionOpen = activeSidebarSection === "people";
   const isAlbumsSectionOpen = activeSidebarSection === "albums";
   const isSettingsSectionOpen = activeSidebarSection === "settings";
@@ -385,7 +404,17 @@ export function App(): ReactElement {
         sidebarHighlightedSmartAlbumKind={
           isAlbumsSectionOpen && albumWorkspaceMode === "smart" ? smartAlbumRootKind : null
         }
-        folderTree={folderTree}
+        folderTree={{
+          ...folderTree,
+          handleSelectFolder: async (folderPath) => {
+            closeSimilarImagesView();
+            await folderTree.handleSelectFolder(folderPath);
+          },
+          handleOpenFolderAiSummary: (folderPath) => {
+            closeSimilarImagesView();
+            folderTree.handleOpenFolderAiSummary(folderPath);
+          },
+        }}
       />
 
       <DesktopAppMain
@@ -441,7 +470,6 @@ export function App(): ReactElement {
         onOpenImageEditSuggestions={openImageEditSuggestions}
         onCloseSpecialMainPaneView={closeSpecialMainPaneView}
         pipeline={pipeline}
-        faceModelDownload={faceModelDownload}
         handleOpenFolderAiSummary={folderTree.handleOpenFolderAiSummary}
         imageEditSuggestionItems={imageEditSuggestionItems}
         isFolderLoading={isFolderLoading}
@@ -460,6 +488,12 @@ export function App(): ReactElement {
         semanticIndexEta={semanticIndexEta}
         descEmbedBackfill={descEmbedBackfill}
         setDescEmbedBackfill={setDescEmbedBackfill}
+        similarImagesSession={similarImagesSession}
+        similarImagesPage={similarImagesPage}
+        onSimilarImagesPageChange={setSimilarImagesPage}
+        onCloseSimilarImages={closeSimilarImagesView}
+        onSimilarImagesMinSimilarityChange={handleSimilarImagesMinSimilarityChange}
+        onFindSimilar={handleFindSimilar}
       />
 
       <MediaSwiperViewer

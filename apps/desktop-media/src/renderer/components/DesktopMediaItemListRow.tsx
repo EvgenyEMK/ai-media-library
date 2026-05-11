@@ -18,6 +18,7 @@ interface DesktopMediaItemListRowProps {
     albumId: string;
     onAlbumChanged?: () => void;
   };
+  onFindSimilar?: (filePath: string) => void;
 }
 
 export function DesktopMediaItemListRow({
@@ -33,6 +34,7 @@ export function DesktopMediaItemListRow({
   onStarRatingChange,
   starRatingShowRejected = false,
   albumContext,
+  onFindSimilar,
 }: DesktopMediaItemListRowProps): ReactElement {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -54,6 +56,7 @@ export function DesktopMediaItemListRow({
           mediaType={mediaType}
           onOpenChange={setMenuOpen}
           albumContext={albumContext}
+          onFindSimilar={onFindSimilar}
         />
       )}
     />

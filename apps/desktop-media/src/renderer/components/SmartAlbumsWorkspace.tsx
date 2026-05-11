@@ -39,6 +39,7 @@ export function SmartAlbumsWorkspace({
   onSmartPlaceHierarchyLevelsChange,
   onActiveSmartAlbumChange,
   onSmartItemsPageChange,
+  onFindSimilar,
 }: {
   isLoading: boolean;
   activeSmartAlbum: ActiveSmartAlbum;
@@ -64,6 +65,7 @@ export function SmartAlbumsWorkspace({
   onSmartPlaceHierarchyLevelsChange: (next: SmartPlaceHierarchyLevels) => void;
   onActiveSmartAlbumChange: (album: ActiveSmartAlbum) => void;
   onSmartItemsPageChange: (page: number) => void;
+  onFindSimilar?: (filePath: string) => void;
 }): ReactElement {
   return (
     <div className="min-h-0 flex-1 overflow-auto p-4">
@@ -110,6 +112,7 @@ export function SmartAlbumsWorkspace({
           quickFilters={quickFilters}
           viewMode={viewMode}
           onAlbumItemsPageChange={onSmartItemsPageChange}
+          onFindSimilar={onFindSimilar}
         />
       )}
     </div>

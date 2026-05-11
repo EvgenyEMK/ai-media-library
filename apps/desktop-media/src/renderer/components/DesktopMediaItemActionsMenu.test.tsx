@@ -195,6 +195,45 @@ describe("DesktopMediaItemActionsMenu", () => {
     expect(screen.queryByRole("menuitem", { name: "Remove from album" })).toBeNull();
   });
 
+  it("does not show Find similar without onFindSimilar", async () => {
+    installDesktopApiMock();
+    renderMenu();
+
+    fireEvent.click(screen.getByTitle("Open media item actions"));
+    expect(screen.queryByRole("menuitem", { name: "Find similar" })).toBeNull();
+  });
+
+  it("shows Find similar and invokes callback when onFindSimilar is set", async () => {
+    installDesktopApiMock();
+    const onFindSimilar = vi.fn();
+    render(
+      <DesktopStoreProvider initialState={{ albums, recentAlbumIds: ["recent"] }}>
+        <DesktopMediaItemActionsMenu filePath="C:/photos/item.jpg" onFindSimilar={onFindSimilar} />
+      </DesktopStoreProvider>,
+    );
+
+    fireEvent.click(screen.getByTitle("Open media item actions"));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Find similar" }));
+    expect(onFindSimilar).toHaveBeenCalledWith("C:/photos/item.jpg");
+  });
+
+  it("does not show Find similar for video items even with onFindSimilar", async () => {
+    installDesktopApiMock();
+    const onFindSimilar = vi.fn();
+    render(
+      <DesktopStoreProvider initialState={{ albums, recentAlbumIds: ["recent"] }}>
+        <DesktopMediaItemActionsMenu
+          filePath="C:/videos/clip.mp4"
+          mediaType="video"
+          onFindSimilar={onFindSimilar}
+        />
+      </DesktopStoreProvider>,
+    );
+
+    fireEvent.click(screen.getByTitle("Open media item actions"));
+    expect(screen.queryByRole("menuitem", { name: "Find similar" })).toBeNull();
+  });
+
   it("runs set cover action in album context", async () => {
     const desktopApi = installDesktopApiMock();
     const onAlbumChanged = vi.fn();

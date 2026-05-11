@@ -16,8 +16,14 @@ import {
  *
  * Defaults preserve today's behaviour: heavy AI pipelines run strictly serial
  * (gpu=1, ollama=1) while filesystem and CPU work allows two parallel jobs.
+ *
+ * Hidden when the user enables "Hide advanced settings" (same as other advanced cards).
  */
-export function PipelineConcurrencySettings(): ReactElement {
+export function PipelineConcurrencySettings({
+  hideAdvancedSettings,
+}: {
+  hideAdvancedSettings: boolean;
+}): ReactElement {
   const store = useDesktopStoreApi();
   const config = useDesktopStore((s) => s.pipelineConcurrencySettings);
 
@@ -37,7 +43,11 @@ export function PipelineConcurrencySettings(): ReactElement {
   );
 
   return (
-    <SettingsSectionCard title="Pipeline concurrency (advanced)">
+    <SettingsSectionCard
+      title="Pipeline concurrency (advanced)"
+      advanced
+      className={hideAdvancedSettings ? "hidden" : undefined}
+    >
       <div className="space-y-3">
         <p className="m-0 text-sm leading-relaxed text-muted-foreground">
           How many pipelines may run in parallel within each resource group. Leave at the defaults

@@ -98,6 +98,7 @@ export const IPC_CHANNELS = {
   descEmbedBackfillProgress: "media:desc-embed-backfill-progress",
   cancelDescEmbedBackfill: "media:cancel-desc-embed-backfill",
   semanticSearchPhotos: "media:semantic-search-photos",
+  findSimilarImages: "media:find-similar-images",
   cancelSemanticEmbeddingIndex: "media:cancel-semantic-embedding-index",
   getSemanticEmbeddingStatus: "media:get-semantic-embedding-status",
   getSemanticIndexDebugLogTail: "media:get-semantic-index-debug-log-tail",
@@ -2049,6 +2050,25 @@ export interface FaceEmbeddingStats {
   pending: number;
 }
 
+/** Image-to-image similarity (VLM embedding cosine); main adds source row first with score 1. */
+export interface FindSimilarImagesRequest {
+  sourcePath: string;
+  /** Minimum cosine similarity in (0, 1], e.g. 0.9 for 90%. */
+  minSimilarity: number;
+}
+
+export interface FindSimilarImagesResultRow {
+  mediaItemId: string;
+  path: string;
+  name: string;
+  score: number;
+  city: string | null;
+  country: string | null;
+  peopleDetected: number | null;
+  ageMin: number | null;
+  ageMax: number | null;
+}
+
 export interface DesktopApi {
   selectLibraryFolder: () => Promise<string | null>;
   readFolderChildren: (folderPath: string) => Promise<FolderNode[]>;
@@ -2227,6 +2247,12 @@ export interface DesktopApi {
       keywords: string[];
     };
   }>;
+  findSimilarImages: (
+    request: FindSimilarImagesRequest,
+  ) => Promise<
+    | { ok: true; results: FindSimilarImagesResultRow[] }
+    | { ok: false; error: string }
+  >;
   scanFolderMetadata: (
     request: ScanFolderMetadataRequest,
   ) => Promise<ScanFolderMetadataResult>;

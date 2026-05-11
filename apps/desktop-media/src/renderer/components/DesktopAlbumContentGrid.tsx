@@ -79,6 +79,7 @@ export function DesktopAlbumContentGrid({
   onAlbumItemsPageChange,
   onAlbumContentChanged,
   reorderAlbumMediaItem,
+  onFindSimilar,
 }: {
   store: DesktopStore;
   albumId?: string;
@@ -91,6 +92,7 @@ export function DesktopAlbumContentGrid({
   onAlbumContentChanged?: () => void;
   /** When set with `albumId` and no active quick filters, grid view allows drag-reorder (manual albums). */
   reorderAlbumMediaItem?: (params: ReorderAlbumMediaItemParams) => Promise<void>;
+  onFindSimilar?: (filePath: string) => void;
 }): ReactElement {
   const mediaMetadataByItemId = useDesktopStore((s) => s.mediaMetadataByItemId);
   const dateFormat = useDesktopStore((s) => s.mediaViewerSettings.dateFormat);
@@ -172,20 +174,21 @@ export function DesktopAlbumContentGrid({
               autoPlayInitialVideo: filteredAlbumItems[index]?.mediaKind === "video",
             });
           }}
-          renderActions={
-            albumId
-              ? (item) => (
-                  <DesktopMediaItemActionsMenu
-                    filePath={item.id}
-                    mediaType={item.mediaType}
-                    albumContext={{
+          renderActions={(item) => (
+            <DesktopMediaItemActionsMenu
+              filePath={item.id}
+              mediaType={item.mediaType}
+              albumContext={
+                albumId
+                  ? {
                       albumId,
                       onAlbumChanged: onAlbumContentChanged,
-                    }}
-                  />
-                )
-              : undefined
-          }
+                    }
+                  : undefined
+              }
+              onFindSimilar={onFindSimilar}
+            />
+          )}
           dragReorder={albumDragReorder}
           priorityCount={24}
           scrollable={false}
@@ -227,6 +230,7 @@ export function DesktopAlbumContentGrid({
                       autoPlayInitialVideo: item.mediaKind === "video",
                     });
                   }}
+                  onFindSimilar={onFindSimilar}
                 />
               );
             })()

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { getDesktopDatabase } from "./client";
+import { getDesktopDatabase, getVectorBackendStatus } from "./client";
 import { DEFAULT_LIBRARY_ID } from "./folder-analysis-status";
 import { appendEventAndLocationPredicates } from "./media-item-sql-filters";
 import { MULTIMODAL_EMBED_MODEL } from "../semantic-embeddings";
@@ -332,6 +332,218 @@ export async function searchByVector(
 
   results.sort((a, b) => b.score - a.score);
   return results.slice(0, Math.max(1, limit));
+}
+
+const MAX_SIMILAR_NEIGHBORS = 99;
+const MAX_SIMILAR_RESULTS_WITH_SOURCE = MAX_SIMILAR_NEIGHBORS + 1;
+
+type SimilarImageDbRow = {
+  media_item_id: string;
+  source_path: string;
+  filename: string;
+  city: string | null;
+  country: string | null;
+  people_detected: number | null;
+  age_min: number | null;
+  age_max: number | null;
+};
+
+function semanticRowFromDbRow(row: SimilarImageDbRow, score: number): SemanticSearchRow {
+  return {
+    mediaItemId: row.media_item_id,
+    path: row.source_path,
+    name: row.filename,
+    score,
+    city: row.city,
+    country: row.country,
+    peopleDetected: row.people_detected,
+    ageMin: row.age_min,
+    ageMax: row.age_max,
+  };
+}
+
+/**
+ * Global image-to-image similarity using stored VLM embeddings (`embedding_type = image`).
+ * Uses sqlite-vec KNN when available so the main process does not parse every vector into JS.
+ * Falls back to the classic full-library scan only when sqlite-vec is unavailable.
+ */
+export async function searchSimilarImagesBySourcePath(
+  sourcePath: string,
+  minSimilarity: number,
+  libraryId = DEFAULT_LIBRARY_ID,
+  modelVersion = MULTIMODAL_EMBED_MODEL,
+): Promise<
+  | { ok: true; results: SemanticSearchRow[] }
+  | { ok: false; error: string }
+> {
+  if (!Number.isFinite(minSimilarity) || minSimilarity <= 0 || minSimilarity > 1) {
+    return { ok: false, error: "Invalid similarity threshold." };
+  }
+
+  const db = getDesktopDatabase();
+  const source = db
+    .prepare(
+      `SELECT
+         mi.id AS media_item_id,
+         mi.source_path,
+         mi.filename,
+         mi.city,
+         mi.country,
+         mi.people_detected,
+         mi.age_min,
+         mi.age_max,
+         me.vector_json
+       FROM media_items mi
+       INNER JOIN media_embeddings me ON me.media_item_id = mi.id
+       WHERE mi.library_id = ?
+         AND mi.deleted_at IS NULL
+         AND mi.source_path = ?
+         AND me.library_id = ?
+         AND me.embedding_type = 'image'
+         AND me.model_version = ?
+         AND me.embedding_status = 'ready'
+       LIMIT 1`,
+    )
+    .get(libraryId, sourcePath, libraryId, modelVersion) as
+      | {
+          media_item_id: string;
+          source_path: string;
+          filename: string;
+          city: string | null;
+          country: string | null;
+          people_detected: number | null;
+          age_min: number | null;
+          age_max: number | null;
+          vector_json: string;
+        }
+      | undefined;
+
+  if (!source) {
+    return {
+      ok: false,
+      error: "Image is not indexed for AI search yet. Index images for this library first.",
+    };
+  }
+
+  const sourceParsed = parseVector(source.vector_json);
+  if (!sourceParsed) {
+    return { ok: false, error: "Could not read image embedding." };
+  }
+  const queryVec = new Float32Array(sourceParsed);
+  const sourceId = source.media_item_id;
+  const sourceResult = semanticRowFromDbRow(source, 1);
+
+  if (getVectorBackendStatus().activeMode === "sqlite-vec") {
+    try {
+      const queryVectorJson = JSON.stringify(sourceParsed);
+      const rows = db
+        .prepare(
+          `SELECT
+             mi.id as media_item_id,
+             mi.source_path,
+             mi.filename,
+             mi.city,
+             mi.country,
+             mi.people_detected,
+             mi.age_min,
+             mi.age_max,
+             vec_distance_cosine(me.vector_json, ?) AS distance
+           FROM media_embeddings me
+           INNER JOIN media_items mi ON mi.id = me.media_item_id
+           WHERE mi.library_id = ?
+             AND mi.deleted_at IS NULL
+             AND me.library_id = ?
+             AND me.embedding_type = 'image'
+             AND me.model_version = ?
+             AND me.embedding_status = 'ready'
+           ORDER BY distance ASC
+           LIMIT ?`,
+        )
+        .all(queryVectorJson, libraryId, libraryId, modelVersion, MAX_SIMILAR_RESULTS_WITH_SOURCE) as Array<
+          SimilarImageDbRow & { distance: number | null }
+        >;
+
+      const neighbors = rows
+        .filter(
+          (row) =>
+            row.media_item_id !== sourceId &&
+            typeof row.distance === "number" &&
+            Number.isFinite(row.distance),
+        )
+        .map((row) => semanticRowFromDbRow(row, Math.max(-1, Math.min(1, 1 - Number(row.distance)))))
+        .filter((row) => row.score >= minSimilarity)
+        .slice(0, MAX_SIMILAR_NEIGHBORS);
+
+      return { ok: true, results: [sourceResult, ...neighbors] };
+    } catch {
+      // Fall back to the classic JS cosine scan when sqlite-vec is not loadable at runtime.
+    }
+  }
+
+  const where: string[] = ["mi.library_id = ?", "mi.deleted_at IS NULL"];
+  const args: unknown[] = [libraryId];
+
+  const rows = db
+    .prepare(
+      `SELECT
+         mi.id as media_item_id,
+         mi.source_path,
+         mi.filename,
+         mi.city,
+         mi.country,
+         mi.people_detected,
+         mi.age_min,
+         mi.age_max,
+         me.vector_json
+       FROM media_items mi
+       INNER JOIN media_embeddings me ON me.media_item_id = mi.id
+       WHERE ${where.join(" AND ")}
+         AND me.library_id = ?
+         AND me.embedding_type = 'image'
+         AND me.model_version = ?
+         AND me.embedding_status = 'ready'`,
+    )
+    .all(...args, libraryId, modelVersion) as Array<{
+    media_item_id: string;
+    source_path: string;
+    filename: string;
+    city: string | null;
+    country: string | null;
+    people_detected: number | null;
+    age_min: number | null;
+    age_max: number | null;
+    vector_json: string;
+  }>;
+
+  const scored: SemanticSearchRow[] = [];
+  const CHUNK_SIZE = 200;
+
+  for (let i = 0; i < rows.length; i += 1) {
+    const row = rows[i];
+    if (i > 0 && i % CHUNK_SIZE === 0) {
+      await yieldToEventLoop();
+    }
+    if (row.media_item_id === sourceId) {
+      continue;
+    }
+    const parsed = parseVector(row.vector_json);
+    if (!parsed || parsed.length !== sourceParsed.length) {
+      continue;
+    }
+    const vec = new Float32Array(parsed);
+    const score = cosineSimilarityTyped(queryVec, vec);
+    if (score < minSimilarity) {
+      continue;
+    }
+    scored.push({
+      ...semanticRowFromDbRow(row, score),
+    });
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  const neighbors = scored.slice(0, MAX_SIMILAR_NEIGHBORS);
+
+  return { ok: true, results: [sourceResult, ...neighbors] };
 }
 
 function parseVector(value: string): number[] | null {

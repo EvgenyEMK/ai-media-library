@@ -3,6 +3,7 @@ import type { ImageEditSuggestionsItem } from "@emk/media-viewer";
 import type { SemanticSearchResult } from "@emk/media-store";
 import type { SmartAlbumRootKind, SmartAlbumYearAreaSubView } from "@emk/shared-contracts";
 import type { ThumbnailQuickFilterState } from "@emk/media-metadata-core";
+import { DesktopSimilarImagesWorkspace, type SimilarImagesSession } from "./similar-images/desktop-similar-images-workspace";
 import { DesktopMainToolbar } from "./DesktopMainToolbar";
 import { DesktopMediaWorkspace } from "./DesktopMediaWorkspace";
 import { DesktopAlbumsWorkspace } from "./DesktopAlbumsWorkspace";
@@ -83,7 +84,6 @@ interface DesktopAppMainProps {
   onOpenImageEditSuggestions: () => void;
   onCloseSpecialMainPaneView: () => void;
   pipeline: DesktopPipelineHandlers;
-  faceModelDownload: DesktopStoreState["faceModelDownload"];
   handleOpenFolderAiSummary: (folderPath: string) => void;
   imageEditSuggestionItems: ImageEditSuggestionsItem[];
   isFolderLoading: boolean;
@@ -102,6 +102,12 @@ interface DesktopAppMainProps {
   semanticIndexEta: SemanticIndexEtaState;
   descEmbedBackfill: DescEmbedBackfillState;
   setDescEmbedBackfill: Dispatch<SetStateAction<DescEmbedBackfillState>>;
+  similarImagesSession: SimilarImagesSession | null;
+  similarImagesPage: number;
+  onSimilarImagesPageChange: Dispatch<SetStateAction<number>>;
+  onCloseSimilarImages: () => void;
+  onSimilarImagesMinSimilarityChange: (minSimilarity: number) => void;
+  onFindSimilar: (filePath: string) => void;
 }
 
 export function DesktopAppMain({
@@ -157,7 +163,6 @@ export function DesktopAppMain({
   onOpenImageEditSuggestions,
   onCloseSpecialMainPaneView,
   pipeline,
-  faceModelDownload,
   handleOpenFolderAiSummary,
   imageEditSuggestionItems,
   isFolderLoading,
@@ -176,10 +181,27 @@ export function DesktopAppMain({
   semanticIndexEta,
   descEmbedBackfill,
   setDescEmbedBackfill,
+  similarImagesSession,
+  similarImagesPage,
+  onSimilarImagesPageChange,
+  onCloseSimilarImages,
+  onSimilarImagesMinSimilarityChange,
+  onFindSimilar,
 }: DesktopAppMainProps): ReactElement {
   return (
     <main className="main-panel relative flex min-h-0 min-w-0 flex-col overflow-hidden">
-      {isAlbumsSectionOpen ? (
+      {similarImagesSession ? (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <DesktopSimilarImagesWorkspace
+            store={store}
+            session={similarImagesSession}
+            currentPage={similarImagesPage}
+            onPageChange={onSimilarImagesPageChange}
+            onClose={onCloseSimilarImages}
+            onMinSimilarityChange={onSimilarImagesMinSimilarityChange}
+          />
+        </div>
+      ) : isAlbumsSectionOpen ? (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <DesktopAlbumsWorkspace
             mode={albumWorkspaceMode}
@@ -189,6 +211,7 @@ export function DesktopAppMain({
             onYearAreaSubViewChange={onYearAreaSubViewChange}
             searchControlsOpen={albumSearchControlsOpen}
             onSearchControlsOpenChange={setAlbumSearchControlsOpen}
+            onFindSimilar={onFindSimilar}
           />
         </div>
       ) : isPeopleSectionOpen ? (
@@ -289,7 +312,6 @@ export function DesktopAppMain({
             onCloseSpecialMainPaneView={onCloseSpecialMainPaneView}
             selectedFolder={selectedFolder}
             semanticPanelOpen={semanticPanelOpen}
-            faceModelDownload={faceModelDownload}
             pipeline={pipeline}
             handleOpenFolderAiSummary={handleOpenFolderAiSummary}
             imageEditSuggestionItems={imageEditSuggestionItems}
@@ -305,6 +327,7 @@ export function DesktopAppMain({
             filteredSemanticListItems={filteredSemanticListItems}
             quickFiltersActiveCount={quickFiltersActiveCount}
             openFolderViewerById={openFolderViewerById}
+            onFindSimilar={onFindSimilar}
           />
         </div>
       )}

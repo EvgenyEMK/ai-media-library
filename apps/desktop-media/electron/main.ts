@@ -20,6 +20,7 @@ import { registerFaceDetectionHandlers } from "./ipc/face-detection-handlers";
 import { registerFaceTagsHandlers } from "./ipc/face-tags-handlers";
 import { registerFaceEmbeddingHandlers } from "./ipc/face-embedding-handlers";
 import { registerSemanticSearchHandlers } from "./ipc/semantic-search-handlers";
+import { registerSimilarImagesHandlers } from "./ipc/similar-images-handlers";
 import { registerMetadataScanHandlers } from "./ipc/metadata-scan-handlers";
 import { registerPathAnalysisHandlers } from "./ipc/path-analysis-handlers";
 import { registerFolderAiSummaryHandlers } from "./ipc/folder-ai-summary-handlers";
@@ -33,13 +34,14 @@ import { setPipelineConcurrencyConfig } from "./pipelines/concurrency-config";
 import { releaseAllPowerSave } from "./ipc/power-save-manager";
 import {
   ensureActiveModels,
+  ensureAuxModel,
   setModelsDirectory,
 } from "./native-face";
 import { readSettings } from "./storage";
 import { DEFAULT_FACE_DETECTION_SETTINGS } from "../src/shared/ipc";
 import {
   IPC_CHANNELS,
-  type FaceDetectorModelId,
+  type AppSettings,
   type FaceModelDownloadProgressEvent,
 } from "../src/shared/ipc";
 import { exiftool } from "exiftool-vendored";
@@ -70,6 +72,7 @@ function registerAllIpcHandlers(): void {
   registerFaceTagsHandlers();
   registerFaceEmbeddingHandlers();
   registerSemanticSearchHandlers();
+  registerSimilarImagesHandlers();
   registerMetadataScanHandlers();
   registerPathAnalysisHandlers();
   registerFolderAiSummaryHandlers();
@@ -93,7 +96,27 @@ function emitFaceModelDownloadProgress(event: FaceModelDownloadProgressEvent): v
   }
 }
 
-function beginStartupNativeFaceModelEnsure(activeDetectorId: FaceDetectorModelId): void {
+async function ensureStartupNativeFaceModels(
+  faceDetection: AppSettings["faceDetection"],
+  enableOrientation: boolean,
+  onProgress: Parameters<typeof ensureActiveModels>[1],
+): Promise<void> {
+  await ensureActiveModels(faceDetection.detectorModel, onProgress);
+  if (enableOrientation) {
+    await ensureAuxModel("orientation", faceDetection.imageOrientationDetection.model, onProgress);
+  }
+  if (faceDetection.faceLandmarkRefinement.enabled) {
+    await ensureAuxModel("landmarks", faceDetection.faceLandmarkRefinement.model, onProgress);
+  }
+  if (faceDetection.faceAgeGenderDetection.enabled) {
+    await ensureAuxModel("age-gender", faceDetection.faceAgeGenderDetection.model, onProgress);
+  }
+}
+
+function beginStartupNativeFaceModelEnsure(
+  faceDetection: AppSettings["faceDetection"],
+  enableOrientation: boolean,
+): void {
   const modelsStart = Date.now();
   emitFaceModelDownloadProgress({
     type: "started",
@@ -101,7 +124,7 @@ function beginStartupNativeFaceModelEnsure(activeDetectorId: FaceDetectorModelId
     message: "Downloading AI face detection and recognition models...",
     startedAtIso: new Date().toISOString(),
   });
-  void ensureActiveModels(activeDetectorId, (progress) => {
+  void ensureStartupNativeFaceModels(faceDetection, enableOrientation, (progress) => {
     emitFaceModelDownloadProgress({
       type: "progress",
       filename: progress.filename,
@@ -151,11 +174,17 @@ app.whenReady().then(async () => {
     // Hydrate the scheduler's concurrency config from saved settings.
     setPipelineConcurrencyConfig(s.pipelineConcurrency);
     if (!skipStartupAiModels) {
-      beginStartupNativeFaceModelEnsure(s.faceDetection.detectorModel);
+      beginStartupNativeFaceModelEnsure(
+        s.faceDetection,
+        s.wrongImageRotationDetection.enabled,
+      );
     }
   } catch {
     if (!skipStartupAiModels) {
-      beginStartupNativeFaceModelEnsure(DEFAULT_FACE_DETECTION_SETTINGS.detectorModel);
+      beginStartupNativeFaceModelEnsure(
+        DEFAULT_FACE_DETECTION_SETTINGS,
+        true,
+      );
     }
   }
 

@@ -16,9 +16,17 @@ test.describe("Face model download failure handling", () => {
     });
     expect(result.success).toBe(false);
 
-    // Failure should surface to renderer state and be visible in the operations area.
+    await mainWindow.getByRole("navigation").getByText("Settings", { exact: true }).click();
+
+    const backgroundOperations = mainWindow.getByRole("region", { name: /Background operations/i });
+    await expect(backgroundOperations).toBeVisible({ timeout: 10_000 });
     await expect(
-      mainWindow.getByText("Failed to download face detector model (yolov12m-face)."),
+      backgroundOperations.getByRole("heading", { name: "AI model download - Face detection" }),
+    ).toBeVisible();
+
+    // Failure should surface to renderer state and remain visible outside the folders view.
+    await expect(
+      backgroundOperations.getByText("Failed to download face detector model (yolov12m-face)."),
     ).toBeVisible({ timeout: 10_000 });
   });
 
@@ -46,7 +54,7 @@ test.describe("Face model download failure handling", () => {
     ];
 
     for (const c of auxCases) {
-      test(`${c.kind}: surfaces failure banner`, async ({ electronApp, mainWindow }) => {
+      test(`${c.kind}: surfaces failure in Background operations`, async ({ electronApp, mainWindow }) => {
         await openE2ePhotoLibrary(electronApp, mainWindow);
 
         const result = await mainWindow.evaluate(
@@ -57,7 +65,9 @@ test.describe("Face model download failure handling", () => {
         );
         expect(result.success).toBe(false);
 
-        await expect(mainWindow.getByText(c.message)).toBeVisible({ timeout: 10_000 });
+        const backgroundOperations = mainWindow.getByRole("region", { name: /Background operations/i });
+        await expect(backgroundOperations).toBeVisible({ timeout: 10_000 });
+        await expect(backgroundOperations.getByText(c.message)).toBeVisible({ timeout: 10_000 });
       });
     }
   });

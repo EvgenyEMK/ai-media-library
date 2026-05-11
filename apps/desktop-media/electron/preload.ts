@@ -206,6 +206,7 @@ const api: DesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.getSemanticIndexDebugLogTail),
   semanticSearchPhotos: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.semanticSearchPhotos, request),
+  findSimilarImages: (request) => ipcRenderer.invoke(IPC_CHANNELS.findSimilarImages, request),
   scanFolderMetadata: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.scanFolderMetadata, request),
   cancelMetadataScan: (jobId) =>

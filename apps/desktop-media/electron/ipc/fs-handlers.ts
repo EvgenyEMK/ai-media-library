@@ -236,7 +236,7 @@ export function registerFsHandlers(): void {
     } catch {
       cachePath = null;
     }
-    const runtimeFallback = path.join(appDataPath, "EMK Desktop Media");
+    const runtimeFallback = path.join(appDataPath, "AI Media Library");
     return {
       appDataPath,
       userDataPath,

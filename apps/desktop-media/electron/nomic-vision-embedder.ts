@@ -11,6 +11,14 @@ let loadError: string | null = null;
 
 let transformersEnvConfigured: Promise<void> | null = null;
 
+function getOnnxWasmMaxMemoryMb(): number {
+  const configured = Number(process.env.EMK_ONNX_WASM_MAX_MEMORY_MB);
+  if (Number.isFinite(configured) && configured >= 512) {
+    return Math.floor(configured);
+  }
+  return 2048;
+}
+
 function getTransformersCacheDirs(): { cacheDir: string; localModelPath: string } {
   const hfRoot = resolveHuggingfaceModelsRoot(app);
   return {
@@ -36,11 +44,11 @@ function ensureTransformersEnvConfigured(): Promise<void> {
       const onnx = env.backends.onnx as unknown as {
         wasm?: { maxMemoryUsageInMB?: number };
       };
-      const cap = 4096;
+      const cap = getOnnxWasmMaxMemoryMb();
       if (!onnx.wasm) {
         onnx.wasm = { maxMemoryUsageInMB: cap };
       } else {
-        onnx.wasm.maxMemoryUsageInMB = Math.max(onnx.wasm.maxMemoryUsageInMB ?? 2048, cap);
+        onnx.wasm.maxMemoryUsageInMB = cap;
       }
     })();
   }
