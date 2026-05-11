@@ -3,12 +3,14 @@
  * Design goal: simple silhouette readable at tiny title-bar/taskbar sizes.
  * Run: pnpm exec node scripts/generate-app-icon.mjs (from apps/desktop-media).
  */
+import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Jimp, rgbaToInt } from "jimp";
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const outPath = path.join(dir, "../build-resources/app-icon.png");
+const icoOutPath = path.join(dir, "../build-resources/app-icon.ico");
 
 const W = 512;
 const H = 512;
@@ -86,4 +88,22 @@ for (let y = 0; y < H; y++) {
 }
 
 await image.write(outPath);
+
+const icoPng = await image.clone().resize({ w: 256, h: 256 }).getBuffer("image/png");
+const ico = Buffer.alloc(22 + icoPng.length);
+ico.writeUInt16LE(0, 0); // reserved
+ico.writeUInt16LE(1, 2); // icon
+ico.writeUInt16LE(1, 4); // image count
+ico.writeUInt8(0, 6); // 256px width
+ico.writeUInt8(0, 7); // 256px height
+ico.writeUInt8(0, 8); // no palette
+ico.writeUInt8(0, 9); // reserved
+ico.writeUInt16LE(1, 10); // color planes
+ico.writeUInt16LE(32, 12); // bits per pixel
+ico.writeUInt32LE(icoPng.length, 14);
+ico.writeUInt32LE(22, 18);
+icoPng.copy(ico, 22);
+await fs.writeFile(icoOutPath, ico);
+
 console.log("Wrote", outPath);
+console.log("Wrote", icoOutPath);
