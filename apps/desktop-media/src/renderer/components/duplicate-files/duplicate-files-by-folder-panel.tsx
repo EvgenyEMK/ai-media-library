@@ -230,6 +230,34 @@ function DuplicateFolderSection({
   );
 }
 
+function DuplicateFolderSectionLoadingSkeleton({ sectionTitle }: { sectionTitle: string }): ReactElement {
+  return (
+    <section className="space-y-4">
+      <h2 className="text-2xl font-semibold tracking-tight text-foreground">{sectionTitle}</h2>
+      <div className="flex flex-wrap gap-3">
+        <DuplicateMetricCard icon={Percent} label="Duplicates" primaryText="" loading />
+        <DuplicateMetricCard icon={Files} label="Files" primaryText="" loading />
+        <DuplicateMetricCard icon={HardDrive} label="Size" primaryText="" loading />
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Placeholder for the by-folder duplicate overview while the catalog scan pipeline runs.
+ */
+export function DuplicateFilesByFolderLoadingPanel(): ReactElement {
+  return (
+    <div className="space-y-10" aria-busy="true" aria-live="polite">
+      <DuplicateFolderSectionLoadingSkeleton sectionTitle={DUPLICATE_FILES_TITLE_OUTSIDE_TREE} />
+      <DuplicateFolderSectionLoadingSkeleton sectionTitle={DUPLICATE_FILES_TITLE_INSIDE_TREE} />
+      <p className="text-sm text-muted-foreground">
+        Results appear here when the scan finishes. Progress stays in Background operations.
+      </p>
+    </div>
+  );
+}
+
 export function DuplicateFilesByFolderPanel({
   outsideSummaries,
   insideSummaries,

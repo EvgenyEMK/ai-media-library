@@ -2,7 +2,8 @@ import type { Dispatch, ReactElement, RefObject, SetStateAction } from "react";
 import type { ImageEditSuggestionsItem } from "@emk/media-viewer";
 import type { SemanticSearchResult } from "@emk/media-store";
 import type { SmartAlbumRootKind, SmartAlbumYearAreaSubView } from "@emk/shared-contracts";
-import type { FolderDuplicateScanResultPayload } from "../../shared/ipc";
+import type { DuplicateFilesSession } from "../types/duplicate-files-session";
+import { DesktopDuplicateFilesScanningShell } from "./duplicate-files/desktop-duplicate-files-scanning-shell";
 import type { ThumbnailQuickFilterState } from "@emk/media-metadata-core";
 import { DesktopSimilarImagesWorkspace, type SimilarImagesSession } from "./similar-images/desktop-similar-images-workspace";
 import { DesktopDuplicateFilesWorkspace } from "./duplicate-files/desktop-duplicate-files-workspace";
@@ -119,7 +120,7 @@ interface DesktopAppMainProps {
   onCloseSimilarImages: () => void;
   onSimilarImagesMinSimilarityChange: (minSimilarity: number) => void;
   onFindSimilar: (filePath: string) => void;
-  duplicateFilesSession: FolderDuplicateScanResultPayload | null;
+  duplicateFilesSession: DuplicateFilesSession | null;
   duplicateFilesPage: number;
   onDuplicateFilesPageChange: Dispatch<SetStateAction<number>>;
   onCloseDuplicateFiles: () => void;
@@ -221,13 +222,21 @@ export function DesktopAppMain({
       {/* Duplicate-files view takes precedence when both overlap (latest workflow wins). */}
       {duplicateFilesSession ? (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <DesktopDuplicateFilesWorkspace
-            payload={duplicateFilesSession}
-            currentPage={duplicateFilesPage}
-            onPageChange={onDuplicateFilesPageChange}
-            onClose={onCloseDuplicateFiles}
-            onDeletedMediaItems={onDuplicateFilesDeletedMediaItems}
-          />
+          {duplicateFilesSession.kind === "scanning" ? (
+            <DesktopDuplicateFilesScanningShell
+              folderPath={duplicateFilesSession.folderPath}
+              recursive={duplicateFilesSession.recursive}
+              onClose={onCloseDuplicateFiles}
+            />
+          ) : (
+            <DesktopDuplicateFilesWorkspace
+              payload={duplicateFilesSession.payload}
+              currentPage={duplicateFilesPage}
+              onPageChange={onDuplicateFilesPageChange}
+              onClose={onCloseDuplicateFiles}
+              onDeletedMediaItems={onDuplicateFilesDeletedMediaItems}
+            />
+          )}
         </div>
       ) : similarImagesSession ? (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">

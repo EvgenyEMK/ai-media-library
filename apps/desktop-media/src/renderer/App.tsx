@@ -28,8 +28,9 @@ import {
   useDesktopSettingsSyncFromMain,
 } from "./hooks/useDesktopIpcBindings";
 import { usePipelineQueueBinding } from "./hooks/use-pipeline-queue-binding";
-import { useFolderDuplicateScanCompletion } from "./hooks/use-folder-duplicate-scan-completion";
+import { useFolderDuplicateScanLifecycle } from "./hooks/use-folder-duplicate-scan-completion";
 import { filterDuplicateScanPayloadAfterMediaDeleted } from "./lib/duplicate-files-session-after-delete";
+import { duplicateScanSessionMatchesJobFinished } from "./lib/folder-duplicate-scan-queue-helpers";
 import { useFilteredMediaItems } from "./hooks/use-filtered-media-items";
 import { lookupMediaMetadataByItemId } from "./lib/media-metadata-lookup";
 import { useAnalysisEta, useFaceDetectionEta, useMetadataProgress, useSemanticIndexEta } from "./hooks/use-eta-tracking";
@@ -37,6 +38,7 @@ import { UI_TEXT } from "./lib/ui-text";
 import { cn } from "./lib/cn";
 import { useDesktopStore, useDesktopStoreApi } from "./stores/desktop-store";
 import { enqueueFolderDuplicateScan } from "./actions/duplicate-files-actions";
+import type { DuplicateFilesSession } from "./types/duplicate-files-session";
 import type {
   AlbumWorkspaceMode,
   ExpandedSidebarSectionId,
@@ -150,9 +152,7 @@ export function App(): ReactElement {
   const [recentAlbumsHydrated, setRecentAlbumsHydrated] = useState(false);
   const [similarImagesSession, setSimilarImagesSession] = useState<SimilarImagesSession | null>(null);
   const [similarImagesPage, setSimilarImagesPage] = useState(0);
-  const [duplicateFilesSession, setDuplicateFilesSession] = useState<FolderDuplicateScanResultPayload | null>(
-    null,
-  );
+  const [duplicateFilesSession, setDuplicateFilesSession] = useState<DuplicateFilesSession | null>(null);
   const [duplicateFilesPage, setDuplicateFilesPage] = useState(0);
   const [insightsSubSection, setInsightsSubSection] = useState<InsightsSidebarSubSection | null>(null);
   const [insightsDuplicateFilesHubOpen, setInsightsDuplicateFilesHubOpen] = useState(false);
@@ -361,18 +361,55 @@ export function App(): ReactElement {
     }
   }, [closeDuplicateFilesView]);
 
-  const onDuplicateScanResult = useCallback((payload: FolderDuplicateScanResultPayload) => {
-    setDuplicateFilesSession(payload);
-    setDuplicateFilesPage(0);
-  }, []);
+  const onDuplicateScanSucceeded = useCallback(
+    (args: { jobId: string; bundleId: string; result: FolderDuplicateScanResultPayload }) => {
+      setDuplicateFilesSession((prev) => {
+        if (prev?.kind !== "scanning") {
+          return prev;
+        }
+        if (!duplicateScanSessionMatchesJobFinished(prev, { jobId: args.jobId, bundleId: args.bundleId })) {
+          return prev;
+        }
+        return { kind: "ready", payload: args.result };
+      });
+      setDuplicateFilesPage(0);
+    },
+    [],
+  );
+
+  const onDuplicateScanEndedWithoutResult = useCallback(
+    (args: { jobId: string; bundleId: string }) => {
+      setDuplicateFilesSession((prev) => {
+        if (prev?.kind !== "scanning") {
+          return prev;
+        }
+        if (!duplicateScanSessionMatchesJobFinished(prev, { jobId: args.jobId, bundleId: args.bundleId })) {
+          return prev;
+        }
+        return null;
+      });
+    },
+    [],
+  );
+
+  useFolderDuplicateScanLifecycle({
+    onSucceeded: onDuplicateScanSucceeded,
+    onEndedWithoutResult: (args) => {
+      onDuplicateScanEndedWithoutResult(args);
+    },
+  });
 
   const handleDuplicateFilesDeletedMediaItems = useCallback((mediaItemIds: readonly string[]) => {
-    setDuplicateFilesSession((prev) =>
-      prev ? filterDuplicateScanPayloadAfterMediaDeleted(prev, mediaItemIds) : prev,
-    );
+    setDuplicateFilesSession((prev) => {
+      if (prev?.kind !== "ready") {
+        return prev;
+      }
+      return {
+        kind: "ready",
+        payload: filterDuplicateScanPayloadAfterMediaDeleted(prev.payload, mediaItemIds),
+      };
+    });
   }, []);
-
-  useFolderDuplicateScanCompletion(onDuplicateScanResult);
 
   const resetInsightsFlow = useCallback((): void => {
     setInsightsSubSection(null);
@@ -405,6 +442,14 @@ export function App(): ReactElement {
             window.desktopApi._logToMain(`[duplicate-scan] ${result.error}`);
             return;
           }
+          setDuplicateFilesSession({
+            kind: "scanning",
+            bundleId: result.bundleId,
+            jobId: result.jobId,
+            folderPath: root,
+            recursive: true,
+          });
+          setDuplicateFilesPage(0);
           setProgressPanelCollapsed(false);
         });
       }
@@ -452,6 +497,14 @@ export function App(): ReactElement {
         window.desktopApi._logToMain(`[duplicate-scan] ${result.error}`);
         return;
       }
+      setDuplicateFilesSession({
+        kind: "scanning",
+        bundleId: result.bundleId,
+        jobId: result.jobId,
+        folderPath,
+        recursive: true,
+      });
+      setDuplicateFilesPage(0);
       setProgressPanelCollapsed(false);
     });
   }, []);
@@ -643,6 +696,14 @@ export function App(): ReactElement {
                 window.desktopApi._logToMain(`[duplicate-scan] ${result.error}`);
                 return;
               }
+              setDuplicateFilesSession({
+                kind: "scanning",
+                bundleId: result.bundleId,
+                jobId: result.jobId,
+                folderPath,
+                recursive,
+              });
+              setDuplicateFilesPage(0);
               setProgressPanelCollapsed(false);
             });
           },

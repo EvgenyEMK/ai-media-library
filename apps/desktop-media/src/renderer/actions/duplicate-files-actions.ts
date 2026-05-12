@@ -1,5 +1,6 @@
 import type { DuplicateMarkedFilesDeleteTarget } from "../../shared/ipc";
 import type { EnqueueBundleResponse } from "../../shared/pipeline-ipc";
+import { findFolderDuplicateScanJobId } from "../lib/folder-duplicate-scan-queue-helpers";
 
 function rejectionMessage(result: EnqueueBundleResponse): string {
   if (result.ok) return "";
@@ -46,13 +47,27 @@ export async function enqueueDuplicateMarkedFilesDelete(options: {
   return { ok: true, bundleId: result.bundleId };
 }
 
+async function waitForFolderDuplicateScanJobId(bundleId: string): Promise<string | null> {
+  for (let i = 0; i < 10; i++) {
+    const snapshot = await window.desktopApi.pipelines.getSnapshot();
+    const jobId = findFolderDuplicateScanJobId(snapshot, bundleId);
+    if (jobId) {
+      return jobId;
+    }
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, 30);
+    });
+  }
+  return null;
+}
+
 /**
  * Enqueues the folder duplicate-file scan pipeline (progress appears in Background operations).
  */
 export async function enqueueFolderDuplicateScan(options: {
   folderPath: string;
   recursive?: boolean;
-}): Promise<{ ok: true; bundleId: string } | { ok: false; error: string }> {
+}): Promise<{ ok: true; bundleId: string; jobId: string | null } | { ok: false; error: string }> {
   const folderPath = options.folderPath.trim();
   if (!folderPath) {
     return { ok: false, error: "Folder path is required." };
@@ -72,5 +87,6 @@ export async function enqueueFolderDuplicateScan(options: {
     return { ok: false, error: rejectionMessage(result) };
   }
 
-  return { ok: true, bundleId: result.bundleId };
+  const jobId = await waitForFolderDuplicateScanJobId(result.bundleId);
+  return { ok: true, bundleId: result.bundleId, jobId };
 }
