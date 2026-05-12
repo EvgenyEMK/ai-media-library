@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { setImmediate as yieldToEventLoop } from "node:timers/promises";
 import type {
   FolderDuplicateScanDuplicateEntry,
   FolderDuplicateScanResultPayload,
@@ -15,7 +16,7 @@ import {
 import { bucketWeakDuplicateRows } from "../lib/folder-duplicate-scan-weak";
 
 const MAX_HASH_BYTES = 128 * 1024 * 1024;
-
+const PROGRESS_REPORT_INTERVAL = 100;
 interface CatalogRow {
   id: string;
   source_path: string;
@@ -57,6 +58,17 @@ function abortIfNeeded(signal: AbortSignal): void {
   }
 }
 
+function shouldReportProgress(processed: number, total: number): boolean {
+  return processed === 1 || processed === total || processed % PROGRESS_REPORT_INTERVAL === 0;
+}
+
+async function yieldForCancellation(processed: number, signal: AbortSignal): Promise<void> {
+  if (processed > 0) {
+    await yieldToEventLoop();
+    abortIfNeeded(signal);
+  }
+}
+
 export async function runFolderDuplicateScan(params: {
   folderPath: string;
   recursive: boolean;
@@ -80,9 +92,15 @@ export async function runFolderDuplicateScan(params: {
     )
     .all(libraryId, exact, like) as CatalogRow[];
 
-  const scoped = rawRows.filter((row) =>
-    isMediaPathInFolderScope(row.source_path, exact, params.recursive),
-  );
+  const scoped: CatalogRow[] = [];
+  for (let ri = 0; ri < rawRows.length; ri++) {
+    abortIfNeeded(params.signal);
+    const row = rawRows[ri]!;
+    if (isMediaPathInFolderScope(row.source_path, exact, params.recursive)) {
+      scoped.push(row);
+    }
+    await yieldForCancellation(ri + 1, params.signal);
+  }
 
   const runtimeHashByPath = new Map<string, string>();
   let skippedLargeFileCount = 0;
@@ -99,11 +117,14 @@ export async function runFolderDuplicateScan(params: {
     if (size > MAX_HASH_BYTES) {
       skippedLargeFileCount += 1;
       skippedHashUnresolvedCount += 1;
-      params.onProgress?.(
-        hi + 1,
-        hashTotal,
-        `Skipped over limit (${path.basename(row.source_path)})`,
-      );
+      if (shouldReportProgress(hi + 1, hashTotal)) {
+        params.onProgress?.(
+          hi + 1,
+          hashTotal,
+          `Skipped over limit (${path.basename(row.source_path)})`,
+        );
+      }
+      await yieldForCancellation(hi + 1, params.signal);
       continue;
     }
     try {
@@ -111,7 +132,10 @@ export async function runFolderDuplicateScan(params: {
     } catch {
       skippedMissingOnDiskCount += 1;
       skippedHashUnresolvedCount += 1;
-      params.onProgress?.(hi + 1, hashTotal, `Missing on disk`);
+      if (shouldReportProgress(hi + 1, hashTotal)) {
+        params.onProgress?.(hi + 1, hashTotal, `Missing on disk`);
+      }
+      await yieldForCancellation(hi + 1, params.signal);
       continue;
     }
     const hash = await computeStrongHashWithinSizeLimit(row.source_path, size);
@@ -120,7 +144,10 @@ export async function runFolderDuplicateScan(params: {
     } else {
       skippedHashUnresolvedCount += 1;
     }
-    params.onProgress?.(hi + 1, hashTotal, `Hashing ${path.basename(row.source_path)}`);
+    if (shouldReportProgress(hi + 1, hashTotal)) {
+      params.onProgress?.(hi + 1, hashTotal, `Hashing ${path.basename(row.source_path)}`);
+    }
+    await yieldForCancellation(hi + 1, params.signal);
   }
 
   function resolvedHashForCatalogRow(row: CatalogRow): string | null {
@@ -167,19 +194,23 @@ export async function runFolderDuplicateScan(params: {
     const row = scoped[si]!;
     const resolvedHash = resolvedHashForCatalogRow(row);
 
-    params.onProgress?.(
-      si + 1,
-      checkTotal,
-      `Checking duplicates: ${path.basename(row.source_path)}`,
-    );
+    if (shouldReportProgress(si + 1, checkTotal)) {
+      params.onProgress?.(
+        si + 1,
+        checkTotal,
+        `Checking duplicates: ${path.basename(row.source_path)}`,
+      );
+    }
 
     if (!resolvedHash) {
+      await yieldForCancellation(si + 1, params.signal);
       continue;
     }
 
     const group = mergedGroupForHash(resolvedHash);
     const others = [...group.values()].filter((r) => r.source_path !== row.source_path);
     if (others.length === 0) {
+      await yieldForCancellation(si + 1, params.signal);
       continue;
     }
 
@@ -193,17 +224,21 @@ export async function runFolderDuplicateScan(params: {
       mediaKind: normalizeMediaKind(row.media_kind),
       duplicates: others.map((r) => rowToDuplicateEntry(r)),
     });
+    await yieldForCancellation(si + 1, params.signal);
   }
 
   const weakCandidates = scoped.filter((row) => !resolvedHashForCatalogRow(row));
   const weakBuckets = bucketWeakDuplicateRows(weakCandidates);
 
   for (const [, bucket] of weakBuckets) {
+    abortIfNeeded(params.signal);
     if (bucket.length < 2) {
       continue;
     }
     bucket.sort((a, b) => a.source_path.localeCompare(b.source_path));
-    for (const row of bucket) {
+    for (let bi = 0; bi < bucket.length; bi++) {
+      abortIfNeeded(params.signal);
+      const row = bucket[bi]!;
       const others = bucket.filter((r) => r.source_path !== row.source_path);
       rowsOut.push({
         scopedPath: row.source_path,
@@ -216,10 +251,13 @@ export async function runFolderDuplicateScan(params: {
         duplicates: others.map((r) => rowToDuplicateEntry(r)),
         duplicateMatchBasis: "weak-metadata",
       });
+      await yieldForCancellation(bi + 1, params.signal);
     }
   }
 
+  await yieldForCancellation(1, params.signal);
   rowsOut.sort((a, b) => a.scopedPath.localeCompare(b.scopedPath));
+  await yieldForCancellation(1, params.signal);
 
   return {
     folderPath,

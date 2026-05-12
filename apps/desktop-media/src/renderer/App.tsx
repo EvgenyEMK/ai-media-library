@@ -6,6 +6,7 @@ import {
 } from "@emk/media-metadata-core";
 import type { SmartAlbumRootKind, SmartAlbumYearAreaSubView } from "@emk/shared-contracts";
 import type { DesktopMediaItemMetadata, FolderDuplicateScanResultPayload } from "../shared/ipc";
+import type { BundleView } from "../shared/pipeline-types";
 import { supportsThinkingMode } from "../shared/photo-analysis-prompt";
 import { DesktopAppMain } from "./components/DesktopAppMain";
 import type { SimilarImagesSession } from "./components/similar-images/desktop-similar-images-workspace";
@@ -40,6 +41,23 @@ import type { AlbumWorkspaceMode, MainPaneViewMode, RotationReviewScope, Sidebar
 import type { DesktopViewerItem } from "./types/viewer-types";
 
 const RECENT_ALBUM_IDS_STORAGE_KEY = "desktop-media.recentAlbumIds.v1";
+
+function collectActiveDuplicateScanBundleIds(
+  running: readonly BundleView[],
+  queued: readonly BundleView[],
+): Set<string> {
+  const ids = new Set<string>();
+  const collectFrom = (bundles: readonly BundleView[]): void => {
+    for (const bundle of bundles) {
+      if (bundle.jobs.some((job) => job.pipelineId === "folder-duplicate-scan")) {
+        ids.add(bundle.bundleId);
+      }
+    }
+  };
+  collectFrom(running);
+  collectFrom(queued);
+  return ids;
+}
 
 export function App(): ReactElement {
   const store = useDesktopStoreApi();
@@ -138,6 +156,31 @@ export function App(): ReactElement {
     actionsMenuWrapRef,
     quickFiltersMenuWrapRef,
   } = useMainPaneMenus();
+
+  useEffect(() => {
+    return store.subscribe((state, previousState) => {
+      if (
+        state.pipelineRunning === previousState.pipelineRunning &&
+        state.pipelineQueued === previousState.pipelineQueued
+      ) {
+        return;
+      }
+
+      const activeBundleIds = collectActiveDuplicateScanBundleIds(state.pipelineRunning, state.pipelineQueued);
+      if (activeBundleIds.size === 0) return;
+
+      const previousActiveBundleIds = collectActiveDuplicateScanBundleIds(
+        previousState.pipelineRunning,
+        previousState.pipelineQueued,
+      );
+      const hasNewDuplicateScan = Array.from(activeBundleIds).some(
+        (bundleId) => !previousActiveBundleIds.has(bundleId),
+      );
+      if (hasNewDuplicateScan) {
+        setProgressPanelCollapsed(false);
+      }
+    });
+  }, [store]);
 
   const {
     descEmbedBackfill,

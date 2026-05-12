@@ -91,9 +91,9 @@ export function registerPipelineOrchestrationHandlers(): void {
     },
   );
 
-  ipcMain.handle(PIPELINE_IPC_CHANNELS.cancelBundle, (_event, bundleId: string): boolean => {
-    return pipelineScheduler.cancelBundle(bundleId);
-  });
+  ipcMain.handle(PIPELINE_IPC_CHANNELS.cancelBundle, (_event, bundleId: string): boolean =>
+    pipelineScheduler.cancelBundle(bundleId),
+  );
 
   ipcMain.handle(PIPELINE_IPC_CHANNELS.cancelJob, (_event, jobId: string): boolean => {
     return pipelineScheduler.cancelJob(jobId);
