@@ -553,6 +553,7 @@ function TreeNode({
                               <span>Include sub-folders</span>
                               <input
                                 type="checkbox"
+                                data-testid="sidebar-metadata-scan-include-subfolders"
                                 className="h-4 w-4 min-w-0 cursor-pointer accent-indigo-500"
                                 checked={scanIncludeSubfolders}
                                 disabled={isMetadataScanRunning}

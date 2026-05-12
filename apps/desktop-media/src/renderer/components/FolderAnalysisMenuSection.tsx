@@ -22,6 +22,8 @@ interface FolderAnalysisMenuSectionProps {
   onCancelSemanticIndex: () => void;
   onAnalyzeFolderPathMetadata?: (folderPath: string, recursive: boolean) => void;
   onCancelPathAnalysis?: () => void;
+  /** Toolbar menus pass this so start/cancel actions hide the dropdown (sidebar menus omit). */
+  onDismiss?: () => void;
 }
 
 export function FolderAnalysisMenuSection({
@@ -34,6 +36,7 @@ export function FolderAnalysisMenuSection({
   onCancelSemanticIndex,
   onAnalyzeFolderPathMetadata,
   onCancelPathAnalysis,
+  onDismiss,
 }: FolderAnalysisMenuSectionProps): ReactElement {
   const aiStatus = useDesktopStore((s) => s.aiStatus);
   const faceStatus = useDesktopStore((s) => s.faceStatus);
@@ -81,8 +84,10 @@ export function FolderAnalysisMenuSection({
           onClick={() => {
             if (isSemanticIndexing) {
               onCancelSemanticIndex();
+              onDismiss?.();
             } else if (targetFolderPath) {
               onIndexSemantic(targetFolderPath, semanticIncludeSubfolders, semanticOverrideExisting);
+              onDismiss?.();
             }
           }}
         >
@@ -140,8 +145,10 @@ export function FolderAnalysisMenuSection({
           onClick={() => {
             if (isDetectingFaces) {
               onCancelFaceDetection();
+              onDismiss?.();
             } else if (targetFolderPath) {
               onDetectFaces(targetFolderPath, faceIncludeSubfolders, faceOverrideExisting);
+              onDismiss?.();
             }
           }}
         >
@@ -199,8 +206,10 @@ export function FolderAnalysisMenuSection({
           onClick={() => {
             if (isAnalyzing) {
               onCancelAnalysis();
+              onDismiss?.();
             } else if (targetFolderPath) {
               onAnalyzePhotos(targetFolderPath, aiIncludeSubfolders, aiOverrideExisting);
+              onDismiss?.();
             }
           }}
         >
@@ -260,8 +269,10 @@ export function FolderAnalysisMenuSection({
               onClick={() => {
                 if (isPathAnalysisRunning) {
                   onCancelPathAnalysis();
+                  onDismiss?.();
                 } else if (targetFolderPath) {
                   onAnalyzeFolderPathMetadata(targetFolderPath, pathIncludeSubfolders);
+                  onDismiss?.();
                 }
               }}
             >

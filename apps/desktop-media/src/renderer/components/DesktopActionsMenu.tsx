@@ -67,6 +67,7 @@ export function DesktopActionsMenu({
         onCancelSemanticIndex={onCancelSemanticIndex}
         onAnalyzeFolderPathMetadata={onAnalyzeFolderPathMetadata}
         onCancelPathAnalysis={onCancelPathAnalysis}
+        onDismiss={onCloseMenu}
       />
     </div>
   );

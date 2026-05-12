@@ -94,13 +94,17 @@ async function runRecursiveMetadataScan(
   const normalized = path.normalize(libraryRoot);
   const completion = awaitNextManualMetadataScanForFolder(mainWindow, normalized);
   const sidebar = mainDesktopSidebar(mainWindow);
-  const rootRow = sidebar.getByRole("button", { name: normalized, exact: true });
-  await rootRow.scrollIntoViewIfNeeded();
-  await expect(rootRow).toBeVisible({ timeout: 60_000 });
-  /** `SidebarTree` opens the same folder menu on right-click as the More button (avoids flaky `group-hover`). */
-  await rootRow.click({ button: "right" });
+  /** Folder rows can remount after scan completion; re-resolve locators until the menu opens. */
+  await expect(async () => {
+    const rootButton = sidebar.getByRole("button", { name: normalized, exact: true });
+    await expect(rootButton).toBeVisible({ timeout: 15_000 });
+    await rootButton.scrollIntoViewIfNeeded();
+    const row = rootButton.locator("..").locator("..");
+    await row.hover();
+    await row.getByRole("button", { name: "More", exact: true }).click();
+  }).toPass({ timeout: 60_000 });
   await mainWindow.getByRole("button", { name: UI_TEXT.scanForFileChanges }).click();
-  const subfolders = mainWindow.getByRole("checkbox", { name: /Include sub-folders/i });
+  const subfolders = mainWindow.getByTestId("sidebar-metadata-scan-include-subfolders");
   await expect(subfolders).toBeVisible({ timeout: 30_000 });
   if (!(await subfolders.isChecked())) {
     await subfolders.check({ force: true });

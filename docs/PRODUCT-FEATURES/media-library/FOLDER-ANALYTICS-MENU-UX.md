@@ -7,6 +7,7 @@ This document defines the product UX and business logic for the folder-level ana
 It covers:
 - The top-right `More actions` (`...`) menu behavior in folder content view
 - The **sidebar folder row** context menu (`…` or right-click), which exposes the same folder-scoped analytics controls for the row’s folder
+- **Check duplicate files** also lives on the sidebar folder row menu (not in `More actions`); product UX and logic for that flow are in [`docs/find-duplicate-files/`](../../find-duplicate-files/README.md)
 - The `Folder AI analysis summary` action from the sidebar row menu
 - Face detection controls and runtime behavior
 - Photo AI analysis controls and runtime behavior
