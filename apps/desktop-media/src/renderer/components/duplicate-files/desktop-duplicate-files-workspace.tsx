@@ -22,6 +22,7 @@ import {
   rowMatchesFolderFilter,
   splitDuplicateFolderSummariesBySelectionDiskTree,
 } from "../../lib/duplicate-files-folder-aggregate";
+import { dedupeMutualSingletonDuplicateRowsForFolderFilter } from "../../lib/duplicate-files-symmetric-folder-drilldown-rows";
 import { normalizedScanRoot, parentFolderPath } from "../../lib/duplicate-files-folder-scope";
 import {
   countScopedFilesWithDuplicateInsideDiskTree,
@@ -259,7 +260,8 @@ export function DesktopDuplicateFilesWorkspace({
 
   const filteredRows = useMemo((): FolderDuplicateScanRow[] => {
     if (!filterFolder) return rows;
-    return rows.filter((row) => rowMatchesFolderFilter(row, filterFolder));
+    const matched = rows.filter((row) => rowMatchesFolderFilter(row, filterFolder));
+    return dedupeMutualSingletonDuplicateRowsForFolderFilter(matched, filterFolder);
   }, [rows, filterFolder]);
 
   const pageSliceFullList = useMemo(() => {
