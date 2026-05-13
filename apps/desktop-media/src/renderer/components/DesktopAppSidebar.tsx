@@ -1,15 +1,18 @@
 import type { ReactElement } from "react";
 import { MainAppSidebar } from "@emk/media-viewer";
 import type { SmartAlbumRootKind } from "@emk/shared-contracts";
-import { FolderOpen, Images, Lightbulb, PanelLeftClose, PanelLeftOpen, Plus, Settings, Users } from "lucide-react";
+import { FileText, FolderOpen, Images, Lightbulb, PanelLeftClose, PanelLeftOpen, Plus, Settings, Users } from "lucide-react";
 import { DesktopFoldersSidebarPanel } from "./DesktopFoldersSidebarPanel";
 import { DesktopSidebarAlbumsSection } from "./DesktopSidebarAlbumsSection";
+import { DesktopSidebarDocumentsSection } from "./documents/desktop-sidebar-documents-section";
 import { DesktopSidebarInsightsSection } from "./insights/desktop-sidebar-insights-section";
 import type { DesktopPipelineHandlers } from "../hooks/use-desktop-pipeline-handlers";
 import { UI_TEXT } from "../lib/ui-text";
 import { cn } from "../lib/cn";
+import { resolveMainAppSidebarActiveSectionId } from "../lib/main-app-sidebar-active-section-id";
 import type { DesktopStore, DesktopStoreState } from "../stores/desktop-store";
 import type {
+  DocumentsSidebarSubSection,
   ExpandedSidebarSectionId,
   InsightsSidebarSubSection,
   PrimarySidebarSectionId,
@@ -19,8 +22,9 @@ interface DesktopAppSidebarProps {
   store: DesktopStore;
   sidebarCollapsed: boolean;
   primarySidebarSection: PrimarySidebarSectionId;
-  /** When set, top-level sections (Folders, Albums, …) are not shown as active; Insights header stays visually inactive. */
+  /** When set, Documents/Insights headers stay visually inactive in expanded sidebar (sub-row shows active); in collapsed sidebar the parent icon is active instead. */
   insightsSubSection: InsightsSidebarSubSection | null;
+  documentsSubSection: DocumentsSidebarSubSection | null;
   expandedSidebarSection: ExpandedSidebarSectionId | null;
   onSectionToggle: (sectionId: string) => void;
   libraryRoots: DesktopStoreState["libraryRoots"];
@@ -36,8 +40,10 @@ interface DesktopAppSidebarProps {
   onShowAlbumList: () => void;
   onOpenInsightsDuplicateFiles: () => void;
   onOpenInsightsFolderAnalysis: () => void;
+  onOpenInvoicesReceipts: () => void;
   insightsDuplicateFilesActive: boolean;
   insightsFolderAnalysisActive: boolean;
+  invoicesReceiptsActive: boolean;
   /** When albums workspace is in smart mode, which root is active (sidebar row highlight). */
   sidebarHighlightedSmartAlbumKind: SmartAlbumRootKind | null;
   /** When set, overrides default RECENT expansion in the albums sidebar (e.g. from app settings). */
@@ -57,6 +63,7 @@ export function DesktopAppSidebar({
   sidebarCollapsed,
   primarySidebarSection,
   insightsSubSection,
+  documentsSubSection,
   expandedSidebarSection,
   onSectionToggle,
   libraryRoots,
@@ -72,8 +79,10 @@ export function DesktopAppSidebar({
   onShowAlbumList,
   onOpenInsightsDuplicateFiles,
   onOpenInsightsFolderAnalysis,
+  onOpenInvoicesReceipts,
   insightsDuplicateFilesActive,
   insightsFolderAnalysisActive,
+  invoicesReceiptsActive,
   sidebarHighlightedSmartAlbumKind,
   albumsSidebarExpandRecentByDefault,
   folderTree,
@@ -97,7 +106,7 @@ export function DesktopAppSidebar({
             id: "folders",
             label: UI_TEXT.sectionFolders,
             icon: <FolderOpen size={20} aria-hidden="true" />,
-            headerTrailing: primarySidebarSection === "folders" && insightsSubSection === null
+            headerTrailing: primarySidebarSection === "folders" && insightsSubSection === null && documentsSubSection === null
               ? (
                   <button
                     type="button"
@@ -136,7 +145,7 @@ export function DesktopAppSidebar({
             id: "albums",
             label: UI_TEXT.sectionAlbums,
             icon: <Images size={20} aria-hidden="true" />,
-            headerTrailing: primarySidebarSection === "albums" && insightsSubSection === null
+            headerTrailing: primarySidebarSection === "albums" && insightsSubSection === null && documentsSubSection === null
               ? (
                   <button
                     type="button"
@@ -171,6 +180,19 @@ export function DesktopAppSidebar({
             icon: <Users size={20} aria-hidden="true" />,
           },
           {
+            id: "documents",
+            label: UI_TEXT.sectionDocuments,
+            icon: <FileText size={20} aria-hidden="true" />,
+            contentChrome: "plain",
+            contentClassName: "pr-0",
+            content: (
+              <DesktopSidebarDocumentsSection
+                isInvoicesReceiptsActive={invoicesReceiptsActive}
+                onOpenInvoicesReceipts={onOpenInvoicesReceipts}
+              />
+            ),
+          },
+          {
             id: "insights",
             label: UI_TEXT.sectionInsights,
             icon: <Lightbulb size={20} aria-hidden="true" />,
@@ -193,7 +215,12 @@ export function DesktopAppSidebar({
             icon: <Settings size={20} aria-hidden="true" />,
           },
         ]}
-        activeSectionId={insightsSubSection !== null ? null : primarySidebarSection}
+        activeSectionId={resolveMainAppSidebarActiveSectionId({
+          sidebarCollapsed,
+          primarySidebarSection,
+          documentsSubSection,
+          insightsSubSection,
+        })}
         expandedSectionId={expandedSidebarSection}
         onSectionToggle={onSectionToggle}
       />

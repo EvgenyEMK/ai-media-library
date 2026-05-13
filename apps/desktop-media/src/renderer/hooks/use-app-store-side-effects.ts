@@ -1,6 +1,10 @@
-import { useEffect, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import type { DesktopStore } from "../stores/desktop-store";
-import type { ExpandedSidebarSectionId } from "../types/app-types";
+import type {
+  DocumentsSidebarSubSection,
+  ExpandedSidebarSectionId,
+  InsightsSidebarSubSection,
+} from "../types/app-types";
 
 export function useAppStoreSideEffects(opts: {
   store: DesktopStore;
@@ -10,6 +14,8 @@ export function useAppStoreSideEffects(opts: {
   selectedModelSupportsThinking: boolean;
   aiThinkingEnabled: boolean;
   sidebarCollapsed: boolean;
+  documentsSubSection: DocumentsSidebarSubSection | null;
+  insightsSubSection: InsightsSidebarSubSection | null;
   setExpandedSidebarSection: Dispatch<SetStateAction<ExpandedSidebarSectionId | null>>;
 }): void {
   const {
@@ -20,8 +26,12 @@ export function useAppStoreSideEffects(opts: {
     selectedModelSupportsThinking,
     aiThinkingEnabled,
     sidebarCollapsed,
+    documentsSubSection,
+    insightsSubSection,
     setExpandedSidebarSection,
   } = opts;
+
+  const prevSidebarCollapsedRef = useRef(sidebarCollapsed);
 
   useEffect(() => {
     const next = photoAnalysisSettingsModel?.trim();
@@ -40,7 +50,21 @@ export function useAppStoreSideEffects(opts: {
     }
   }, [selectedModelSupportsThinking, aiThinkingEnabled, store]);
 
+  /** After widening the left panel, re-open Documents/Insights if a child row is still active (accordion state is preserved while collapsed). */
   useEffect(() => {
-    if (sidebarCollapsed) setExpandedSidebarSection(null);
-  }, [sidebarCollapsed, setExpandedSidebarSection]);
+    const wasCollapsed = prevSidebarCollapsedRef.current;
+    if (wasCollapsed && !sidebarCollapsed) {
+      if (documentsSubSection !== null) {
+        setExpandedSidebarSection((current) => (current === "documents" ? current : "documents"));
+      } else if (insightsSubSection !== null) {
+        setExpandedSidebarSection((current) => (current === "insights" ? current : "insights"));
+      }
+    }
+    prevSidebarCollapsedRef.current = sidebarCollapsed;
+  }, [
+    sidebarCollapsed,
+    documentsSubSection,
+    insightsSubSection,
+    setExpandedSidebarSection,
+  ]);
 }

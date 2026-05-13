@@ -249,6 +249,10 @@ const api: DesktopApi = {
   listSmartAlbumYears: (request) => ipcRenderer.invoke(IPC_CHANNELS.listSmartAlbumYears, request),
   listSmartAlbumItems: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.listSmartAlbumItems, request),
+  countInvoiceReceiptDocuments: (libraryId) =>
+    ipcRenderer.invoke(IPC_CHANNELS.countInvoiceReceiptDocuments, libraryId),
+  listInvoiceReceiptDocuments: (request) =>
+    ipcRenderer.invoke(IPC_CHANNELS.listInvoiceReceiptDocuments, request),
   onMediaItemMetadataRefreshed: (listener) => {
     const wrapped = (
       _event: Electron.IpcRendererEvent,

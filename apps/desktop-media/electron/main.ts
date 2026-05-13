@@ -28,6 +28,7 @@ import { registerMediaItemMutationHandlers } from "./ipc/media-item-mutation-han
 import { registerRotationReviewHandlers } from "./ipc/rotation-review-handlers";
 import { registerGeocoderHandlers } from "./ipc/geocoder-handlers";
 import { registerAlbumHandlers } from "./ipc/album-handlers";
+import { registerDocumentsHandlers } from "./ipc/documents-handlers";
 import { registerPipelineOrchestrationHandlers } from "./ipc/pipeline-orchestration-handlers";
 import { registerFolderDuplicateScanHandlers } from "./ipc/folder-duplicate-scan-handlers";
 import { registerParentFolderMediaCountHandlers } from "./ipc/parent-folder-media-count-handlers";
@@ -85,6 +86,7 @@ function registerAllIpcHandlers(): void {
   registerRotationReviewHandlers();
   registerGeocoderHandlers();
   registerAlbumHandlers();
+  registerDocumentsHandlers();
   registerFolderDuplicateScanHandlers();
   registerParentFolderMediaCountHandlers();
   registerPipelineOrchestrationHandlers();

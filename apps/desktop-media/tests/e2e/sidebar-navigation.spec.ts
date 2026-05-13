@@ -21,6 +21,16 @@ test.describe("Sidebar navigation", () => {
     await expect(mainWindow.locator(".empty-state")).toBeVisible();
   });
 
+  test("Documents → Invoices & Receipts shows sample table banner when library has no invoice rows", async ({
+    mainWindow,
+  }) => {
+    const sidebar = mainDesktopSidebar(mainWindow);
+    await sidebar.getByRole("button", { name: "Documents", exact: true }).click();
+    await sidebar.getByRole("button", { name: "Invoices & Receipts" }).click();
+    await expect(mainWindow.getByRole("status")).toContainText(/Example only/i);
+    await expect(mainWindow.getByText("Café Solstice")).toBeVisible();
+  });
+
   test("sidebar collapse toggle works", async ({ mainWindow }) => {
     const sidebar = mainDesktopSidebar(mainWindow);
     await expect(sidebar).not.toHaveClass(/w-\[84px\]/);

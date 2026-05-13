@@ -121,6 +121,8 @@ export const IPC_CHANNELS = {
   listSmartAlbumPlaces: "media:list-smart-album-places",
   listSmartAlbumYears: "media:list-smart-album-years",
   listSmartAlbumItems: "media:list-smart-album-items",
+  countInvoiceReceiptDocuments: "media:count-invoice-receipt-documents",
+  listInvoiceReceiptDocuments: "media:list-invoice-receipt-documents",
   /** Pushed from main → renderer after a background file-metadata write refreshes the catalog row. */
   mediaItemMetadataRefreshed: "media:media-item-metadata-refreshed",
   listPersonTags: "media:list-person-tags",
@@ -1359,6 +1361,37 @@ export interface DocumentData {
   vat_amount?: number | null;
 }
 
+/** List / filter invoices & receipts (`image_category` = invoice_or_receipt) from catalog AI metadata. */
+export interface InvoiceReceiptDocumentsListRequest {
+  libraryId?: string;
+  page?: number;
+  pageSize?: number;
+  issuedBy?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  totalFrom?: number | null;
+  totalTo?: number | null;
+  currency?: string;
+}
+
+export interface InvoiceReceiptDocumentRow {
+  id: string;
+  sourcePath: string;
+  filename: string;
+  mediaKind: MediaKind;
+  issuer: string | null;
+  invoiceDate: string | null;
+  totalAmount: number | null;
+  currency: string | null;
+  vatPercent: number | null;
+  vatAmount: number | null;
+}
+
+export interface InvoiceReceiptDocumentsListResult {
+  total: number;
+  rows: InvoiceReceiptDocumentRow[];
+}
+
 export type PhotoEditType =
   | "rotate"
   | "crop"
@@ -2360,6 +2393,10 @@ export interface DesktopApi {
   listSmartAlbumPlaces: (request: SmartAlbumPlacesRequest) => Promise<SmartAlbumPlacesResult>;
   listSmartAlbumYears: (request?: SmartAlbumYearsRequest) => Promise<SmartAlbumYearsResult>;
   listSmartAlbumItems: (request: SmartAlbumItemsRequest) => Promise<AlbumItemsResult>;
+  countInvoiceReceiptDocuments: (libraryId?: string) => Promise<number>;
+  listInvoiceReceiptDocuments: (
+    request: InvoiceReceiptDocumentsListRequest,
+  ) => Promise<InvoiceReceiptDocumentsListResult>;
   onMediaItemMetadataRefreshed: (
     listener: (byPath: Record<string, DesktopMediaItemMetadata>) => void,
   ) => () => void;

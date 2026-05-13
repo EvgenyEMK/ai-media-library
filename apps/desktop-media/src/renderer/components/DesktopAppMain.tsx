@@ -29,10 +29,12 @@ import type { DescEmbedBackfillState } from "./DesktopProgressDock";
 import type { DesktopStore, DesktopStoreState } from "../stores/desktop-store";
 import type { AlbumWorkspaceMode, MainPaneViewMode, RotationReviewScope } from "../types/app-types";
 import { DesktopInsightLibraryPickHub } from "./insights/desktop-insight-library-pick-hub";
+import { DesktopInvoicesReceiptsWorkspace } from "./documents/desktop-invoices-receipts-workspace";
 import { UI_TEXT } from "../lib/ui-text";
 
 interface DesktopAppMainProps {
   store: DesktopStore;
+  isInvoicesReceiptsWorkspaceOpen: boolean;
   isPeopleSectionOpen: boolean;
   isAlbumsSectionOpen: boolean;
   mainPaneViewMode: MainPaneViewMode;
@@ -105,7 +107,7 @@ interface DesktopAppMainProps {
   displaySemanticResults: SemanticSearchResult[];
   filteredDisplaySemanticResults: SemanticSearchResult[];
   filteredSemanticListItems: DesktopSemanticListItem[];
-  openFolderViewerById: (itemId: string) => void;
+  openFolderViewerById: (itemId: string, catalogSourcePath?: string | null) => void;
   progressPanelCollapsed: boolean;
   setProgressPanelCollapsed: Dispatch<SetStateAction<boolean>>;
   analysisEta: AnalysisEtaState;
@@ -129,6 +131,7 @@ interface DesktopAppMainProps {
 
 export function DesktopAppMain({
   store,
+  isInvoicesReceiptsWorkspaceOpen,
   isPeopleSectionOpen,
   isAlbumsSectionOpen,
   mainPaneViewMode,
@@ -266,6 +269,10 @@ export function DesktopAppMain({
             libraryRoots={libraryRoots}
             onPickLibrary={onOpenFolderAiSummaryFromInsightsHub}
           />
+        </div>
+      ) : isInvoicesReceiptsWorkspaceOpen && mainPaneViewMode !== "folderAiSummary" ? (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <DesktopInvoicesReceiptsWorkspace onOpenItem={openFolderViewerById} />
         </div>
       ) : isAlbumsSectionOpen && mainPaneViewMode !== "folderAiSummary" ? (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

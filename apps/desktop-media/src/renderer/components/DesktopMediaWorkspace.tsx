@@ -94,7 +94,7 @@ interface DesktopMediaWorkspaceProps {
   filteredDisplaySemanticResults: SemanticSearchResult[];
   filteredSemanticListItems: DesktopSemanticListItem[];
   quickFiltersActiveCount: number;
-  openFolderViewerById: (itemId: string) => void;
+  openFolderViewerById: (itemId: string, catalogSourcePath?: string | null) => void;
   onFindSimilar?: (filePath: string) => void;
 }
 

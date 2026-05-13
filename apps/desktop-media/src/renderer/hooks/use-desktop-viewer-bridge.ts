@@ -9,7 +9,8 @@ export function useDesktopViewerBridge(opts: {
   mediaItems: Array<{ id: string; mediaType?: "image" | "video" }>;
   refreshMetadataByPath: (sourcePath: string) => Promise<DesktopMediaItemMetadata | undefined>;
 }): {
-  openFolderViewerById: (itemId: string) => void;
+  /** When the item is not in the current folder list, pass `catalogSourcePath` from the catalog (e.g. invoices table). */
+  openFolderViewerById: (itemId: string, catalogSourcePath?: string | null) => void;
   openFacePhotoInViewer: (args: {
     sourcePath: string;
     imageWidth?: number | null;
@@ -20,7 +21,7 @@ export function useDesktopViewerBridge(opts: {
   const { store, mediaItems, refreshMetadataByPath } = opts;
 
   const openFolderViewerById = useCallback(
-    (itemId: string): void => {
+    (itemId: string, catalogSourcePath?: string | null): void => {
       const sourceIndex = mediaItems.findIndex((item) => item.id === itemId);
       if (sourceIndex >= 0) {
         const item = mediaItems[sourceIndex];
@@ -35,6 +36,31 @@ export function useDesktopViewerBridge(opts: {
           viewerActiveInfoTab: null,
           viewerAutoPlayInitialVideo: autoPlayInitialVideo,
         });
+        return;
+      }
+      const path = catalogSourcePath?.trim();
+      if (path) {
+        const title = path.split(/[\\/]/).pop() ?? path;
+        const isVideo = /\.(mp4|mov|m4v|webm|mkv|avi)$/i.test(path);
+        const entry: ViewerItemListEntry = {
+          id: itemId,
+          sourcePath: path,
+          title,
+          storage_url: toFileUrl(path),
+          thumbnail_url: toFileUrl(path),
+          mediaType: isVideo ? "video" : "image",
+        };
+        store.setState({
+          viewerOpen: true,
+          viewerCurrentIndex: 0,
+          viewerSource: "folder",
+          viewerSelectedFaceIndex: null,
+          viewerItemsOverride: [entry],
+          viewerShowInfoPanel: false,
+          viewerActiveInfoTab: null,
+          viewerAutoPlayInitialVideo: isVideo,
+        });
+        void refreshMetadataByPath(path);
         return;
       }
       const title = itemId.split(/[\\/]/).pop() ?? itemId;
@@ -58,7 +84,7 @@ export function useDesktopViewerBridge(opts: {
         viewerAutoPlayInitialVideo: isVideo,
       });
     },
-    [mediaItems, store],
+    [mediaItems, refreshMetadataByPath, store],
   );
 
   const openFacePhotoInViewer = useCallback(
