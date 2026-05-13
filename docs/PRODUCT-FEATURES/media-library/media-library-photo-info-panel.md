@@ -58,7 +58,7 @@ The panel features a horizontal tab bar at the top with three icon-based tabs:
 1. **Info Tab** (Information icon)
    - Primary tab, shows structured photo and catalog information (**desktop** uses expanded sections; **web** may differ).
    - **Desktop — first row:** **Rating** — always the **expanded** five-star editor (same component as grid/list expanded mode). **Clear** appears only when a rating is already set (**1–5** or rejected **-1** when shown).
-   - **Desktop — below rating:** Photo **title**, then collapsible **`<details>`** sections (default **collapsed**), each with a **chevron** before the section title, e.g. **Image file data**, **Image capture data**, **AI image analysis**, **AI quality…**, **Invoice / receipt** (when relevant). Rating semantics: [FILE-STAR-RATING.md](./FILE-STAR-RATING.md).
+   - **Desktop — below rating:** Photo **title**, then collapsible **`<details>`** sections (default **collapsed**), each with a **chevron** before the section title, e.g. **Image file data**, **Image capture data**, **AI image analysis**, **AI quality…**, **Invoice / receipt** (when relevant). Rating semantics: [FILE-STAR-RATING.md](./FILE-STAR-RATING.md). Library-wide list of invoices and receipts: [Documents — Invoices & Receipts](./DOCUMENTS-INVOICES-RECEIPTS-UX.md).
    - **General / web-oriented content** may also include description, dates, file size, dimensions, and type depending on app.
 
 2. **Tag Tab** (Tag/Label icon)
