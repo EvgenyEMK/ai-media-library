@@ -5,8 +5,12 @@ import {
   useState,
   type ReactElement,
 } from "react";
-import { Loader2, Search } from "lucide-react";
-import type { InvoiceReceiptDocumentsListRequest, InvoiceReceiptDocumentRow } from "../../../shared/ipc";
+import { HelpCircle, Loader2, Search } from "lucide-react";
+import {
+  DEFAULT_PHOTO_ANALYSIS_SETTINGS,
+  type InvoiceReceiptDocumentsListRequest,
+  type InvoiceReceiptDocumentRow,
+} from "../../../shared/ipc";
 import { createDocumentActions } from "../../actions/document-actions";
 import { ALBUM_LIST_SEARCH_FIELD_DEBOUNCE_MS } from "../../lib/album-list-search-ui";
 import { INVOICE_RECEIPT_SAMPLE_ROWS } from "../../lib/invoice-receipt-mock-rows";
@@ -15,8 +19,10 @@ import { ToolbarIconButton } from "../ToolbarIconButton";
 import { PeoplePaginationBar } from "../people-pagination-bar";
 import { ALBUM_ITEMS_PAGE_SIZE } from "../DesktopAlbumDetailPanel";
 import { countActiveInvoiceFilters } from "../../lib/invoice-receipt-filter-count";
+import { useDesktopStore } from "../../stores/desktop-store";
 import { InvoiceReceiptDocumentsTable } from "./invoice-receipt-documents-table";
 import { InvoiceReceiptFiltersPanel } from "./invoice-receipt-filters-panel";
+import { InvoicesReceiptsHelpModal } from "./invoices-receipts-help-modal";
 
 export function DesktopInvoicesReceiptsWorkspace({
   onOpenItem,
@@ -45,6 +51,15 @@ export function DesktopInvoicesReceiptsWorkspace({
   const [currencyDraft, setCurrencyDraft] = useState("");
 
   const [appliedFilters, setAppliedFilters] = useState<InvoiceReceiptDocumentsListRequest>({});
+
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  const photoAnalysisModel = useDesktopStore((s) => s.photoAnalysisSettings.model);
+  const aiSelectedModel = useDesktopStore((s) => s.aiSelectedModel);
+  const effectivePhotoAnalysisModel = useMemo(
+    () => (photoAnalysisModel ?? aiSelectedModel).trim() || DEFAULT_PHOTO_ANALYSIS_SETTINGS.model,
+    [aiSelectedModel, photoAnalysisModel],
+  );
 
   const sampleMode = catalogCount === 0;
   const activeFilterCount = useMemo(() => countActiveInvoiceFilters(appliedFilters), [appliedFilters]);
@@ -177,7 +192,18 @@ export function DesktopInvoicesReceiptsWorkspace({
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="sticky top-0 z-20 shrink-0 border-b border-border bg-card/90 p-4 backdrop-blur">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="mr-auto text-xl font-semibold">{UI_TEXT.documentsInvoicesReceiptsNav}</h1>
+          <div className="mr-auto flex items-center gap-2">
+            <h1 className="text-xl font-semibold">{UI_TEXT.documentsInvoicesReceiptsNav}</h1>
+            <button
+              type="button"
+              onClick={() => setHelpOpen(true)}
+              className="inline-flex size-[33px] shrink-0 items-center justify-center rounded-full border border-border p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label={UI_TEXT.invoicesReceiptsHelpAria}
+              title={UI_TEXT.invoicesReceiptsHelpAria}
+            >
+              <HelpCircle className="size-[29px]" aria-hidden="true" />
+            </button>
+          </div>
           {!sampleMode ? (
             <ToolbarIconButton
               title={searchControlsOpen ? UI_TEXT.invoicesReceiptsFiltersClose : UI_TEXT.invoicesReceiptsFiltersOpen}
@@ -254,6 +280,12 @@ export function DesktopInvoicesReceiptsWorkspace({
           />
         </div>
       ) : null}
+
+      <InvoicesReceiptsHelpModal
+        open={helpOpen}
+        effectivePhotoAnalysisModel={effectivePhotoAnalysisModel}
+        onClose={() => setHelpOpen(false)}
+      />
     </div>
   );
 }

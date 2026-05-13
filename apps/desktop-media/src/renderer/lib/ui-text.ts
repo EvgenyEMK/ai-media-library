@@ -31,6 +31,7 @@ export const UI_TEXT = {
   invoicesReceiptsColumnVat: "VAT",
   invoicesReceiptsLoadCountError: "Could not load invoice data.",
   invoicesReceiptsLoadRowsError: "Could not load rows.",
+  invoicesReceiptsHelpAria: "About Invoices & Receipts",
   sectionSettings: "Settings",
   insightsDuplicateFilesNav: "Duplicate files",
   insightsFolderAnalysisStatusNav: "Folder analysis status",
