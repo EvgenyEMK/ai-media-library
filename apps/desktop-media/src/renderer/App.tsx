@@ -313,6 +313,8 @@ export function App(): ReactElement {
     selectedModelSupportsThinking,
     aiThinkingEnabled,
     sidebarCollapsed,
+    documentsSubSection,
+    insightsSubSection,
     setExpandedSidebarSection,
   });
 

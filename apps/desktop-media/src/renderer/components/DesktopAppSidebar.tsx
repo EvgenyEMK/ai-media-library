@@ -9,6 +9,7 @@ import { DesktopSidebarInsightsSection } from "./insights/desktop-sidebar-insigh
 import type { DesktopPipelineHandlers } from "../hooks/use-desktop-pipeline-handlers";
 import { UI_TEXT } from "../lib/ui-text";
 import { cn } from "../lib/cn";
+import { resolveMainAppSidebarActiveSectionId } from "../lib/main-app-sidebar-active-section-id";
 import type { DesktopStore, DesktopStoreState } from "../stores/desktop-store";
 import type {
   DocumentsSidebarSubSection,
@@ -21,7 +22,7 @@ interface DesktopAppSidebarProps {
   store: DesktopStore;
   sidebarCollapsed: boolean;
   primarySidebarSection: PrimarySidebarSectionId;
-  /** When set, top-level sections (Folders, Albums, …) are not shown as active; Insights header stays visually inactive. */
+  /** When set, Documents/Insights headers stay visually inactive in expanded sidebar (sub-row shows active); in collapsed sidebar the parent icon is active instead. */
   insightsSubSection: InsightsSidebarSubSection | null;
   documentsSubSection: DocumentsSidebarSubSection | null;
   expandedSidebarSection: ExpandedSidebarSectionId | null;
@@ -214,9 +215,12 @@ export function DesktopAppSidebar({
             icon: <Settings size={20} aria-hidden="true" />,
           },
         ]}
-        activeSectionId={
-          insightsSubSection !== null || documentsSubSection !== null ? null : primarySidebarSection
-        }
+        activeSectionId={resolveMainAppSidebarActiveSectionId({
+          sidebarCollapsed,
+          primarySidebarSection,
+          documentsSubSection,
+          insightsSubSection,
+        })}
         expandedSectionId={expandedSidebarSection}
         onSectionToggle={onSectionToggle}
       />
