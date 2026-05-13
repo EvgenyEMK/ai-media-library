@@ -41,10 +41,14 @@ test.describe("Image AI analysis cancel", () => {
     const row = menu.locator(".photo-ai-row");
     await expect(row.getByText("Image AI analysis")).toBeVisible();
 
-    // Click start then cancel immediately (this used to be a no-op if jobId wasn't known yet).
+    // Start analysis (toolbar menu closes after start), then reopen and cancel immediately.
     const playPause = row.locator("button.face-detect-play-btn");
     await playPause.click();
-    await playPause.click();
+    await actionsButton.click();
+    const menuAfterStart = mainWindow.locator(".desktop-actions-menu");
+    const rowAfterStart = menuAfterStart.locator(".photo-ai-row");
+    await expect(rowAfterStart.getByText("Image AI analysis")).toBeVisible();
+    await rowAfterStart.locator("button.face-detect-play-btn").click();
 
     // Ensure the app stays responsive by switching folders and loading thumbnails.
     await clickSidebarLibraryRoot(mainWindow, REAL_IMAGE_FOLDER);

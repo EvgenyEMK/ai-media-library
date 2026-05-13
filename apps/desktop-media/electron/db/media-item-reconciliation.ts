@@ -87,6 +87,82 @@ export function reconcileFolder(
   return { softDeleted, resurrected, softDeletedItems };
 }
 
+export type SoftDeleteMediaItemForUserRemovedFileResult =
+  | { ok: true; catalogSourcePath: string }
+  | { ok: false; reason: "not_found_or_deleted" | "path_mismatch" };
+
+/**
+ * Resolve the on-disk path for an active catalog row before a user-initiated delete.
+ */
+export function resolveActiveMediaItemPathForDeletion(params: {
+  mediaItemId: string;
+  /** Path from duplicate UI; must match the catalog row. */
+  expectedSourcePath: string;
+  libraryId?: string;
+}): { ok: true; sourcePath: string } | { ok: false; reason: "not_found_or_deleted" | "path_mismatch" } {
+  const db = getDesktopDatabase();
+  const libraryId = params.libraryId ?? DEFAULT_LIBRARY_ID;
+  const row = db
+    .prepare(
+      `SELECT source_path FROM media_items
+       WHERE library_id = ? AND id = ? AND deleted_at IS NULL`,
+    )
+    .get(libraryId, params.mediaItemId) as { source_path: string } | undefined;
+  if (!row) {
+    return { ok: false, reason: "not_found_or_deleted" };
+  }
+  if (row.source_path !== params.expectedSourcePath) {
+    return { ok: false, reason: "path_mismatch" };
+  }
+  return { ok: true, sourcePath: row.source_path };
+}
+
+/**
+ * Soft-delete a catalog row after the file was removed from disk by an explicit
+ * user action. Ordering matches {@link reconcileFolder} (media_items then sources).
+ */
+export function softDeleteMediaItemForUserRemovedFile(params: {
+  mediaItemId: string;
+  /** Path shown in the UI — must match the active catalog row. */
+  expectedSourcePath: string;
+  libraryId?: string;
+}): SoftDeleteMediaItemForUserRemovedFileResult {
+  const db = getDesktopDatabase();
+  const libraryId = params.libraryId ?? DEFAULT_LIBRARY_ID;
+  const row = db
+    .prepare(
+      `SELECT id, source_path FROM media_items
+       WHERE library_id = ? AND id = ? AND deleted_at IS NULL`,
+    )
+    .get(libraryId, params.mediaItemId) as { id: string; source_path: string } | undefined;
+  if (!row) {
+    return { ok: false, reason: "not_found_or_deleted" };
+  }
+  if (row.source_path !== params.expectedSourcePath) {
+    return { ok: false, reason: "path_mismatch" };
+  }
+
+  const now = new Date().toISOString();
+  const markDeleted = db.prepare(
+    `UPDATE media_items SET deleted_at = ?, updated_at = ? WHERE id = ?`,
+  );
+
+  const tx = db.transaction(() => {
+    markDeleted.run(now, now, row.id);
+    const sourceResult = markSourceDeleted({ sourcePath: row.source_path, libraryId });
+    if (sourceResult && !sourceResult.hasOtherActiveSources) {
+      appendSyncOperation({
+        mediaId: row.id,
+        operationType: "media.delete",
+        payload: { reason: "user_deleted_file", lastSourcePath: row.source_path },
+        libraryId,
+      });
+    }
+  });
+  tx();
+  return { ok: true, catalogSourcePath: row.source_path };
+}
+
 const PURGE_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
 
 export interface PurgeResult {

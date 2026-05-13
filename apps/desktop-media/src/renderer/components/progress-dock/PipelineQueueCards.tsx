@@ -7,6 +7,7 @@ import { ProgressDockCloseButton } from "./ProgressDockCloseButton";
 import { ProgressCardBody } from "./cards/ProgressCardBody";
 import { GeocoderQueueRecentCard } from "./cards/GeocoderQueueRecentCard";
 import { buildPipelineQueueRightText, buildPipelineQueueStatsText } from "../../lib/pipeline-queue-progress-stats";
+import { markDuplicateScanJobCancelRequested } from "../../lib/duplicate-files-cancelled-scan-jobs";
 
 /**
  * Renders the "central queue" view of the Background operations dock — the
@@ -106,6 +107,7 @@ interface BundleCardProps {
 
 function BundleCard({ bundle, variant, onDismissRecent }: BundleCardProps): ReactElement {
   const activeJob = bundle.jobs.find((j) => j.state === "running") ?? bundle.jobs[0];
+  const isDuplicateScan = bundle.jobs.some((job) => job.pipelineId === "folder-duplicate-scan");
   const completedCount = bundle.jobs.filter(
     (j) => j.state === "succeeded" || j.state === "failed" || j.state === "skipped",
   ).length;
@@ -117,6 +119,9 @@ function BundleCard({ bundle, variant, onDismissRecent }: BundleCardProps): Reac
         title={`Cancel ${bundle.displayName}`}
         ariaLabel={`Cancel ${bundle.displayName}`}
         onClick={() => {
+          if (isDuplicateScan) {
+            markDuplicateScanJobCancelRequested(activeJob?.jobId);
+          }
           void window.desktopApi.pipelines.cancelBundle(bundle.bundleId);
         }}
       />

@@ -19,6 +19,7 @@ import {
   type PhotoPendingFolderIconTint,
 } from "../../shared/ipc";
 import { FolderAnalysisMenuSection } from "./FolderAnalysisMenuSection";
+import { SidebarTreeFolderActionRow } from "./SidebarTreeFolderActionRow";
 import { UI_TEXT } from "../lib/ui-text";
 import { cn } from "../lib/cn";
 import { photoPendingTintToSquareClass } from "../lib/photo-pending-folder-tint";
@@ -77,6 +78,7 @@ interface SidebarTreeProps {
   onOpenFolderAiSummary: (folderPath: string) => void;
   onAnalyzeFolderPathMetadata?: (folderPath: string, recursive: boolean) => void;
   onCancelPathAnalysis?: () => void;
+  onCheckDuplicateFiles?: (folderPath: string, recursive: boolean) => void;
 }
 
 export function SidebarTree({
@@ -101,6 +103,7 @@ export function SidebarTree({
   onOpenFolderAiSummary,
   onAnalyzeFolderPathMetadata,
   onCancelPathAnalysis,
+  onCheckDuplicateFiles,
 }: SidebarTreeProps): ReactElement {
   const treeRef = useRef<HTMLDivElement | null>(null);
   const metadataStatus = useDesktopStore((s) => s.metadataStatus);
@@ -148,6 +151,7 @@ export function SidebarTree({
           onOpenFolderAiSummary={onOpenFolderAiSummary}
           onAnalyzeFolderPathMetadata={onAnalyzeFolderPathMetadata}
           onCancelPathAnalysis={onCancelPathAnalysis}
+          onCheckDuplicateFiles={onCheckDuplicateFiles}
         />
       ))}
     </div>
@@ -288,6 +292,7 @@ interface TreeNodeProps {
   onOpenFolderAiSummary: (folderPath: string) => void;
   onAnalyzeFolderPathMetadata?: (folderPath: string, recursive: boolean) => void;
   onCancelPathAnalysis?: () => void;
+  onCheckDuplicateFiles?: (folderPath: string, recursive: boolean) => void;
 }
 
 function TreeNode({
@@ -316,6 +321,7 @@ function TreeNode({
   onOpenFolderAiSummary,
   onAnalyzeFolderPathMetadata,
   onCancelPathAnalysis,
+  onCheckDuplicateFiles,
 }: TreeNodeProps): ReactElement {
   const photoPendingFolderIconTint = useDesktopStore(
     (s) =>
@@ -324,13 +330,18 @@ function TreeNode({
   );
   const [scanMenuOpen, setScanMenuOpen] = useState(false);
   const [scanIncludeSubfolders, setScanIncludeSubfolders] = useState(true);
+  const [duplicateScanMenuOpen, setDuplicateScanMenuOpen] = useState(false);
+  const [duplicateIncludeSubfolders, setDuplicateIncludeSubfolders] = useState(true);
   const menuOpen = useIsMenuOpen(folderPath);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const globalAnchor = useMenuAnchor();
   const [menuPosition, setMenuPosition] = useState<{ left: number; top: number } | null>(null);
 
   useEffect(() => {
-    if (!menuOpen) setScanMenuOpen(false);
+    if (!menuOpen) {
+      setScanMenuOpen(false);
+      setDuplicateScanMenuOpen(false);
+    }
   }, [menuOpen]);
 
   const closeMenu = useCallback(() => setOpenMenu(null, null), []);
@@ -511,60 +522,48 @@ function TreeNode({
                       right: "auto",
                     }}
                   >
-                    <div className="box-border flex min-h-[34px] w-full items-center justify-between gap-2 py-2 pl-2.5 pr-0 text-left text-sm leading-snug">
-                      <button
-                        type="button"
-                        className="inline-flex flex-1 cursor-pointer items-center gap-2 border-0 bg-transparent p-0 px-0.5 text-left font-inherit text-inherit shadow-none"
-                        onClick={() => setScanMenuOpen((v) => !v)}
-                      >
-                        <ChevronRight
-                          size={14}
-                          className={cn(
-                            "shrink-0 transition-transform duration-150 ease-in-out",
-                            scanMenuOpen && "rotate-90",
-                          )}
-                          aria-hidden="true"
-                        />
-                        {UI_TEXT.scanForFileChanges}
-                      </button>
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1 rounded-md border border-border bg-transparent px-1.5 py-1 text-muted-foreground shadow-none transition-colors duration-150 hover:border-indigo-500 hover:bg-[#1e2a40] disabled:cursor-not-allowed disabled:opacity-40"
-                        disabled={!folderPath}
-                        title={isMetadataScanRunning ? UI_TEXT.cancelScan : "Start metadata scan"}
-                        onClick={() => {
-                          if (isMetadataScanRunning) {
-                            onCancelMetadataScan();
-                          } else {
-                            onScanForFileChanges(folderPath, scanIncludeSubfolders);
-                            closeMenu();
-                          }
-                        }}
-                      >
-                        {isMetadataScanRunning ? (
+                    <SidebarTreeFolderActionRow
+                      accordionOpen={scanMenuOpen}
+                      onToggleAccordion={() => setScanMenuOpen((v) => !v)}
+                      label={UI_TEXT.scanForFileChanges}
+                      runDisabled={!folderPath}
+                      runTitle={isMetadataScanRunning ? UI_TEXT.cancelScan : "Start metadata scan"}
+                      onRun={() => {
+                        if (isMetadataScanRunning) {
+                          onCancelMetadataScan();
+                        } else {
+                          onScanForFileChanges(folderPath, scanIncludeSubfolders);
+                          closeMenu();
+                        }
+                      }}
+                      runControl={
+                        isMetadataScanRunning ? (
                           <>
                             <Loader size={14} className="animate-spin" aria-hidden="true" />
                             <Pause size={14} aria-hidden="true" />
                           </>
                         ) : (
                           <Play size={14} aria-hidden="true" />
-                        )}
-                      </button>
-                    </div>
-                    {scanMenuOpen ? (
-                      <div className="ml-3 grid gap-1.5 border-l border-border pl-3">
-                        <label className="flex min-h-8 items-center justify-between gap-2 text-[13px] leading-snug text-muted-foreground">
-                          <span>Include sub-folders</span>
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 min-w-0 cursor-pointer accent-indigo-500"
-                            checked={scanIncludeSubfolders}
-                            disabled={isMetadataScanRunning}
-                            onChange={(event) => setScanIncludeSubfolders(event.target.checked)}
-                          />
-                        </label>
-                      </div>
-                    ) : null}
+                        )
+                      }
+                      accordionContent={
+                        scanMenuOpen ? (
+                          <div className="ml-3 grid gap-1.5 border-l border-border pl-3">
+                            <label className="flex min-h-8 items-center justify-between gap-2 text-[13px] leading-snug text-muted-foreground">
+                              <span>Include sub-folders</span>
+                              <input
+                                type="checkbox"
+                                data-testid="sidebar-metadata-scan-include-subfolders"
+                                className="h-4 w-4 min-w-0 cursor-pointer accent-indigo-500"
+                                checked={scanIncludeSubfolders}
+                                disabled={isMetadataScanRunning}
+                                onChange={(event) => setScanIncludeSubfolders(event.target.checked)}
+                              />
+                            </label>
+                          </div>
+                        ) : null
+                      }
+                    />
                     <div className="box-border flex min-h-[34px] w-full items-center px-2.5 py-2 text-left text-sm leading-snug">
                       <button
                         type="button"
@@ -578,6 +577,35 @@ function TreeNode({
                         <span>{UI_TEXT.folderAiAnalysisSummary}</span>
                       </button>
                     </div>
+                    {onCheckDuplicateFiles ? (
+                      <SidebarTreeFolderActionRow
+                        accordionOpen={duplicateScanMenuOpen}
+                        onToggleAccordion={() => setDuplicateScanMenuOpen((open) => !open)}
+                        label={UI_TEXT.checkDuplicateFiles}
+                        runDisabled={!folderPath}
+                        runTitle="Run duplicate check"
+                        onRun={() => {
+                          onCheckDuplicateFiles(folderPath, duplicateIncludeSubfolders);
+                          closeMenu();
+                        }}
+                        runControl={<Play size={14} aria-hidden="true" />}
+                        accordionContent={
+                          duplicateScanMenuOpen ? (
+                            <div className="ml-3 grid gap-1.5 border-l border-border pl-3">
+                              <label className="flex min-h-8 items-center justify-between gap-2 text-[13px] leading-snug text-muted-foreground">
+                                <span>Include sub-folders</span>
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 min-w-0 cursor-pointer accent-indigo-500"
+                                  checked={duplicateIncludeSubfolders}
+                                  onChange={(event) => setDuplicateIncludeSubfolders(event.target.checked)}
+                                />
+                              </label>
+                            </div>
+                          ) : null
+                        }
+                      />
+                    ) : null}
                     <FolderAnalysisMenuSection
                       targetFolderPath={folderPath}
                       onAnalyzePhotos={(path, recursive, overrideExisting) => {
@@ -661,6 +689,7 @@ function TreeNode({
               onOpenFolderAiSummary={onOpenFolderAiSummary}
               onAnalyzeFolderPathMetadata={onAnalyzeFolderPathMetadata}
               onCancelPathAnalysis={onCancelPathAnalysis}
+              onCheckDuplicateFiles={onCheckDuplicateFiles}
             />
           ))}
         </div>

@@ -1,6 +1,6 @@
 import { useEffect, type Dispatch, type SetStateAction } from "react";
 import type { DesktopStore } from "../stores/desktop-store";
-import type { SidebarSectionId } from "../types/app-types";
+import type { ExpandedSidebarSectionId } from "../types/app-types";
 
 export function useAppStoreSideEffects(opts: {
   store: DesktopStore;
@@ -10,7 +10,7 @@ export function useAppStoreSideEffects(opts: {
   selectedModelSupportsThinking: boolean;
   aiThinkingEnabled: boolean;
   sidebarCollapsed: boolean;
-  setExpandedSidebarSection: Dispatch<SetStateAction<SidebarSectionId | null>>;
+  setExpandedSidebarSection: Dispatch<SetStateAction<ExpandedSidebarSectionId | null>>;
 }): void {
   const {
     store,

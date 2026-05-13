@@ -79,6 +79,9 @@ interface DesktopMediaWorkspaceProps {
   semanticPanelOpen: boolean;
   pipeline: DesktopPipelineHandlers;
   handleOpenFolderAiSummary: (folderPath: string) => void;
+  /** When set, Folder AI summary loads for this path without changing the library's selected folder in the tree. */
+  folderAiSummaryPathOverride: string | null;
+  onFolderAiSummaryClosed: () => void;
   imageEditSuggestionItems: ImageEditSuggestionsItem[];
   mediaItemsLength: number;
   isFolderLoading: boolean;
@@ -107,6 +110,8 @@ export function DesktopMediaWorkspace({
   semanticPanelOpen,
   pipeline,
   handleOpenFolderAiSummary,
+  folderAiSummaryPathOverride,
+  onFolderAiSummaryClosed,
   imageEditSuggestionItems,
   mediaItemsLength,
   isFolderLoading,
@@ -293,6 +298,9 @@ export function DesktopMediaWorkspace({
     selectedFolderChildrenCount > 0 &&
     !showSummaryOnEmptyFolderSelection;
 
+  const folderSummaryPath =
+    mainPaneViewMode === "folderAiSummary" ? (folderAiSummaryPathOverride ?? selectedFolder) : null;
+
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       {mainPaneViewMode === "media" && semanticPanelOpen ? (
@@ -348,10 +356,10 @@ export function DesktopMediaWorkspace({
               onBackToPhotos={onCloseSpecialMainPaneView}
             />
           )
-        ) : mainPaneViewMode === "folderAiSummary" && selectedFolder ? (
+        ) : mainPaneViewMode === "folderAiSummary" && folderSummaryPath ? (
           <DesktopFolderAiSummaryView
-            folderPath={selectedFolder}
-            onBackToPhotos={() => setMainPaneViewMode("media")}
+            folderPath={folderSummaryPath}
+            onBackToPhotos={onFolderAiSummaryClosed}
             onRunSemanticPipeline={(folderPath, recursive, overrideExisting) =>
               pipeline.handleIndexSemantic(folderPath, recursive, overrideExisting)
             }

@@ -216,6 +216,12 @@ export const IPC_CHANNELS = {
   checkForUpdates: "app:check-for-updates",
   quitAndInstallUpdate: "app:quit-and-install-update",
   getAppVersion: "app:get-version",
+  /** Result payload for a completed `folder-duplicate-scan` job (read once). */
+  getFolderDuplicateScanResult: "media:get-folder-duplicate-scan-result",
+  /** Direct children of each parent folder path (catalog `dirname(source_path)` match). */
+  countMediaItemsByParentFolders: "media:count-media-items-by-parent-folders",
+  /** Catalog rows under folderPath matching duplicate-scan scope rules. */
+  countMediaItemsInFolderScope: "media:count-media-items-in-folder-scope",
 } as const;
 
 /** Push payload from main → renderer for optional update UI (toast, restart prompt). */
@@ -291,6 +297,85 @@ export interface DesktopRuntimeFlags {
   /** When true, show E2E-only “Run pipelines” controls (`EMK_E2E_RUN_PIPELINES_UI=1`). */
   showRunPipelinesTestUi: boolean;
 }
+
+/** One duplicate occurrence elsewhere in the library (same content hash). */
+export interface FolderDuplicateScanDuplicateEntry {
+  mediaItemId: string;
+  sourcePath: string;
+  byteSize: number | null;
+  fileMtimeMs: number | null;
+  photoTakenAt: string | null;
+  photoTakenPrecision: string | null;
+}
+
+/** One catalog row under the selected folder that has at least one duplicate. */
+export interface FolderDuplicateScanRow {
+  scopedPath: string;
+  mediaItemId: string;
+  byteSize: number | null;
+  fileMtimeMs: number | null;
+  photoTakenAt: string | null;
+  photoTakenPrecision: string | null;
+  mediaKind: "image" | "video";
+  duplicates: FolderDuplicateScanDuplicateEntry[];
+  /**
+   * How duplicates were matched. Omitted or `"content-hash"` = content hash (DB or on-disk).
+   * `"weak-metadata"` = same file name (basename), byte size, and file modified time (no content hash).
+   */
+  duplicateMatchBasis?: "content-hash" | "weak-metadata";
+}
+
+/** Completed duplicate-scan payload (stored in main until consumed via IPC). */
+export interface FolderDuplicateScanResultPayload {
+  folderPath: string;
+  recursive: boolean;
+  rows: FolderDuplicateScanRow[];
+  /** Scoped files that could not be assigned a content hash (large file, missing, or hash failure). */
+  skippedMissingContentHashCount: number;
+  skippedLargeFileCount: number;
+  skippedMissingOnDiskCount: number;
+}
+
+export type GetFolderDuplicateScanResultResponse =
+  | { ok: true; result: FolderDuplicateScanResultPayload }
+  | { ok: false; error: string };
+
+/** One file chosen in the duplicate-files UI for deletion. */
+export interface DuplicateMarkedFilesDeleteTarget {
+  mediaItemId: string;
+  sourcePath: string;
+}
+
+/** Params for the `duplicate-marked-files-delete` pipeline. */
+export interface DuplicateMarkedFilesDeleteParams {
+  targets: DuplicateMarkedFilesDeleteTarget[];
+  useTrash: boolean;
+}
+
+/** Result from `duplicate-marked-files-delete` (also sent on pipeline `job-finished.output`). */
+export interface DuplicateMarkedFilesDeleteJobResult {
+  deletedMediaItemIds: string[];
+  failed: Array<{ mediaItemId: string; sourcePath: string; error: string }>;
+}
+
+export interface CountMediaItemsByParentFoldersRequest {
+  folderPaths: string[];
+  libraryId?: string;
+}
+
+export type CountMediaItemsByParentFoldersResponse =
+  | { ok: true; counts: Record<string, number> }
+  | { ok: false; error: string };
+
+export interface CountMediaItemsInFolderScopeRequest {
+  folderPath: string;
+  recursive: boolean;
+  libraryId?: string;
+}
+
+export type CountMediaItemsInFolderScopeResponse =
+  | { ok: true; count: number }
+  | { ok: false; error: string };
 
 export interface PathExtractionSettings {
   extractDates: boolean;
@@ -2443,6 +2528,16 @@ export interface DesktopApi {
    * standalone pipelines through a single FIFO scheduler.
    */
   pipelines: PipelineDesktopApi;
+  /** Reads cached result from the last successful `folder-duplicate-scan` job for `jobId`. */
+  getFolderDuplicateScanResult: (jobId: string) => Promise<GetFolderDuplicateScanResultResponse>;
+  /** Counts non-deleted catalog rows whose parent directory equals each requested path (exact match after normalization). */
+  countMediaItemsByParentFolders: (
+    request: CountMediaItemsByParentFoldersRequest,
+  ) => Promise<CountMediaItemsByParentFoldersResponse>;
+  /** Counts catalog rows under folderPath using the same scope as folder duplicate scan. */
+  countMediaItemsInFolderScope: (
+    request: CountMediaItemsInFolderScopeRequest,
+  ) => Promise<CountMediaItemsInFolderScopeResponse>;
   /** Manual update check; dev builds open the latest releases page in the browser. */
   checkForUpdates: () => Promise<CheckForUpdatesResult>;
   /** Install a downloaded update and restart (no-op if not packaged / no pending update). */

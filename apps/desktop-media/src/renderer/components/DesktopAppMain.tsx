@@ -2,8 +2,11 @@ import type { Dispatch, ReactElement, RefObject, SetStateAction } from "react";
 import type { ImageEditSuggestionsItem } from "@emk/media-viewer";
 import type { SemanticSearchResult } from "@emk/media-store";
 import type { SmartAlbumRootKind, SmartAlbumYearAreaSubView } from "@emk/shared-contracts";
+import type { DuplicateFilesSession } from "../types/duplicate-files-session";
+import { DesktopDuplicateFilesScanningShell } from "./duplicate-files/desktop-duplicate-files-scanning-shell";
 import type { ThumbnailQuickFilterState } from "@emk/media-metadata-core";
 import { DesktopSimilarImagesWorkspace, type SimilarImagesSession } from "./similar-images/desktop-similar-images-workspace";
+import { DesktopDuplicateFilesWorkspace } from "./duplicate-files/desktop-duplicate-files-workspace";
 import { DesktopMainToolbar } from "./DesktopMainToolbar";
 import { DesktopMediaWorkspace } from "./DesktopMediaWorkspace";
 import { DesktopAlbumsWorkspace } from "./DesktopAlbumsWorkspace";
@@ -25,11 +28,19 @@ import type {
 import type { DescEmbedBackfillState } from "./DesktopProgressDock";
 import type { DesktopStore, DesktopStoreState } from "../stores/desktop-store";
 import type { AlbumWorkspaceMode, MainPaneViewMode, RotationReviewScope } from "../types/app-types";
+import { DesktopInsightLibraryPickHub } from "./insights/desktop-insight-library-pick-hub";
+import { UI_TEXT } from "../lib/ui-text";
 
 interface DesktopAppMainProps {
   store: DesktopStore;
   isPeopleSectionOpen: boolean;
   isAlbumsSectionOpen: boolean;
+  mainPaneViewMode: MainPaneViewMode;
+  isInsightsDuplicateFilesHubOpen: boolean;
+  isInsightsFolderAnalysisHubOpen: boolean;
+  libraryRoots: DesktopStoreState["libraryRoots"];
+  onCheckDuplicateFilesFromInsightsHub: (folderPath: string) => void;
+  onOpenFolderAiSummaryFromInsightsHub: (folderPath: string) => void;
   albumWorkspaceMode: AlbumWorkspaceMode;
   setAlbumWorkspaceMode: Dispatch<SetStateAction<AlbumWorkspaceMode>>;
   smartAlbumRootKind: SmartAlbumRootKind;
@@ -76,7 +87,6 @@ interface DesktopAppMainProps {
   actionsMenuOpen: boolean;
   setActionsMenuOpen: Dispatch<SetStateAction<boolean>>;
   actionsMenuWrapRef: RefObject<HTMLDivElement | null>;
-  mainPaneViewMode: MainPaneViewMode;
   setMainPaneViewMode: Dispatch<SetStateAction<MainPaneViewMode>>;
   rotationReviewScope: RotationReviewScope | null;
   setRotationReviewScope: Dispatch<SetStateAction<RotationReviewScope | null>>;
@@ -85,6 +95,8 @@ interface DesktopAppMainProps {
   onCloseSpecialMainPaneView: () => void;
   pipeline: DesktopPipelineHandlers;
   handleOpenFolderAiSummary: (folderPath: string) => void;
+  folderAiSummaryPathOverride: string | null;
+  onFolderAiSummaryClosed: () => void;
   imageEditSuggestionItems: ImageEditSuggestionsItem[];
   isFolderLoading: boolean;
   folderLoadProgress: { loaded: number; total: number | null };
@@ -108,12 +120,23 @@ interface DesktopAppMainProps {
   onCloseSimilarImages: () => void;
   onSimilarImagesMinSimilarityChange: (minSimilarity: number) => void;
   onFindSimilar: (filePath: string) => void;
+  duplicateFilesSession: DuplicateFilesSession | null;
+  duplicateFilesPage: number;
+  onDuplicateFilesPageChange: Dispatch<SetStateAction<number>>;
+  onCloseDuplicateFiles: () => void;
+  onDuplicateFilesDeletedMediaItems: (mediaItemIds: readonly string[]) => void;
 }
 
 export function DesktopAppMain({
   store,
   isPeopleSectionOpen,
   isAlbumsSectionOpen,
+  mainPaneViewMode,
+  isInsightsDuplicateFilesHubOpen,
+  isInsightsFolderAnalysisHubOpen,
+  libraryRoots,
+  onCheckDuplicateFilesFromInsightsHub,
+  onOpenFolderAiSummaryFromInsightsHub,
   albumWorkspaceMode,
   setAlbumWorkspaceMode,
   smartAlbumRootKind,
@@ -155,7 +178,6 @@ export function DesktopAppMain({
   actionsMenuOpen,
   setActionsMenuOpen,
   actionsMenuWrapRef,
-  mainPaneViewMode,
   setMainPaneViewMode,
   rotationReviewScope,
   setRotationReviewScope,
@@ -164,6 +186,8 @@ export function DesktopAppMain({
   onCloseSpecialMainPaneView,
   pipeline,
   handleOpenFolderAiSummary,
+  folderAiSummaryPathOverride,
+  onFolderAiSummaryClosed,
   imageEditSuggestionItems,
   isFolderLoading,
   folderLoadProgress,
@@ -187,10 +211,34 @@ export function DesktopAppMain({
   onCloseSimilarImages,
   onSimilarImagesMinSimilarityChange,
   onFindSimilar,
+  duplicateFilesSession,
+  duplicateFilesPage,
+  onDuplicateFilesPageChange,
+  onCloseDuplicateFiles,
+  onDuplicateFilesDeletedMediaItems,
 }: DesktopAppMainProps): ReactElement {
   return (
     <main className="main-panel relative flex min-h-0 min-w-0 flex-col overflow-hidden">
-      {similarImagesSession ? (
+      {/* Duplicate-files view takes precedence when both overlap (latest workflow wins). */}
+      {duplicateFilesSession ? (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          {duplicateFilesSession.kind === "scanning" ? (
+            <DesktopDuplicateFilesScanningShell
+              folderPath={duplicateFilesSession.folderPath}
+              recursive={duplicateFilesSession.recursive}
+              onClose={onCloseDuplicateFiles}
+            />
+          ) : (
+            <DesktopDuplicateFilesWorkspace
+              payload={duplicateFilesSession.payload}
+              currentPage={duplicateFilesPage}
+              onPageChange={onDuplicateFilesPageChange}
+              onClose={onCloseDuplicateFiles}
+              onDeletedMediaItems={onDuplicateFilesDeletedMediaItems}
+            />
+          )}
+        </div>
+      ) : similarImagesSession ? (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <DesktopSimilarImagesWorkspace
             store={store}
@@ -201,7 +249,25 @@ export function DesktopAppMain({
             onMinSimilarityChange={onSimilarImagesMinSimilarityChange}
           />
         </div>
-      ) : isAlbumsSectionOpen ? (
+      ) : isInsightsDuplicateFilesHubOpen ? (
+        <div className="min-h-0 flex-1 overflow-auto">
+          <DesktopInsightLibraryPickHub
+            title={UI_TEXT.insightsDuplicateFilesNav}
+            emptyMessage={UI_TEXT.duplicateFilesInsightHubEmpty}
+            libraryRoots={libraryRoots}
+            onPickLibrary={onCheckDuplicateFilesFromInsightsHub}
+          />
+        </div>
+      ) : isInsightsFolderAnalysisHubOpen ? (
+        <div className="min-h-0 flex-1 overflow-auto">
+          <DesktopInsightLibraryPickHub
+            title={UI_TEXT.insightsFolderAnalysisStatusNav}
+            emptyMessage={UI_TEXT.duplicateFilesInsightHubEmpty}
+            libraryRoots={libraryRoots}
+            onPickLibrary={onOpenFolderAiSummaryFromInsightsHub}
+          />
+        </div>
+      ) : isAlbumsSectionOpen && mainPaneViewMode !== "folderAiSummary" ? (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <DesktopAlbumsWorkspace
             mode={albumWorkspaceMode}
@@ -214,11 +280,11 @@ export function DesktopAppMain({
             onFindSimilar={onFindSimilar}
           />
         </div>
-      ) : isPeopleSectionOpen ? (
+      ) : isPeopleSectionOpen && mainPaneViewMode !== "folderAiSummary" ? (
         <div className="min-h-0 flex-1 overflow-auto">
           <DesktopPeopleSection onOpenFacePhoto={openFacePhotoInViewer} />
         </div>
-      ) : isSettingsSectionOpen ? (
+      ) : isSettingsSectionOpen && mainPaneViewMode !== "folderAiSummary" ? (
         <div className="min-h-0 flex-1 overflow-auto">
           <DesktopSettingsSection
             faceDetectionSettings={faceDetectionSettings}
@@ -314,6 +380,8 @@ export function DesktopAppMain({
             semanticPanelOpen={semanticPanelOpen}
             pipeline={pipeline}
             handleOpenFolderAiSummary={handleOpenFolderAiSummary}
+            folderAiSummaryPathOverride={folderAiSummaryPathOverride}
+            onFolderAiSummaryClosed={onFolderAiSummaryClosed}
             imageEditSuggestionItems={imageEditSuggestionItems}
             mediaItemsLength={mediaItemsLength}
             isFolderLoading={isFolderLoading}

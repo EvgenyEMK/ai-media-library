@@ -690,14 +690,18 @@ export class PipelineScheduler {
     job.output = output;
     job.error = error;
     job.finishedAt = Date.now();
-    this.emitLifecycle({
+    const lifecycle: PipelineLifecycleEvent = {
       type: "job-finished",
       bundleId: record.bundle.bundleId,
       jobId: job.jobId,
       pipelineId: job.pipelineId,
       state,
       error,
-    });
+    };
+    if (output != null) {
+      (lifecycle as { output?: unknown }).output = output;
+    }
+    this.emitLifecycle(lifecycle);
     this.finaliseBundleIfNeeded(record.bundle);
     this.emitQueueChanged();
     this.tick();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatPhotoTakenListLabel } from "./photo-date-format";
+import { formatPhotoTakenListDateOnly, formatPhotoTakenListLabel } from "./photo-date-format";
 
 describe("formatPhotoTakenListLabel", () => {
   it("prefers photo taken over file created", () => {
@@ -42,5 +42,14 @@ describe("formatPhotoTakenListLabel", () => {
   it("formats month precision by selected format", () => {
     expect(formatPhotoTakenListLabel("1980-06", null, "month", "YYYY-MM-DD")).toBe("1980-06");
     expect(formatPhotoTakenListLabel("1980-06", null, "month", "DD.MM.YYYY")).toBe("06.1980");
+  });
+});
+
+describe("formatPhotoTakenListDateOnly", () => {
+  it("falls back to calendar date from file mtime when no catalog dates", () => {
+    const ms = Date.UTC(2022, 0, 5, 15, 30, 0);
+    const label = formatPhotoTakenListDateOnly(null, null, null, "YYYY-MM-DD", ms);
+    expect(label).toContain("2022");
+    expect(label).not.toMatch(/\d{1,2}:\d{2}/);
   });
 });

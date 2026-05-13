@@ -47,7 +47,7 @@ async function startManualMetadataScanFromRootMenu(
   await row.hover();
   await row.getByRole("button", { name: "More", exact: true }).click();
   await mainWindow.getByRole("button", { name: "Scan for file changes", exact: true }).click();
-  const includeSubfolders = mainWindow.getByRole("checkbox", { name: /Include sub-folders/i });
+  const includeSubfolders = mainWindow.getByTestId("sidebar-metadata-scan-include-subfolders");
   await expect(includeSubfolders).toBeVisible();
   await includeSubfolders.check();
   await mainWindow.locator('[title="Start metadata scan"]').first().click();

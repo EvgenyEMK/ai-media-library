@@ -1,5 +1,6 @@
 import { type ReactElement, type ReactNode } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
+import { cn } from "../lib/cn";
 
 export function ConfirmActionDialog({
   open,
@@ -9,6 +10,7 @@ export function ConfirmActionDialog({
   isBusy,
   tone = "destructive",
   emphasizeCancel = tone === "destructive",
+  contentTextClassName,
   children,
   onConfirm,
   onCancel,
@@ -21,6 +23,8 @@ export function ConfirmActionDialog({
   tone?: "destructive" | "default";
   /** When true, Cancel looks like the primary/safe choice (keyboard default stays Cancel). */
   emphasizeCancel?: boolean;
+  /** Optional typography for the body region below the title (defaults to small muted text). */
+  contentTextClassName?: string;
   children: ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
@@ -48,10 +52,14 @@ export function ConfirmActionDialog({
           />
           <div className="min-w-0">
             <h3 className="text-lg font-semibold text-foreground">{title}</h3>
-            <div className="mt-2 text-sm leading-6 text-muted-foreground">{children}</div>
+            <div
+              className={cn("mt-2 text-sm leading-6 text-muted-foreground", contentTextClassName)}
+            >
+              {children}
+            </div>
           </div>
         </div>
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="mt-5 flex justify-end gap-4">
           <button
             type="button"
             autoFocus

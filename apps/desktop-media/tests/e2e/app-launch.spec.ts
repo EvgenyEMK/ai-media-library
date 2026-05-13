@@ -15,9 +15,11 @@ test.describe("App launch", () => {
   });
 
   test("displays all sidebar section labels", async ({ mainWindow }) => {
-    await expect(mainWindow.getByText("Folders")).toBeVisible();
-    await expect(mainWindow.getByText("Albums")).toBeVisible();
-    await expect(mainWindow.getByText("People")).toBeVisible();
-    await expect(mainWindow.getByText("Settings")).toBeVisible();
+    const sidebar = mainDesktopSidebar(mainWindow);
+    await expect(sidebar.getByText("Folders")).toBeVisible();
+    await expect(sidebar.getByText("Albums")).toBeVisible();
+    await expect(sidebar.getByText("Insights")).toBeVisible();
+    await expect(sidebar.getByText("People")).toBeVisible();
+    await expect(sidebar.getByText("Settings")).toBeVisible();
   });
 });

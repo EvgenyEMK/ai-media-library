@@ -3,6 +3,8 @@ import {
   IPC_CHANNELS,
   type AppSettings,
   type AppUpdateUiEvent,
+  type CountMediaItemsByParentFoldersRequest,
+  type CountMediaItemsInFolderScopeRequest,
   type DesktopApi,
 } from "../src/shared/ipc";
 import { PIPELINE_IPC_CHANNELS } from "../src/shared/pipeline-ipc";
@@ -495,6 +497,12 @@ const api: DesktopApi = {
     e2ePushQueueSnapshot: (snapshot: PipelineQueueSnapshot) =>
       ipcRenderer.invoke(PIPELINE_IPC_CHANNELS.e2ePushQueueSnapshot, snapshot) as Promise<{ ok: true }>,
   },
+  getFolderDuplicateScanResult: (jobId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.getFolderDuplicateScanResult, jobId),
+  countMediaItemsByParentFolders: (request: CountMediaItemsByParentFoldersRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.countMediaItemsByParentFolders, request),
+  countMediaItemsInFolderScope: (request: CountMediaItemsInFolderScopeRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.countMediaItemsInFolderScope, request),
   checkForUpdates: () => ipcRenderer.invoke(IPC_CHANNELS.checkForUpdates),
   quitAndInstallPendingUpdate: () =>
     ipcRenderer.invoke(IPC_CHANNELS.quitAndInstallUpdate),

@@ -542,6 +542,14 @@ async function maybeComputeStrongHash(
   return computeSha256(absolutePath);
 }
 
+/** Same as catalog strong hash rules — used by folder duplicate scan (files over 128 MiB return null). */
+export async function computeStrongHashWithinSizeLimit(
+  absolutePath: string,
+  fileSize: number,
+): Promise<string | null> {
+  return maybeComputeStrongHash(absolutePath, fileSize);
+}
+
 async function computeSha256(absolutePath: string): Promise<string | null> {
   return new Promise((resolve) => {
     const hash = createHash("sha256");

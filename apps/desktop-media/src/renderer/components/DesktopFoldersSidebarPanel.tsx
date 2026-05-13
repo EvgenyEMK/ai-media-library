@@ -18,6 +18,7 @@ interface DesktopFoldersSidebarPanelProps {
   handleSelectFolder: (folderPath: string) => Promise<void>;
   handleRemoveLibrary: (rootPath: string) => void;
   handleOpenFolderAiSummary: (folderPath: string) => void;
+  handleCheckDuplicateFiles?: (folderPath: string, recursive: boolean) => void;
 }
 
 export function DesktopFoldersSidebarPanel({
@@ -33,6 +34,7 @@ export function DesktopFoldersSidebarPanel({
   handleSelectFolder,
   handleRemoveLibrary,
   handleOpenFolderAiSummary,
+  handleCheckDuplicateFiles,
 }: DesktopFoldersSidebarPanelProps): ReactElement {
   return (
     <div className="space-y-2">
@@ -68,6 +70,13 @@ export function DesktopFoldersSidebarPanel({
           void pipeline.handleAnalyzeFolderPathMetadata(folderPath, recursive)
         }
         onCancelPathAnalysis={() => void pipeline.handleCancelPathAnalysis()}
+        onCheckDuplicateFiles={
+          handleCheckDuplicateFiles
+            ? (folderPath, recursive) => {
+                handleCheckDuplicateFiles(folderPath, recursive);
+              }
+            : undefined
+        }
       />
       <button
         type="button"

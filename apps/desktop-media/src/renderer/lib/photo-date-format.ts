@@ -46,6 +46,27 @@ export function formatPhotoTakenListLabel(
   return "";
 }
 
+/**
+ * Same sources as {@link formatPhotoTakenListLabel}, but never includes a time-of-day component.
+ * Falls back to file mtime as a calendar date, then "—".
+ */
+export function formatPhotoTakenListDateOnly(
+  photoTakenAt: string | null,
+  fileCreatedAt: string | null,
+  photoTakenPrecision: DesktopPhotoTakenPrecision | null | undefined,
+  dateFormat: DateDisplayFormat | undefined,
+  fileMtimeMs: number | null,
+): string {
+  const label = formatPhotoTakenListLabel(photoTakenAt, fileCreatedAt, photoTakenPrecision, dateFormat);
+  if (label) {
+    return label;
+  }
+  if (fileMtimeMs != null) {
+    return new Date(fileMtimeMs).toLocaleDateString();
+  }
+  return "—";
+}
+
 function formatPartialPhotoTaken(
   raw: string,
   precision: DesktopPhotoTakenPrecision | null,

@@ -29,6 +29,8 @@ import { registerRotationReviewHandlers } from "./ipc/rotation-review-handlers";
 import { registerGeocoderHandlers } from "./ipc/geocoder-handlers";
 import { registerAlbumHandlers } from "./ipc/album-handlers";
 import { registerPipelineOrchestrationHandlers } from "./ipc/pipeline-orchestration-handlers";
+import { registerFolderDuplicateScanHandlers } from "./ipc/folder-duplicate-scan-handlers";
+import { registerParentFolderMediaCountHandlers } from "./ipc/parent-folder-media-count-handlers";
 import { registerAllPipelineDefinitions } from "./pipelines/definitions";
 import { setPipelineConcurrencyConfig } from "./pipelines/concurrency-config";
 import { releaseAllPowerSave } from "./ipc/power-save-manager";
@@ -83,6 +85,8 @@ function registerAllIpcHandlers(): void {
   registerRotationReviewHandlers();
   registerGeocoderHandlers();
   registerAlbumHandlers();
+  registerFolderDuplicateScanHandlers();
+  registerParentFolderMediaCountHandlers();
   registerPipelineOrchestrationHandlers();
 
 }
