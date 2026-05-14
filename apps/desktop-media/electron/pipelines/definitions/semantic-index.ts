@@ -17,6 +17,7 @@ import { vectorStore } from "../../ipc/state";
 import { appendSyncOperation } from "../../db/sync-log";
 import { runWrongImageRotationPrecheck } from "../../orientation-preprocess";
 import { readSettings } from "../../storage";
+import { logVerbose } from "../../verbose-electron-logs";
 
 export interface SemanticIndexParams {
   folderPath: string;
@@ -80,7 +81,20 @@ export const semanticIndexDefinition: PipelineDefinition<SemanticIndexParams, Se
       message: `Semantic indexing ${selected.length} images`,
       details: { skipped: skippedExisting },
     });
-    await warmupVisionPipeline();
+    logVerbose(
+      `[semantic-index][pipeline] warming up vision pipeline... (${selected.length} image(s), folder=${params.folderPath})`,
+    );
+    const warmupT0 = Date.now();
+    try {
+      await warmupVisionPipeline();
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      console.error(`[semantic-index][pipeline] vision pipeline warmup failed: ${reason}`);
+      throw err;
+    }
+    logVerbose(
+      `[semantic-index][pipeline] vision pipeline ready (${((Date.now() - warmupT0) / 1000).toFixed(1)}s)`,
+    );
     ctx.report({
       type: "phase-changed",
       phase: "embedding",
@@ -116,6 +130,7 @@ export const semanticIndexDefinition: PipelineDefinition<SemanticIndexParams, Se
           modelVersion: MULTIMODAL_EMBED_MODEL,
         });
         const vector = await embedImageDirect(img.path, ctx.signal);
+        logVerbose(`[semantic-index][pipeline] ${img.name}: direct vision embedding (${vector.length}-dim)`);
         vectorStore.upsertEmbedding({
           mediaItemId,
           embeddingType: "image",
@@ -137,6 +152,7 @@ export const semanticIndexDefinition: PipelineDefinition<SemanticIndexParams, Se
       } catch (error) {
         failed += 1;
         const message = error instanceof Error ? error.message : "Embedding failed";
+        logVerbose(`[semantic-index][pipeline] ${img.name}: FAILED - ${message}`);
         const mediaItemId = ensureMediaItemForPath(img.path);
         if (mediaItemId) {
           vectorStore.markEmbeddingFailed({
@@ -155,6 +171,9 @@ export const semanticIndexDefinition: PipelineDefinition<SemanticIndexParams, Se
         details: { completed, failed, cancelled, skipped: skippedExisting },
       });
     }
+    logVerbose(
+      `[semantic-index][pipeline] summary completed=${completed} failed=${failed} cancelled=${cancelled} total=${selected.length}`,
+    );
     return { total: selected.length, completed, failed, cancelled };
   },
 };

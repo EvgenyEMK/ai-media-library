@@ -174,10 +174,24 @@ if (!rendererStillReady) {
   process.exit(1);
 }
 
-const electron = runPnpm(
-  ["exec", "electron", "dist-electron/main.js"],
-  { VITE_DEV_SERVER_URL: rendererUrl },
+const electronForwardEnvKeys = [
+  "EMK_VERBOSE_ELECTRON_LOGS",
+  "EMK_SEMANTIC_DEBUG_LOGS",
+  "EMK_OLLAMA_BASE_URL",
+  "EMK_OLLAMA_URL",
+  "EMK_ONNX_WASM_MAX_MEMORY_MB",
+];
+const electronExtraEnv = { VITE_DEV_SERVER_URL: rendererUrl };
+for (const key of electronForwardEnvKeys) {
+  if (process.env[key] !== undefined) {
+    electronExtraEnv[key] = process.env[key];
+  }
+}
+console.error(
+  `[desktop-media dev] launching Electron (EMK_VERBOSE_ELECTRON_LOGS=${process.env.EMK_VERBOSE_ELECTRON_LOGS ?? "(unset)"})`,
 );
+
+const electron = runPnpm(["exec", "electron", "dist-electron/main.js"], electronExtraEnv);
 
 electron.on("exit", () => {
   shutdown();

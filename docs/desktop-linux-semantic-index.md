@@ -55,6 +55,10 @@ This enables **`logVerbose`** lines in the **Electron main process** (see [`verb
 
 **Important:** these lines **do not** appear in the renderer **DevTools** console. Watch the **terminal where you started** `pnpm dev` (or the parent `pnpm` process). Indexing uses the **`[semantic-index]`** prefix; interactive search uses **`[semantic-search][main]`**.
 
+The **pipeline queue** job *Build semantic search index* (`semantic-index`) logs with **`[semantic-index][pipeline]`** (see [`pipelines/definitions/semantic-index.ts`](../apps/desktop-media/electron/pipelines/definitions/semantic-index.ts)). The **folder menu / IPC** path uses **`[semantic-index]`** without `[pipeline]` (see [`semantic-search-handlers.ts`](../apps/desktop-media/electron/ipc/semantic-search-handlers.ts)).
+
+On `pnpm dev` startup you should see **`[desktop-media dev] launching Electron (EMK_VERBOSE_ELECTRON_LOGS=…)`** from [`scripts/dev.mjs`](../apps/desktop-media/scripts/dev.mjs) and, when verbose is on, **`[main] EMK_VERBOSE_ELECTRON_LOGS=1`** from [`main.ts`](../apps/desktop-media/electron/main.ts) — if those are missing, the Electron child did not receive the env var.
+
 From a `.deb` install you may need a wrapper script or `env` in the `.desktop` `Exec=` if you start from a menu.
 
 ### D. GLib-GObject lines (`g_object_ref` / `G_IS_OBJECT`)
