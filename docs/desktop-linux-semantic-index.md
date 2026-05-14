@@ -51,9 +51,17 @@ Launch the app with:
 EMK_VERBOSE_ELECTRON_LOGS=1
 ```
 
-This enables existing `[semantic-index]…` / `[semantic-search]…` **`logVerbose`** lines in main (see [`verbose-electron-logs.ts`](../apps/desktop-media/electron/verbose-electron-logs.ts)). From a `.deb` install you may need a wrapper script or `env` in the `.desktop` `Exec=` if you start from a menu.
+This enables **`logVerbose`** lines in the **Electron main process** (see [`verbose-electron-logs.ts`](../apps/desktop-media/electron/verbose-electron-logs.ts)). They are written to **stderr** (same stream as many Chromium messages).
 
-### C. Semantic index debug file (optional)
+**Important:** these lines **do not** appear in the renderer **DevTools** console. Watch the **terminal where you started** `pnpm dev` (or the parent `pnpm` process). Indexing uses the **`[semantic-index]`** prefix; interactive search uses **`[semantic-search][main]`**.
+
+From a `.deb` install you may need a wrapper script or `env` in the `.desktop` `Exec=` if you start from a menu.
+
+### D. GLib-GObject lines (`g_object_ref` / `G_IS_OBJECT`)
+
+On Linux / WSLg, Electron/Chromium often emits **`GLib-GObject`** assertions to **stderr**. They are usually **noise** and not produced by the semantic indexer. Treat **`[semantic-index]`** / **`[semantic-search]`** lines as the app’s own diagnostics.
+
+### E. Semantic index debug file (optional)
 
 Set:
 
@@ -63,7 +71,7 @@ EMK_SEMANTIC_DEBUG_LOGS=1
 
 Then the main process writes **`semantic-index-debug.log`** under **userData** (path returned by IPC **`getSemanticIndexDebugLogTail`** when enabled — see [`semantic-index-debug-log.ts`](../apps/desktop-media/electron/semantic-index-debug-log.ts)).
 
-### D. Clear a bad Hugging Face / ONNX cache
+### F. Clear a bad Hugging Face / ONNX cache
 
 If logs mention parse errors or bad ONNX:
 
@@ -73,7 +81,7 @@ If logs mention parse errors or bad ONNX:
    (and optionally `…/models` under the same `huggingface` folder if a partial model extract exists).
 3. Relaunch and re-run indexing so models download again.
 
-### E. Ollama for **photo analysis** (optional, separate from index)
+### G. Ollama for **photo analysis** (optional, separate from index)
 
 If you want **`qwen3.5:9b`** (or your chosen model) for **analysis** / chat-style features:
 
