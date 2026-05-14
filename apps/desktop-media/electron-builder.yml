@@ -4,8 +4,6 @@
 appId: com.emk.aimedialibrary
 productName: AI Media Library
 copyright: Copyright © EMK contributors
-# Required for deb/FPM metadata (app-builder-lib).
-homepage: https://github.com/EMK-solutions/ai-media-library
 
 # GitHub Releases provider for electron-updater. Each GitHub Release must include update metadata for every shipped OS:
 # - Windows: `latest.yml` + NSIS `.exe` (and `.exe.blockmap` when publishing via electron-builder).

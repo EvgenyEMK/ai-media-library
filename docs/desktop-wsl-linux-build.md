@@ -150,6 +150,16 @@ That means **`apps/desktop-media/package.json` in your current tree does not def
 
 Alternatively remove `~/dev/ai-media-library` and **`git clone` again** from `/mnt/c/...` after committing on Windows.
 
+### Troubleshooting: `Cannot find module '@rollup/rollup-linux-x64-gnu'` (Rollup / Vite)
+
+You ran **`pnpm … dist:linux` or `pnpm build` from WSL** while the repo lives under **`/mnt/c/...`** and `node_modules` was produced by **Windows** `pnpm install`. Optional native Rollup bindings are OS-specific.
+
+**Fix:** Run Linux builds only from a clone under **`~/…`** where **`pnpm install --frozen-lockfile` was executed inside WSL** (see **§4b**). Do not reuse the same `node_modules` tree for Windows and WSL.
+
+### Troubleshooting: `configuration has an unknown property 'homepage'` (electron-builder 26)
+
+Put **`homepage` in `apps/desktop-media/package.json`** (required for `.deb` / FPM). Do **not** set a root-level `homepage` key in `electron-builder.yml` — electron-builder **26.x** rejects it (use `extraMetadata` only if you need to inject metadata without editing `package.json`).
+
 **Faster compile-only smoke** (unpack directory, no AppImage/deb):
 
 ```bash
