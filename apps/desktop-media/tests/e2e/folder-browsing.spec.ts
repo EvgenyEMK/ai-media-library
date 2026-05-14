@@ -20,7 +20,7 @@ test.describe("Folder browsing", () => {
   test("adding a library folder shows it in the sidebar tree", async ({ electronApp, mainWindow }) => {
     await mockFolderDialog(electronApp, tempFolder);
 
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
 
     const sidebar = mainDesktopSidebar(mainWindow);
     await expect(
@@ -30,7 +30,7 @@ test.describe("Folder browsing", () => {
 
   test("clicking a folder in the tree selects it and updates the header", async ({ electronApp, mainWindow }) => {
     await mockFolderDialog(electronApp, tempFolder);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
 
     await clickSidebarLibraryRoot(mainWindow, tempFolder);
 
@@ -40,7 +40,7 @@ test.describe("Folder browsing", () => {
 
   test("selecting a folder clears the empty state", async ({ electronApp, mainWindow }) => {
     await mockFolderDialog(electronApp, tempFolder);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
 
     await clickSidebarLibraryRoot(mainWindow, tempFolder);
 
@@ -51,7 +51,7 @@ test.describe("Folder browsing", () => {
 
   test("real photos folder loads thumbnails into the grid", async ({ electronApp, mainWindow }) => {
     await mockFolderDialog(electronApp, REAL_IMAGE_FOLDER);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
 
     await clickSidebarLibraryRoot(mainWindow, REAL_IMAGE_FOLDER);
 
@@ -64,7 +64,7 @@ test.describe("Folder browsing", () => {
 
   test("clicking a thumbnail opens the photo viewer", async ({ electronApp, mainWindow }) => {
     await mockFolderDialog(electronApp, REAL_IMAGE_FOLDER);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
 
     await clickSidebarLibraryRoot(mainWindow, REAL_IMAGE_FOLDER);
 
@@ -79,7 +79,7 @@ test.describe("Folder browsing", () => {
 
   test("removing a library from row menu hides it without deleting files", async ({ electronApp, mainWindow }) => {
     await mockFolderDialog(electronApp, tempFolder);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
 
     const sidebar = mainDesktopSidebar(mainWindow);
     const normalizedTemp = path.normalize(tempFolder);

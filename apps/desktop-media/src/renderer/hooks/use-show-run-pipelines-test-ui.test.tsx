@@ -13,6 +13,7 @@ describe("useShowRunPipelinesTestUi", () => {
   it("resolves to true when IPC returns showRunPipelinesTestUi", async () => {
     const getDesktopRuntimeFlags = vi.fn().mockResolvedValue({
       showRunPipelinesTestUi: true,
+      skipAutoProductIntro: false,
     });
     Object.defineProperty(window, "desktopApi", {
       configurable: true,
@@ -30,6 +31,7 @@ describe("useShowRunPipelinesTestUi", () => {
   it("resolves to false when IPC returns showRunPipelinesTestUi false", async () => {
     const getDesktopRuntimeFlags = vi.fn().mockResolvedValue({
       showRunPipelinesTestUi: false,
+      skipAutoProductIntro: false,
     });
     Object.defineProperty(window, "desktopApi", {
       configurable: true,

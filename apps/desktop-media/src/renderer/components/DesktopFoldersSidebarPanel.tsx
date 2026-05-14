@@ -78,14 +78,16 @@ export function DesktopFoldersSidebarPanel({
             : undefined
         }
       />
-      <button
-        type="button"
-        onClick={() => void handleAddLibrary()}
-        className="inline-flex h-9 w-full items-center justify-start rounded-md border border-border px-2 text-sm"
-      >
-        <Plus size={16} aria-hidden="true" className="mr-2" />
-        {UI_TEXT.addLibrary}
-      </button>
+      {libraryRoots.length === 0 ? (
+        <button
+          type="button"
+          onClick={() => void handleAddLibrary()}
+          className="inline-flex h-9 w-full items-center justify-start rounded-md border-2 border-amber-600 bg-amber-500/5 px-2 text-sm text-foreground hover:bg-amber-500/10 dark:border-amber-500"
+        >
+          <Plus size={16} aria-hidden="true" className="mr-2" />
+          {UI_TEXT.addLibrary}
+        </button>
+      ) : null}
     </div>
   );
 }

@@ -18,7 +18,7 @@ test.afterAll(() => {
 test.describe("Image AI analysis readiness", () => {
   test("does not mark early images failed while Ollama model warms up", async ({ electronApp, mainWindow }) => {
     await mockFolderDialog(electronApp, testFolder);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
 
     await clickSidebarLibraryRoot(mainWindow, testFolder);
 

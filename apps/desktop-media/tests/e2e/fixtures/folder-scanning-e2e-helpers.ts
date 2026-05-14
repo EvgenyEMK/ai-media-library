@@ -47,8 +47,12 @@ async function waitForStableSettingsFlag(mainWindow: Page, options: {
       return saved.photoAnalysis.downscaleBeforeLlm === opts.enabled;
     };
 
-    await apply();
-    const deadline = Date.now() + 20_000;
+    /** Photo downscale is toggled in Settings (Zustand + subscriber save). Forcing `saveSettings` here races with that save and can reorder `settingsSaved` so the store briefly reverts to the old flag — only poll disk. */
+    const forceApply = opts.kind !== "photoDownscale";
+    if (forceApply) {
+      await apply();
+    }
+    const deadline = Date.now() + (opts.kind === "photoDownscale" ? 30_000 : 20_000);
     let stableChecks = 0;
     while (Date.now() < deadline) {
       if (await isReady()) {
@@ -58,7 +62,9 @@ async function waitForStableSettingsFlag(mainWindow: Page, options: {
         }
       } else {
         stableChecks = 0;
-        await apply();
+        if (forceApply) {
+          await apply();
+        }
       }
       await new Promise<void>((resolve) => {
         window.setTimeout(resolve, 100);

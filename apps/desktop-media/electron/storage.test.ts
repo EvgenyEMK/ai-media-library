@@ -27,6 +27,7 @@ describe("readSettings (no auto-writeback)", () => {
     expect(settings.folderScanning.writeEmbeddedMetadataOnUserEdit).toBe(false);
     expect(typeof settings.clientId).toBe("string");
     expect(settings.clientId.length).toBeGreaterThan(0);
+    expect(settings.guidedExperience.helpTopics).toEqual({});
   });
 
   it("preserves user-set values across reads (does not race-overwrite)", async () => {
@@ -46,6 +47,39 @@ describe("readSettings (no auto-writeback)", () => {
     expect(b.folderScanning.writeEmbeddedMetadataOnUserEdit).toBe(true);
     expect(a.clientId).toBe("test-client-id");
     expect(b.clientId).toBe("test-client-id");
+  });
+
+  it("sanitizes guidedExperience helpTopics (drops unknown ids) and round-trips valid topics", async () => {
+    const settingsPath = path.join(userDataPath, "media-settings.json");
+    await fs.mkdir(userDataPath, { recursive: true });
+    await fs.writeFile(
+      settingsPath,
+      JSON.stringify({
+        ...DEFAULT_APP_SETTINGS,
+        clientId: "guided-client",
+        guidedExperience: {
+          helpTopics: {
+            "documents:invoices-receipts": {
+              helpWizardDismissed: true,
+              dismissedAt: "2026-01-01T00:00:00.000Z",
+            },
+            "bogus:topic": { helpWizardDismissed: true },
+          },
+        },
+      }),
+      "utf-8",
+    );
+
+    const read = await readSettings(userDataPath);
+    expect(Object.keys(read.guidedExperience.helpTopics)).toEqual(["documents:invoices-receipts"]);
+    expect(read.guidedExperience.helpTopics["documents:invoices-receipts"]?.helpWizardDismissed).toBe(true);
+    expect(read.guidedExperience.helpTopics["documents:invoices-receipts"]?.dismissedAt).toBe(
+      "2026-01-01T00:00:00.000Z",
+    );
+
+    await writeSettings(userDataPath, read);
+    const read2 = await readSettings(userDataPath);
+    expect(read2.guidedExperience.helpTopics["documents:invoices-receipts"]?.helpWizardDismissed).toBe(true);
   });
 });
 

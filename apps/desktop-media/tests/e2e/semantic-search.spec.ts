@@ -85,7 +85,7 @@ test.describe("Semantic image search", () => {
     await waitForSemanticSearchAiReady(mainWindow);
 
     await mockFolderDialog(electronApp, e2ePhotosDir);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
     await clickSidebarLibraryRoot(mainWindow, e2ePhotosDir);
     await mainWindow.waitForTimeout(2_000);
 
@@ -166,7 +166,7 @@ test.describe("Semantic image search", () => {
 
     // Set up library folder
     await mockFolderDialog(electronApp, e2ePhotosDir);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
     await clickSidebarLibraryRoot(mainWindow, e2ePhotosDir);
     await mainWindow.waitForTimeout(2_000);
 
@@ -254,7 +254,7 @@ test.describe("Semantic image search", () => {
 
     // Set up library folder and index with override-existing
     await mockFolderDialog(electronApp, e2ePhotosDir);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
     await clickSidebarLibraryRoot(mainWindow, e2ePhotosDir);
     await mainWindow.waitForTimeout(2_000);
 
@@ -301,7 +301,7 @@ test.describe("Semantic image search", () => {
     await waitForSemanticSearchAiReady(mainWindow);
 
     await mockFolderDialog(electronApp, e2ePhotosDir);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
     await clickSidebarLibraryRoot(mainWindow, e2ePhotosDir);
     await mainWindow.waitForTimeout(2_000);
 
@@ -355,7 +355,7 @@ test.describe("Semantic image search", () => {
     await waitForSemanticSearchAiReady(mainWindow);
 
     await mockFolderDialog(electronApp, e2ePhotosDir);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
     await clickSidebarLibraryRoot(mainWindow, e2ePhotosDir);
     await mainWindow.waitForTimeout(2_000);
 

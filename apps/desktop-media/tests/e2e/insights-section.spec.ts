@@ -45,7 +45,7 @@ test.describe("Insights section", () => {
     mainWindow,
   }) => {
     await mockFolderDialog(electronApp, singleLibraryFolder);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
     await expect(
       mainDesktopSidebar(mainWindow).getByRole("button", {
         name: path.normalize(singleLibraryFolder),
@@ -76,13 +76,13 @@ test.describe("Insights section", () => {
     const normB = path.normalize(secondLibraryFolder);
 
     await mockFolderDialog(electronApp, singleLibraryFolder);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
     await expect(mainDesktopSidebar(mainWindow).getByRole("button", { name: normA, exact: true })).toBeVisible({
       timeout: 10_000,
     });
 
     await mockFolderDialog(electronApp, secondLibraryFolder);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
     await expect(mainDesktopSidebar(mainWindow).getByRole("button", { name: normB, exact: true })).toBeVisible({
       timeout: 10_000,
     });
@@ -115,7 +115,7 @@ test.describe("Insights section", () => {
     mainWindow,
   }) => {
     await mockFolderDialog(electronApp, singleLibraryFolder);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
     await expect(
       mainDesktopSidebar(mainWindow).getByRole("button", {
         name: path.normalize(singleLibraryFolder),

@@ -45,7 +45,7 @@ test.describe("AI image analysis LLM downscale settings", () => {
     });
 
     await mockFolderDialog(electronApp, fixture.root);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
 
     const normalizedRoot = path.normalize(fixture.root);
     const sidebar = mainDesktopSidebar(mainWindow);
@@ -120,11 +120,15 @@ test.describe("AI image analysis LLM downscale settings", () => {
     const photoAnalysisSection = mainWindow
       .locator("details")
       .filter({ has: mainWindow.getByText("AI image analysis", { exact: true }) });
-    await photoAnalysisSection.locator("summary").first().click();
+    await photoAnalysisSection.waitFor({ state: "visible", timeout: 15_000 });
+    const photoDetailsOpen = await photoAnalysisSection.evaluate((el) => (el as HTMLDetailsElement).open);
+    if (!photoDetailsOpen) {
+      await photoAnalysisSection.locator("summary").first().click();
+    }
     const downscaleCheckbox = mainWindow.getByRole("checkbox", {
       name: /Downscale image dimensions before passing to LLM/i,
     });
-    await expect(downscaleCheckbox).toBeVisible();
+    await expect(downscaleCheckbox).toBeVisible({ timeout: 30_000 });
     await downscaleCheckbox.uncheck();
     await expect(downscaleCheckbox).not.toBeChecked();
     await waitForPhotoDownscaleSetting(mainWindow, false);

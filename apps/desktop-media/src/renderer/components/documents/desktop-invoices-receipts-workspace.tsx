@@ -19,7 +19,10 @@ import { ToolbarIconButton } from "../ToolbarIconButton";
 import { PeoplePaginationBar } from "../people-pagination-bar";
 import { ALBUM_ITEMS_PAGE_SIZE } from "../DesktopAlbumDetailPanel";
 import { countActiveInvoiceFilters } from "../../lib/invoice-receipt-filter-count";
-import { useDesktopStore } from "../../stores/desktop-store";
+import { markGuidedHelpTopicDismissed } from "../../actions/guided-experience-actions";
+import { useDesktopStore, useDesktopStoreApi } from "../../stores/desktop-store";
+import { useInvoicesReceiptsAutoHelp } from "../../hooks/use-invoices-receipts-auto-help";
+import { GUIDED_HELP_TOPIC_DOCUMENTS_INVOICES_RECEIPTS } from "../../../shared/guided-experience-types";
 import { InvoiceReceiptDocumentsTable } from "./invoice-receipt-documents-table";
 import { InvoiceReceiptFiltersPanel } from "./invoice-receipt-filters-panel";
 import { InvoicesReceiptsHelpModal } from "./invoices-receipts-help-modal";
@@ -53,6 +56,15 @@ export function DesktopInvoicesReceiptsWorkspace({
   const [appliedFilters, setAppliedFilters] = useState<InvoiceReceiptDocumentsListRequest>({});
 
   const [helpOpen, setHelpOpen] = useState(false);
+
+  const storeApi = useDesktopStoreApi();
+
+  const closeInvoicesHelp = useCallback((): void => {
+    markGuidedHelpTopicDismissed(storeApi, GUIDED_HELP_TOPIC_DOCUMENTS_INVOICES_RECEIPTS);
+    setHelpOpen(false);
+  }, [storeApi]);
+
+  useInvoicesReceiptsAutoHelp(setHelpOpen);
 
   const photoAnalysisModel = useDesktopStore((s) => s.photoAnalysisSettings.model);
   const aiSelectedModel = useDesktopStore((s) => s.aiSelectedModel);
@@ -284,7 +296,7 @@ export function DesktopInvoicesReceiptsWorkspace({
       <InvoicesReceiptsHelpModal
         open={helpOpen}
         effectivePhotoAnalysisModel={effectivePhotoAnalysisModel}
-        onClose={() => setHelpOpen(false)}
+        onClose={closeInvoicesHelp}
       />
     </div>
   );

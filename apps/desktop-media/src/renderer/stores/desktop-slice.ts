@@ -23,6 +23,13 @@ import {
   type WrongImageRotationDetectionSettings,
 } from "../../shared/ipc";
 import {
+  CURRENT_PRODUCT_INTRO_SCHEMA_VERSION,
+  DEFAULT_GUIDED_EXPERIENCE_SETTINGS,
+  type GuidedExperienceSettings,
+  type GuidedHelpTopicId,
+  type ProductWelcomeDeckVariant,
+} from "../../shared/guided-experience-types";
+import {
   DEFAULT_PIPELINE_CONCURRENCY,
   type PipelineConcurrencyConfig,
 } from "../../shared/pipeline-types";
@@ -69,6 +76,13 @@ export interface DesktopSlice {
   aiInferencePreferredGpuId: string | null;
   /** Per-group concurrency limits for the new pipeline scheduler. */
   pipelineConcurrencySettings: PipelineConcurrencyConfig;
+  /** Mirrors `AppSettings.guidedExperience` (help wizard dismissal, future onboarding). */
+  guidedExperienceSettings: GuidedExperienceSettings;
+  /**
+   * Set true after the first `applyPersistedAppSettingsToStore` from disk/main.
+   * Used to avoid auto-opening guided help before settings hydration.
+   */
+  persistedSettingsHydrated: boolean;
   aiInferenceGpuOptions: AiInferenceGpuOption[];
   faceModelDownload: {
     visible: boolean;
@@ -118,6 +132,8 @@ export interface DesktopSlice {
   similarUntaggedCountsByTagId: Record<string, number>;
   similarUntaggedCountsError: string | null;
   similarUntaggedCountsPanelVisible: boolean;
+  /** Ephemeral UI: show welcome slides from Settings without marking `productIntro` complete. */
+  productWelcomePreviewOpen: boolean;
 
   setLibraryRoots: (roots: string[]) => void;
   setHideAdvancedSettings: (hide: boolean) => void;
@@ -183,6 +199,9 @@ export interface DesktopSlice {
   setAiInferencePreferredGpuId: (gpuId: string | null) => void;
   setAiInferenceGpuOptions: (options: AiInferenceGpuOption[]) => void;
 
+  markGuidedHelpTopicWizardDismissed: (topicId: GuidedHelpTopicId) => void;
+  markProductIntroWizardDismissed: (deckVariant: ProductWelcomeDeckVariant) => void;
+
   setGeocoderInitStatus: (
     status: GeocoderInitStatus,
     error?: string,
@@ -195,6 +214,8 @@ export interface DesktopSlice {
 
   resetSimilarUntaggedCountsJob: () => void;
   setSimilarUntaggedCountsPanelVisible: (visible: boolean) => void;
+
+  setProductWelcomePreviewOpen: (open: boolean) => void;
 }
 
 export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", never]]> = (set) => ({
@@ -222,6 +243,8 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
     groupLimits: { ...DEFAULT_PIPELINE_CONCURRENCY.groupLimits },
     perPipelineGroupOverride: DEFAULT_PIPELINE_CONCURRENCY.perPipelineGroupOverride,
   },
+  guidedExperienceSettings: { ...DEFAULT_GUIDED_EXPERIENCE_SETTINGS, helpTopics: {} },
+  persistedSettingsHydrated: false,
   aiInferenceGpuOptions: [],
   faceModelDownload: {
     visible: false,
@@ -268,6 +291,7 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   similarUntaggedCountsByTagId: {},
   similarUntaggedCountsError: null,
   similarUntaggedCountsPanelVisible: false,
+  productWelcomePreviewOpen: false,
 
   setLibraryRoots: (roots) =>
     set((state) => {
@@ -497,6 +521,32 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
       state.aiInferenceGpuOptions = options;
     }),
 
+  markGuidedHelpTopicWizardDismissed: (topicId) =>
+    set((state) => {
+      const cur = state.guidedExperienceSettings.helpTopics[topicId];
+      if (cur?.helpWizardDismissed === true) {
+        return;
+      }
+      state.guidedExperienceSettings.helpTopics[topicId] = {
+        helpWizardDismissed: true,
+        dismissedAt: new Date().toISOString(),
+      };
+    }),
+
+  markProductIntroWizardDismissed: (deckVariant) =>
+    set((state) => {
+      if (state.guidedExperienceSettings.productIntro?.completed === true) {
+        return;
+      }
+      state.guidedExperienceSettings.productIntro = {
+        ...state.guidedExperienceSettings.productIntro,
+        completed: true,
+        version: CURRENT_PRODUCT_INTRO_SCHEMA_VERSION,
+        dismissedAt: new Date().toISOString(),
+        lastDeckVariant: deckVariant,
+      };
+    }),
+
   resetSimilarUntaggedCountsJob: () =>
     set((state) => {
       state.similarUntaggedCountsJobId = null;
@@ -509,6 +559,11 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   setSimilarUntaggedCountsPanelVisible: (visible) =>
     set((state) => {
       state.similarUntaggedCountsPanelVisible = visible;
+    }),
+
+  setProductWelcomePreviewOpen: (open) =>
+    set((state) => {
+      state.productWelcomePreviewOpen = open;
     }),
 
   setGeocoderInitStatus: (status, error, progressPercent, progressLabel) =>

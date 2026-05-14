@@ -32,15 +32,15 @@ test.describe("Sidebar navigation", () => {
   });
 
   test("sidebar collapse toggle works", async ({ mainWindow }) => {
-    const sidebar = mainDesktopSidebar(mainWindow);
-    await expect(sidebar).not.toHaveClass(/w-\[84px\]/);
+    const aside = mainWindow.getByRole("complementary");
+    await expect(aside).not.toHaveClass(/w-\[84px\]/);
 
     const collapseButton = mainWindow.getByRole("button", { name: "Collapse" });
     await collapseButton.click();
-    await expect(sidebar).toHaveClass(/w-\[84px\]/);
+    await expect(aside).toHaveClass(/w-\[84px\]/);
 
     const expandButton = mainWindow.getByRole("button", { name: "Expand" });
     await expandButton.click();
-    await expect(sidebar).not.toHaveClass(/w-\[84px\]/);
+    await expect(aside).not.toHaveClass(/w-\[84px\]/);
   });
 });

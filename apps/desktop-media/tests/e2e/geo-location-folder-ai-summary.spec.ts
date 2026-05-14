@@ -62,11 +62,12 @@ async function waitForFullMetadataScan(mainWindow: Page, folderPath: string): Pr
 }
 
 async function openFolderAiSummary(mainWindow: Page, folderButtonName: string): Promise<void> {
+  await mainWindow.keyboard.press("Escape");
   await mainWindow.getByRole("button", { name: folderButtonName, exact: true }).click({ button: "right" });
   await mainWindow
     .locator("[data-sidebar-tree-menu]")
     .getByRole("button", { name: "Folder AI analysis summary", exact: true })
-    .click();
+    .click({ force: true });
   // Flat libraries use "Folder analysis summary"; trees with subfolders use "Folder tree analysis summary".
   const folderOnlyHeading = mainWindow.getByRole("heading", { name: "Folder analysis summary" });
   const treeHeading = mainWindow.getByRole("heading", { name: "Folder tree analysis summary" });
@@ -87,7 +88,7 @@ test.describe("Folder AI summary — Geo-location card", () => {
 
     try {
       await mockFolderDialog(electronApp, photoLibrary);
-      await mainWindow.getByText("Add library folder").click();
+      await mainWindow.getByRole("button", { name: "Add library folder" }).click();
       await enableGpsGeocodingSetting(mainWindow, [photoLibrary]);
 
       await waitForFullMetadataScan(mainWindow, photoLibrary);
@@ -118,7 +119,7 @@ test.describe("Folder AI summary — Geo-location card", () => {
 
     try {
       await mockFolderDialog(electronApp, photoLibrary);
-      await mainWindow.getByText("Add library folder").click();
+      await mainWindow.getByRole("button", { name: "Add library folder" }).click();
       await enableGpsGeocodingSetting(mainWindow, [photoLibrary]);
 
       await waitForFullMetadataScan(mainWindow, photoLibrary);
@@ -154,7 +155,7 @@ test.describe("Folder AI summary — Geo-location card", () => {
 
     try {
       await mockFolderDialog(electronApp, tempRoot);
-      await mainWindow.getByText("Add library folder").click();
+      await mainWindow.getByRole("button", { name: "Add library folder" }).click();
       await enableGpsGeocodingSetting(mainWindow, [tempRoot]);
 
       await waitForFullMetadataScan(mainWindow, subOnly);

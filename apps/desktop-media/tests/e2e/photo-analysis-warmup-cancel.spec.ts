@@ -17,7 +17,7 @@ test.afterAll(() => {
 
 test("cancel during warmup resets running menu state", async ({ electronApp, mainWindow }) => {
   await mockFolderDialog(electronApp, testFolder);
-  await mainWindow.getByText("Add library folder").click();
+  await mainWindow.getByRole("button", { name: "Add library folder" }).click();
   await clickSidebarLibraryRoot(mainWindow, testFolder);
 
   const actionsButton = mainWindow.getByRole("button", { name: "More actions" });

@@ -1,5 +1,5 @@
 import { useEffect, useId, useState, type ReactElement } from "react";
-import { ChevronDown, Square, Star } from "lucide-react";
+import { ChevronDown, Sparkles, Square, Star } from "lucide-react";
 import {
   MediaItemStarRating,
   SettingsCheckboxField,
@@ -41,8 +41,10 @@ import {
   type WrongImageRotationDetectionSettings,
 } from "../../shared/ipc";
 import { cn } from "../lib/cn";
+import { useDesktopStore } from "../stores/desktop-store";
 import { PipelineConcurrencySettings } from "./PipelineConcurrencySettings";
 import { photoPendingTintToSquareClass } from "../lib/photo-pending-folder-tint";
+import { AiModelsReferenceSheet } from "./onboarding/ai-models-reference-sheet";
 import {
   INVOICE_DATA_EXTRACTION_PROMPT,
   INVOICE_DATA_EXTRACTION_PROMPT_VERSION,
@@ -112,6 +114,9 @@ interface DesktopSettingsSectionProps {
 
 const UI_TEXT = {
   title: "Settings",
+  /** Opens the welcome slide deck without marking the first-run tour complete. */
+  showWelcomeWizardPreview: "Features overview",
+  aiModelsReferenceOpen: "AI models & licenses",
   hideAdvancedSettingsTitle: "Hide advanced settings",
   scanForFileChanges: "Scan for file changes",
   /** Covers scan policy, embedded metadata writes, path helpers, and GPS reverse geocoding. */
@@ -124,6 +129,9 @@ const UI_TEXT = {
   excludedImageCategoriesTitle: "Exclude image categories in smart albums",
   emptyFolderAiSummaryTitle: "On empty folder selection show AI analysis status summary for subfolders",
   emptyFolderAiSummaryDescription: `When the folder you select has no images or videos in it directly but it contains sub-folders, open the Folder AI analysis summary in the main pane—the same view as “Folder AI analysis summary” on the folder’s right-click menu. It shows a table with face detection, AI image analysis, and AI search index status for this folder and all sub-folders (large trees may take a few seconds). If the folder has no sub-folders, this summary is not shown.`,
+  fullMetadataScanOnAddLibraryRootTitle: "After adding a media library root folder, start a full metadata scan",
+  fullMetadataScanOnAddLibraryRootDescription:
+    "Runs a recursive full-tree scan on the new root so the catalog fills quickly. Turn off if you prefer to start scans manually from the folder menu.",
   pathExtractDatesTitle: "Extract date(s) from file path",
   pathExtractDatesDescription: `During a metadata scan, the app parses the file name and path. It looks for common patterns: YYYY-MM-DD; multi-day spans on one line; year-only or year-to-year ranges; YYYY-MM; eight-digit dates such as YYYYMMDD (including after camera-style prefixes like IMG_ or DSC_). If both an embedded capture date from the file and a path-derived date exist, the app compares calendar years: when the path-derived year is earlier than the embedded capture year, the event date from the path is used (typical when scans of old prints inherit a newer file date). Otherwise the embedded capture date wins. If neither exists, the file creation time may be used as a last resort. Results are stored in the database.`,
   pathUseLlmTitle: "Detect location and dates from file paths using AI (LLM)",
@@ -282,10 +290,12 @@ export function DesktopSettingsSection({
   aiInferenceGpuOptions,
   onAiInferencePreferredGpuIdChange,
 }: DesktopSettingsSectionProps): ReactElement {
+  const setProductWelcomePreviewOpen = useDesktopStore((s) => s.setProductWelcomePreviewOpen);
   const [showGpsConfirm, setShowGpsConfirm] = useState(false);
   const [gpsConfirmHasLocalCopy, setGpsConfirmHasLocalCopy] = useState(false);
   const [showWindowsGpuGuide, setShowWindowsGpuGuide] = useState(false);
   const [showAiModelHelp, setShowAiModelHelp] = useState(false);
+  const [modelsReferenceOpen, setModelsReferenceOpen] = useState(false);
   const [showPhotoDownscaleDescription, setShowPhotoDownscaleDescription] = useState(false);
   const [showAdvancedSearchDescription, setShowAdvancedSearchDescription] = useState(false);
   const [downscaleLongestSideDraft, setDownscaleLongestSideDraft] = useState(() =>
@@ -368,16 +378,36 @@ export function DesktopSettingsSection({
   return (
     <div className="mx-auto w-full max-w-7xl space-y-3 px-4 py-6 md:px-8">
       <h1 className="m-0 text-3xl font-bold text-foreground md:text-4xl">{UI_TEXT.title}</h1>
-      <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border/70 bg-card/40 px-3 py-2 text-sm text-foreground">
-        <input
-          type="checkbox"
-          className="h-4 w-4 cursor-pointer [accent-color:hsl(var(--primary))]"
-          checked={hideAdvancedSettings}
-          onChange={(event) => onHideAdvancedSettingsChange(event.target.checked)}
-        />
-        <span>{UI_TEXT.hideAdvancedSettingsTitle}</span>
-        <Star className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-      </label>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border/70 bg-card/40 px-3 py-2 text-sm text-foreground">
+          <input
+            type="checkbox"
+            className="h-4 w-4 cursor-pointer [accent-color:hsl(var(--primary))]"
+            checked={hideAdvancedSettings}
+            onChange={(event) => onHideAdvancedSettingsChange(event.target.checked)}
+          />
+          <span>{UI_TEXT.hideAdvancedSettingsTitle}</span>
+          <Star className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+        </label>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            className="inline-flex h-10 w-fit items-center gap-2 rounded-md border border-dashed border-primary/50 bg-card/50 px-3 text-sm font-medium text-foreground hover:bg-card"
+            title="Opens the welcome slides only. Closing the wizard from this preview does not mark the first-run tour as finished."
+            onClick={() => setProductWelcomePreviewOpen(true)}
+          >
+            <Sparkles className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+            {UI_TEXT.showWelcomeWizardPreview}
+          </button>
+          <button
+            type="button"
+            className="inline-flex h-10 w-fit items-center gap-2 rounded-md border border-dashed border-border bg-card/50 px-3 text-sm font-medium text-foreground hover:bg-card"
+            onClick={() => setModelsReferenceOpen(true)}
+          >
+            {UI_TEXT.aiModelsReferenceOpen}
+          </button>
+        </div>
+      </div>
 
       <SettingsSectionCard title={UI_TEXT.mediaViewer}>
         <div className="space-y-3">
@@ -634,6 +664,14 @@ export function DesktopSettingsSection({
               onFolderScanningSettingChange("showFolderAiSummaryWhenSelectingEmptyFolder", next)
             }
           />
+          <SettingsCheckboxField
+            title={UI_TEXT.fullMetadataScanOnAddLibraryRootTitle}
+            description={UI_TEXT.fullMetadataScanOnAddLibraryRootDescription}
+            checked={folderScanningSettings.runFullMetadataScanWhenLibraryRootAdded}
+            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+            surfaceVariant="accent-stripe"
+            onChange={(next) => onFolderScanningSettingChange("runFullMetadataScanWhenLibraryRootAdded", next)}
+          />
           {showAdvancedSettings ? (
             <SettingsNumberField
               title="Automatically scan folder for changes on selection if number of files less than"
@@ -713,6 +751,8 @@ export function DesktopSettingsSection({
               disabled={
                 folderScanningSettings.showFolderAiSummaryWhenSelectingEmptyFolder ===
                   DEFAULT_FOLDER_SCANNING_SETTINGS.showFolderAiSummaryWhenSelectingEmptyFolder &&
+                folderScanningSettings.runFullMetadataScanWhenLibraryRootAdded ===
+                  DEFAULT_FOLDER_SCANNING_SETTINGS.runFullMetadataScanWhenLibraryRootAdded &&
                 folderScanningSettings.autoMetadataScanOnSelectMaxFiles ===
                   DEFAULT_FOLDER_SCANNING_SETTINGS.autoMetadataScanOnSelectMaxFiles &&
                 folderScanningSettings.writeEmbeddedMetadataOnUserEdit ===
@@ -1664,6 +1704,7 @@ export function DesktopSettingsSection({
           </div>
         </div>
       </SettingsSectionCard>
+      <AiModelsReferenceSheet open={modelsReferenceOpen} onClose={() => setModelsReferenceOpen(false)} />
     </div>
   );
 }

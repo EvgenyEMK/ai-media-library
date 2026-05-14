@@ -34,7 +34,7 @@ async function addLibrary(
   root: string,
 ): Promise<void> {
   await mockFolderDialog(electronApp, root);
-  await mainWindow.getByText("Add library folder").click();
+  await mainWindow.getByRole("button", { name: "Add library folder" }).click();
 }
 
 async function startManualMetadataScanFromRootMenu(

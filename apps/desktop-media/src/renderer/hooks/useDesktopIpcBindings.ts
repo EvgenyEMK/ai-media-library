@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useDesktopStoreApi } from "../stores/desktop-store";
 import { applyPersistedAppSettingsToStore } from "../lib/apply-persisted-app-settings";
+import type { GuidedExperienceSettings } from "../../shared/guided-experience-types";
 import {
   bindPhotoAnalysisProgress,
   bindFaceDetectionProgress,
@@ -95,14 +96,12 @@ export function useDesktopIpcBindings(): void {
 
 export function useDesktopInitialization(): void {
   const store = useDesktopStoreApi();
-  const initialized = useRef(false);
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
-
     // Defer hydration slightly so an early Playwright `saveSettings` can persist before we read disk,
     // and so `settingsSaved` broadcasts can land before a stale first `getSettings` overwrites Zustand.
+    // Do **not** use a "run once" ref: React 18 Strict Mode remounts clear the timer and would otherwise
+    // skip the second effect, leaving `persistedSettingsHydrated` false until a later `saveSettings`.
     const hydrationTimer = window.setTimeout(() => {
       void window.desktopApi
         .getSettings()
@@ -319,6 +318,8 @@ export function useDesktopSettingsPersistence(): void {
           state.hideAdvancedSettings !== prev.hideAdvancedSettings ||
           state.folderScanningSettings.showFolderAiSummaryWhenSelectingEmptyFolder !==
             prev.folderScanningSettings.showFolderAiSummaryWhenSelectingEmptyFolder ||
+          state.folderScanningSettings.runFullMetadataScanWhenLibraryRootAdded !==
+            prev.folderScanningSettings.runFullMetadataScanWhenLibraryRootAdded ||
           state.folderScanningSettings.autoMetadataScanOnSelectMaxFiles !==
             prev.folderScanningSettings.autoMetadataScanOnSelectMaxFiles ||
           state.folderScanningSettings.writeEmbeddedMetadataOnUserEdit !==
@@ -369,7 +370,8 @@ export function useDesktopSettingsPersistence(): void {
           pipelineConcurrencyChanged(
             state.pipelineConcurrencySettings,
             prev.pipelineConcurrencySettings,
-          )
+          ) ||
+          !guidedExperienceSettingsEqual(state.guidedExperienceSettings, prev.guidedExperienceSettings)
         ) {
           void window.desktopApi.saveSettings({
             clientId: state.clientId,
@@ -386,11 +388,16 @@ export function useDesktopSettingsPersistence(): void {
             pathExtraction: state.pathExtractionSettings,
             aiInferencePreferredGpuId: state.aiInferencePreferredGpuId,
             pipelineConcurrency: state.pipelineConcurrencySettings,
+            guidedExperience: state.guidedExperienceSettings,
           });
         }
       },
     );
   }, [store]);
+}
+
+function guidedExperienceSettingsEqual(next: GuidedExperienceSettings, prev: GuidedExperienceSettings): boolean {
+  return JSON.stringify(next) === JSON.stringify(prev);
 }
 
 function pipelineConcurrencyChanged(

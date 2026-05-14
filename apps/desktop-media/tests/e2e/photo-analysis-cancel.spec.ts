@@ -20,9 +20,9 @@ test.describe("Image AI analysis cancel", () => {
   test("cancelling immediately does not break folder browsing or leave analysis in-progress", async ({ electronApp, mainWindow }) => {
     // Add two libraries so we can switch after cancel.
     await mockFolderDialog(electronApp, tempFolder);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
     await mockFolderDialog(electronApp, REAL_IMAGE_FOLDER);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
 
     const sidebar = mainDesktopSidebar(mainWindow);
     await expect(

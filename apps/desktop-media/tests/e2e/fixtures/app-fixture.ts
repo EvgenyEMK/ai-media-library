@@ -35,6 +35,11 @@ interface AppOptions {
    * data, such as real GeoNames. Default E2E tests keep using a disposable temp runtime.
    */
   e2eRuntimeRootPath?: string;
+  /**
+   * When true, do not set `EMK_E2E_SKIP_PRODUCT_INTRO` so the first-run welcome wizard can auto-open.
+   * Default false keeps intro skipped for faster, deterministic specs.
+   */
+  e2eAllowAutoProductIntro?: boolean;
 }
 
 /**
@@ -52,6 +57,7 @@ export const test = base.extend<AppFixtures & AppOptions>({
   e2eFailFaceModelDownload: [false, { option: true }],
   e2eSkipStartupAiModelsDownload: [true, { option: true }],
   e2eRuntimeRootPath: [undefined, { option: true }],
+  e2eAllowAutoProductIntro: [false, { option: true }],
 
   electronApp: async (
     {
@@ -62,6 +68,7 @@ export const test = base.extend<AppFixtures & AppOptions>({
       e2eFailFaceModelDownload,
       e2eSkipStartupAiModelsDownload,
       e2eRuntimeRootPath,
+      e2eAllowAutoProductIntro,
     },
     use,
   ) => {
@@ -92,6 +99,7 @@ export const test = base.extend<AppFixtures & AppOptions>({
         EMK_DESKTOP_RUNTIME_ROOT_PATH: runtimeRootPath,
         EMK_OLLAMA_BASE_URL: ollama.baseUrl,
         EMK_E2E_RUN_PIPELINES_UI: "1",
+        ...(e2eAllowAutoProductIntro ? {} : { EMK_E2E_SKIP_PRODUCT_INTRO: "1" }),
         ...(e2eSkipStartupAiModelsDownload
           ? { EMK_E2E_SKIP_STARTUP_AI_MODELS_DOWNLOAD: "1" }
           : {}),

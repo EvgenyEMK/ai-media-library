@@ -32,6 +32,7 @@ import {
   type SmartAlbumSettings,
   type WrongImageRotationDetectionSettings,
 } from "../src/shared/ipc";
+import { sanitizeGuidedExperienceSettings } from "../src/shared/guided-experience-sanitize";
 import {
   DEFAULT_PIPELINE_CONCURRENCY,
   type PipelineConcurrencyConfig,
@@ -98,6 +99,7 @@ async function readSettingsLocked(userDataPath: string): Promise<AppSettings> {
     pathExtraction: sanitizePathExtractionSettings(parsed.pathExtraction),
     aiInferencePreferredGpuId: sanitizeAiInferencePreferredGpuId(parsed.aiInferencePreferredGpuId),
     pipelineConcurrency: sanitizePipelineConcurrency(parsed.pipelineConcurrency),
+    guidedExperience: sanitizeGuidedExperienceSettings(parsed.guidedExperience),
     clientId,
   };
 
@@ -382,6 +384,10 @@ function sanitizeFolderScanningSettings(candidate: unknown): FolderScanningSetti
       typeof value.showFolderAiSummaryWhenSelectingEmptyFolder === "boolean"
         ? value.showFolderAiSummaryWhenSelectingEmptyFolder
         : DEFAULT_FOLDER_SCANNING_SETTINGS.showFolderAiSummaryWhenSelectingEmptyFolder,
+    runFullMetadataScanWhenLibraryRootAdded:
+      typeof value.runFullMetadataScanWhenLibraryRootAdded === "boolean"
+        ? value.runFullMetadataScanWhenLibraryRootAdded
+        : DEFAULT_FOLDER_SCANNING_SETTINGS.runFullMetadataScanWhenLibraryRootAdded,
     autoMetadataScanOnSelectMaxFiles: clampToRange(
       asNumber(value.autoMetadataScanOnSelectMaxFiles),
       0,

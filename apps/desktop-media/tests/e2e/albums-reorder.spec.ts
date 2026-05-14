@@ -41,7 +41,7 @@ async function addLibraryAndScan(
   folderPath: string,
 ): Promise<void> {
   await mockFolderDialog(electronApp, folderPath);
-  await mainWindow.getByText("Add library folder").click();
+  await mainWindow.getByRole("button", { name: "Add library folder" }).click();
   await clickSidebarLibraryRoot(mainWindow, folderPath);
 
   await mainWindow.evaluate(async (folder) => {

@@ -255,6 +255,7 @@ export function registerFsHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.getDesktopRuntimeFlags, async (): Promise<DesktopRuntimeFlags> => {
     return {
       showRunPipelinesTestUi: process.env.EMK_E2E_RUN_PIPELINES_UI === "1",
+      skipAutoProductIntro: process.env.EMK_E2E_SKIP_PRODUCT_INTRO === "1",
     };
   });
 
