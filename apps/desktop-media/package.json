@@ -25,7 +25,7 @@
     "test:e2e": "pnpm run rebuild:native && pnpm run build && pnpm exec playwright test --config playwright.config.ts",
     "test:e2e-real-geocoder": "pnpm run rebuild:native && pnpm run build && pnpm exec playwright test --config playwright.real-geocoder.config.ts",
     "test:e2e-real-model-download": "pnpm run rebuild:native && pnpm run build && pnpm exec playwright test --config playwright.real-model-download.config.ts",
-    "test:e2e:ci-smoke": "pnpm run rebuild:native && pnpm run build && pnpm exec playwright test --config playwright.config.ts tests/e2e/app-launch.spec.ts tests/e2e/folder-browsing.spec.ts tests/e2e/geocoder-download.spec.ts tests/e2e/insights-section.spec.ts tests/e2e/settings.spec.ts tests/e2e/sidebar-navigation.spec.ts tests/e2e/viewer-info-panel.spec.ts tests/e2e/viewer-video.spec.ts tests/e2e/viewer.spec.ts",
+    "test:e2e:ci-smoke": "pnpm run rebuild:native && pnpm run build && pnpm exec playwright test --config playwright.config.ts tests/e2e/app-launch.spec.ts tests/e2e/folder-browsing.spec.ts tests/e2e/geocoder-download.spec.ts tests/e2e/insights-section.spec.ts tests/e2e/product-welcome-first-launch.spec.ts tests/e2e/settings.spec.ts tests/e2e/sidebar-navigation.spec.ts tests/e2e/viewer-info-panel.spec.ts tests/e2e/viewer-video.spec.ts tests/e2e/viewer.spec.ts",
     "test:e2e:no-build": "pnpm exec playwright test --config playwright.config.ts",
     "test:e2e-people-module": "pnpm exec playwright test --config playwright.config.ts tests/e2e/people-module.spec.ts",
     "test:e2e:star-rating": "pnpm run rebuild:native && pnpm run build && pnpm exec playwright test --config playwright.star-rating.config.ts",

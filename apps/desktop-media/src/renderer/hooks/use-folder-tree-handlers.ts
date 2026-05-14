@@ -39,6 +39,12 @@ export function useFolderTreeHandlers(opts: {
       const picked = await window.desktopApi.selectLibraryFolder();
       if (!picked) return;
       store.getState().addLibraryRoot(picked);
+      const runFullOnAdd = store.getState().folderScanningSettings.runFullMetadataScanWhenLibraryRootAdded;
+      if (runFullOnAdd) {
+        void window.desktopApi
+          .scanFolderMetadata({ folderPath: picked, recursive: true, scanScope: "full" })
+          .catch(() => undefined);
+      }
     };
 
     const handleRemoveLibrary = (rootPath: string): void => {

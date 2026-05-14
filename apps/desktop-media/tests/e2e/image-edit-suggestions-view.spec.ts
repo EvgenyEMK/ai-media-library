@@ -48,7 +48,7 @@ test.describe("Image edit suggestions metadata", () => {
     });
 
     await mockFolderDialog(electronApp, e2ePhotosDir);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
     await clickSidebarLibraryRoot(mainWindow, e2ePhotosDir);
     await mainWindow.waitForTimeout(2_000);
 

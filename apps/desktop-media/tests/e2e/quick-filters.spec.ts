@@ -72,7 +72,7 @@ test.describe("Quick filters (e2e-photos)", () => {
     );
 
     await mockFolderDialog(electronApp, e2ePhotosDir);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
     await clickSidebarLibraryRoot(mainWindow, e2ePhotosDir);
     await mainWindow.waitForTimeout(2_000);
 
@@ -111,7 +111,7 @@ test.describe("Quick filters (e2e-photos)", () => {
     );
 
     await mockFolderDialog(electronApp, e2ePhotosDir);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
     await clickSidebarLibraryRoot(mainWindow, e2ePhotosDir);
     await mainWindow.waitForTimeout(2_000);
 
@@ -137,7 +137,7 @@ test.describe("Quick filters (e2e-photos)", () => {
     );
 
     await mockFolderDialog(electronApp, e2ePhotosDir);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
     await clickSidebarLibraryRoot(mainWindow, e2ePhotosDir);
     await mainWindow.waitForTimeout(2_000);
 
@@ -172,7 +172,7 @@ test.describe("Quick filters (e2e-photos)", () => {
     await waitForSemanticSearchAiReady(mainWindow);
 
     await mockFolderDialog(electronApp, e2ePhotosDir);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
     await clickSidebarLibraryRoot(mainWindow, e2ePhotosDir);
     await mainWindow.waitForTimeout(2_000);
 

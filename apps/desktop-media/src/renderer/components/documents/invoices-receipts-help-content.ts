@@ -192,7 +192,7 @@ export function buildInvoicesReceiptsHelpDeck(
       : variant === "c"
         ? buildVariantC(effectivePhotoAnalysisModel)
         : buildVariantA(effectivePhotoAnalysisModel);
-  return { flowTitle: FLOW_TITLE, slides };
+  return { flowTitle: FLOW_TITLE, slides, deckCategory: "feature-help" };
 }
 
 export function invoicesReceiptsHelpSlideCount(variant: InvoicesReceiptsHelpVariant): number {

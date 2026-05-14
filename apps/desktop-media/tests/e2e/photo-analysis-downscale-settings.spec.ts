@@ -45,7 +45,7 @@ test.describe("AI image analysis LLM downscale settings", () => {
     });
 
     await mockFolderDialog(electronApp, fixture.root);
-    await mainWindow.getByText("Add library folder").click();
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
 
     const normalizedRoot = path.normalize(fixture.root);
     const sidebar = mainDesktopSidebar(mainWindow);

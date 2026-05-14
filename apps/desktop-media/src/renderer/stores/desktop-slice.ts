@@ -23,9 +23,11 @@ import {
   type WrongImageRotationDetectionSettings,
 } from "../../shared/ipc";
 import {
+  CURRENT_PRODUCT_INTRO_SCHEMA_VERSION,
   DEFAULT_GUIDED_EXPERIENCE_SETTINGS,
   type GuidedExperienceSettings,
   type GuidedHelpTopicId,
+  type ProductWelcomeDeckVariant,
 } from "../../shared/guided-experience-types";
 import {
   DEFAULT_PIPELINE_CONCURRENCY,
@@ -130,6 +132,8 @@ export interface DesktopSlice {
   similarUntaggedCountsByTagId: Record<string, number>;
   similarUntaggedCountsError: string | null;
   similarUntaggedCountsPanelVisible: boolean;
+  /** Ephemeral UI: show welcome slides from Settings without marking `productIntro` complete. */
+  productWelcomePreviewOpen: boolean;
 
   setLibraryRoots: (roots: string[]) => void;
   setHideAdvancedSettings: (hide: boolean) => void;
@@ -196,6 +200,7 @@ export interface DesktopSlice {
   setAiInferenceGpuOptions: (options: AiInferenceGpuOption[]) => void;
 
   markGuidedHelpTopicWizardDismissed: (topicId: GuidedHelpTopicId) => void;
+  markProductIntroWizardDismissed: (deckVariant: ProductWelcomeDeckVariant) => void;
 
   setGeocoderInitStatus: (
     status: GeocoderInitStatus,
@@ -209,6 +214,8 @@ export interface DesktopSlice {
 
   resetSimilarUntaggedCountsJob: () => void;
   setSimilarUntaggedCountsPanelVisible: (visible: boolean) => void;
+
+  setProductWelcomePreviewOpen: (open: boolean) => void;
 }
 
 export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", never]]> = (set) => ({
@@ -284,6 +291,7 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   similarUntaggedCountsByTagId: {},
   similarUntaggedCountsError: null,
   similarUntaggedCountsPanelVisible: false,
+  productWelcomePreviewOpen: false,
 
   setLibraryRoots: (roots) =>
     set((state) => {
@@ -525,6 +533,20 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
       };
     }),
 
+  markProductIntroWizardDismissed: (deckVariant) =>
+    set((state) => {
+      if (state.guidedExperienceSettings.productIntro?.completed === true) {
+        return;
+      }
+      state.guidedExperienceSettings.productIntro = {
+        ...state.guidedExperienceSettings.productIntro,
+        completed: true,
+        version: CURRENT_PRODUCT_INTRO_SCHEMA_VERSION,
+        dismissedAt: new Date().toISOString(),
+        lastDeckVariant: deckVariant,
+      };
+    }),
+
   resetSimilarUntaggedCountsJob: () =>
     set((state) => {
       state.similarUntaggedCountsJobId = null;
@@ -537,6 +559,11 @@ export const createDesktopSlice: StateCreator<DesktopSlice, [["zustand/immer", n
   setSimilarUntaggedCountsPanelVisible: (visible) =>
     set((state) => {
       state.similarUntaggedCountsPanelVisible = visible;
+    }),
+
+  setProductWelcomePreviewOpen: (open) =>
+    set((state) => {
+      state.productWelcomePreviewOpen = open;
     }),
 
   setGeocoderInitStatus: (status, error, progressPercent, progressLabel) =>

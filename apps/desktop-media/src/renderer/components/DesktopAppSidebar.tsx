@@ -106,22 +106,24 @@ export function DesktopAppSidebar({
             id: "folders",
             label: UI_TEXT.sectionFolders,
             icon: <FolderOpen size={20} aria-hidden="true" />,
-            headerTrailing: primarySidebarSection === "folders" && insightsSubSection === null && documentsSubSection === null
-              ? (
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      void folderTree.handleAddLibrary();
-                    }}
-                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center border-0 bg-transparent px-0 text-inherit shadow-none outline-none hover:bg-muted/70"
-                    aria-label={UI_TEXT.addLibrary}
-                    title={UI_TEXT.addLibrary}
-                  >
-                    <Plus size={20} aria-hidden="true" />
-                  </button>
-                )
-              : undefined,
+            headerTrailing:
+              primarySidebarSection === "folders" &&
+              insightsSubSection === null &&
+              documentsSubSection === null &&
+              libraryRoots.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void folderTree.handleAddLibrary();
+                  }}
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center border-0 border-transparent bg-transparent px-0 text-inherit shadow-none outline-none hover:bg-muted/70"
+                  aria-label={UI_TEXT.addLibrary}
+                  title={UI_TEXT.addLibrary}
+                >
+                  <Plus size={20} aria-hidden="true" />
+                </button>
+              ) : undefined,
             contentClassName: "pr-0",
             content: (
               <DesktopFoldersSidebarPanel

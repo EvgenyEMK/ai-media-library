@@ -87,7 +87,7 @@ test.describe("Folder AI summary — Geo-location card", () => {
 
     try {
       await mockFolderDialog(electronApp, photoLibrary);
-      await mainWindow.getByText("Add library folder").click();
+      await mainWindow.getByRole("button", { name: "Add library folder" }).click();
       await enableGpsGeocodingSetting(mainWindow, [photoLibrary]);
 
       await waitForFullMetadataScan(mainWindow, photoLibrary);
@@ -118,7 +118,7 @@ test.describe("Folder AI summary — Geo-location card", () => {
 
     try {
       await mockFolderDialog(electronApp, photoLibrary);
-      await mainWindow.getByText("Add library folder").click();
+      await mainWindow.getByRole("button", { name: "Add library folder" }).click();
       await enableGpsGeocodingSetting(mainWindow, [photoLibrary]);
 
       await waitForFullMetadataScan(mainWindow, photoLibrary);
@@ -154,7 +154,7 @@ test.describe("Folder AI summary — Geo-location card", () => {
 
     try {
       await mockFolderDialog(electronApp, tempRoot);
-      await mainWindow.getByText("Add library folder").click();
+      await mainWindow.getByRole("button", { name: "Add library folder" }).click();
       await enableGpsGeocodingSetting(mainWindow, [tempRoot]);
 
       await waitForFullMetadataScan(mainWindow, subOnly);

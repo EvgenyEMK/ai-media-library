@@ -54,4 +54,28 @@ describe("sanitizeGuidedExperienceSettings", () => {
       version: 1,
     });
   });
+
+  it("keeps productIntro dismissedAt and lastDeckVariant when valid", () => {
+    const out = sanitizeGuidedExperienceSettings({
+      productIntro: {
+        completed: true,
+        version: 1,
+        dismissedAt: "2026-05-01T12:00:00.000Z",
+        lastDeckVariant: "c",
+      },
+    });
+    expect(out.productIntro).toEqual({
+      completed: true,
+      version: 1,
+      dismissedAt: "2026-05-01T12:00:00.000Z",
+      lastDeckVariant: "c",
+    });
+  });
+
+  it("drops invalid productIntro lastDeckVariant", () => {
+    const out = sanitizeGuidedExperienceSettings({
+      productIntro: { completed: true, lastDeckVariant: "x" },
+    });
+    expect(out.productIntro?.lastDeckVariant).toBeUndefined();
+  });
 });

@@ -12,6 +12,8 @@ test.describe("Settings", () => {
     // Settings should no longer show the empty folder state
     await expect(mainWindow.getByText("Select a folder to view media")).not.toBeVisible();
 
+    await expect(settingsArea.getByText("After adding a media library root folder, start a full metadata scan")).toBeVisible();
+
     await settingsArea.locator("details summary").first().click();
     const dateFormatSelect = settingsArea.locator("select").first();
     await expect(dateFormatSelect).toBeVisible();

@@ -310,6 +310,8 @@ export interface DatabaseLocationInfo {
 export interface DesktopRuntimeFlags {
   /** When true, show E2E-only “Run pipelines” controls (`EMK_E2E_RUN_PIPELINES_UI=1`). */
   showRunPipelinesTestUi: boolean;
+  /** When true, do not auto-open the first-run welcome wizard (`EMK_E2E_SKIP_PRODUCT_INTRO=1`). */
+  skipAutoProductIntro: boolean;
 }
 
 /** One duplicate occurrence elsewhere in the library (same content hash). */
@@ -669,6 +671,11 @@ export interface FolderScanningSettings {
    * (same as the folder right-click action). Ignored when the folder has no sub-folders.
    */
   showFolderAiSummaryWhenSelectingEmptyFolder: boolean;
+  /**
+   * When true, adding a new media library root folder immediately starts a recursive full-tree metadata scan
+   * on that root (`scanScope: "full"`). When false, add the root only; run scans from the folder menu as needed.
+   */
+  runFullMetadataScanWhenLibraryRootAdded: boolean;
   /** Run automatic scan only when image count in the selected folder (non-recursive) is strictly less than this. */
   autoMetadataScanOnSelectMaxFiles: number;
   /**
@@ -780,6 +787,7 @@ export const DEFAULT_WRONG_IMAGE_ROTATION_DETECTION_SETTINGS: WrongImageRotation
 
 export const DEFAULT_FOLDER_SCANNING_SETTINGS: FolderScanningSettings = {
   showFolderAiSummaryWhenSelectingEmptyFolder: true,
+  runFullMetadataScanWhenLibraryRootAdded: true,
   autoMetadataScanOnSelectMaxFiles: 100,
   writeEmbeddedMetadataOnUserEdit: false,
   detectLocationFromGps: false,

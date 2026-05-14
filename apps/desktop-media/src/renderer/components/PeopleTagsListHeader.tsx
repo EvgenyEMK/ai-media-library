@@ -1,10 +1,19 @@
-import { type ReactElement, useState } from "react";
+import { type ReactElement, useCallback, useMemo, useState } from "react";
 import { HelpCircle, Loader2, RefreshCw, UserPlus } from "lucide-react";
+import { GuidedSlideModal } from "./guided-content/guided-slide-modal";
+import { AiModelsReferenceSheet } from "./onboarding/ai-models-reference-sheet";
+import {
+  buildGuidedSlideDeckFromIds,
+  handleGuidedSlideDeckAction,
+  openOllamaInstallDocInBrowser,
+  PEOPLE_FACES_HELP_SLIDE_ORDER,
+} from "./onboarding/guided-slide-catalog";
 import { PeopleOnboardingModal, type PeopleOnboardingSlideId } from "./PeopleOnboardingModal";
 
 const UI_TEXT = {
   title: "People",
-  helpAria: "About People tags and birth dates",
+  helpAria: "People & faces overview",
+  taggingHelpLabel: "Tagging & birth dates",
   addPersonAria: "Add person",
   refreshAriaLabel:
     "Refresh people list and recompute similar face counts for the current page",
@@ -21,24 +30,58 @@ export function PeopleTagsListHeader({
 }): ReactElement {
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [onboardingSlideId, setOnboardingSlideId] = useState<PeopleOnboardingSlideId>("whyTags");
+  const [peopleGuideOpen, setPeopleGuideOpen] = useState(false);
+  const [modelsReferenceOpen, setModelsReferenceOpen] = useState(false);
+
+  const peopleHelpDeck = useMemo(
+    () =>
+      buildGuidedSlideDeckFromIds(
+        PEOPLE_FACES_HELP_SLIDE_ORDER,
+        "people-faces-help",
+        "People",
+        "feature-help",
+      ),
+    [],
+  );
+
+  const onSlideAction = useCallback((actionId: string): void => {
+    const next = handleGuidedSlideDeckAction(actionId);
+    if (next === "models") {
+      setModelsReferenceOpen(true);
+    }
+    if (next === "ollama-doc") {
+      openOllamaInstallDocInBrowser();
+    }
+  }, []);
 
   return (
     <>
       <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="flex flex-wrap items-start gap-2">
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-3xl font-bold md:text-4xl">{UI_TEXT.title}</h1>
+          <div className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 className="text-3xl font-bold md:text-4xl">{UI_TEXT.title}</h1>
+              <button
+                type="button"
+                onClick={() => {
+                  setPeopleGuideOpen(true);
+                }}
+                className="inline-flex size-[33px] shrink-0 items-center justify-center rounded-full border border-border p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label={UI_TEXT.helpAria}
+                title={UI_TEXT.helpAria}
+              >
+                <HelpCircle className="size-[29px]" aria-hidden />
+              </button>
+            </div>
             <button
               type="button"
+              className="m-0 w-fit rounded-md px-0.5 text-left text-sm font-medium text-primary underline-offset-2 hover:underline"
               onClick={() => {
                 setOnboardingSlideId("whyTags");
                 setOnboardingOpen(true);
               }}
-              className="inline-flex size-[33px] shrink-0 items-center justify-center rounded-full border border-border p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-              aria-label={UI_TEXT.helpAria}
-              title={UI_TEXT.helpAria}
             >
-              <HelpCircle className="size-[29px]" aria-hidden />
+              {UI_TEXT.taggingHelpLabel}
             </button>
           </div>
         </div>
@@ -74,6 +117,17 @@ export function PeopleTagsListHeader({
         initialSlideId={onboardingSlideId}
         onClose={() => setOnboardingOpen(false)}
       />
+
+      <GuidedSlideModal
+        open={peopleGuideOpen}
+        onClose={() => setPeopleGuideOpen(false)}
+        flowTitle={peopleHelpDeck.flowTitle}
+        slides={peopleHelpDeck.slides}
+        initialSlideIndex={0}
+        slideHeadlineAsPrimaryExceptFirst
+        onSlideAction={onSlideAction}
+      />
+      <AiModelsReferenceSheet open={modelsReferenceOpen} onClose={() => setModelsReferenceOpen(false)} />
     </>
   );
 }

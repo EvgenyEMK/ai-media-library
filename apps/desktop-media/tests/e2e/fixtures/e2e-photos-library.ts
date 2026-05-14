@@ -9,7 +9,7 @@ export const E2E_PHOTOS_DIR = path.resolve(__dirname, "../../../test-assets-loca
 
 export async function openE2ePhotoLibrary(electronApp: ElectronApplication, mainWindow: Page): Promise<void> {
   await mockFolderDialog(electronApp, E2E_PHOTOS_DIR);
-  await mainWindow.getByText("Add library folder").click();
+  await mainWindow.getByRole("button", { name: "Add library folder" }).click();
 
   await clickSidebarLibraryRoot(mainWindow, E2E_PHOTOS_DIR);
 }

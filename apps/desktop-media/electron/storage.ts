@@ -384,6 +384,10 @@ function sanitizeFolderScanningSettings(candidate: unknown): FolderScanningSetti
       typeof value.showFolderAiSummaryWhenSelectingEmptyFolder === "boolean"
         ? value.showFolderAiSummaryWhenSelectingEmptyFolder
         : DEFAULT_FOLDER_SCANNING_SETTINGS.showFolderAiSummaryWhenSelectingEmptyFolder,
+    runFullMetadataScanWhenLibraryRootAdded:
+      typeof value.runFullMetadataScanWhenLibraryRootAdded === "boolean"
+        ? value.runFullMetadataScanWhenLibraryRootAdded
+        : DEFAULT_FOLDER_SCANNING_SETTINGS.runFullMetadataScanWhenLibraryRootAdded,
     autoMetadataScanOnSelectMaxFiles: clampToRange(
       asNumber(value.autoMetadataScanOnSelectMaxFiles),
       0,

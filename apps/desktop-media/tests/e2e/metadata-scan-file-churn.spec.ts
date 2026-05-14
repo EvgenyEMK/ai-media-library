@@ -56,7 +56,7 @@ async function addLibraryAndSelectRoot(
   root: string,
 ): Promise<void> {
   await mockFolderDialog(electronApp, root);
-  await mainWindow.getByText("Add library folder").click();
+  await mainWindow.getByRole("button", { name: "Add library folder" }).click();
   await clickSidebarLibraryRoot(mainWindow, root);
   await mainWindow.waitForTimeout(1_500);
 }

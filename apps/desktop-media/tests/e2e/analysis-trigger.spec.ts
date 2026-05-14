@@ -19,7 +19,7 @@ async function addAndSelectFolder(
   folder: string,
 ): Promise<void> {
   await mockFolderDialog(electronApp, folder);
-  await mainWindow.getByText("Add library folder").click();
+  await mainWindow.getByRole("button", { name: "Add library folder" }).click();
   await clickSidebarLibraryRoot(mainWindow, folder);
   await mainWindow.waitForTimeout(2_000);
 }

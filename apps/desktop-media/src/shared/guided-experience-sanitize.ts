@@ -64,6 +64,12 @@ export function sanitizeGuidedExperienceSettings(candidate: unknown): GuidedExpe
     !Array.isArray(raw.productIntro)
   ) {
     const pi = raw.productIntro as Record<string, unknown>;
+    const dismissedAt =
+      typeof pi.dismissedAt === "string" && pi.dismissedAt.length > 0 ? pi.dismissedAt : undefined;
+    const lastDeckVariant =
+      pi.lastDeckVariant === "a" || pi.lastDeckVariant === "b" || pi.lastDeckVariant === "c"
+        ? pi.lastDeckVariant
+        : undefined;
     next.productIntro = {
       completed: typeof pi.completed === "boolean" ? pi.completed : undefined,
       skippedAtStep:
@@ -72,6 +78,8 @@ export function sanitizeGuidedExperienceSettings(candidate: unknown): GuidedExpe
           : undefined,
       version:
         typeof pi.version === "number" && Number.isFinite(pi.version) ? Math.trunc(pi.version) : undefined,
+      dismissedAt,
+      lastDeckVariant,
     };
   }
 

@@ -9,6 +9,7 @@ import type { DesktopMediaItemMetadata, FolderDuplicateScanResultPayload } from 
 import type { BundleView } from "../shared/pipeline-types";
 import { supportsThinkingMode } from "../shared/photo-analysis-prompt";
 import { DesktopAppMain } from "./components/DesktopAppMain";
+import { DesktopProductWelcomeLayer } from "./components/onboarding/desktop-product-welcome-layer";
 import type { SimilarImagesSession } from "./components/similar-images/desktop-similar-images-workspace";
 import { DesktopAppSidebar } from "./components/DesktopAppSidebar";
 import { DesktopSwiperInfoPanel } from "./components/DesktopSwiperInfoPanel";
@@ -855,6 +856,8 @@ export function App(): ReactElement {
         autoPlayVideoOnSelection={mediaViewerSettings.autoPlayVideoOnOpen}
         skipVideosInSlideshow={mediaViewerSettings.skipVideosInSlideshow}
       />
+
+      <DesktopProductWelcomeLayer />
     </div>
   );
 }
