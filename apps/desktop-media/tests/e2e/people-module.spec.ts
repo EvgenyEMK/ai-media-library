@@ -12,7 +12,7 @@ test.describe("People module", () => {
 
   test("People onboarding opens from help and shows first slide", async ({ mainWindow }) => {
     await mainWindow.getByRole("complementary").getByRole("button", { name: "People" }).click();
-    await mainWindow.getByRole("button", { name: "About People tags and birth dates" }).click();
+    await mainWindow.getByRole("button", { name: "Tagging & birth dates" }).click();
     await expect(mainWindow.getByRole("heading", { name: "People tags" })).toBeVisible();
     await expect(
       mainWindow.getByText("Organize photos around the people who matter", { exact: true }),

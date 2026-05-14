@@ -57,8 +57,12 @@ async function addLibraryAndSelectRoot(
 ): Promise<void> {
   await mockFolderDialog(electronApp, root);
   await mainWindow.getByRole("button", { name: "Add library folder" }).click();
+  const normalized = path.normalize(root);
+  await expect(mainDesktopSidebar(mainWindow).getByRole("button", { name: normalized, exact: true })).toBeVisible({
+    timeout: 30_000,
+  });
   await clickSidebarLibraryRoot(mainWindow, root);
-  await mainWindow.waitForTimeout(1_500);
+  await mainWindow.waitForTimeout(500);
 }
 
 function awaitNextManualMetadataScanForFolder(
@@ -87,29 +91,51 @@ function awaitNextManualMetadataScanForFolder(
   }, folderPath);
 }
 
+async function ensureFolderTreeRootRowVisible(mainWindow: Page, libraryRoot: string): Promise<void> {
+  const normalized = path.normalize(libraryRoot);
+  const aside = mainWindow.getByRole("complementary");
+  const sidebar = mainDesktopSidebar(mainWindow);
+  const expandSidebar = aside.getByRole("button", { name: UI_TEXT.expand, exact: true });
+  if ((await expandSidebar.count()) > 0) {
+    await expandSidebar.first().click();
+  }
+  const foldersNav = sidebar.getByRole("button", { name: UI_TEXT.sectionFolders, exact: true });
+  if ((await foldersNav.getAttribute("aria-expanded")) !== "true") {
+    await foldersNav.click();
+  }
+  await expect(sidebar.getByRole("button", { name: normalized, exact: true })).toBeVisible({ timeout: 45_000 });
+}
+
 async function runRecursiveMetadataScan(
   mainWindow: Page,
   libraryRoot: string,
 ): Promise<MetadataJobCompleted> {
   const normalized = path.normalize(libraryRoot);
-  const completion = awaitNextManualMetadataScanForFolder(mainWindow, normalized);
   const sidebar = mainDesktopSidebar(mainWindow);
-  /** Folder rows can remount after scan completion; re-resolve locators until the menu opens. */
+  await mainWindow.keyboard.press("Escape");
+  await ensureFolderTreeRootRowVisible(mainWindow, libraryRoot);
+  await clickSidebarLibraryRoot(mainWindow, libraryRoot);
   await expect(async () => {
     const rootButton = sidebar.getByRole("button", { name: normalized, exact: true });
-    await expect(rootButton).toBeVisible({ timeout: 15_000 });
+    await expect(rootButton).toBeVisible({ timeout: 25_000 });
     await rootButton.scrollIntoViewIfNeeded();
     const row = rootButton.locator("..").locator("..");
     await row.hover();
     await row.getByRole("button", { name: "More", exact: true }).click();
-  }).toPass({ timeout: 60_000 });
-  await mainWindow.getByRole("button", { name: UI_TEXT.scanForFileChanges }).click();
+    await mainWindow.getByRole("button", { name: UI_TEXT.scanForFileChanges }).click({ force: true });
+    await expect(mainWindow.getByTestId("sidebar-metadata-scan-include-subfolders")).toBeVisible({
+      timeout: 10_000,
+    });
+  }).toPass({ timeout: 75_000 });
   const subfolders = mainWindow.getByTestId("sidebar-metadata-scan-include-subfolders");
-  await expect(subfolders).toBeVisible({ timeout: 30_000 });
+  await expect(subfolders).toBeVisible({ timeout: 15_000 });
   if (!(await subfolders.isChecked())) {
     await subfolders.check({ force: true });
   }
-  await mainWindow.locator('[title="Start metadata scan"]').first().click();
+  const completion = awaitNextManualMetadataScanForFolder(mainWindow, normalized);
+  await expect(async () => {
+    await mainWindow.locator('[title="Start metadata scan"]').first().click({ force: true });
+  }).toPass({ timeout: 15_000 });
   return completion;
 }
 
