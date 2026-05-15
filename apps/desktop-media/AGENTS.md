@@ -134,9 +134,13 @@ Product UX and behavior: `docs/PRODUCT-FEATURES/AI/AI-SEARCH-DESKTOP.md`.
 ```bash
 pnpm dev                  # Start Electron + Vite dev (from monorepo root: pnpm dev:desktop)
 pnpm build                # Build main + renderer (Vite) into dist-electron / dist-renderer
-pnpm run dist:win         # From apps/desktop-media: NSIS installer under release/ (unsigned; see CI workflow)
+pnpm run dist:win         # From apps/desktop-media: NSIS installer under release/artifacts (unsigned; Windows host)
+pnpm run dist:linux       # AppImage + deb under release/artifacts (run on Linux or WSL2; needs build-essential + python3)
+pnpm run dist:linux:dir   # Unpacked linux dir only (faster smoke); output under release/artifacts/linux-unpacked
 pnpm test                 # Run tests (Vitest)
 ```
+
+Linux packaging requires compiling native addons (`better-sqlite3`, etc.) for Electron on that OS. Do not run `dist:linux` from Windows against the same tree unless using a Linux environment (WSL2, container, CI). Step-by-step WSL2 setup, packages, and manual AppImage/deb tests: [docs/desktop-wsl-linux-build.md](../../docs/desktop-wsl-linux-build.md).
 
 This app is intended to be distributed under an open-source license (see `LICENSE` in this directory). The surrounding monorepo may include other proprietary or open-core apps; only files under `apps/desktop-media/` are covered by that license unless noted otherwise.
 

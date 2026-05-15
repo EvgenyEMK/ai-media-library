@@ -56,6 +56,7 @@ import {
   detectAiInferenceGpuOptions,
 } from "./ai-inference-gpu";
 import { setSemanticIndexDebugLogPath } from "./semantic-index-debug-log";
+import { isVerboseElectronLogsEnabled } from "./verbose-electron-logs";
 import { shouldSkipStartupAiModelsDownload } from "./startup-ai-models";
 
 const configuredUserDataPath = resolveInstalledUserDataPath();
@@ -167,6 +168,11 @@ function beginStartupNativeFaceModelEnsure(
 app.whenReady().then(async () => {
   initDesktopDatabase(app.getPath("userData"));
   setSemanticIndexDebugLogPath(app.getPath("userData"));
+  if (isVerboseElectronLogsEnabled()) {
+    console.error(
+      "[main] EMK_VERBOSE_ELECTRON_LOGS=1 — main diagnostics on stderr ([semantic-index], [semantic-search], …)",
+    );
+  }
   setDatabaseProvider(() => getDesktopDatabase());
   clearAllInProgressFlags();
 

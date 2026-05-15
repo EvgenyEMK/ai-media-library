@@ -55,20 +55,13 @@ import {
 } from "./folder-utils";
 import { emitSemanticIndexProgress } from "./progress-emitters";
 import { acquirePowerSave, releasePowerSave } from "./power-save-manager";
-import { isVerboseElectronLogsEnabled } from "../verbose-electron-logs";
+import { logVerbose } from "../verbose-electron-logs";
 import { getFaceRecognitionSimilarityThreshold } from "../face-recognition-threshold";
 import type { SemanticSearchSignalMode } from "@emk/media-store";
 import { readSettings } from "../storage";
 import { app } from "electron";
 import { runWrongImageRotationPrecheck } from "../orientation-preprocess";
 import { readSemanticIndexDebugLogTail } from "../semantic-index-debug-log";
-
-const consoleLog = console.log.bind(console);
-
-function logVerbose(...args: Parameters<typeof console.log>): void {
-  if (!isVerboseElectronLogsEnabled()) return;
-  consoleLog(...args);
-}
 
 function formatKeywordRerankHitScores(r: ReRankedRow): string {
   const scores = r.keywordHitScores;

@@ -1,11 +1,13 @@
-# Windows packaging (Phase 1). See AGENTS.md / root docs for release process.
+# Windows (NSIS) and Linux (AppImage + deb). Build Linux artifacts on Linux or WSL2, not by cross-compiling from Windows.
 # https://www.electron.build/configuration/configuration
 
 appId: com.emk.aimedialibrary
 productName: AI Media Library
 copyright: Copyright © EMK contributors
 
-# GitHub Releases provider for electron-updater (requires published `latest.yml` + installer per release).
+# GitHub Releases provider for electron-updater. Each GitHub Release must include update metadata for every shipped OS:
+# - Windows: `latest.yml` + NSIS `.exe` (and `.exe.blockmap` when publishing via electron-builder).
+# - Linux (AppImage / generic): `latest-linux.yml` + `.AppImage` (and `.deb` when deb is a target), plus blockmaps if used.
 publish:
   provider: github
   owner: EMK-solutions
@@ -42,6 +44,13 @@ asarUnpack:
   - "**/node_modules/exiftool-vendored/**/*"
   - "**/node_modules/better-sqlite3/**/*.node"
   - "**/node_modules/onnxruntime-node/**/*"
+  # Sharp uses platform packages under @img. The native .node can be unpacked
+  # by the generic rule above, but libvips ships as .so files that dlopen
+  # cannot read from app.asar.
+  - "**/node_modules/@img/sharp-*/**/*"
+  # Transformers.js loads ONNX/tokenizer assets at runtime; keeping this inside app.asar
+  # breaks vision warmup on Linux packaged builds (immediate semantic-index failure).
+  - "**/@huggingface/transformers/**"
 
 afterPack: scripts/electron-builder-after-pack.mjs
 
@@ -64,3 +73,19 @@ nsis:
   perMachine: false
   deleteAppDataOnUninstall: false
   include: build-resources/installer-user-data.nsh
+
+linux:
+  icon: build-resources/app-icon.png
+  vendor: EMK contributors
+  maintainer: EMK contributors <ai-media-library@noreply.github.com>
+  synopsis: Local AI media library
+  description: Desktop-first local photo library with semantic search and offline AI (Electron).
+  category: Graphics
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+  artifactName: "${productName}-${version}-Linux-${arch}.${ext}"

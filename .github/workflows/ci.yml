@@ -68,3 +68,41 @@ jobs:
 
       - name: Run desktop E2E smoke subset
         run: pnpm --filter @emk/desktop-media test:e2e:ci-smoke
+
+  desktop-linux-dist:
+    name: Desktop Linux distributable (AppImage + deb)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install Linux build and packaging deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3 fakeroot
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10.16.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Linux distributables
+        run: pnpm --filter @emk/desktop-media run dist:linux
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-linux-release-artifacts
+          path: apps/desktop-media/release/artifacts/**
+          if-no-files-found: error

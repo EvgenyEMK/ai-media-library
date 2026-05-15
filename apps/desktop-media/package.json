@@ -5,6 +5,7 @@
   "description": "AI Media Library — desktop-first local photo library with semantic search and offline AI (Electron + React + SQLite)",
   "license": "MIT",
   "author": "EMK contributors",
+  "homepage": "https://github.com/EMK-solutions/ai-media-library",
   "main": "dist-electron/main.js",
   "scripts": {
     "rebuild:native": "node scripts/rebuild-native.mjs",
@@ -33,6 +34,8 @@
     "generate:icon": "node scripts/generate-app-icon.mjs",
     "clean:release": "node scripts/clean-release.mjs",
     "dist:win": "pnpm run clean:release && pnpm run build && pnpm run rebuild:native && pnpm exec electron-builder --win --x64 --config electron-builder.yml",
+    "dist:linux": "pnpm run clean:release && pnpm run build && pnpm run rebuild:native && pnpm exec electron-builder --linux --x64 --config electron-builder.yml",
+    "dist:linux:dir": "pnpm run clean:release && pnpm run build && pnpm run rebuild:native && pnpm exec electron-builder --linux --x64 --dir --config electron-builder.yml",
     "audit:release-size": "node scripts/audit-release-size.mjs"
   },
   "dependencies": {

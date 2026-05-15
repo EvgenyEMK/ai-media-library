@@ -1,8 +1,8 @@
 /**
  * Auto-update wiring (electron-updater + GitHub Releases).
  *
- * Publishing: configure `publish` in electron-builder.yml and attach `latest.yml`
- * plus the NSIS installer to each GitHub Release (CI with GH_TOKEN / electron-builder publish).
+ * Publishing: configure `publish` in electron-builder.yml and attach per-OS update metadata
+ * (`latest.yml` + NSIS on Windows; `latest-linux.yml` + AppImage/deb on Linux) and installers to each GitHub Release.
  * Updates apply only to packaged builds (`app.isPackaged`).
  */
 

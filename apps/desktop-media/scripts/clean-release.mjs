@@ -53,6 +53,9 @@ async function removeWithRetries(targetPath, { maxAttempts = 40, required = true
 const lockedAsarPath = path.join(releaseDir, "win-unpacked", "resources", "app.asar");
 await removeWithRetries(lockedAsarPath, { required: false, maxAttempts: 3 });
 await removeWithRetries(path.join(releaseDir, "win-unpacked"), { required: false, maxAttempts: 3 });
+const linuxLockedAsarPath = path.join(releaseDir, "linux-unpacked", "resources", "app.asar");
+await removeWithRetries(linuxLockedAsarPath, { required: false, maxAttempts: 3 });
+await removeWithRetries(path.join(releaseDir, "linux-unpacked"), { required: false, maxAttempts: 3 });
 await removeWithRetries(path.join(releaseDir, "artifacts"));
 
 const { exeName, blockmapName } = await readWindowsInstallerBasenames();
