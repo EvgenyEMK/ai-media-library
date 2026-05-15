@@ -5,7 +5,10 @@ appId: com.emk.aimedialibrary
 productName: AI Media Library
 copyright: Copyright © EMK contributors
 
-# GitHub Releases provider for electron-updater. Each GitHub Release must include update metadata for every shipped OS:
+# GitHub Releases provider for electron-updater (feed URL in packaged app).
+# CI and local `dist:*` scripts pass `--publish never` so builds only write artifacts under
+# release/artifacts. Upload to GitHub Releases is a separate release step (GH_TOKEN required).
+# Each GitHub Release must include update metadata for every shipped OS:
 # - Windows: `latest.yml` + NSIS `.exe` (and `.exe.blockmap` when publishing via electron-builder).
 # - Linux (AppImage / generic): `latest-linux.yml` + `.AppImage` (and `.deb` when deb is a target), plus blockmaps if used.
 publish:

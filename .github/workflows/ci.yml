@@ -71,6 +71,8 @@ jobs:
 
   desktop-linux-dist:
     name: Desktop Linux distributable (AppImage + deb)
+    # Build installers only on main (not on dev/PR) to save CI time; remove this `if` to build on every push.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
