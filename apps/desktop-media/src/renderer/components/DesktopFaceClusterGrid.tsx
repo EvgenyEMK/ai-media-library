@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
+  RefreshCw,
   Sparkles,
   UserPlus,
   Users,
@@ -69,9 +70,9 @@ function sortFaceIdsBySimilarityDesc(
 const UI_TEXT = {
   title: "Untagged faces",
   description:
-    "Auto-grouped faces that haven't been assigned a person tag yet. Name a group to assign all its faces at once.",
+    "Auto-grouped faces without a person tag yet. Assign a person to the group to bulk-tag faces for that person. Assigning a person does not automatically tag every face in the group.",
   runClustering: "Find groups",
-  refresh: "Refresh",
+  refreshAriaLabel: "Refresh face groups list",
   empty: "No face clusters found. Run face detection with embeddings first, then click \"Find groups\".",
   members: "faces",
   nameGroup: "Name this person",
@@ -806,9 +807,15 @@ export function DesktopFaceClusterGrid({
               void loadClusters(0);
             }}
             disabled={isLoading || isClusteringRunning}
-            className="inline-flex h-9 items-center justify-center rounded-md border border-border px-3 text-sm"
+            title={UI_TEXT.refreshAriaLabel}
+            aria-label={UI_TEXT.refreshAriaLabel}
+            className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
           >
-            {isLoading ? "Loading..." : UI_TEXT.refresh}
+            {isLoading ? (
+              <Loader2 className="size-8 animate-spin" aria-hidden />
+            ) : (
+              <RefreshCw className="size-8" aria-hidden />
+            )}
           </button>
         </div>
       </header>
@@ -901,7 +908,9 @@ export function DesktopFaceClusterGrid({
                 className="rounded-xl border border-border bg-card shadow-sm"
               >
                 <div
-                  className="flex cursor-pointer items-center gap-4 p-4"
+                  className={`flex cursor-pointer items-center gap-4 border border-transparent p-4 transition-colors duration-150 hover:border-border hover:bg-muted/50 ${
+                    expanded ? "rounded-t-xl" : "rounded-xl"
+                  }`}
                   onClick={() => void handleExpandCluster(cluster)}
                 >
                   {representativeFace ? (
@@ -1015,7 +1024,11 @@ export function DesktopFaceClusterGrid({
                       <>
                         {personTags.length > 0 ? (
                           <select
-                            className="h-8 rounded-md border border-border bg-background px-2 text-xs"
+                            className={`h-8 rounded-md border bg-background px-2 text-xs ${
+                              expanded && !selectedTargetTagId
+                                ? "border-amber-500 ring-1 ring-amber-500/40"
+                                : "border-border"
+                            }`}
                             value={selectedTargetTagId}
                             disabled={isAssigning}
                             onChange={(event) => {
@@ -1054,7 +1067,11 @@ export function DesktopFaceClusterGrid({
                             type="button"
                             onClick={() => handleStartNaming(cluster.clusterId)}
                             disabled={isAssigning}
-                            className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-3 text-xs hover:bg-muted"
+                            className={`inline-flex h-8 items-center gap-1 rounded-md border px-3 text-xs hover:bg-muted ${
+                              expanded
+                                ? "border-amber-500 ring-1 ring-amber-500/40"
+                                : "border-border"
+                            }`}
                           >
                             <UserPlus className="size-3" />
                             {UI_TEXT.nameGroup}

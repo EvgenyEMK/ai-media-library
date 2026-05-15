@@ -8,12 +8,10 @@ import {
   openOllamaInstallDocInBrowser,
   PEOPLE_FACES_HELP_SLIDE_ORDER,
 } from "./onboarding/guided-slide-catalog";
-import { PeopleOnboardingModal, type PeopleOnboardingSlideId } from "./PeopleOnboardingModal";
 
 const UI_TEXT = {
   title: "People",
   helpAria: "People & faces overview",
-  taggingHelpLabel: "Tagging & birth dates",
   addPersonAria: "Add person",
   refreshAriaLabel:
     "Refresh people list and recompute similar face counts for the current page",
@@ -28,8 +26,6 @@ export function PeopleTagsListHeader({
   onRefresh: () => void;
   onAddPerson: () => void;
 }): ReactElement {
-  const [onboardingOpen, setOnboardingOpen] = useState(false);
-  const [onboardingSlideId, setOnboardingSlideId] = useState<PeopleOnboardingSlideId>("whyTags");
   const [peopleGuideOpen, setPeopleGuideOpen] = useState(false);
   const [modelsReferenceOpen, setModelsReferenceOpen] = useState(false);
 
@@ -73,16 +69,6 @@ export function PeopleTagsListHeader({
                 <HelpCircle className="size-[29px]" aria-hidden />
               </button>
             </div>
-            <button
-              type="button"
-              className="m-0 w-fit rounded-md px-0.5 text-left text-sm font-medium text-primary underline-offset-2 hover:underline"
-              onClick={() => {
-                setOnboardingSlideId("whyTags");
-                setOnboardingOpen(true);
-              }}
-            >
-              {UI_TEXT.taggingHelpLabel}
-            </button>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5 md:pt-1">
@@ -111,12 +97,6 @@ export function PeopleTagsListHeader({
           </button>
         </div>
       </header>
-
-      <PeopleOnboardingModal
-        open={onboardingOpen}
-        initialSlideId={onboardingSlideId}
-        onClose={() => setOnboardingOpen(false)}
-      />
 
       <GuidedSlideModal
         open={peopleGuideOpen}

@@ -1,5 +1,5 @@
 import { type ReactElement } from "react";
-import { Check, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, Loader2, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { useDesktopPeopleGroupsTab } from "../hooks/use-desktop-people-groups-tab";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
 import { PeopleMembershipChip } from "./people-membership-chip";
@@ -9,7 +9,7 @@ const UI_TEXT = {
   title: "People groups",
   description:
     "Organize people into named groups. Deleting a group removes only the grouping, not person tags.",
-  refresh: "Refresh",
+  refreshAriaLabel: "Refresh people groups",
   empty: "No groups yet. Create one from the People tab or add a group here.",
   noMembers: "No people assigned.",
   namePlaceholder: "Group name",
@@ -62,9 +62,15 @@ export function DesktopPeopleGroupsTab(): ReactElement {
           type="button"
           onClick={() => void load()}
           disabled={isLoading}
-          className="inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-border px-3 text-sm"
+          title={UI_TEXT.refreshAriaLabel}
+          aria-label={UI_TEXT.refreshAriaLabel}
+          className="inline-flex size-10 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
         >
-          {isLoading ? "Loading..." : UI_TEXT.refresh}
+          {isLoading ? (
+            <Loader2 className="size-8 animate-spin" aria-hidden />
+          ) : (
+            <RefreshCw className="size-8" aria-hidden />
+          )}
         </button>
       </header>
 

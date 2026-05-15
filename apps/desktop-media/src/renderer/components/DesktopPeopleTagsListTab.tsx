@@ -14,8 +14,9 @@ import { PeopleTagsNameSearchHeader } from "./people-tags-name-search-header";
 const UI_TEXT = {
   noFilterMatches: "No people match the filter value",
   description:
-    "Manually tagged faces are used to build person's digital profile (centroid) that is used to automatically find other similar faces",
-  empty: "No person tags yet. Tag faces in photos or name a cluster in Untagged faces.",
+    "Assigning a person tag to faces detected in images helps group photos in albums, narrow search results, and more.",
+  empty:
+    "No person tags yet. Add people here or in Untagged faces. You can also tag a face in the photo viewer info panel.",
   colName: "Name",
   colBirthDate: "BIRTH DATE",
   colBirthDateHint: "YYYY-MM-DD",

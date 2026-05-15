@@ -13,7 +13,7 @@ import {
   taggedFacesTabShouldOfferShowAll,
   type PersonTagListMeta,
 } from "../lib/tagged-faces-tab-visible-tags";
-import { Check, Loader2, X } from "lucide-react";
+import { Check, HelpCircle, Loader2, X } from "lucide-react";
 import { chunkArray } from "@emk/shared-contracts";
 import {
   FaceHoverPhotoPreviewLayer,
@@ -24,6 +24,7 @@ import {
   type PeopleWorkspaceTaggedFace,
 } from "@emk/media-viewer";
 import type { TaggedFaceInfo } from "../../shared/ipc";
+import { PeopleOnboardingModal } from "./PeopleOnboardingModal";
 import { FaceSelectionFooter } from "./FaceSelectionFooter";
 import { computeFaceBackgroundCropStyle, toFileUrl } from "./face-cluster-utils";
 import { PeoplePaginationBar } from "./people-pagination-bar";
@@ -36,11 +37,14 @@ const MATCH_PAGE_SIZE = MATCH_GRID_COLS * MATCH_FACE_ROWS_PER_PAGE;
 const UI_TEXT = {
   title: "Tagged faces",
   description:
-    "Select a person tag and review related faces from your local database. Assigning a related face updates local tags.",
-  refresh: "Refresh",
+    "Faces assigned (tagged) to a person and unconfirmed similar faces.",
+  refreshAriaLabel:
+    "Refresh person tags, tagged faces for the selected person, and similar face suggestions.",
+  taggingHelpAria: "Tagging & birth dates",
   tagsHeading: "Person tags",
   emptyTags: "Create person tags in photo face tags to start assigning related faces.",
   noFilterMatches: "No people match the filter.",
+  addPeopleFirst: "Please add people first.",
   matchesHeading: "Auto-detected matching faces",
   emptyMatches: "Select a person tag to see related faces.",
   loadError: "Failed to load people workspace.",
@@ -186,6 +190,7 @@ export function DesktopPeopleWorkspace({
   const [pendingAssignRowKey, setPendingAssignRowKey] = useState<string | null>(null);
   const [faceMatchThreshold, setFaceMatchThreshold] = useState(0.6);
   const [isRecomputingProfile, setIsRecomputingProfile] = useState(false);
+  const [taggingOnboardingOpen, setTaggingOnboardingOpen] = useState(false);
 
   const loadTags = useCallback(async () => {
     setIsRefreshing(true);
@@ -470,6 +475,8 @@ export function DesktopPeopleWorkspace({
   const declinedFaceSet = useMemo(() => new Set(declinedFaceIds), [declinedFaceIds]);
   const acceptedFaceSet = useMemo(() => new Set(acceptedFaceIds), [acceptedFaceIds]);
   const isAnyAssigning = assigningFaceIds.length > 0;
+  const libraryMissingPersonTagsMessage =
+    tagsMeta.length === 0 ? (isRefreshing ? "Loading…" : UI_TEXT.addPeopleFirst) : null;
 
   const headerActionsElement =
     selectedTagId || needsReprocessing ? (
@@ -629,16 +636,28 @@ export function DesktopPeopleWorkspace({
   );
 
   return (
+    <>
     <PeopleFaceWorkspace
       title={UI_TEXT.title}
       description={UI_TEXT.description}
-      refreshLabel={UI_TEXT.refresh}
+      refreshAriaLabel={UI_TEXT.refreshAriaLabel}
       isRefreshing={isRefreshing}
       onRefresh={() => {
         void loadTags();
         void loadMatches(selectedTagId);
         void loadTaggedFaces(selectedTagId);
       }}
+      titleAccessory={
+        <button
+          type="button"
+          onClick={() => setTaggingOnboardingOpen(true)}
+          className="inline-flex size-[33px] shrink-0 items-center justify-center rounded-full border border-border p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+          aria-label={UI_TEXT.taggingHelpAria}
+          title={UI_TEXT.taggingHelpAria}
+        >
+          <HelpCircle className="size-[29px]" aria-hidden />
+        </button>
+      }
       tagsHeading={UI_TEXT.tagsHeading}
       tags={visibleTags}
       selectedTagId={selectedTagId}
@@ -648,8 +667,9 @@ export function DesktopPeopleWorkspace({
           ? UI_TEXT.noFilterMatches
           : UI_TEXT.emptyTags
       }
+      libraryMissingPersonTagsMessage={libraryMissingPersonTagsMessage}
       tagsToolbar={
-        tagsMeta.length > 0 ? (
+        tagsMeta.length > 0 && libraryMissingPersonTagsMessage === null ? (
           <PeopleTagsNameSearchRow
             value={nameFilter}
             onChange={setNameFilter}
@@ -683,5 +703,11 @@ export function DesktopPeopleWorkspace({
       errorMessage={errorMessage}
       headerActions={headerActionsElement}
     />
+    <PeopleOnboardingModal
+      open={taggingOnboardingOpen}
+      initialSlideId="whyTags"
+      onClose={() => setTaggingOnboardingOpen(false)}
+    />
+    </>
   );
 }

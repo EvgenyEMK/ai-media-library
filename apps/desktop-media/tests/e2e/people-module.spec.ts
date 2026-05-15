@@ -10,8 +10,11 @@ test.describe("People module", () => {
     await expect(mainWindow.getByText("YYYY-MM-DD", { exact: true })).toBeVisible();
   });
 
-  test("People onboarding opens from help and shows first slide", async ({ mainWindow }) => {
+  test("People onboarding opens from Tagged faces help and shows first slide", async ({
+    mainWindow,
+  }) => {
     await mainWindow.getByRole("complementary").getByRole("button", { name: "People" }).click();
+    await mainWindow.getByRole("button", { name: "Tagged faces" }).click();
     await mainWindow.getByRole("button", { name: "Tagging & birth dates" }).click();
     await expect(mainWindow.getByRole("heading", { name: "People tags" })).toBeVisible();
     await expect(

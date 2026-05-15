@@ -83,12 +83,56 @@ export interface PeopleWorkspaceTaggedFace {
   onOpenPhoto?: () => void;
 }
 
+function RefreshCwIcon(): ReactElement {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+      <path d="M21 3v5h-5" />
+      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+      <path d="M8 16H3v5" />
+    </svg>
+  );
+}
+
+function SpinnerIcon(): ReactElement {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="animate-spin"
+      aria-hidden
+    >
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
+  );
+}
+
 interface PeopleFaceWorkspaceProps {
   title: string;
   description: string;
-  refreshLabel: string;
+  refreshAriaLabel: string;
   isRefreshing: boolean;
   onRefresh: () => void;
+  /** Shown beside the page title (e.g. help trigger). */
+  titleAccessory?: ReactNode;
   tagsHeading: string;
   tags: PeopleWorkspaceTag[];
   selectedTagId: string | null;
@@ -110,6 +154,11 @@ interface PeopleFaceWorkspaceProps {
   headerActions?: ReactElement | null;
   /** Inline with tag chips in one wrapping row (e.g. name filter + show/hide). */
   tagsToolbar?: ReactNode;
+  /**
+   * When set (library has no person tags yet), hide person-tags + matches sections and show this
+   * banner instead (desktop Tagged faces tab).
+   */
+  libraryMissingPersonTagsMessage?: string | null;
 }
 
 export type PeopleWorkspaceOpenFacePhotoFn = (args: {
@@ -231,9 +280,10 @@ function HoverPreviewThumb({
 export function PeopleFaceWorkspace({
   title,
   description,
-  refreshLabel,
+  refreshAriaLabel,
   isRefreshing,
   onRefresh,
+  titleAccessory = null,
   tagsHeading,
   tags,
   selectedTagId,
@@ -252,6 +302,7 @@ export function PeopleFaceWorkspace({
   errorMessage,
   headerActions,
   tagsToolbar,
+  libraryMissingPersonTagsMessage = null,
 }: PeopleFaceWorkspaceProps): ReactElement {
   const [showAllTaggedFaces, setShowAllTaggedFaces] = useState(false);
   const [taggedFacesPage, setTaggedFacesPage] = useState(0);
@@ -288,18 +339,23 @@ export function PeopleFaceWorkspace({
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-8">
       <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold md:text-4xl">{title}</h1>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-3xl font-bold md:text-4xl">{title}</h1>
+            {titleAccessory}
+          </div>
           <p className="max-w-3xl text-sm text-muted-foreground md:text-base">{description}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2 md:items-start md:pt-1">
           {headerActions}
           <button
             type="button"
             onClick={onRefresh}
             disabled={isRefreshing}
-            className="inline-flex h-9 items-center justify-center rounded-md border border-border px-3 text-sm"
+            title={refreshAriaLabel}
+            aria-label={refreshAriaLabel}
+            className="inline-flex size-10 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
           >
-            {isRefreshing ? "Loading..." : refreshLabel}
+            {isRefreshing ? <SpinnerIcon /> : <RefreshCwIcon />}
           </button>
         </div>
       </header>
@@ -310,185 +366,195 @@ export function PeopleFaceWorkspace({
         </p>
       ) : null}
 
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          {tagsHeading}
-        </h2>
-        {tags.length === 0 ? (
-          <div className="space-y-2">
-            {tagsToolbar ? (
-              <div className="flex flex-wrap items-center gap-2">{tagsToolbar}</div>
-            ) : null}
-            <div className="rounded-md border border-dashed border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-              {emptyTagsLabel}
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center gap-2">
-            {tagsToolbar}
-            {tags.map((tag) => {
-              const isActive = selectedTagId === tag.id;
-              return (
-                <button
-                  key={tag.id}
-                  type="button"
-                  onClick={() => onTagSelect(tag.id)}
-                  className={`inline-flex h-8 shrink-0 items-center rounded-md border px-3 text-sm transition ${
-                    isActive ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
-                  }`}
-                >
-                  {tag.label}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {taggedFaces !== undefined && selectedTagId ? (
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            {taggedFacesHeading ?? "Tagged faces"}
-          </h2>
-          {isTaggedFacesLoading ? (
-            <div
-              className="flex min-h-[72px] items-center justify-center rounded-md border border-dashed border-border bg-muted/20 px-4 py-8"
-              role="status"
-              aria-live="polite"
-              aria-busy="true"
-              aria-label="Loading thumbnails"
-            >
-              <div
-                className="size-8 shrink-0 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-primary"
-                aria-hidden
-              />
-            </div>
-          ) : taggedFaces.length === 0 ? (
-            <div className="rounded-md border border-dashed border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-              {emptyTaggedFacesLabel ?? "No faces tagged for this person yet."}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="grid grid-cols-5 gap-1">
-                {visibleTaggedFaces.map((face) => (
-                  <HoverPreviewThumb
-                    key={face.id}
-                    thumbnailStyle={face.backgroundStyle}
-                    previewStyle={face.previewStyle}
-                    previewImageSrc={face.previewImageSrc}
-                    previewImageWidth={face.previewImageWidth}
-                    previewImageHeight={face.previewImageHeight}
-                    sizeClassName="aspect-square w-full"
-                    ariaLabel="Photo preview"
-                    subtitle={face.subtitle}
-                    onOpenPhoto={face.onOpenPhoto}
-                  />
-                ))}
+      {libraryMissingPersonTagsMessage !== null ? (
+        <div className="rounded-xl border border-dashed border-border bg-muted/30 px-6 py-12 text-center text-sm text-muted-foreground">
+          {libraryMissingPersonTagsMessage}
+        </div>
+      ) : (
+        <>
+          <section className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              {tagsHeading}
+            </h2>
+            {tags.length === 0 ? (
+              <div className="space-y-2">
+                {tagsToolbar ? (
+                  <div className="flex flex-wrap items-center gap-2">{tagsToolbar}</div>
+                ) : null}
+                <div className="rounded-md border border-dashed border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+                  {emptyTagsLabel}
+                </div>
               </div>
-              {hasMoreTaggedFaces && !showAllTaggedFaces ? (
-                <button
-                  type="button"
-                  onClick={() => setShowAllTaggedFaces(true)}
-                  className="w-full rounded-md border border-border bg-muted/30 py-2 text-sm font-medium text-muted-foreground hover:bg-muted"
-                >
-                  Show all
-                </button>
-              ) : null}
-              {usePagedTaggedFaces && taggedTotalPages > 1 ? (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
-                  <span className="text-muted-foreground">
-                    {taggedFaceCount === 0
-                      ? "No faces"
-                      : `${safeTaggedPage * taggedFacesPageSize! + 1}–${Math.min(
-                          taggedFaceCount,
-                          (safeTaggedPage + 1) * taggedFacesPageSize!,
-                        )} of ${taggedFaceCount}`}
-                  </span>
-                  <div className="flex items-center gap-2">
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                {tagsToolbar}
+                {tags.map((tag) => {
+                  const isActive = selectedTagId === tag.id;
+                  return (
                     <button
+                      key={tag.id}
                       type="button"
-                      disabled={safeTaggedPage <= 0}
-                      onClick={() => setTaggedFacesPage((p) => Math.max(0, p - 1))}
-                      className="inline-flex size-8 items-center justify-center rounded-md border border-border hover:bg-muted disabled:opacity-50"
-                      aria-label="Previous page"
-                      title="Previous page"
+                      onClick={() => onTagSelect(tag.id)}
+                      className={`inline-flex h-8 shrink-0 items-center rounded-md border px-3 text-sm transition ${
+                        isActive
+                          ? "border-primary bg-primary/10"
+                          : "border-border hover:border-primary/50"
+                      }`}
                     >
-                      <ChevronPageLeftIcon />
+                      {tag.label}
                     </button>
-                    <span className="tabular-nums text-muted-foreground">
-                      Page {safeTaggedPage + 1} / {taggedTotalPages}
-                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          {taggedFaces !== undefined && selectedTagId ? (
+            <section className="space-y-3">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                {taggedFacesHeading ?? "Tagged faces"}
+              </h2>
+              {isTaggedFacesLoading ? (
+                <div
+                  className="flex min-h-[72px] items-center justify-center rounded-md border border-dashed border-border bg-muted/20 px-4 py-8"
+                  role="status"
+                  aria-live="polite"
+                  aria-busy="true"
+                  aria-label="Loading thumbnails"
+                >
+                  <div
+                    className="size-8 shrink-0 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-primary"
+                    aria-hidden
+                  />
+                </div>
+              ) : taggedFaces.length === 0 ? (
+                <div className="rounded-md border border-dashed border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+                  {emptyTaggedFacesLabel ?? "No faces tagged for this person yet."}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-5 gap-1">
+                    {visibleTaggedFaces.map((face) => (
+                      <HoverPreviewThumb
+                        key={face.id}
+                        thumbnailStyle={face.backgroundStyle}
+                        previewStyle={face.previewStyle}
+                        previewImageSrc={face.previewImageSrc}
+                        previewImageWidth={face.previewImageWidth}
+                        previewImageHeight={face.previewImageHeight}
+                        sizeClassName="aspect-square w-full"
+                        ariaLabel="Photo preview"
+                        subtitle={face.subtitle}
+                        onOpenPhoto={face.onOpenPhoto}
+                      />
+                    ))}
+                  </div>
+                  {hasMoreTaggedFaces && !showAllTaggedFaces ? (
                     <button
                       type="button"
-                      disabled={safeTaggedPage >= taggedTotalPages - 1}
-                      onClick={() =>
-                        setTaggedFacesPage((p) => Math.min(taggedTotalPages - 1, p + 1))
-                      }
-                      className="inline-flex size-8 items-center justify-center rounded-md border border-border hover:bg-muted disabled:opacity-50"
-                      aria-label="Next page"
-                      title="Next page"
+                      onClick={() => setShowAllTaggedFaces(true)}
+                      className="w-full rounded-md border border-border bg-muted/30 py-2 text-sm font-medium text-muted-foreground hover:bg-muted"
                     >
-                      <ChevronPageRightIcon />
+                      Show all
+                    </button>
+                  ) : null}
+                  {usePagedTaggedFaces && taggedTotalPages > 1 ? (
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
+                      <span className="text-muted-foreground">
+                        {taggedFaceCount === 0
+                          ? "No faces"
+                          : `${safeTaggedPage * taggedFacesPageSize! + 1}–${Math.min(
+                              taggedFaceCount,
+                              (safeTaggedPage + 1) * taggedFacesPageSize!,
+                            )} of ${taggedFaceCount}`}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={safeTaggedPage <= 0}
+                          onClick={() => setTaggedFacesPage((p) => Math.max(0, p - 1))}
+                          className="inline-flex size-8 items-center justify-center rounded-md border border-border hover:bg-muted disabled:opacity-50"
+                          aria-label="Previous page"
+                          title="Previous page"
+                        >
+                          <ChevronPageLeftIcon />
+                        </button>
+                        <span className="tabular-nums text-muted-foreground">
+                          Page {safeTaggedPage + 1} / {taggedTotalPages}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={safeTaggedPage >= taggedTotalPages - 1}
+                          onClick={() =>
+                            setTaggedFacesPage((p) => Math.min(taggedTotalPages - 1, p + 1))
+                          }
+                          className="inline-flex size-8 items-center justify-center rounded-md border border-border hover:bg-muted disabled:opacity-50"
+                          aria-label="Next page"
+                          title="Next page"
+                        >
+                          <ChevronPageRightIcon />
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </section>
+          ) : null}
+
+          <section className="space-y-4">
+            <h2 className="text-lg font-semibold">
+              {matchesHeading}{" "}
+              <span className="font-normal text-muted-foreground">{matchesCountLabel}</span>
+            </h2>
+
+            {matchesContent ? (
+              matchesContent
+            ) : matches.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border bg-muted/30 px-6 py-12 text-center">
+                <p className="text-sm text-muted-foreground">{emptyMatchesLabel}</p>
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {matches.map((match) => (
+                  <div
+                    key={match.id}
+                    className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3 shadow-sm"
+                  >
+                    <HoverPreviewThumb
+                      thumbnailStyle={match.backgroundStyle}
+                      previewStyle={match.previewStyle}
+                      previewImageSrc={match.previewImageSrc}
+                      previewImageWidth={match.previewImageWidth}
+                      previewImageHeight={match.previewImageHeight}
+                      sizeClassName="relative aspect-square w-full overflow-hidden"
+                      ariaLabel="Photo preview"
+                      onOpenPhoto={match.onOpenPhoto}
+                    />
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium text-foreground">{match.title}</div>
+                      {match.subtitle ? (
+                        <div className="truncate text-xs text-muted-foreground">{match.subtitle}</div>
+                      ) : null}
+                      {match.confidenceLabel ? (
+                        <div className="text-xs text-muted-foreground">{match.confidenceLabel}</div>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={match.onAction}
+                      disabled={match.actionDisabled}
+                      className="inline-flex h-8 items-center justify-center rounded-md border border-border px-3 text-sm"
+                    >
+                      {match.actionLabel}
                     </button>
                   </div>
-                </div>
-              ) : null}
-            </div>
-          )}
-        </section>
-      ) : null}
-
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold">
-          {matchesHeading}{" "}
-          <span className="font-normal text-muted-foreground">{matchesCountLabel}</span>
-        </h2>
-
-        {matchesContent ? (
-          matchesContent
-        ) : matches.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border bg-muted/30 px-6 py-12 text-center">
-            <p className="text-sm text-muted-foreground">{emptyMatchesLabel}</p>
-          </div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {matches.map((match) => (
-              <div
-                key={match.id}
-                className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3 shadow-sm"
-              >
-                <HoverPreviewThumb
-                  thumbnailStyle={match.backgroundStyle}
-                  previewStyle={match.previewStyle}
-                  previewImageSrc={match.previewImageSrc}
-                  previewImageWidth={match.previewImageWidth}
-                  previewImageHeight={match.previewImageHeight}
-                  sizeClassName="relative aspect-square w-full overflow-hidden"
-                  ariaLabel="Photo preview"
-                  onOpenPhoto={match.onOpenPhoto}
-                />
-                <div className="space-y-1">
-                  <div className="text-sm font-medium text-foreground">{match.title}</div>
-                  {match.subtitle ? (
-                    <div className="truncate text-xs text-muted-foreground">{match.subtitle}</div>
-                  ) : null}
-                  {match.confidenceLabel ? (
-                    <div className="text-xs text-muted-foreground">{match.confidenceLabel}</div>
-                  ) : null}
-                </div>
-                <button
-                  type="button"
-                  onClick={match.onAction}
-                  disabled={match.actionDisabled}
-                  className="inline-flex h-8 items-center justify-center rounded-md border border-border px-3 text-sm"
-                >
-                  {match.actionLabel}
-                </button>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-      </section>
+            )}
+          </section>
+        </>
+      )}
     </div>
   );
 }
