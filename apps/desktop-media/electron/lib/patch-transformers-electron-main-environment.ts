@@ -18,6 +18,10 @@ export function patchProcessReleaseForTransformersInElectronMain(
   }
   const release = proc.release as { name?: string } | undefined;
   if (release && release.name !== "node") {
-    (release as { name: string }).name = "node";
+    Object.defineProperty(release, "name", {
+      configurable: true,
+      enumerable: true,
+      value: "node",
+    });
   }
 }

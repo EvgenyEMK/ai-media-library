@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { app } from "electron";
 import { resolveHuggingfaceModelsRoot } from "./app-paths";
@@ -33,7 +34,7 @@ function getTransformersCacheDirs(): { cacheDir: string; localModelPath: string 
 function ensureTransformersEnvConfigured(): Promise<void> {
   if (!transformersEnvConfigured) {
     transformersEnvConfigured = (async () => {
-      const { env } = await import("@huggingface/transformers");
+      const { env } = loadTransformers();
       const dirs = getTransformersCacheDirs();
       await fs.mkdir(dirs.cacheDir, { recursive: true });
       await fs.mkdir(dirs.localModelPath, { recursive: true });
@@ -44,14 +45,11 @@ function ensureTransformersEnvConfigured(): Promise<void> {
       env.allowRemoteModels = true;
       env.allowLocalModels = true;
       // Types mark `wasm` read-only; runtime allows configuring ORT wasm memory cap.
-      const onnx = env.backends.onnx as unknown as {
-        wasm?: { maxMemoryUsageInMB?: number };
-      };
+      const onnx = env.backends.onnx;
       const cap = getOnnxWasmMaxMemoryMb();
-      if (!onnx.wasm) {
-        onnx.wasm = { maxMemoryUsageInMB: cap };
-      } else {
-        onnx.wasm.maxMemoryUsageInMB = cap;
+      if (onnx) {
+        const wasm = onnx.wasm ?? (onnx.wasm = {});
+        wasm.maxMemoryUsageInMB = cap;
       }
     })();
   }
@@ -72,10 +70,39 @@ type RawImageConstructor = {
   fromBlob(blob: Blob): Promise<unknown>;
 };
 
+type TransformersEnv = {
+  cacheDir: string;
+  localModelPath: string;
+  allowRemoteModels: boolean;
+  allowLocalModels: boolean;
+  backends: {
+    onnx?: {
+      wasm?: { maxMemoryUsageInMB?: number };
+    };
+  };
+};
+
+type TransformersModule = {
+  env: TransformersEnv;
+  pipeline: (
+    task: string,
+    model: string,
+    options?: Record<string, unknown>,
+  ) => Promise<unknown>;
+  RawImage: RawImageConstructor;
+};
+
+const requireTransformers = createRequire(__filename);
+
+function loadTransformers(): TransformersModule {
+  patchProcessReleaseForTransformersInElectronMain();
+  return requireTransformers("@huggingface/transformers") as TransformersModule;
+}
+
 function createVisionPipeline(): Promise<FeatureExtractionPipeline> {
   return (async () => {
     await ensureTransformersEnvConfigured();
-    const { pipeline, env } = await import("@huggingface/transformers");
+    const { pipeline, env } = loadTransformers();
     env.allowLocalModels = true;
     const pipelineOptions: Record<string, unknown> = {};
     if (QUANTIZED) {
@@ -89,7 +116,7 @@ function createVisionPipeline(): Promise<FeatureExtractionPipeline> {
 function createTextPipeline(): Promise<FeatureExtractionPipeline> {
   return (async () => {
     await ensureTransformersEnvConfigured();
-    const { pipeline, env } = await import("@huggingface/transformers");
+    const { pipeline, env } = loadTransformers();
     env.allowLocalModels = true;
     const pipelineOptions: Record<string, unknown> = {};
     if (QUANTIZED) {
@@ -103,7 +130,7 @@ function createTextPipeline(): Promise<FeatureExtractionPipeline> {
 function createRawImagePromise(): Promise<RawImageConstructor> {
   return (async () => {
     await ensureTransformersEnvConfigured();
-    const { RawImage } = await import("@huggingface/transformers");
+    const { RawImage } = loadTransformers();
     return RawImage as unknown as RawImageConstructor;
   })();
 }
