@@ -148,6 +148,13 @@ The goal is to make confirmation workflows fast, accurate, and batch-friendly.
 
 ## Untagged faces tab
 
+Face detection includes ArcFace embedding generation for each detected face. The
+standalone **Generate embeddings** action remains available as a repair/catch-up
+path when older or failed detections are missing vectors. If no provisional
+clusters exist and the library has 300 or fewer embedded untagged faces, opening
+this tab auto-starts **Find groups** and shows a grouping spinner instead of the
+empty-state prompt.
+
 ### Similarity filters (when a target person is selected)
 
 - **Show** filters use the same centroid metric as elsewhere, with bands derived from the app threshold **X** (cosine, 0–1): **Matching ≥ X%**, **Y%–X%** where **Y = max(0, X − 10)** percentage points on that scale, and **Below Y%**.

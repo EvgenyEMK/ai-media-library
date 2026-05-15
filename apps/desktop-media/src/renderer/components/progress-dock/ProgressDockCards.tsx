@@ -107,7 +107,6 @@ export function ProgressDockCards({
           faceClusteringClusterCount={d.faceClusteringClusterCount}
           faceClusteringTotalFaces={d.faceClusteringTotalFaces}
           faceClusteringStatus={d.faceClusteringStatus}
-          faceClusteringPhaseLabel={d.faceClusteringPhaseLabel}
           onCancelFaceClustering={onCancelFaceClustering}
         />
       ) : null}

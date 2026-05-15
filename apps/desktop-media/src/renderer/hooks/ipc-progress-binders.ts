@@ -512,8 +512,10 @@ export function bindFaceClusteringProgress(store: DesktopStore): () => void {
     if (event.type === "progress") {
       store.setState((s) => {
         s.faceClusteringPhase = event.phase;
-        s.faceClusteringProcessed = event.processed;
-        s.faceClusteringTotal = Math.max(1, event.total);
+        if (event.phase !== "refreshing-suggestions") {
+          s.faceClusteringProcessed = event.processed;
+          s.faceClusteringTotal = Math.max(1, event.total);
+        }
       });
       return;
     }
@@ -523,7 +525,6 @@ export function bindFaceClusteringProgress(store: DesktopStore): () => void {
         s.faceClusteringStatus = "completed";
         s.faceClusteringPhase = null;
         s.faceClusteringClusterCount = event.clusterCount;
-        s.faceClusteringProcessed = s.faceClusteringTotal;
       });
       return;
     }

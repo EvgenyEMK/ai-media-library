@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactElement,
 } from "react";
@@ -19,6 +20,7 @@ import type { PeopleWorkspaceOpenFacePhotoFn } from "@emk/media-viewer";
 import type {
   ClusterPersonCentroidMatchStats,
   DesktopPersonTag,
+  FaceClusteringStats,
   FaceClusterFaceInfo,
   FaceClusterInfo,
   FaceClusterTagSuggestion,
@@ -32,6 +34,7 @@ import { chunkArray } from "./face-cluster-utils";
 import { groupRepresentativeFaceIdsByTag } from "../lib/group-rep-similarity-by-tag";
 import { logUntaggedLoadRenderer } from "../lib/untagged-load-log";
 import { untaggedTabLog } from "../lib/untagged-tab-trace";
+import { shouldAutoFindFaceGroups } from "../lib/face-clustering-auto";
 
 const CLUSTER_LIST_PAGE_SIZE = 10;
 const CLUSTER_FACE_GRID_COLS = 5;
@@ -171,6 +174,9 @@ export function DesktopFaceClusterGrid({
   const [personFilteredMemberIdsByKey, setPersonFilteredMemberIdsByKey] = useState<
     Record<string, string[]>
   >({});
+  const [clusteringStats, setClusteringStats] = useState<FaceClusteringStats | null>(null);
+  const autoFindGroupsTriggeredRef = useRef(false);
+  const isClusteringRunning = faceClusteringStatus === "running";
 
   useEffect(() => {
     untaggedTabLog("DesktopFaceClusterGrid mounted");
@@ -189,9 +195,10 @@ export function DesktopFaceClusterGrid({
     try {
       const tList = performance.now();
       const offset = listPage * CLUSTER_LIST_PAGE_SIZE;
-      const [pageResult, tags] = await Promise.all([
+      const [pageResult, tags, stats] = await Promise.all([
         window.desktopApi.getFaceClusters({ offset, limit: CLUSTER_LIST_PAGE_SIZE }),
         window.desktopApi.listPersonTags(),
+        window.desktopApi.getFaceClusteringStats(),
       ]);
       const clusterData = pageResult.clusters;
       const msList = performance.now() - tList;
@@ -209,6 +216,7 @@ export function DesktopFaceClusterGrid({
       setClusters(clusterData);
       setClusterTotalCount(pageResult.totalCount);
       setPersonTags(tags);
+      setClusteringStats(stats);
       setLoadedFaceIdsByClusterId({});
       setClusterMemberPageById({});
       setPersonFilteredMemberIdsByKey({});
@@ -554,7 +562,7 @@ export function DesktopFaceClusterGrid({
     matchThreshold,
   ]);
 
-  const handleRunClustering = async () => {
+  const handleRunClustering = useCallback(async (): Promise<void> => {
     setErrorMessage(null);
     // Show immediate feedback in the dock and button before IPC/main work starts.
     store.setState((s) => {
@@ -580,7 +588,28 @@ export function DesktopFaceClusterGrid({
         s.faceClusteringError = message;
       });
     }
-  };
+  }, [faceGroupMinSize, faceGroupPairwiseSimilarityThreshold, store]);
+
+  useEffect(() => {
+    if (
+      shouldAutoFindFaceGroups({
+        clusterTotalCount,
+        stats: clusteringStats,
+        isLoading,
+        isClusteringRunning,
+        alreadyTriggered: autoFindGroupsTriggeredRef.current,
+      })
+    ) {
+      autoFindGroupsTriggeredRef.current = true;
+      void handleRunClustering();
+    }
+  }, [
+    clusterTotalCount,
+    clusteringStats,
+    handleRunClustering,
+    isClusteringRunning,
+    isLoading,
+  ]);
 
   const loadClusterMemberPage = useCallback(async (cluster: FaceClusterInfo, memberPage: number) => {
     const offset = memberPage * CLUSTER_MEMBER_PAGE_SIZE;
@@ -736,8 +765,7 @@ export function DesktopFaceClusterGrid({
   const isExpanded = (clusterId: string) =>
     expandedCluster?.clusterId === clusterId;
   const assigningFaceSet = useMemo(() => new Set(assigningFaceIds), [assigningFaceIds]);
-
-  const isClusteringRunning = faceClusteringStatus === "running";
+  const isEmptyBusy = clusters.length === 0 && (isLoading || isClusteringRunning);
 
   const similarityHighPctLabel = formatSimilarityPercent(matchThreshold);
   const similarityLowBand = Math.max(0, matchThreshold - 0.1);
@@ -791,7 +819,12 @@ export function DesktopFaceClusterGrid({
         </p>
       ) : null}
 
-      {clusters.length === 0 && !isLoading ? (
+      {isEmptyBusy ? (
+        <div className="rounded-xl border border-dashed border-border bg-muted/30 px-6 py-12 text-center">
+          <Loader2 className="mx-auto mb-3 size-10 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Finding face groups...</p>
+        </div>
+      ) : clusters.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-muted/30 px-6 py-12 text-center">
           <Users className="mx-auto mb-3 size-10 text-muted-foreground/60" />
           <p className="text-sm text-muted-foreground">{UI_TEXT.empty}</p>

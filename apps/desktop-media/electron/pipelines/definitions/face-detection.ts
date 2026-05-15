@@ -14,11 +14,19 @@ import {
   markFaceDetectionFailed,
   upsertFaceDetectionResult,
 } from "../../db/media-analysis";
+import { getFacesNeedingEmbeddings } from "../../db/face-embeddings";
+import { DEFAULT_LIBRARY_ID } from "../../db/folder-analysis-status";
 import { readSettings } from "../../storage";
 import { runWrongImageRotationPrecheck } from "../../orientation-preprocess";
 import { detectFacesUsingOrientationState } from "../../ipc/face-detection-handlers";
 import { appendSyncOperation } from "../../db/sync-log";
 import { orderPendingPipelineItems, type PipelineImageItem } from "../../ipc/pipeline-item-order";
+import { ensureFaceDetectionServiceRunning } from "../../face-service";
+import {
+  embedFacesForMediaItem,
+  ensureFaceEmbeddingModelLoaded,
+} from "../../face-embed-for-media-item";
+import { embedFaceEmbeddingJobsByImage } from "../../face-embedding-batch";
 
 export interface FaceDetectionParams {
   folderPath: string;
@@ -34,6 +42,11 @@ export interface FaceDetectionOutputSummary {
   cancelled: number;
   mediaItemIdsWithFaces: string[];
   totalFacesDetected: number;
+  embeddedFaces: number;
+  failedFaceEmbeddings: number;
+  cancelledFaceEmbeddings: number;
+  catchUpEmbeddedFaces: number;
+  catchUpFailedFaceEmbeddings: number;
 }
 
 function validateParams(params: unknown):
@@ -109,11 +122,25 @@ export const faceDetectionDefinition: PipelineDefinition<
 
     const faceSettings = (await readSettings(app.getPath("userData"))).faceDetection;
     const appSettings = await readSettings(app.getPath("userData"));
+    if (selectedImages.length > 0) {
+      const serviceReady = await ensureFaceDetectionServiceRunning();
+      if (!serviceReady) {
+        const message = "Face detection service is unavailable. Ensure ONNX models are downloaded.";
+        console.error(`[face-detection] ${message}`);
+        throw new Error(message);
+      }
+      await ensureFaceEmbeddingModelLoaded();
+    }
 
     let completed = 0;
     let failed = 0;
     let cancelled = 0;
     let totalFacesDetected = 0;
+    let embeddedFaces = 0;
+    let failedFaceEmbeddings = 0;
+    let cancelledFaceEmbeddings = 0;
+    let catchUpEmbeddedFaces = 0;
+    let catchUpFailedFaceEmbeddings = 0;
     const mediaItemIdsWithFaces: string[] = [];
 
     ctx.report({
@@ -179,6 +206,17 @@ export const faceDetectionDefinition: PipelineDefinition<
           });
           if (result.faceCount > 0) {
             mediaItemIdsWithFaces.push(mediaId);
+            const embeddingSummary = await embedFacesForMediaItem({
+              mediaItemId: mediaId,
+              imagePath: image.path,
+              signal: ctx.signal,
+              preferredRotationClockwise: orientationState?.correctionAngleClockwise,
+              embeddingOverride: detection.embeddingOverride,
+              requireLoadedModel: true,
+            });
+            embeddedFaces += embeddingSummary.embedded;
+            failedFaceEmbeddings += embeddingSummary.failed;
+            cancelledFaceEmbeddings += embeddingSummary.cancelled;
           }
         }
         completed += 1;
@@ -209,6 +247,20 @@ export const faceDetectionDefinition: PipelineDefinition<
       }
     }
 
+    if (!ctx.signal.aborted) {
+      const catchUpFaces = getFacesNeedingEmbeddings(DEFAULT_LIBRARY_ID);
+      if (catchUpFaces.length > 0) {
+        console.log(
+          `[face-detection][embedding-catchup] processing ${catchUpFaces.length} face(s) missing embeddings after successful pipeline run`,
+        );
+        await ensureFaceEmbeddingModelLoaded();
+        const catchUpResult = await embedFaceEmbeddingJobsByImage(catchUpFaces, ctx.signal);
+        catchUpEmbeddedFaces = catchUpResult.embedded;
+        catchUpFailedFaceEmbeddings = catchUpResult.failed;
+        cancelledFaceEmbeddings += catchUpResult.cancelled;
+      }
+    }
+
     return {
       total: selectedImages.length,
       completed,
@@ -216,6 +268,11 @@ export const faceDetectionDefinition: PipelineDefinition<
       cancelled,
       mediaItemIdsWithFaces,
       totalFacesDetected,
+      embeddedFaces,
+      failedFaceEmbeddings,
+      cancelledFaceEmbeddings,
+      catchUpEmbeddedFaces,
+      catchUpFailedFaceEmbeddings,
     };
   },
 };

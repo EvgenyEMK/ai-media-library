@@ -79,16 +79,17 @@ export function markFaceEmbeddingStatus(
 export function getFacesNeedingEmbeddings(
   libraryId = DEFAULT_LIBRARY_ID,
   folderPath?: string,
+  options: { recursive?: boolean } = {},
 ): FaceForEmbeddingJob[] {
   const db = getDesktopDatabase();
 
   const whereClause = folderPath
-    ? `AND mi.source_path LIKE ? || '%'`
+    ? `AND (mi.source_path = ? OR mi.source_path LIKE ? OR mi.source_path LIKE ?)`
     : "";
   const params: unknown[] = [libraryId];
+  const prefix = folderPath?.replace(/[\\/]+$/, "") ?? "";
   if (folderPath) {
-    const normalized = folderPath.replace(/[\\/]$/, "") + "\\";
-    params.push(normalized);
+    params.push(prefix, `${prefix}\\%`, `${prefix}/%`);
   }
 
   const rows = db
@@ -122,7 +123,15 @@ export function getFacesNeedingEmbeddings(
     landmarks_json: string;
   }>;
 
-  return rows.map((row) => ({
+  const filteredRows =
+    folderPath && options.recursive === false
+      ? rows.filter((row) => {
+          const rest = row.source_path.slice(prefix.length).replace(/^[\\/]+/, "");
+          return !/[\\/]/.test(rest);
+        })
+      : rows;
+
+  return filteredRows.map((row) => ({
     faceInstanceId: row.face_instance_id,
     mediaItemId: row.media_item_id,
     sourcePath: row.source_path,
@@ -911,6 +920,41 @@ export function getEmbeddingStats(
     withEmbeddings: row.with_embeddings,
     withLandmarks: row.with_landmarks,
     pending: row.pending,
+  };
+}
+
+export function getFaceClusteringStats(
+  libraryId = DEFAULT_LIBRARY_ID,
+): {
+  readyUntaggedFaceCount: number;
+  ungroupedReadyUntaggedFaceCount: number;
+} {
+  const db = getDesktopDatabase();
+  const row = db
+    .prepare(
+      `SELECT
+         SUM(CASE
+           WHEN tag_id IS NULL
+            AND embedding_json IS NOT NULL
+            AND embedding_status = 'ready'
+           THEN 1 ELSE 0 END) AS ready_untagged,
+         SUM(CASE
+           WHEN tag_id IS NULL
+            AND cluster_id IS NULL
+            AND embedding_json IS NOT NULL
+            AND embedding_status = 'ready'
+           THEN 1 ELSE 0 END) AS ungrouped_ready_untagged
+       FROM media_face_instances
+       WHERE library_id = ?`,
+    )
+    .get(libraryId) as {
+    ready_untagged: number | null;
+    ungrouped_ready_untagged: number | null;
+  };
+
+  return {
+    readyUntaggedFaceCount: row.ready_untagged ?? 0,
+    ungroupedReadyUntaggedFaceCount: row.ungrouped_ready_untagged ?? 0,
   };
 }
 

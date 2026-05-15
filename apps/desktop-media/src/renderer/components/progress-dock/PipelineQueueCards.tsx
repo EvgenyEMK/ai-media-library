@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { useDesktopStore } from "../../stores/desktop-store";
 import { cn } from "../../lib/cn";
@@ -107,6 +107,7 @@ interface BundleCardProps {
 
 function BundleCard({ bundle, variant, onDismissRecent }: BundleCardProps): ReactElement {
   const activeJob = bundle.jobs.find((j) => j.state === "running") ?? bundle.jobs[0];
+  const progressJob = progressJobForBundle(bundle, variant, activeJob);
   const isDuplicateScan = bundle.jobs.some((job) => job.pipelineId === "folder-duplicate-scan");
   const completedCount = bundle.jobs.filter(
     (j) => j.state === "succeeded" || j.state === "failed" || j.state === "skipped",
@@ -137,9 +138,13 @@ function BundleCard({ bundle, variant, onDismissRecent }: BundleCardProps): Reac
     <ProgressCardBody
       title={title}
       action={action}
-      progressPercent={activeJob && variant === "running" ? progressPercentForJob(activeJob, true) : variant === "recent" ? 100 : 0}
+      progressPercent={
+        progressJob
+          ? progressPercentForBundle(bundle, variant, progressJob)
+          : 0
+      }
       ariaLabel={`${bundle.displayName} progress`}
-      statsText={statsTextForBundle(bundle, variant, activeJob)}
+      statsText={statsTextForBundle(bundle, variant, progressJob)}
       rightText={rightTextForBundle(variant, activeJob)}
       showProgress={variant !== "queued"}
       footer={bundle.jobs.length > 1 ? <BundleBreadcrumb jobs={bundle.jobs} /> : null}
@@ -159,8 +164,49 @@ function progressPercentForJob(job: JobView, minimumVisible: boolean): number {
   return percent;
 }
 
-function statsTextForBundle(bundle: BundleView, variant: BundleCardProps["variant"], activeJob: JobView | undefined): string {
+function progressJobForBundle(
+  bundle: BundleView,
+  variant: BundleCardProps["variant"],
+  activeJob: JobView | undefined,
+): JobView | undefined {
+  if (variant === "recent" && bundle.state === "cancelled") {
+    return [...bundle.jobs]
+      .filter((job) => job.state === "cancelled")
+      .sort((a, b) => b.progress.processed - a.progress.processed)[0] ?? activeJob;
+  }
+  return activeJob;
+}
+
+function progressPercentForBundle(
+  bundle: BundleView,
+  variant: BundleCardProps["variant"],
+  job: JobView,
+): number {
+  if (variant === "running") return progressPercentForJob(job, true);
+  if (variant === "recent" && bundle.state === "cancelled") {
+    return progressPercentForJob(job, false);
+  }
+  if (variant === "recent") return 100;
+  return 0;
+}
+
+function statsTextForBundle(
+  bundle: BundleView,
+  variant: BundleCardProps["variant"],
+  activeJob: JobView | undefined,
+): ReactNode {
   if (variant === "recent") {
+    if (bundle.state === "cancelled" && activeJob) {
+      return (
+        <>
+          <span className="font-medium text-amber-500">Cancelled</span>
+          <span>{` · ${buildPipelineQueueStatsText(activeJob)}`}</span>
+        </>
+      );
+    }
+    if (bundle.state === "succeeded" && activeJob) {
+      return buildPipelineQueueStatsText(activeJob);
+    }
     return labelForBundleState(bundle.state);
   }
   if (variant === "queued" || !activeJob) {

@@ -1,7 +1,7 @@
 import type { FaceClusteringProgressPhase, TaskStatus } from "@emk/media-store";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { UI_TEXT } from "../../../lib/ui-text";
-import { formatCount, formatCountRatio } from "../../../lib/progress-stats-format";
+import { buildFaceClusteringStatsText } from "../../../lib/face-clustering-progress-stats";
 import type { DesktopStore } from "../../../stores/desktop-store";
 import { ProgressDockCloseButton } from "../ProgressDockCloseButton";
 import { useProgressEta } from "./use-progress-eta";
@@ -19,7 +19,6 @@ interface FaceClusteringCardProps {
   faceClusteringClusterCount: number | null;
   faceClusteringTotalFaces: number;
   faceClusteringStatus: TaskStatus;
-  faceClusteringPhaseLabel: string;
   onCancelFaceClustering: () => void;
 }
 
@@ -35,7 +34,6 @@ export function FaceClusteringCard({
   faceClusteringClusterCount,
   faceClusteringTotalFaces,
   faceClusteringStatus,
-  faceClusteringPhaseLabel,
   onCancelFaceClustering,
 }: FaceClusteringCardProps): ReactElement {
   const faceClusteringTimeLeftText = useProgressEta({
@@ -45,19 +43,26 @@ export function FaceClusteringCard({
     total: faceClusteringTotal,
   });
   const progressPercent = faceClusteringProgressPercent;
-  const statsText = `${faceClusteringPhaseLabel} ${formatCountRatio(
-    faceClusteringProcessed,
-    faceClusteringTotal,
-  )}${faceClusteringTotalFaces > 0 && faceClusteringPhase === "loading" ? ` | Faces: ${formatCount(faceClusteringTotalFaces)}` : ""}`;
+  const statsLine = buildFaceClusteringStatsText({
+    status: faceClusteringStatus,
+    phase: faceClusteringPhase,
+    processed: faceClusteringProcessed,
+    total: faceClusteringTotal,
+    totalFaces: faceClusteringTotalFaces,
+    clusterCount: faceClusteringClusterCount,
+  });
+  const statsText: ReactNode =
+    faceClusteringStatus === "cancelled" ? (
+      <>
+        <span className="font-medium text-amber-500">Cancelled</span>
+        <span>{` · ${statsLine}`}</span>
+      </>
+    ) : (
+      statsLine
+    );
   const rightText = faceClusteringTimeLeftText
     ? `${UI_TEXT.analysisTimeLeftLabel}: ${faceClusteringTimeLeftText}`
     : null;
-  const footer =
-    !isFaceClusteringRunning && faceClusteringStatus === "completed" && faceClusteringClusterCount !== null
-      ? `Done: ${formatCount(faceClusteringClusterCount)} group${faceClusteringClusterCount === 1 ? "" : "s"}`
-      : !isFaceClusteringRunning && faceClusteringStatus === "cancelled"
-        ? "Cancelled."
-        : null;
 
   return (
     <ProgressCardBody
@@ -81,8 +86,7 @@ export function FaceClusteringCard({
       statsText={statsText}
       rightText={rightText}
       error={faceClusteringError}
-      showProgress={isFaceClusteringRunning}
-      footer={footer}
+      showProgress
     />
   );
 }

@@ -174,6 +174,7 @@ export const IPC_CHANNELS = {
   suggestPersonTagForFace: "media:suggest-person-tag-for-face",
   findPersonMatches: "media:find-person-matches",
   getFaceClusters: "media:get-face-clusters",
+  getFaceClusteringStats: "media:get-face-clustering-stats",
   listClusterFaceIds: "media:list-cluster-face-ids",
   runFaceClustering: "media:run-face-clustering",
   cancelFaceClustering: "media:cancel-face-clustering",
@@ -2156,6 +2157,11 @@ export interface FaceClustersPageResult {
   totalCount: number;
 }
 
+export interface FaceClusteringStats {
+  readyUntaggedFaceCount: number;
+  ungroupedReadyUntaggedFaceCount: number;
+}
+
 export interface FaceClusterTagSuggestion {
   tagId: string;
   tagLabel: string;
@@ -2503,6 +2509,7 @@ export interface DesktopApi {
     offset?: number;
     limit?: number;
   }) => Promise<FaceClustersPageResult>;
+  getFaceClusteringStats: () => Promise<FaceClusteringStats>;
   listClusterFaceIds: (
     clusterId: string,
     options?: { offset?: number; limit?: number },

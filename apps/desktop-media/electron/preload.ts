@@ -366,6 +366,8 @@ const api: DesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.findPersonMatches, request),
   getFaceClusters: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.getFaceClusters, request),
+  getFaceClusteringStats: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.getFaceClusteringStats),
   listClusterFaceIds: (clusterId, options) =>
     ipcRenderer.invoke(IPC_CHANNELS.listClusterFaceIds, clusterId, options),
   runFaceClustering: (options) =>

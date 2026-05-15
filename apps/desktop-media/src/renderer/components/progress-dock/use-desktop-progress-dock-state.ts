@@ -118,15 +118,6 @@ export function useDesktopProgressDockState({
       ? Math.min(100, (faceClusteringProcessed / faceClusteringTotal) * 100)
       : 0;
 
-  const faceClusteringPhaseLabel =
-    faceClusteringPhase === "refreshing-suggestions"
-      ? UI_TEXT.faceClusteringPhaseRefreshingSuggestions
-      : faceClusteringPhase === "persisting"
-      ? UI_TEXT.faceClusteringPhasePersisting
-      : faceClusteringPhase === "clustering"
-        ? UI_TEXT.faceClusteringPhaseClustering
-        : UI_TEXT.faceClusteringPhaseLoading;
-
   const faceClusteringQualifies =
     faceClusteringPanelVisible &&
     (isFaceClusteringRunning ||
@@ -276,7 +267,6 @@ export function useDesktopProgressDockState({
     faceClusteringClusterCount,
     faceClusteringTotalFaces,
     faceClusteringProgressPercent,
-    faceClusteringPhaseLabel,
     faceClusteringStatus,
     similarUntaggedCountsJobId,
     similarUntaggedCountsProcessed,

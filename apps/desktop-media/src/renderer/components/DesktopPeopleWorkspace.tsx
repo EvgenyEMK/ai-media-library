@@ -27,6 +27,7 @@ import type { TaggedFaceInfo } from "../../shared/ipc";
 import { FaceSelectionFooter } from "./FaceSelectionFooter";
 import { computeFaceBackgroundCropStyle, toFileUrl } from "./face-cluster-utils";
 import { PeoplePaginationBar } from "./people-pagination-bar";
+import { useDesktopStore } from "../stores/desktop-store";
 
 const MATCH_GRID_COLS = 5;
 const MATCH_FACE_ROWS_PER_PAGE = 5;
@@ -164,6 +165,7 @@ export function DesktopPeopleWorkspace({
 }: {
   onOpenFacePhoto: PeopleWorkspaceOpenFacePhotoFn;
 }): ReactElement {
+  const lastAiPipelineCompletion = useDesktopStore((s) => s.lastAiPipelineCompletion);
   const [tagsMeta, setTagsMeta] = useState<PersonTagListMeta[]>([]);
   const [nameFilter, setNameFilter] = useState("");
   const [tagsListExpanded, setTagsListExpanded] = useState(false);
@@ -268,6 +270,11 @@ export function DesktopPeopleWorkspace({
   useEffect(() => {
     void loadTags();
   }, [loadTags]);
+
+  useEffect(() => {
+    if (lastAiPipelineCompletion?.kind !== "face") return;
+    void loadTags();
+  }, [lastAiPipelineCompletion, loadTags]);
 
   useEffect(() => {
     if (selectedTagId) {

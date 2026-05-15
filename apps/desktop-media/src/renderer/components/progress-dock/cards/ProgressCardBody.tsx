@@ -5,7 +5,7 @@ interface ProgressCardBodyProps {
   action?: ReactNode;
   progressPercent: number;
   ariaLabel: string;
-  statsText: string;
+  statsText: ReactNode;
   rightText?: ReactNode;
   error?: string | null;
   showProgress?: boolean;
