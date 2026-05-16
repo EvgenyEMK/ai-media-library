@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type ReactElement } from "react";
+import { useEffect, useId, useRef, useState, type ReactElement } from "react";
 import { ChevronDown, Sparkles, Square, Star } from "lucide-react";
 import {
   AdvancedSettingsStar,
@@ -310,6 +310,64 @@ export function DesktopSettingsSection({
   useEffect(() => {
     setDownscaleLongestSideDraft(String(photoAnalysisSettings.downscaleLongestSidePx));
   }, [photoAnalysisSettings.downscaleLongestSidePx]);
+
+  const [photoAnalysisModelDraft, setPhotoAnalysisModelDraft] = useState(() => photoAnalysisSettings.model);
+  const photoAnalysisModelDraftRef = useRef(photoAnalysisSettings.model);
+  const photoAnalysisModelStoreRef = useRef(photoAnalysisSettings.model);
+  const photoAnalysisModelFocusedRef = useRef(false);
+  const photoAnalysisModelDebounceRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    photoAnalysisModelStoreRef.current = photoAnalysisSettings.model;
+  }, [photoAnalysisSettings.model]);
+
+  useEffect(() => {
+    if (photoAnalysisModelFocusedRef.current) {
+      return;
+    }
+    setPhotoAnalysisModelDraft(photoAnalysisSettings.model);
+    photoAnalysisModelDraftRef.current = photoAnalysisSettings.model;
+  }, [photoAnalysisSettings.model]);
+
+  useEffect(() => {
+    return (): void => {
+      if (photoAnalysisModelDebounceRef.current !== null) {
+        window.clearTimeout(photoAnalysisModelDebounceRef.current);
+        photoAnalysisModelDebounceRef.current = null;
+      }
+    };
+  }, []);
+
+  const flushPhotoAnalysisModelDraftToStoreImmediate = (): void => {
+    if (photoAnalysisModelDebounceRef.current !== null) {
+      window.clearTimeout(photoAnalysisModelDebounceRef.current);
+      photoAnalysisModelDebounceRef.current = null;
+    }
+    const trimmed = photoAnalysisModelDraftRef.current.trim();
+    const nextModel =
+      trimmed.length > 0 ? trimmed : DEFAULT_PHOTO_ANALYSIS_SETTINGS.model;
+    if (nextModel !== photoAnalysisModelStoreRef.current) {
+      onPhotoAnalysisSettingChange("model", nextModel);
+    }
+  };
+
+  const schedulePhotoAnalysisModelPersist = (value: string): void => {
+    photoAnalysisModelDraftRef.current = value;
+    setPhotoAnalysisModelDraft(value);
+    if (photoAnalysisModelDebounceRef.current !== null) {
+      window.clearTimeout(photoAnalysisModelDebounceRef.current);
+    }
+    photoAnalysisModelDebounceRef.current = window.setTimeout(() => {
+      photoAnalysisModelDebounceRef.current = null;
+      const trimmed = photoAnalysisModelDraftRef.current.trim();
+      const nextModel =
+        trimmed.length > 0 ? trimmed : DEFAULT_PHOTO_ANALYSIS_SETTINGS.model;
+      if (nextModel !== photoAnalysisModelStoreRef.current) {
+        onPhotoAnalysisSettingChange("model", nextModel);
+      }
+    }, 400);
+  };
+
   const [databaseLocation, setDatabaseLocation] = useState<{
     appDataPath: string;
     userDataPath: string;
@@ -1496,8 +1554,15 @@ export function DesktopSettingsSection({
               <input
                 type="text"
                 className="h-10 min-w-[260px] rounded-md border border-border bg-background px-2 text-sm text-foreground"
-                value={photoAnalysisSettings.model}
-                onChange={(event) => onPhotoAnalysisSettingChange("model", event.target.value)}
+                value={photoAnalysisModelDraft}
+                onChange={(event) => schedulePhotoAnalysisModelPersist(event.target.value)}
+                onFocus={() => {
+                  photoAnalysisModelFocusedRef.current = true;
+                }}
+                onBlur={() => {
+                  flushPhotoAnalysisModelDraftToStoreImmediate();
+                  photoAnalysisModelFocusedRef.current = false;
+                }}
                 autoComplete="off"
               />
             </div>

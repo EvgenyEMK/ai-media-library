@@ -45,6 +45,9 @@ extraResources:
 asarUnpack:
   - "**/*.node"
   - "**/node_modules/exiftool-vendored/**/*"
+  # ExifTool's platform binary lives in a sibling optional package; videos hang
+  # in packaged builds if this package is omitted or left inside app.asar.
+  - "**/node_modules/exiftool-vendored.{exe,pl}/**/*"
   - "**/node_modules/better-sqlite3/**/*.node"
   - "**/node_modules/onnxruntime-node/**/*"
   # Sharp uses platform packages under @img. The native .node can be unpacked

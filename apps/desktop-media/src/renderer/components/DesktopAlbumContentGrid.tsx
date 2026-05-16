@@ -172,18 +172,28 @@ export function DesktopAlbumContentGrid({
   if (albumItems.length === 0) {
     const emptyCopy = emptyAlbumMessage ?? "This album is empty.";
     const emphasizeEmpty = emptyAlbumMessageEmphasis === true && Boolean(emptyAlbumMessage);
+    const showStandardAlbumAddHint = Boolean(albumId) && emptyAlbumMessage === undefined;
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex min-h-0 flex-1 items-center justify-center p-8">
-          <div
-            className={cn(
-              "max-w-md text-center",
-              emphasizeEmpty
-                ? "text-base font-medium text-amber-600 dark:text-amber-400 md:text-lg"
-                : "text-sm text-muted-foreground",
-            )}
-          >
-            {emptyCopy}
+          <div className="max-w-md text-center">
+            <p
+              className={cn(
+                "m-0",
+                emphasizeEmpty
+                  ? "text-base font-medium text-amber-600 dark:text-amber-400 md:text-lg"
+                  : "text-sm text-muted-foreground",
+              )}
+            >
+              {emptyCopy}
+            </p>
+            {showStandardAlbumAddHint ? (
+              <p className="m-0 mt-3 text-sm leading-relaxed text-muted-foreground">
+                Open a folder, select photos you want to add, then use{" "}
+                <span className="font-medium text-foreground">Open media item actions</span> (⋯) on a thumbnail and
+                choose <span className="font-medium text-foreground">Albums</span> to add items to one or more albums.
+              </p>
+            ) : null}
           </div>
         </div>
         {showPagination ? paginationFooter : null}

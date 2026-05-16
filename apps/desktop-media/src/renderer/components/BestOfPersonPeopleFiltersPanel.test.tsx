@@ -1,33 +1,52 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { SmartAlbumFilters } from "@emk/shared-contracts";
 import { BestOfPersonPeopleFiltersPanel } from "./BestOfPersonPeopleFiltersPanel";
 
-const EMPTY_FILTERS: SmartAlbumFilters = {
-  includeUnconfirmedFaces: true,
-  ratingLogic: "or",
-};
+const emptyFilters: SmartAlbumFilters = {};
+
+function renderPanel(filters: SmartAlbumFilters = emptyFilters): void {
+  render(
+    <BestOfPersonPeopleFiltersPanel
+      filters={filters}
+      selectedPersonTagIds={[]}
+      personTags={[]}
+      resetKey={0}
+      onClose={vi.fn()}
+      onClear={vi.fn()}
+      onFiltersChange={vi.fn()}
+      onTogglePersonTag={vi.fn()}
+    />,
+  );
+}
 
 describe("BestOfPersonPeopleFiltersPanel", () => {
-  it("invokes onClear when Clear filters is clicked", () => {
-    const onClear = vi.fn();
-    render(
-      <BestOfPersonPeopleFiltersPanel
-        filters={EMPTY_FILTERS}
-        selectedPersonTagIds={[]}
-        personTags={[]}
-        resetKey={0}
-        onClose={vi.fn()}
-        onClear={onClear}
-        onFiltersChange={vi.fn()}
-        onTogglePersonTag={vi.fn()}
-      />,
-    );
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
 
-    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
-    expect(onClear).toHaveBeenCalledTimes(1);
+  it("hides AI prompt, location, and year range by default", () => {
+    renderPanel();
+    expect(screen.queryByPlaceholderText("AI search prompt (optional)")).toBeNull();
+    expect(screen.queryByPlaceholderText("Country, area, or city")).toBeNull();
+    expect(screen.getByRole("button", { name: "More filters" })).toBeVisible();
+    expect(screen.getByText("Rating")).toBeVisible();
+  });
+
+  it("shows extra fields after More filters", () => {
+    renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: "More filters" }));
+    expect(screen.getByPlaceholderText("AI search prompt (optional)")).toBeVisible();
+    expect(screen.getByPlaceholderText("Country, area, or city")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Less filters" })).toBeVisible();
+  });
+
+  it("expands automatically when filters include an AI query", () => {
+    renderPanel({ query: "sunset" });
+    expect(screen.getByDisplayValue("sunset")).toBeVisible();
   });
 });

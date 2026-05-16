@@ -1,10 +1,10 @@
 import path from "node:path";
-import { exiftool } from "exiftool-vendored";
 import {
   starsToExifIfd0Rating,
   starsToWindowsRatingPercent,
 } from "@emk/media-metadata-core";
 import { VIDEO_EXTENSIONS } from "../../src/shared/ipc";
+import { exiftool } from "./exiftool-runtime";
 
 function exifToolWriteTimeoutMs(): number {
   const raw = process.env.EMK_EXIFTOOL_WRITE_TIMEOUT_MS?.trim();

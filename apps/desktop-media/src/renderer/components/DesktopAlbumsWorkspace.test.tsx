@@ -172,18 +172,30 @@ describe("DesktopAlbumsWorkspace", () => {
     fireEvent.click(within(pagination).getByRole("button", { name: "Next page" }));
 
     await waitFor(() => {
-      const last = desktopApi.listAlbums.mock.calls.at(-1)?.[0] as { offset?: number } | undefined;
+      const filtered = desktopApi.listAlbums.mock.calls
+        .map((c) => c[0] as { offset?: number; limit?: number } | undefined)
+        .filter((req) => req?.limit === 24);
+      const last = filtered.at(-1);
       expect(last?.offset).toBe(24);
     });
 
     fireEvent.click(screen.getByRole("button", { name: "River" }));
 
     await waitFor(() => {
-      const last = desktopApi.listAlbums.mock.calls.at(-1)?.[0] as {
-        offset?: number;
-        personTagIds?: string[];
-        includeUnconfirmedFaces?: boolean;
-      };
+      const filtered = desktopApi.listAlbums.mock.calls
+        .map(
+          (c) =>
+            c[0] as
+              | {
+                  offset?: number;
+                  limit?: number;
+                  personTagIds?: string[];
+                  includeUnconfirmedFaces?: boolean;
+                }
+              | undefined,
+        )
+        .filter((req) => req?.limit === 24);
+      const last = filtered.at(-1);
       expect(last?.offset).toBe(0);
       expect(last?.personTagIds).toEqual(["tag-1"]);
       expect(last?.includeUnconfirmedFaces).toBe(true);
@@ -198,7 +210,7 @@ describe("DesktopAlbumsWorkspace", () => {
     fireEvent.click(await screen.findByRole("menuitem", { name: "Remove from album" }));
 
     await waitFor(() => expect(window.desktopApi.removeMediaItemFromAlbum).toHaveBeenCalledWith("member", "C:/photos/item.jpg"));
-    await waitFor(() => expect(window.desktopApi.listAlbums).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(window.desktopApi.listAlbums).toHaveBeenCalledTimes(4));
 
     fireEvent.click(screen.getByRole("button", { name: "Back to albums" }));
 

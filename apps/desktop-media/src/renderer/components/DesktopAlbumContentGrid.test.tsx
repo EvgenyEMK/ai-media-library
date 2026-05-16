@@ -148,6 +148,15 @@ describe("DesktopAlbumContentGrid", () => {
     renderGrid({ albumItems: [] });
 
     expect(screen.getByText("This album is empty.")).toBeVisible();
+    expect(screen.queryByText(/Open a folder/i)).toBeNull();
+  });
+
+  it("shows how to add photos when a manual album is empty", () => {
+    renderGrid({ albumItems: [], albumId: "album-1" });
+
+    expect(screen.getByText("This album is empty.")).toBeVisible();
+    expect(screen.getByText(/Open a folder/i)).toBeVisible();
+    expect(screen.getByText(/Open media item actions/i)).toBeVisible();
   });
 
   it("uses emptyAlbumMessage when the album has no items", () => {

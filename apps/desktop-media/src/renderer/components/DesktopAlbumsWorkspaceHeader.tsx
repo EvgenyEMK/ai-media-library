@@ -39,6 +39,8 @@ export function DesktopAlbumsWorkspaceHeader({
   albumQuickFilters,
   onAlbumQuickFiltersChange,
   quickFiltersMenuWrapRef,
+  /** When true (album list mode), search is hidden and the new-album field is shown inline in the header. */
+  inlineAlbumCreateInListHeader = false,
 }: {
   showingSmart: boolean;
   showingDetail: boolean;
@@ -70,6 +72,7 @@ export function DesktopAlbumsWorkspaceHeader({
   albumQuickFilters: ThumbnailQuickFilterState;
   onAlbumQuickFiltersChange: Dispatch<SetStateAction<ThumbnailQuickFilterState>>;
   quickFiltersMenuWrapRef: RefObject<HTMLDivElement | null>;
+  inlineAlbumCreateInListHeader?: boolean;
 }): ReactElement {
   return (
     <div className="border-b border-border bg-card/90 p-4 backdrop-blur">
@@ -229,30 +232,53 @@ export function DesktopAlbumsWorkspaceHeader({
           </div>
         </div>
       ) : (
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="mr-auto text-xl font-semibold">Albums</h1>
-          <ToolbarIconButton
-            title={searchControlsOpen ? "Hide album search" : "Show album search"}
-            ariaExpanded={searchControlsOpen}
-            ariaPressed={albumListSearchFiltersActiveCount > 0}
-            isActive={searchControlsOpen || albumListSearchFiltersActiveCount > 0}
-            badgeCount={albumListSearchFiltersActiveCount}
-            onClick={() => onSearchControlsOpenChange(!searchControlsOpen)}
-          >
-            <Search size={16} aria-hidden="true" />
-          </ToolbarIconButton>
-          <button
-            type="button"
-            onClick={() => {
-              store.getState().selectAlbum(null);
-              onModeChange("create");
-            }}
-            className="inline-flex size-9 items-center justify-center rounded-md border border-border hover:bg-muted"
-            aria-label="Create album"
-            title="Create album"
-          >
-            <Plus size={18} aria-hidden="true" />
-          </button>
+        <div className="flex min-w-0 w-full flex-wrap items-center gap-3">
+          <h1 className="shrink-0 text-xl font-semibold">Albums</h1>
+          {inlineAlbumCreateInListHeader ? (
+            <div className="flex min-w-0 w-full max-w-xl flex-1 flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
+              <Input
+                value={newTitle}
+                onChange={(event) => onNewTitleChange(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") onCreate();
+                }}
+                placeholder="New album title"
+                className="h-9 min-w-0 flex-1"
+              />
+              <button
+                type="button"
+                onClick={onCreate}
+                className="shrink-0 rounded-md border border-border px-3 py-2 text-sm hover:bg-muted"
+              >
+                Create
+              </button>
+            </div>
+          ) : (
+            <div className="ml-auto flex items-center gap-2">
+              <ToolbarIconButton
+                title={searchControlsOpen ? "Hide album search" : "Show album search"}
+                ariaExpanded={searchControlsOpen}
+                ariaPressed={albumListSearchFiltersActiveCount > 0}
+                isActive={searchControlsOpen || albumListSearchFiltersActiveCount > 0}
+                badgeCount={albumListSearchFiltersActiveCount}
+                onClick={() => onSearchControlsOpenChange(!searchControlsOpen)}
+              >
+                <Search size={16} aria-hidden="true" />
+              </ToolbarIconButton>
+              <button
+                type="button"
+                onClick={() => {
+                  store.getState().selectAlbum(null);
+                  onModeChange("create");
+                }}
+                className="inline-flex size-9 items-center justify-center rounded-md border border-border hover:bg-muted"
+                aria-label="Create album"
+                title="Create album"
+              >
+                <Plus size={18} aria-hidden="true" />
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

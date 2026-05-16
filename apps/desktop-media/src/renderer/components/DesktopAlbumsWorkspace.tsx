@@ -143,6 +143,7 @@ export function DesktopAlbumsWorkspace({
   const [personTags, setPersonTags] = useState<PersonTagListMeta[]>([]);
   const [albumPage, setAlbumPage] = useState(0);
   const [albumTotal, setAlbumTotal] = useState(0);
+  const [libraryWideAlbumTotal, setLibraryWideAlbumTotal] = useState<number | null>(null);
   const [albumItemsPage, setAlbumItemsPage] = useState(0);
   const [albumItems, setAlbumItems] = useState<AlbumMediaItem[]>([]);
   const [albumItemsTotal, setAlbumItemsTotal] = useState(0);
@@ -306,6 +307,8 @@ export function DesktopAlbumsWorkspace({
   ]);
   const showSmartFilterPanel = smartFilterPanelOpen;
 
+  const isAlbumLibraryEmpty = libraryWideAlbumTotal !== null && libraryWideAlbumTotal === 0;
+
   const loadAlbums = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage(null);
@@ -322,6 +325,8 @@ export function DesktopAlbumsWorkspace({
           personTagIds.length > 0 ? includeUnconfirmedAlbumFaces : undefined,
       });
       setAlbumTotal(result.totalCount);
+      const libraryTotalResult = await window.desktopApi.listAlbums({ offset: 0, limit: 1 });
+      setLibraryWideAlbumTotal(libraryTotalResult.totalCount);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Failed to load albums.");
     } finally {
@@ -337,6 +342,12 @@ export function DesktopAlbumsWorkspace({
     yearMonthFromFilter,
     yearMonthToFilter,
   ]);
+
+  useEffect(() => {
+    if (libraryWideAlbumTotal !== null && libraryWideAlbumTotal === 0) {
+      onSearchControlsOpenChange(false);
+    }
+  }, [libraryWideAlbumTotal, onSearchControlsOpenChange]);
 
   const loadAlbumItems = useCallback(async () => {
     if (!selectedAlbumId) {
@@ -482,6 +493,13 @@ export function DesktopAlbumsWorkspace({
   }, [loadAlbumItems, loadAlbums]);
 
   useEffect(() => {
+    const loadTagsForAlbumList = !showingSmart;
+    const loadTagsForSmartYearOrPeople =
+      showingSmart &&
+      (smartAlbumRootKind === "best-of-person-people" || smartAlbumRootKind === "best-of-year");
+    if (!loadTagsForAlbumList && !loadTagsForSmartYearOrPeople) {
+      return;
+    }
     void window.desktopApi.listPersonTagsWithFaceCounts().then((tags: DesktopPersonTagWithFaceCount[]) => {
       setPersonTags(
         tags.map((tag) => ({
@@ -492,9 +510,12 @@ export function DesktopAlbumsWorkspace({
         })),
       );
     });
-  }, []);
+  }, [showingSmart, smartAlbumRootKind]);
 
   useEffect(() => {
+    if (!showingSmart || smartAlbumRootKind !== "best-of-people-group") {
+      return;
+    }
     void window.desktopApi.listPersonGroups().then((groups) => {
       setPersonGroupsMeta(
         groups.map((g) => ({
@@ -503,7 +524,7 @@ export function DesktopAlbumsWorkspace({
         })),
       );
     });
-  }, []);
+  }, [showingSmart, smartAlbumRootKind]);
 
   useEffect(() => {
     const previousDefault = previousDefaultSmartAlbumFiltersRef.current;
@@ -716,6 +737,12 @@ export function DesktopAlbumsWorkspace({
     );
   };
 
+  const hasTaggedFacesOnPeopleTags = useMemo(
+    () => personTags.some((t) => t.taggedFaceCount > 0),
+    [personTags],
+  );
+  const hasAnyPeopleGroups = personGroupsMeta.length > 0;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="sticky top-0 z-20">
@@ -756,10 +783,13 @@ export function DesktopAlbumsWorkspace({
           albumQuickFilters={albumQuickFilters}
           onAlbumQuickFiltersChange={setAlbumQuickFilters}
           quickFiltersMenuWrapRef={quickFiltersMenuWrapRef}
+          inlineAlbumCreateInListHeader={
+            isAlbumLibraryEmpty && !showingSmart && !showingDetail && !showingCreate
+          }
         />
         {!showingSmart && !showingDetail && !showingCreate ? (
           <>
-            {searchControlsOpen ? (
+            {searchControlsOpen && !isAlbumLibraryEmpty ? (
               <section className="relative shrink-0 border-b border-ai-search-border bg-ai-search-panel px-4 py-2.5 pr-[4.75rem] text-ai-search-text">
                 <button
                   type="button"
@@ -955,9 +985,13 @@ export function DesktopAlbumsWorkspace({
           onFindSimilar={onFindSimilar}
           emptyAlbumMessage={
             smartAlbumRootKind === "best-of-people-group" && smartAlbumPersonGroupIds.length === 0
-              ? "Please select a people group"
+              ? hasAnyPeopleGroups
+                ? "Please select a people group"
+                : "Please create people groups first in section People"
               : smartAlbumRootKind === "best-of-person-people" && smartAlbumBestOfPersonTagIds.length === 0
-                ? "Please select at least one person tag"
+                ? hasTaggedFacesOnPeopleTags
+                  ? "Please select at least one person tag"
+                  : "Please add people and tag faces in section People first"
                 : undefined
           }
           emptyAlbumMessageEmphasis={
@@ -1002,7 +1036,11 @@ export function DesktopAlbumsWorkspace({
               <span>Loading...</span>
             </div>
           ) : null}
-          {!isLoading && albums.length === 0 ? (
+          {!isLoading && isAlbumLibraryEmpty ? (
+            <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">
+              You have no albums yet. Enter a name above and choose Create to add your first album.
+            </div>
+          ) : !isLoading && albums.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">
               No albums match the current filters.
             </div>
@@ -1021,16 +1059,18 @@ export function DesktopAlbumsWorkspace({
               ))}
             </div>
           )}
-          <div className="mt-4">
-            <PeoplePaginationBar
-              ariaLabel="Albums pagination"
-              currentPage={albumPage}
-              totalItems={albumTotal}
-              pageSize={ALBUM_PAGE_SIZE}
-              disabled={isLoading}
-              onPageChange={setAlbumPage}
-            />
-          </div>
+          {albumTotal > 0 ? (
+            <div className="mt-4">
+              <PeoplePaginationBar
+                ariaLabel="Albums pagination"
+                currentPage={albumPage}
+                totalItems={albumTotal}
+                pageSize={ALBUM_PAGE_SIZE}
+                disabled={isLoading}
+                onPageChange={setAlbumPage}
+              />
+            </div>
+          ) : null}
         </div>
       )}
     </div>
