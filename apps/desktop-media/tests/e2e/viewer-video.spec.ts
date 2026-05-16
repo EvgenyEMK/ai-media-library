@@ -3,7 +3,6 @@ import {
   E2E_MEDIA_MIXED_DIR,
   hasE2eMixedMediaAssets,
   openE2eMixedMediaLibrary,
-  readFolderMediaOrder,
   readMixedMediaNames,
   switchToGridView,
   switchToListView,
@@ -61,20 +60,30 @@ async function advanceUntilVideo(
   throw new Error(`Did not reach a video slide after ${maxSteps} Next item clicks`);
 }
 
-function findImageBeforeVideo(
-  order: Array<{ name: string; kind: "image" | "video" | string }>,
-): { imageName: string; videoName: string } {
-  const videoIndex = order.findIndex((entry) => entry.kind === "video");
-  expect(videoIndex).toBeGreaterThanOrEqual(0);
-
-  for (let offset = 1; offset < order.length; offset += 1) {
-    const candidate = order[(videoIndex - offset + order.length) % order.length];
-    if (candidate?.kind === "image") {
-      return { imageName: candidate.name, videoName: order[videoIndex]!.name };
+async function selectImageBeforeVideoInViewer(
+  mainWindow: import("@playwright/test").Page,
+): Promise<void> {
+  const selected = await mainWindow.evaluate(() => {
+    const buttons = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('.media-swiper-theme button[aria-label^="Go to item"]'),
+    );
+    const videoIndex = buttons.findIndex(
+      (button) => button.querySelector("video") || button.textContent?.includes("Video"),
+    );
+    if (videoIndex < 0) {
+      return false;
     }
-  }
-
-  throw new Error("Mixed media fixture needs an image before a video");
+    for (let offset = 1; offset < buttons.length; offset += 1) {
+      const candidate = buttons[(videoIndex - offset + buttons.length) % buttons.length];
+      if (candidate?.querySelector("img")) {
+        candidate.click();
+        return true;
+      }
+    }
+    return false;
+  });
+  expect(selected).toBe(true);
+  await expect(mainWindow.locator(".media-swiper-theme .swiper-slide-active img[data-emk-fit-mode]")).toBeVisible();
 }
 
 async function setAutoPlayVideoOnSelection(
@@ -163,10 +172,10 @@ test.describe("Viewer mixed media", () => {
     await openE2eMixedMediaLibrary(electronApp, mainWindow);
     await switchToListView(mainWindow);
 
-    const { imageName } = findImageBeforeVideo(await readFolderMediaOrder(mainWindow));
-
-    await openViewerFromListRow(mainWindow, imageName);
-    await expect(mainWindow.locator(".media-swiper-theme .swiper-slide-active img[data-emk-fit-mode]")).toBeVisible();
+    const { imageNames } = await readMixedMediaNames(mainWindow);
+    expect(imageNames.length).toBeGreaterThan(0);
+    await openViewerFromListRow(mainWindow, imageNames[0]);
+    await selectImageBeforeVideoInViewer(mainWindow);
 
     await advanceUntilVideo(mainWindow, { expectedPaused: false, maxSteps: 1 });
   });
@@ -207,10 +216,10 @@ test.describe("Viewer mixed media", () => {
       .toBe(false);
     await switchToListView(mainWindow);
 
-    const { imageName } = findImageBeforeVideo(await readFolderMediaOrder(mainWindow));
-
-    await openViewerFromListRow(mainWindow, imageName);
-    await expect(mainWindow.locator(".media-swiper-theme .swiper-slide-active img[data-emk-fit-mode]")).toBeVisible();
+    const { imageNames } = await readMixedMediaNames(mainWindow);
+    expect(imageNames.length).toBeGreaterThan(0);
+    await openViewerFromListRow(mainWindow, imageNames[0]);
+    await selectImageBeforeVideoInViewer(mainWindow);
 
     await advanceUntilVideo(mainWindow, { expectedPaused: true, maxSteps: 1, timeoutPerStepMs: 25_000 });
   });
@@ -248,9 +257,10 @@ test.describe("Viewer mixed media", () => {
     await openE2eMixedMediaLibrary(electronApp, mainWindow);
     await switchToListView(mainWindow);
 
-    const { imageName } = findImageBeforeVideo(await readFolderMediaOrder(mainWindow));
-
-    await openViewerFromListRow(mainWindow, imageName);
+    const { imageNames } = await readMixedMediaNames(mainWindow);
+    expect(imageNames.length).toBeGreaterThan(0);
+    await openViewerFromListRow(mainWindow, imageNames[0]);
+    await selectImageBeforeVideoInViewer(mainWindow);
     await mainWindow.getByRole("button", { name: "Play slideshow" }).click();
 
     await expect
