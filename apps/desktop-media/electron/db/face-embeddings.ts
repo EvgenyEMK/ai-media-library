@@ -107,8 +107,7 @@ export function getFacesNeedingEmbeddings(
        INNER JOIN media_items mi ON mi.id = fi.media_item_id
        WHERE fi.library_id = ?
          AND mi.deleted_at IS NULL
-         AND fi.landmarks_json IS NOT NULL
-         AND (fi.embedding_json IS NULL OR fi.embedding_status = 'failed')
+         AND (fi.embedding_json IS NULL OR fi.embedding_status = 'failed' OR fi.embedding_status = 'pending')
          ${whereClause}
        ORDER BY mi.source_path, fi.rowid`,
     )

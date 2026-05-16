@@ -5,7 +5,7 @@ import { test, expect } from "./fixtures/app-fixture";
 import { clickSidebarLibraryRoot } from "./fixtures/desktop-sidebar";
 import { mockFolderDialog } from "./fixtures/mock-dialog";
 
-const defaultAssetsDir = path.resolve(__dirname, "../../test-assets-local/e2e-photos");
+const defaultAssetsDir = path.resolve(__dirname, "../../test-assets/e2e-photos");
 const configuredAssetsDir = process.env.EMK_E2E_PHOTOS_DIR?.trim();
 const e2ePhotosSourceDir =
   configuredAssetsDir && configuredAssetsDir.length > 0 ? configuredAssetsDir : defaultAssetsDir;

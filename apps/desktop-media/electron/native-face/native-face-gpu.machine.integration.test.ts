@@ -22,7 +22,7 @@ const MODELS_DIR =
 
 const TEST_IMAGE_PATH = path.resolve(
   __dirname,
-  "../../test-assets-local/e2e-photos/face-detect-sample-01.jpg",
+  "../../test-assets/e2e-photos/face-detect-sample-01.jpg",
 );
 
 const ORIENTATION_MODEL = "deep-image-orientation-v1";

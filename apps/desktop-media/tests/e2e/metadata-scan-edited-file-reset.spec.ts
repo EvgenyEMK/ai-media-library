@@ -10,7 +10,7 @@ import {
 
 const REPLACEMENT_FIXTURE = path.resolve(
   __dirname,
-  "../../test-assets-local/e2e-photos/IMG-20220802-WA0016.jpg",
+  "../../test-assets/e2e-photos/IMG-20220802-WA0016.jpg",
 );
 
 test.describe.configure({ mode: "serial", timeout: 300_000 });

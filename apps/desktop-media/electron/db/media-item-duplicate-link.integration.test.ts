@@ -34,8 +34,8 @@ function canOpenSqlite(): boolean {
 const HAS_SQLITE = canOpenSqlite();
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const FIXTURE_FACE = path.join(HERE, "../../test-assets-local/e2e-photos/face-detect-sample-01.jpg");
-const FIXTURE_ID = path.join(HERE, "../../test-assets-local/e2e-photos/Croatian_ID_card_specimen.jpg");
+const FIXTURE_FACE = path.join(HERE, "../../test-assets/e2e-photos/face-detect-sample-01.jpg");
+const FIXTURE_ID = path.join(HERE, "../../test-assets/e2e-photos/Croatian_ID_card_specimen.jpg");
 
 /** Same synthetic hash for two different files simulates duplicate detection by strong hash (identical bytes in real scans). */
 const SHARED_HASH = `${"aa".repeat(32)}`;

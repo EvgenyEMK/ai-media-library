@@ -5,7 +5,7 @@ import type { Page } from "@playwright/test";
 import { test, expect } from "../e2e/fixtures/app-fixture";
 
 const configuredAssetsDir = process.env.EMK_E2E_PHOTOS_DIR?.trim();
-const defaultAssetsDir = path.resolve(__dirname, "../../test-assets-local/e2e-photos");
+const defaultAssetsDir = path.resolve(__dirname, "../../test-assets/e2e-photos");
 const e2ePhotosDir =
   configuredAssetsDir && configuredAssetsDir.length > 0 ? configuredAssetsDir : defaultAssetsDir;
 

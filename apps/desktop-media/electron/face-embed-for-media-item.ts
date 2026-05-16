@@ -7,6 +7,7 @@ import {
   type EmbeddingModelInfo,
   type FaceForEmbedding,
 } from "./face-embedding";
+import { planFaceEmbeddingTargets, type FaceInstanceBBox } from "./face-embedding-target";
 import { transformFaceForRotatedEmbedding } from "./face-embedding-rotation";
 import { createRotatedTempImage } from "./photo-analysis";
 
@@ -36,18 +37,34 @@ export async function embedFacesForMediaItem(params: {
   requireLoadedModel?: boolean;
 }): Promise<FaceEmbeddingSummary> {
   const instances = listFaceInstancesByMediaItem(params.mediaItemId);
-  if (instances.length === 0) return emptySummary();
+  const targetInputs: FaceInstanceBBox[] = instances.map((inst) => ({
+    id: inst.id,
+    bbox_x: inst.bounding_box.x,
+    bbox_y: inst.bounding_box.y,
+    bbox_width: inst.bounding_box.width,
+    bbox_height: inst.bounding_box.height,
+    embedding_status: inst.embedding_status,
+  }));
+  const targets = planFaceEmbeddingTargets(
+    targetInputs,
+    params.embeddingOverride?.faces.faces,
+  );
+  if (targets.length === 0) {
+    return emptySummary();
+  }
 
   if (params.requireLoadedModel) {
     await ensureFaceEmbeddingModelLoaded();
   } else {
     const modelInfo = await getEmbeddingModelInfo();
-    if (!modelInfo?.loaded) return emptySummary();
+    if (!modelInfo?.loaded) {
+      return emptySummary();
+    }
   }
 
   let cleanupRotatedImage: (() => Promise<void>) | null = null;
   const facesForEmbed: FaceForEmbedding[] = [];
-  const embeddableInstances: typeof instances = [];
+  const embeddableInstances: Array<(typeof instances)[number]> = [];
 
   try {
     let embeddingImagePath = params.embeddingOverride?.imagePath ?? params.imagePath;
@@ -65,9 +82,15 @@ export async function embedFacesForMediaItem(params: {
       cleanupRotatedImage = rotated.cleanup;
     }
 
-    for (let idx = 0; idx < instances.length; idx++) {
-      const inst = instances[idx]!;
-      const overrideFace = params.embeddingOverride?.faces.faces[idx];
+    for (const target of targets) {
+      const inst = instances.find((row) => row.id === target.instance.id);
+      if (!inst) {
+        continue;
+      }
+      const overrideFace =
+        target.detectionFaceIndex !== null
+          ? params.embeddingOverride?.faces.faces[target.detectionFaceIndex]
+          : undefined;
       const sourceBox = [
         inst.bounding_box.x ?? 0,
         inst.bounding_box.y ?? 0,
@@ -94,7 +117,9 @@ export async function embedFacesForMediaItem(params: {
       embeddableInstances.push(inst);
     }
 
-    if (facesForEmbed.length === 0) return emptySummary();
+    if (facesForEmbed.length === 0) {
+      return emptySummary();
+    }
 
     for (const inst of embeddableInstances) {
       markFaceEmbeddingStatus(inst.id, "indexing");

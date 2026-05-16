@@ -1,6 +1,7 @@
 import { useEffect, useId, useState, type ReactElement } from "react";
 import { ChevronDown, Sparkles, Square, Star } from "lucide-react";
 import {
+  AdvancedSettingsStar,
   MediaItemStarRating,
   SettingsCheckboxField,
   SettingsNumberField,
@@ -611,6 +612,47 @@ export function DesktopSettingsSection({
               </div>
             </div>
           ) : null}
+          <SettingsNumberField
+            title="Mark folder scan as outdated after"
+            description="In the Folder AI summary, highlight the folder scan card in amber when the oldest folder scan in the tree is older than this many days."
+            value={folderScanningSettings.markFolderScanOutdatedAfterDays}
+            min={1}
+            max={365}
+            step={1}
+            surfaceVariant="accent-stripe"
+            onChange={(nextValue) =>
+              onFolderScanningSettingChange(
+                "markFolderScanOutdatedAfterDays",
+                Math.max(1, Math.round(nextValue)),
+              )
+            }
+          />
+          <SettingsCheckboxField
+            title={UI_TEXT.emptyFolderAiSummaryTitle}
+            description={UI_TEXT.emptyFolderAiSummaryDescription}
+            checked={folderScanningSettings.showFolderAiSummaryWhenSelectingEmptyFolder}
+            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+            surfaceVariant="accent-stripe"
+            onChange={(next) =>
+              onFolderScanningSettingChange("showFolderAiSummaryWhenSelectingEmptyFolder", next)
+            }
+          />
+          <SettingsCheckboxField
+            title={UI_TEXT.fullMetadataScanOnAddLibraryRootTitle}
+            description={UI_TEXT.fullMetadataScanOnAddLibraryRootDescription}
+            checked={folderScanningSettings.runFullMetadataScanWhenLibraryRootAdded}
+            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+            surfaceVariant="accent-stripe"
+            onChange={(next) => onFolderScanningSettingChange("runFullMetadataScanWhenLibraryRootAdded", next)}
+          />
+          <SettingsCheckboxField
+            title="Update file metadata on change of Rating, Title, Description"
+            description={`XMP and EXIF are standard metadata blocks inside many image and video files; other apps (Lightroom, Windows) read them for star ratings and titles. When this option is on, after your change is saved in the database the app runs ExifTool to mirror rating into the file. When off, edits stay in the database only—original files on disk are not modified (recommended).`}
+            checked={folderScanningSettings.writeEmbeddedMetadataOnUserEdit}
+            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+            surfaceVariant="accent-stripe"
+            onChange={(next) => onFolderScanningSettingChange("writeEmbeddedMetadataOnUserEdit", next)}
+          />
           {showAdvancedSettings ? (
             <SettingsCheckboxField
               title={UI_TEXT.pathUseLlmTitle}
@@ -654,24 +696,6 @@ export function DesktopSettingsSection({
               </div>
             </div>
           ) : null}
-          <SettingsCheckboxField
-            title={UI_TEXT.emptyFolderAiSummaryTitle}
-            description={UI_TEXT.emptyFolderAiSummaryDescription}
-            checked={folderScanningSettings.showFolderAiSummaryWhenSelectingEmptyFolder}
-            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
-            surfaceVariant="accent-stripe"
-            onChange={(next) =>
-              onFolderScanningSettingChange("showFolderAiSummaryWhenSelectingEmptyFolder", next)
-            }
-          />
-          <SettingsCheckboxField
-            title={UI_TEXT.fullMetadataScanOnAddLibraryRootTitle}
-            description={UI_TEXT.fullMetadataScanOnAddLibraryRootDescription}
-            checked={folderScanningSettings.runFullMetadataScanWhenLibraryRootAdded}
-            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
-            surfaceVariant="accent-stripe"
-            onChange={(next) => onFolderScanningSettingChange("runFullMetadataScanWhenLibraryRootAdded", next)}
-          />
           {showAdvancedSettings ? (
             <SettingsNumberField
               title="Automatically scan folder for changes on selection if number of files less than"
@@ -691,31 +715,16 @@ export function DesktopSettingsSection({
             />
           ) : null}
           {showAdvancedSettings ? (
-            <SettingsNumberField
-              title="Mark folder scan as outdated after"
-              description="In the Folder AI summary, highlight the folder scan card in amber when the oldest folder scan in the tree is older than this many days."
-              value={folderScanningSettings.markFolderScanOutdatedAfterDays}
-              min={1}
-              max={365}
-              step={1}
-              advanced
-              surfaceVariant="accent-stripe"
-              onChange={(nextValue) =>
-                onFolderScanningSettingChange(
-                  "markFolderScanOutdatedAfterDays",
-                  Math.max(1, Math.round(nextValue)),
-                )
-              }
-            />
-          ) : null}
-          {showAdvancedSettings ? (
             <label
               className={cn(
                 settingsCustomOptionSurfaceClass("accent-stripe"),
                 "flex flex-col gap-2 border-l-primary/70 p-3",
               )}
             >
-              <span className="text-sm font-medium text-foreground">Quick scan: detect moved files using</span>
+              <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                Quick scan: detect moved files using
+                <AdvancedSettingsStar />
+              </span>
               <select
                 className="h-9 w-full max-w-lg rounded-md border border-border bg-background px-2 text-base"
                 value={folderScanningSettings.quickScanMovedFileMatchMode}
@@ -735,14 +744,6 @@ export function DesktopSettingsSection({
               </p>
             </label>
           ) : null}
-          <SettingsCheckboxField
-            title="Update file metadata on change of Rating, Title, Description"
-            description={`XMP and EXIF are standard metadata blocks inside many image and video files; other apps (Lightroom, Windows) read them for star ratings and titles. When this option is on, after your change is saved in the database the app runs ExifTool to mirror rating into the file. When off, edits stay in the database only—original files on disk are not modified (recommended).`}
-            checked={folderScanningSettings.writeEmbeddedMetadataOnUserEdit}
-            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
-            surfaceVariant="accent-stripe"
-            onChange={(next) => onFolderScanningSettingChange("writeEmbeddedMetadataOnUserEdit", next)}
-          />
           <div className="pt-1">
             <button
               type="button"
@@ -1186,6 +1187,13 @@ export function DesktopSettingsSection({
               })
             }
           />
+          <SettingsCheckboxField
+            title="Show AI age and gender in Face tags panel"
+            description='When enabled, each face entry in the photo viewer Face tags tab shows text like "AI age: 45, Male (67%)". Requires face age & gender estimation to be on.'
+            checked={faceDetectionSettings.showAiAgeGenderInFaceTagsPanel}
+            checkboxClassName={SETTINGS_OPTION_CHECKBOX_CLASS}
+            onChange={(next) => onFaceDetectionSettingChange("showAiAgeGenderInFaceTagsPanel", next)}
+          />
           <SettingsNumberField
             title="Minimum confidence threshold"
             description="Filters out detected faces below this confidence score, which reduces false positives from patterns that only look like faces."
@@ -1315,7 +1323,9 @@ export function DesktopSettingsSection({
                 faceDetectionSettings.faceAgeGenderDetection.enabled ===
                   DEFAULT_FACE_DETECTION_SETTINGS.faceAgeGenderDetection.enabled &&
                 faceDetectionSettings.faceAgeGenderDetection.model ===
-                  DEFAULT_FACE_DETECTION_SETTINGS.faceAgeGenderDetection.model
+                  DEFAULT_FACE_DETECTION_SETTINGS.faceAgeGenderDetection.model &&
+                faceDetectionSettings.showAiAgeGenderInFaceTagsPanel ===
+                  DEFAULT_FACE_DETECTION_SETTINGS.showAiAgeGenderInFaceTagsPanel
               }
             >
               {UI_TEXT.resetToDefaults}

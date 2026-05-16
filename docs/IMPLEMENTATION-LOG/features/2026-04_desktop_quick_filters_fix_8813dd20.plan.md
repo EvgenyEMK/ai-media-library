@@ -1,6 +1,6 @@
 ---
 name: Desktop quick filters fix
-overview: Fix desktop-media quick filters by applying the same `matchesThumbnailQuickFilters` pipeline to AI search result rows (and keeping viewer indices consistent), resetting filters when switching between folder thumbs and search results, refactoring Categories to checkbox + single select with the requested options (updating shared `thumbnail-quick-filters` + web parity), and expanding automated tests (node tests + E2E strategy for `test-assets-local/e2e-photos`).
+overview: Fix desktop-media quick filters by applying the same `matchesThumbnailQuickFilters` pipeline to AI search result rows (and keeping viewer indices consistent), resetting filters when switching between folder thumbs and search results, refactoring Categories to checkbox + single select with the requested options (updating shared `thumbnail-quick-filters` + web parity), and expanding automated tests (node tests + E2E strategy for `test-assets/e2e-photos`).
 todos:
   - id: filter-search-hook
     content: Add filteredDisplaySemanticResults + viewerItems alignment in use-filtered-media-items.ts; wire DesktopMediaWorkspace + toolbar counts
@@ -63,9 +63,9 @@ Note: `[use-folder-tree-handlers.ts](apps/desktop-media/src/renderer/hooks/use-f
   - **People**: e.g. `peopleEnabled` + exact count vs `gte_1` vs document-ID exclusion (already partially covered; add cases if gaps appear).
   - **Documents**: `invoice_or_receipt` and `document_id_or_passport` with metadata matching your named fixtures’ *expected* AI categories (synthetic metadata objects; filenames only in comments).
 
-### D. E2E tests (`test-assets-local/e2e-photos`)
+### D. E2E tests (`test-assets/e2e-photos`)
 
-- Assets path is already used in `[semantic-search.spec.ts](apps/desktop-media/tests/e2e/semantic-search.spec.ts)` (`../../test-assets-local/e2e-photos` or `EMK_E2E_PHOTOS_DIR`). The folder may be gitignored locally; tests should `skip` when missing (existing pattern).
+- Assets path is already used in `[semantic-search.spec.ts](apps/desktop-media/tests/e2e/semantic-search.spec.ts)` (`../../test-assets/e2e-photos` or `EMK_E2E_PHOTOS_DIR`). The folder may be gitignored locally; tests should `skip` when missing (existing pattern).
 - **Challenge**: Playwright cannot assert invoice/sports/nature without **analysis metadata** in SQLite. The current `[mock-ollama.ts](apps/desktop-media/tests/e2e/fixtures/mock-ollama.ts)` returns a fixed `image_category: "test"` and the chat body does not include the file path, so mocks cannot distinguish files.
 - **Recommended approach** (pick one in implementation):
   1. **Strengthen mock Ollama**: parse `POST /api/chat` JSON, inspect `messages[0].content` (and/or add a **test-only** optional line to the analysis prompt with basename behind an env flag) to return deterministic `image_category`, `number_of_people`, etc. per filename—then run a **small** “Analyze photos” E2E on `e2e-photos` and drive the filter UI via stable `**data-testid`** attributes on the filter button, checkboxes, and selects.

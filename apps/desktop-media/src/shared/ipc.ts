@@ -479,6 +479,8 @@ export interface FaceDetectionSettings {
     enabled: boolean;
     model: FaceAgeGenderModelId;
   };
+  /** When true, Face tags tab in the photo viewer shows AI age/gender estimates per face. */
+  showAiAgeGenderInFaceTagsPanel: boolean;
 }
 
 /** Auxiliary (non-detector) face-pipeline model categories. */
@@ -768,6 +770,7 @@ export const DEFAULT_FACE_DETECTION_SETTINGS: FaceDetectionSettings = {
     enabled: true,
     model: "onnx-age-gender-v1",
   },
+  showAiAgeGenderInFaceTagsPanel: false,
 };
 
 export const DEFAULT_PHOTO_ANALYSIS_SETTINGS: PhotoAnalysisSettings = {
@@ -792,7 +795,7 @@ export const DEFAULT_FOLDER_SCANNING_SETTINGS: FolderScanningSettings = {
   autoMetadataScanOnSelectMaxFiles: 100,
   writeEmbeddedMetadataOnUserEdit: false,
   detectLocationFromGps: false,
-  markFolderScanOutdatedAfterDays: 7,
+  markFolderScanOutdatedAfterDays: 30,
   quickScanMovedFileMatchMode: "name-size",
 };
 
@@ -806,9 +809,9 @@ export const DEFAULT_AI_IMAGE_SEARCH_SETTINGS: AiImageSearchSettings = {
 };
 
 export const DEFAULT_SMART_ALBUM_SETTINGS: SmartAlbumSettings = {
-  defaultStarRating: 3,
+  defaultStarRating: null,
   defaultStarRatingOperator: "gte",
-  defaultAiRating: 4,
+  defaultAiRating: null,
   defaultAiRatingOperator: "gte",
   excludedImageCategories: [...DEFAULT_SMART_ALBUM_EXCLUDED_IMAGE_CATEGORIES],
 };

@@ -19,6 +19,20 @@ test.describe("Settings", () => {
     await settingsArea.getByText(SETTINGS_FILE_METADATA_SECTION_TITLE, { exact: true }).click();
 
     await expect(settingsArea.getByText("After adding a media library root folder, start a full metadata scan")).toBeVisible();
+    await expect(
+      settingsArea.getByText("Update file metadata on change of Rating, Title, Description"),
+    ).toBeVisible();
+    await expect(settingsArea.getByText("Mark folder scan as outdated after")).toBeVisible();
+    await expect(
+      settingsArea.getByText("Detect location and dates from file paths using AI (LLM)"),
+    ).toBeHidden();
+
+    const hideAdvanced = settingsArea.getByRole("checkbox", { name: /Hide advanced settings/i });
+    if (await hideAdvanced.isChecked()) {
+      await hideAdvanced.click();
+    }
+    await settingsArea.getByText("Face detection", { exact: true }).click();
+    await expect(settingsArea.getByText("Show AI age and gender in Face tags panel")).toBeVisible();
 
     await settingsArea.locator("details summary").first().click();
     const dateFormatSelect = settingsArea.locator("select").first();

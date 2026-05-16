@@ -4,7 +4,7 @@ import { test, expect } from "./fixtures/app-fixture";
 import { waitForArcFaceModelReady } from "./fixtures/e2e-ai-ready";
 import { openE2ePhotoLibrary } from "./fixtures/e2e-photos-library";
 
-const defaultAssetsDir = path.resolve(__dirname, "../../test-assets-local/e2e-photos");
+const defaultAssetsDir = path.resolve(__dirname, "../../test-assets/e2e-photos");
 const configuredAssetsDir = process.env.EMK_E2E_PHOTOS_DIR?.trim();
 const e2ePhotosDir =
   configuredAssetsDir && configuredAssetsDir.length > 0 ? configuredAssetsDir : defaultAssetsDir;

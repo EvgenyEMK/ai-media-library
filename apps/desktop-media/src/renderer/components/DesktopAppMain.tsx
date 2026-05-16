@@ -40,9 +40,11 @@ interface DesktopAppMainProps {
   mainPaneViewMode: MainPaneViewMode;
   isInsightsDuplicateFilesHubOpen: boolean;
   isInsightsFolderAnalysisHubOpen: boolean;
+  isInsightsWronglyRotatedHubOpen: boolean;
   libraryRoots: DesktopStoreState["libraryRoots"];
   onCheckDuplicateFilesFromInsightsHub: (folderPath: string) => void;
   onOpenFolderAiSummaryFromInsightsHub: (folderPath: string) => void;
+  onOpenWronglyRotatedFromInsightsHub: (folderPath: string) => void;
   albumWorkspaceMode: AlbumWorkspaceMode;
   setAlbumWorkspaceMode: Dispatch<SetStateAction<AlbumWorkspaceMode>>;
   smartAlbumRootKind: SmartAlbumRootKind;
@@ -137,9 +139,11 @@ export function DesktopAppMain({
   mainPaneViewMode,
   isInsightsDuplicateFilesHubOpen,
   isInsightsFolderAnalysisHubOpen,
+  isInsightsWronglyRotatedHubOpen,
   libraryRoots,
   onCheckDuplicateFilesFromInsightsHub,
   onOpenFolderAiSummaryFromInsightsHub,
+  onOpenWronglyRotatedFromInsightsHub,
   albumWorkspaceMode,
   setAlbumWorkspaceMode,
   smartAlbumRootKind,
@@ -270,11 +274,24 @@ export function DesktopAppMain({
             onPickLibrary={onOpenFolderAiSummaryFromInsightsHub}
           />
         </div>
-      ) : isInvoicesReceiptsWorkspaceOpen && mainPaneViewMode !== "folderAiSummary" ? (
+      ) : isInsightsWronglyRotatedHubOpen ? (
+        <div className="min-h-0 flex-1 overflow-auto">
+          <DesktopInsightLibraryPickHub
+            title={UI_TEXT.insightsWronglyRotatedImagesNav}
+            emptyMessage={UI_TEXT.duplicateFilesInsightHubEmpty}
+            libraryRoots={libraryRoots}
+            onPickLibrary={onOpenWronglyRotatedFromInsightsHub}
+          />
+        </div>
+      ) : isInvoicesReceiptsWorkspaceOpen &&
+        mainPaneViewMode !== "folderAiSummary" &&
+        mainPaneViewMode !== "imageEditSuggestions" ? (
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <DesktopInvoicesReceiptsWorkspace onOpenItem={openFolderViewerById} />
         </div>
-      ) : isAlbumsSectionOpen && mainPaneViewMode !== "folderAiSummary" ? (
+      ) : isAlbumsSectionOpen &&
+        mainPaneViewMode !== "folderAiSummary" &&
+        mainPaneViewMode !== "imageEditSuggestions" ? (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <DesktopAlbumsWorkspace
             mode={albumWorkspaceMode}
@@ -287,11 +304,15 @@ export function DesktopAppMain({
             onFindSimilar={onFindSimilar}
           />
         </div>
-      ) : isPeopleSectionOpen && mainPaneViewMode !== "folderAiSummary" ? (
+      ) : isPeopleSectionOpen &&
+        mainPaneViewMode !== "folderAiSummary" &&
+        mainPaneViewMode !== "imageEditSuggestions" ? (
         <div className="min-h-0 flex-1 overflow-auto">
           <DesktopPeopleSection onOpenFacePhoto={openFacePhotoInViewer} />
         </div>
-      ) : isSettingsSectionOpen && mainPaneViewMode !== "folderAiSummary" ? (
+      ) : isSettingsSectionOpen &&
+        mainPaneViewMode !== "folderAiSummary" &&
+        mainPaneViewMode !== "imageEditSuggestions" ? (
         <div className="min-h-0 flex-1 overflow-auto">
           <DesktopSettingsSection
             faceDetectionSettings={faceDetectionSettings}

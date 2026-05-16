@@ -95,7 +95,7 @@ function parseArgs(): {
     i += 1;
   }
 
-  const folder = map.get("folder") ?? path.resolve("test-assets-local/rotation-crop");
+  const folder = map.get("folder") ?? path.resolve("test-assets/rotation-crop");
   const expectationsPath =
     map.get("expectations") ??
     path.join(folder, "expectations.json");

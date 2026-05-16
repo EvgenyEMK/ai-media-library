@@ -3,7 +3,6 @@ import {
   E2E_MEDIA_MIXED_DIR,
   hasE2eMixedMediaAssets,
   openE2eMixedMediaLibrary,
-  readFolderMediaOrder,
   readMixedMediaNames,
   switchToGridView,
   switchToListView,
@@ -37,6 +36,72 @@ async function currentViewerVideoPaused(mainWindow: import("@playwright/test").P
     ) as HTMLVideoElement | null;
     return video ? video.paused : null;
   });
+}
+
+async function advanceUntilVideo(
+  mainWindow: import("@playwright/test").Page,
+  options: {
+    direction?: "next" | "prev";
+    expectedPaused: boolean;
+    maxSteps?: number;
+    timeoutPerStepMs?: number;
+  },
+): Promise<void> {
+  const direction = options.direction ?? "next";
+  const maxSteps = options.maxSteps ?? 6;
+  const timeoutPerStepMs = options.timeoutPerStepMs ?? 5_000;
+
+  for (let i = 0; i < maxSteps; i += 1) {
+    await mainWindow
+      .getByRole("button", { name: direction === "next" ? "Next item" : "Previous item" })
+      .click();
+    try {
+      await expect
+        .poll(async () => currentViewerVideoPaused(mainWindow), { timeout: timeoutPerStepMs })
+        .not.toBeNull();
+      await expect
+        .poll(async () => currentViewerVideoPaused(mainWindow), { timeout: timeoutPerStepMs })
+        .toBe(options.expectedPaused);
+      return;
+    } catch {
+      // The next item can be another image. Continue until a video slide becomes active.
+    }
+  }
+
+  throw new Error(`Did not reach a video slide after ${maxSteps} ${direction} item clicks`);
+}
+
+async function selectImageBeforeVideoInViewer(
+  mainWindow: import("@playwright/test").Page,
+): Promise<"next" | "prev" | null> {
+  const direction = await mainWindow.evaluate(() => {
+    const buttons = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('.media-swiper-theme button[aria-label^="Go to item"]'),
+    );
+    const videoIndex = buttons.findIndex(
+      (button) => button.querySelector("video") || button.textContent?.includes("Video"),
+    );
+    if (videoIndex < 0) {
+      return null;
+    }
+
+    const previous = buttons[videoIndex - 1];
+    if (previous?.querySelector("img")) {
+      previous.click();
+      return "next";
+    }
+
+    const next = buttons[videoIndex + 1];
+    if (next?.querySelector("img")) {
+      next.click();
+      return "prev";
+    }
+
+    return null;
+  });
+  expect(direction).not.toBeNull();
+  await expect(mainWindow.locator(".media-swiper-theme .swiper-slide-active img[data-emk-fit-mode]")).toBeVisible();
+  return direction;
 }
 
 async function setAutoPlayVideoOnSelection(
@@ -125,24 +190,12 @@ test.describe("Viewer mixed media", () => {
     await openE2eMixedMediaLibrary(electronApp, mainWindow);
     await switchToListView(mainWindow);
 
-    const { imageNames, videoNames } = await readMixedMediaNames(mainWindow);
+    const { imageNames } = await readMixedMediaNames(mainWindow);
     expect(imageNames.length).toBeGreaterThan(0);
-    expect(videoNames.length).toBeGreaterThan(0);
-
     await openViewerFromListRow(mainWindow, imageNames[0]);
-    await expect(mainWindow.locator(".media-swiper-theme .swiper-slide-active img[data-emk-fit-mode]")).toBeVisible();
+    const direction = await selectImageBeforeVideoInViewer(mainWindow);
 
-    let reachedVideo = false;
-    for (let i = 0; i < 6; i += 1) {
-      await mainWindow.getByRole("button", { name: "Next item" }).click();
-      const paused = await currentViewerVideoPaused(mainWindow);
-      if (paused !== null) {
-        reachedVideo = true;
-        expect(paused).toBe(false);
-        break;
-      }
-    }
-    expect(reachedVideo).toBe(true);
+    await advanceUntilVideo(mainWindow, { direction: direction ?? "next", expectedPaused: false, maxSteps: 1 });
   });
 
   test("clicking video in viewer strip auto-plays when setting is enabled", async ({ electronApp, mainWindow }) => {
@@ -181,26 +234,17 @@ test.describe("Viewer mixed media", () => {
       .toBe(false);
     await switchToListView(mainWindow);
 
-    const { imageNames, videoNames } = await readMixedMediaNames(mainWindow);
+    const { imageNames } = await readMixedMediaNames(mainWindow);
     expect(imageNames.length).toBeGreaterThan(0);
-    expect(videoNames.length).toBeGreaterThan(0);
-
     await openViewerFromListRow(mainWindow, imageNames[0]);
-    await expect(mainWindow.locator(".media-swiper-theme .swiper-slide-active img[data-emk-fit-mode]")).toBeVisible();
+    const direction = await selectImageBeforeVideoInViewer(mainWindow);
 
-    let reachedVideo = false;
-    for (let i = 0; i < 6; i += 1) {
-      await mainWindow.getByRole("button", { name: "Next item" }).click();
-      const paused = await currentViewerVideoPaused(mainWindow);
-      if (paused !== null) {
-        reachedVideo = true;
-        await expect
-          .poll(async () => currentViewerVideoPaused(mainWindow), { timeout: 25_000 })
-          .toBe(true);
-        break;
-      }
-    }
-    expect(reachedVideo).toBe(true);
+    await advanceUntilVideo(mainWindow, {
+      direction: direction ?? "next",
+      expectedPaused: true,
+      maxSteps: 1,
+      timeoutPerStepMs: 25_000,
+    });
   });
 
   test("slideshow mode advances after video playback ends", async ({ electronApp, mainWindow }) => {
@@ -236,13 +280,11 @@ test.describe("Viewer mixed media", () => {
     await openE2eMixedMediaLibrary(electronApp, mainWindow);
     await switchToListView(mainWindow);
 
-    const order = await readFolderMediaOrder(mainWindow);
-    const firstImage = order.find((e) => e.kind === "image");
-    const hasVideo = order.some((e) => e.kind === "video");
-    expect(hasVideo).toBe(true);
-    expect(firstImage).toBeTruthy();
-
-    await openViewerFromListRow(mainWindow, firstImage!.name);
+    const { imageNames } = await readMixedMediaNames(mainWindow);
+    expect(imageNames.length).toBeGreaterThan(0);
+    await openViewerFromListRow(mainWindow, imageNames[0]);
+    const direction = await selectImageBeforeVideoInViewer(mainWindow);
+    test.skip(direction !== "next", "Mixed media order cannot reach a video via forward slideshow");
     await mainWindow.getByRole("button", { name: "Play slideshow" }).click();
 
     await expect

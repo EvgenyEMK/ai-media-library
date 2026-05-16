@@ -40,9 +40,11 @@ interface DesktopAppSidebarProps {
   onShowAlbumList: () => void;
   onOpenInsightsDuplicateFiles: () => void;
   onOpenInsightsFolderAnalysis: () => void;
+  onOpenInsightsWronglyRotatedImages: () => void;
   onOpenInvoicesReceipts: () => void;
   insightsDuplicateFilesActive: boolean;
   insightsFolderAnalysisActive: boolean;
+  insightsWronglyRotatedImagesActive: boolean;
   invoicesReceiptsActive: boolean;
   /** When albums workspace is in smart mode, which root is active (sidebar row highlight). */
   sidebarHighlightedSmartAlbumKind: SmartAlbumRootKind | null;
@@ -79,9 +81,11 @@ export function DesktopAppSidebar({
   onShowAlbumList,
   onOpenInsightsDuplicateFiles,
   onOpenInsightsFolderAnalysis,
+  onOpenInsightsWronglyRotatedImages,
   onOpenInvoicesReceipts,
   insightsDuplicateFilesActive,
   insightsFolderAnalysisActive,
+  insightsWronglyRotatedImagesActive,
   invoicesReceiptsActive,
   sidebarHighlightedSmartAlbumKind,
   albumsSidebarExpandRecentByDefault,
@@ -202,10 +206,12 @@ export function DesktopAppSidebar({
             contentClassName: "pr-0",
             content: (
               <DesktopSidebarInsightsSection
-                isDuplicateFilesActive={insightsDuplicateFilesActive}
                 isFolderAnalysisActive={insightsFolderAnalysisActive}
-                onOpenDuplicateFiles={onOpenInsightsDuplicateFiles}
+                isWronglyRotatedImagesActive={insightsWronglyRotatedImagesActive}
+                isDuplicateFilesActive={insightsDuplicateFilesActive}
                 onOpenFolderAnalysis={onOpenInsightsFolderAnalysis}
+                onOpenWronglyRotatedImages={onOpenInsightsWronglyRotatedImages}
+                onOpenDuplicateFiles={onOpenInsightsDuplicateFiles}
               />
             ),
           },

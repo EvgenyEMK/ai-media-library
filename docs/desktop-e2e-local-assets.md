@@ -2,12 +2,12 @@
 
 Desktop Playwright tests use fixture assets under:
 
-`apps/desktop-media/test-assets-local/e2e-photos/`
+`apps/desktop-media/test-assets/e2e-photos/`
 
 Related fixture folders:
 
-- `apps/desktop-media/test-assets-local/e2e-media-mixed/`
-- `apps/desktop-media/test-assets-local/rotation-crop/`
+- `apps/desktop-media/test-assets/e2e-media-mixed/`
+- `apps/desktop-media/test-assets/rotation-crop/`
 
 These fixtures are now tracked in the repository so CI can run E2E suites consistently.
 
@@ -21,7 +21,7 @@ When replacing fixtures, keep each test contract in sync:
 
 1. Update required filenames in relevant E2E specs (`REQUIRED_FILES`, `REQUIRED_FILTER_FILES`, etc.).
 2. Update filename-based mappings in `tests/e2e/fixtures/mock-ollama.ts` when quick-filter expectations depend on category mapping.
-3. Keep `apps/desktop-media/test-assets-local/e2e-photos/expectations.json` aligned for unconfirmed-face and semantic expectations.
+3. Keep `apps/desktop-media/test-assets/e2e-photos/expectations.json` aligned for unconfirmed-face and semantic expectations.
 4. After changing files under `rotation-crop/`, update `rotation-crop/expectations.json` `file` entries to match (see `media01.jpg` … `media07.jpg`).
 5. Re-run `pnpm test:e2e` (or CI smoke subset) to confirm no regressions.
 

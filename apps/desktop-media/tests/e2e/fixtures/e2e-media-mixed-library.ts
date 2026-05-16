@@ -7,7 +7,7 @@ import { mockFolderDialog } from "./mock-dialog";
 
 export const E2E_MEDIA_MIXED_DIR = path.resolve(
   __dirname,
-  "../../../test-assets-local/e2e-media-mixed",
+  "../../../test-assets/e2e-media-mixed",
 );
 
 export function hasE2eMixedMediaAssets(): boolean {

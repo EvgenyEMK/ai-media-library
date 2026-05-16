@@ -48,6 +48,13 @@ export const viewerStyles: Record<string, CSSProperties> = {
     width: "100%",
     overflow: "hidden",
     borderRadius: 6,
+    boxSizing: "border-box",
+  },
+  thumbSlideActive: {
+    boxShadow: "0 0 0 2px hsl(var(--primary, 217 91% 60%) / 1)",
+  },
+  thumbButtonActive: {
+    opacity: 1,
   },
   thumbImage: {
     width: "100%",

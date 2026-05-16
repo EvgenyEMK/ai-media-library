@@ -5,7 +5,10 @@ export type PrimarySidebarSectionId = "folders" | "albums" | "people" | "setting
 export type ExpandedSidebarSectionId = PrimarySidebarSectionId | "insights" | "documents";
 
 /** Which Insights inner row is selected (highlights row; drives hub or direct actions). */
-export type InsightsSidebarSubSection = "duplicate-files" | "folder-analysis-status";
+export type InsightsSidebarSubSection =
+  | "folder-analysis-status"
+  | "wrongly-rotated-images"
+  | "duplicate-files";
 
 /** Which Documents inner row is selected (drives main-pane workspace). */
 export type DocumentsSidebarSubSection = "invoices-receipts";

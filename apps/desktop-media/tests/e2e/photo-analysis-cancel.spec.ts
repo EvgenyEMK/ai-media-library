@@ -4,7 +4,7 @@ import { clickSidebarLibraryRoot, mainDesktopSidebar } from "./fixtures/desktop-
 import { mockFolderDialog } from "./fixtures/mock-dialog";
 import { createTestImageFolder, removeTestImageFolder } from "./fixtures/test-images";
 
-const REAL_IMAGE_FOLDER = path.resolve(__dirname, "../../test-assets-local/e2e-photos");
+const REAL_IMAGE_FOLDER = path.resolve(__dirname, "../../test-assets/e2e-photos");
 
 let tempFolder: string;
 

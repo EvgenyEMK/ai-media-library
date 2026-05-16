@@ -5,7 +5,7 @@ import { Jimp } from "jimp";
 import type { FaceDetectionSettings } from "../../src/shared/ipc";
 import { test, expect } from "./fixtures/app-fixture";
 
-const sourceDir = path.resolve(__dirname, "../../test-assets-local/rotation-crop");
+const sourceDir = path.resolve(__dirname, "../../test-assets/rotation-crop");
 const media05 = path.join(sourceDir, "media05.jpg");
 const media06 = path.join(sourceDir, "media06.jpg");
 

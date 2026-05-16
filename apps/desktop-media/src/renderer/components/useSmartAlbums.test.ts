@@ -3,15 +3,15 @@ import { DEFAULT_SMART_ALBUM_SETTINGS, type SmartAlbumSettings } from "../../sha
 import { smartAlbumSettingsToFilters } from "./useSmartAlbums";
 
 describe("smartAlbumSettingsToFilters", () => {
-  it("maps default settings to star and AI aesthetic filters", () => {
+  it("maps default settings with unset star and AI rating filters", () => {
     expect(smartAlbumSettingsToFilters(DEFAULT_SMART_ALBUM_SETTINGS)).toEqual({
       includeUnconfirmedFaces: true,
-      starRatingMin: 3,
       starRatingOperator: "gte",
-      aiAestheticMin: 7,
       aiAestheticOperator: "gte",
       ratingLogic: "or",
     });
+    expect(smartAlbumSettingsToFilters(DEFAULT_SMART_ALBUM_SETTINGS).starRatingMin).toBeUndefined();
+    expect(smartAlbumSettingsToFilters(DEFAULT_SMART_ALBUM_SETTINGS).aiAestheticMin).toBeUndefined();
   });
 
   it("omits star filter when defaultStarRating is null", () => {

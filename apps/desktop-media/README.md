@@ -25,7 +25,7 @@ From the monorepo root you can use `pnpm test`, `pnpm test:e2e`, or `pnpm test:a
 
 ## E2E local assets (sensitive / not in git)
 
-Some Playwright tests expect photos under **`test-assets-local/e2e-photos/`** (or `EMK_E2E_PHOTOS_DIR`). That folder is **gitignored** so real-world images (IDs, invoices, addresses, …) are never committed. See the repo doc: [../../docs/desktop-e2e-local-assets.md](../../docs/desktop-e2e-local-assets.md).
+Some Playwright tests expect photos under **`test-assets/e2e-photos/`** (or `EMK_E2E_PHOTOS_DIR`). That folder is **gitignored** so real-world images (IDs, invoices, addresses, …) are never committed. See the repo doc: [../../docs/desktop-e2e-local-assets.md](../../docs/desktop-e2e-local-assets.md).
 
 ## Structure (short)
 

@@ -435,7 +435,10 @@ export function DesktopFaceTagsTabContent({
               faceInstance && selectValue === SELECT_NONE
                 ? embeddingSuggestions[faceInstance.id] ?? null
                 : null;
-            const ageGenderLine = formatFaceAgeGenderLine(faceInstance);
+            const ageGenderLine =
+              faceDetectionSettings.showAiAgeGenderInFaceTagsPanel
+                ? formatFaceAgeGenderLine(faceInstance)
+                : null;
 
             return (
               <FaceTagsEntryCard

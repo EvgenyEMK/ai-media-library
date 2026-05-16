@@ -29,7 +29,7 @@ function canOpenSqlite(): boolean {
 const HAS_SQLITE = canOpenSqlite();
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const FIXTURE_FACE = path.join(HERE, "../../test-assets-local/e2e-photos/face-detect-sample-01.jpg");
+const FIXTURE_FACE = path.join(HERE, "../../test-assets/e2e-photos/face-detect-sample-01.jpg");
 
 const DEFAULT_LIBRARY_ID = "local-default";
 

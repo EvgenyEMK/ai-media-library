@@ -5,7 +5,7 @@ import { clickSidebarLibraryRoot } from "./desktop-sidebar";
 import { mockFolderDialog } from "./mock-dialog";
 
 /** Local JPEG library used by desktop E2E tests (not committed in some environments). */
-export const E2E_PHOTOS_DIR = path.resolve(__dirname, "../../../test-assets-local/e2e-photos");
+export const E2E_PHOTOS_DIR = path.resolve(__dirname, "../../../test-assets/e2e-photos");
 
 export async function openE2ePhotoLibrary(electronApp: ElectronApplication, mainWindow: Page): Promise<void> {
   await mockFolderDialog(electronApp, E2E_PHOTOS_DIR);

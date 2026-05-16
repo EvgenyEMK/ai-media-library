@@ -6,7 +6,7 @@ import { mockFolderDialog } from "./fixtures/mock-dialog";
 import { waitForArcFaceModelReady, waitForSemanticSearchAiReady } from "./fixtures/e2e-ai-ready";
 import { waitForSemanticIndexIdle } from "./fixtures/semantic-index-wait";
 
-const defaultAssetsDir = path.resolve(__dirname, "../../test-assets-local/e2e-photos");
+const defaultAssetsDir = path.resolve(__dirname, "../../test-assets/e2e-photos");
 const configuredAssetsDir = process.env.EMK_E2E_PHOTOS_DIR?.trim();
 const e2ePhotosDir = configuredAssetsDir && configuredAssetsDir.length > 0
   ? configuredAssetsDir

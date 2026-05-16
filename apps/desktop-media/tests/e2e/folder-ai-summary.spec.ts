@@ -406,4 +406,79 @@ test.describe("Folder AI summary", () => {
     await expect(reviewRow.getByText("sub-a")).toBeVisible();
     await expect(mainWindow.getByText("Review only - apply/save coming soon.")).toHaveCount(0);
   });
+
+  test("rotation review stays visible when Albums was opened before Insights folder analysis", async ({
+    electronApp,
+    mainWindow,
+  }) => {
+    await electronApp.evaluate(async ({ ipcMain }) => {
+      const geo = {
+        images: { total: 2, withGpsCount: 0, withoutGpsCount: 2, locationDetailsDoneCount: 0 },
+        videos: { total: 0, withGpsCount: 0, withoutGpsCount: 0, locationDetailsDoneCount: 0 },
+        locationDetails: { doneCount: 0, totalWithGps: 0, label: "empty" },
+      };
+      const pipeline = {
+        doneCount: 2,
+        failedCount: 0,
+        totalImages: 2,
+        label: "done",
+      };
+      ipcMain.removeHandler("media:get-folder-ai-coverage");
+      ipcMain.handle("media:get-folder-ai-coverage", async (_event, folderPath: string, recursive: boolean) => ({
+        folderPath,
+        recursive,
+        totalImages: 2,
+        photo: pipeline,
+        face: pipeline,
+        semantic: pipeline,
+        rotation: { ...pipeline, issueCount: 1 },
+        geo,
+      }));
+      ipcMain.removeHandler("media:get-folder-ai-wrongly-rotated-images");
+      ipcMain.handle("media:get-folder-ai-wrongly-rotated-images", async (_event, request: { folderPath: string }) => ({
+        total: 1,
+        page: 1,
+        pageSize: 24,
+        items: [
+          {
+            id: "e2e-rotated-albums",
+            sourcePath: `${request.folderPath}\\sub-a\\stays.jpg`,
+            name: "stays.jpg",
+            imageUrl: "file:///e2e/stays.jpg",
+            folderPathRelative: "sub-a",
+            rotationAngleClockwise: 90,
+            cropRel: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+          },
+        ],
+      }));
+    });
+
+    await mockFolderDialog(electronApp, fixture.root);
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
+
+    const sidebar = mainDesktopSidebar(mainWindow);
+    await expect(
+      sidebar.getByRole("button", { name: path.normalize(fixture.root), exact: true }),
+    ).toBeVisible({ timeout: 10_000 });
+
+    await mainWindow.getByRole("button", { name: "Albums" }).click();
+    await expect(mainWindow.locator("main.main-panel").getByRole("heading", { name: "Albums" })).toBeVisible();
+
+    await sidebar.getByRole("button", { name: "Insights", exact: true }).click();
+    await sidebar.getByRole("button", { name: "Folder analysis status" }).click();
+
+    const main = mainWindow.locator("main.main-panel");
+    await expect(main.getByRole("button", { name: "Back to images", exact: true })).toBeVisible({
+      timeout: 60_000,
+    });
+
+    const rotationCard = mainWindow.locator("section").filter({
+      has: mainWindow.getByRole("heading", { name: "Wrongly rotated images" }),
+    }).first();
+    await rotationCard.getByRole("button", { name: "View wrongly rotated images" }).click();
+
+    await expect(main.getByText("Include subfolders")).toBeVisible({ timeout: 15_000 });
+    await expect(main.getByRole("article").filter({ hasText: "stays.jpg" })).toBeVisible();
+    await expect(main.getByRole("heading", { name: "Albums", exact: true })).toBeHidden();
+  });
 });

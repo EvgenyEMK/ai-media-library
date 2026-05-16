@@ -65,7 +65,7 @@ While currently desktop-only, it is built with the possibility to extend to mult
 | Platform | Status | Notes |
 | :--- | :--- | :--- |
 | **Desktop Windows** | Beta | [Download](https://github.com/EMK-solutions/ai-media-library/releases/latest) |
-| **Desktop Linux** | Planned | - |
+| **Desktop Linux** | Beta | [Download](https://github.com/EMK-solutions/ai-media-library/releases/latest) (AppImage or .deb) |
 | **Desktop MacOS** | Planned | - |
 | **Local web server for TV browsers** | Planned | - |
 | **Android / iOS mobile apps** | - | If desktop app gets traction |
@@ -188,5 +188,5 @@ Linux and macOS package targets are planned but are not yet configured in this r
 - Desktop E2E (Playwright; builds app first): `pnpm test:e2e`
 - Full test run: `pnpm test:all`
 
-Desktop E2E fixtures are now tracked in-repo under `apps/desktop-media/test-assets-local/`.
+Desktop E2E fixtures are now tracked in-repo under `apps/desktop-media/test-assets/`.
 See [docs/desktop-e2e-local-assets.md](docs/desktop-e2e-local-assets.md) for fixture notes and troubleshooting.
