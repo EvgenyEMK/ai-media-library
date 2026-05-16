@@ -6,7 +6,12 @@ import type { BundleView, JobView } from "../../../shared/pipeline-types";
 import { ProgressDockCloseButton } from "./ProgressDockCloseButton";
 import { ProgressCardBody } from "./cards/ProgressCardBody";
 import { GeocoderQueueRecentCard } from "./cards/GeocoderQueueRecentCard";
-import { buildPipelineQueueRightText, buildPipelineQueueStatsText } from "../../lib/pipeline-queue-progress-stats";
+import {
+  buildPipelineQueueRightText,
+  buildPipelineQueueStatsText,
+  bundleTerminalStatusLabel,
+  failureMessageForBundle,
+} from "../../lib/pipeline-queue-progress-stats";
 import { markDuplicateScanJobCancelRequested } from "../../lib/duplicate-files-cancelled-scan-jobs";
 
 /**
@@ -207,7 +212,10 @@ function statsTextForBundle(
     if (bundle.state === "succeeded" && activeJob) {
       return buildPipelineQueueStatsText(activeJob);
     }
-    return labelForBundleState(bundle.state);
+    if (bundle.state === "failed" || bundle.state === "partial") {
+      return <BundleTerminalFailureStats bundle={bundle} />;
+    }
+    return bundleTerminalStatusLabel(bundle.state);
   }
   if (variant === "queued" || !activeJob) {
     return `${bundle.jobs.length} step${bundle.jobs.length === 1 ? "" : "s"}`;
@@ -254,17 +262,12 @@ function BundleBreadcrumb({ jobs }: { jobs: JobView[] }): ReactElement {
   );
 }
 
-function labelForBundleState(state: BundleView["state"]): string {
-  switch (state) {
-    case "succeeded":
-      return "Completed";
-    case "failed":
-      return "Failed";
-    case "cancelled":
-      return "Cancelled";
-    case "partial":
-      return "Completed with errors";
-    default:
-      return state;
-  }
+function BundleTerminalFailureStats({ bundle }: { bundle: BundleView }): ReactElement {
+  const reason = failureMessageForBundle(bundle);
+  return (
+    <span className="flex min-w-0 flex-col gap-0.5">
+      <span className="font-medium text-amber-500">{bundleTerminalStatusLabel(bundle.state)}</span>
+      {reason ? <span className="text-xs leading-snug text-muted-foreground">{reason}</span> : null}
+    </span>
+  );
 }

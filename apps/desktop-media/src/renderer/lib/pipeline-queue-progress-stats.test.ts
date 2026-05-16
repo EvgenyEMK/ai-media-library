@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { JobView, PipelineId } from "../../shared/pipeline-types";
-import { buildPipelineQueueRightText, buildPipelineQueueStatsText } from "./pipeline-queue-progress-stats";
+import type { BundleView, JobView, PipelineId } from "../../shared/pipeline-types";
+import {
+  buildPipelineQueueRightText,
+  buildPipelineQueueStatsText,
+  bundleTerminalStatusLabel,
+  failureMessageForBundle,
+} from "./pipeline-queue-progress-stats";
 
 function jobView(overrides: {
   pipelineId: PipelineId;
@@ -91,6 +96,48 @@ describe("buildPipelineQueueStatsText", () => {
         }),
       ),
     ).toBe("Processed: 4 / 6 | Wrongly rotated: 2 | Skipped: 94 | Failed: 1");
+  });
+});
+
+describe("bundleTerminalStatusLabel", () => {
+  it("maps terminal bundle states to dock labels", () => {
+    expect(bundleTerminalStatusLabel("failed")).toBe("Failed");
+    expect(bundleTerminalStatusLabel("partial")).toBe("Completed with errors");
+  });
+});
+
+describe("failureMessageForBundle", () => {
+  it("returns the first failed job error", () => {
+    const bundle: BundleView = {
+      bundleId: "b1",
+      displayName: "Analyze",
+      state: "failed",
+      enqueuedAt: 1,
+      startedAt: 1,
+      finishedAt: 2,
+      jobs: [
+        {
+          ...jobView({ pipelineId: "photo-analysis", processed: 0, total: 0, state: "failed" }),
+          error: "Ollama model warmup timed out for 'qwen3.5:9c' (model not found)",
+        },
+      ],
+    };
+    expect(failureMessageForBundle(bundle)).toBe(
+      "Ollama model warmup timed out for 'qwen3.5:9c' (model not found)",
+    );
+  });
+
+  it("returns null when no failed job has an error message", () => {
+    const bundle: BundleView = {
+      bundleId: "b1",
+      displayName: "Analyze",
+      state: "failed",
+      enqueuedAt: 1,
+      startedAt: 1,
+      finishedAt: 2,
+      jobs: [jobView({ pipelineId: "photo-analysis", processed: 0, total: 0, state: "failed" })],
+    };
+    expect(failureMessageForBundle(bundle)).toBeNull();
   });
 });
 

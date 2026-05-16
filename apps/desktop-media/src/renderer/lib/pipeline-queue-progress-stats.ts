@@ -1,5 +1,31 @@
-import type { JobView, PipelineId } from "../../shared/pipeline-types";
+import type { BundleState, BundleView, JobView, PipelineId } from "../../shared/pipeline-types";
 import { formatCount, formatCountRatio } from "./progress-stats-format";
+
+/** Human-readable terminal bundle label for the pipeline queue dock. */
+export function bundleTerminalStatusLabel(state: BundleState): string {
+  switch (state) {
+    case "succeeded":
+      return "Completed";
+    case "failed":
+      return "Failed";
+    case "cancelled":
+      return "Cancelled";
+    case "partial":
+      return "Completed with errors";
+    default:
+      return state;
+  }
+}
+
+/** First non-empty error from a failed job in the bundle (for dock failure details). */
+export function failureMessageForBundle(bundle: BundleView): string | null {
+  for (const job of bundle.jobs) {
+    if (job.state !== "failed") continue;
+    const trimmed = job.error?.trim();
+    if (trimmed) return trimmed;
+  }
+  return null;
+}
 
 export function buildPipelineQueueStatsText(job: JobView): string {
   const processed = job.progress.total != null
