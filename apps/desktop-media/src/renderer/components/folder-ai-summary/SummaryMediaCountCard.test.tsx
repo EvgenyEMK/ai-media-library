@@ -164,6 +164,28 @@ describe("LastDataScanCard", () => {
     expect(screen.getByRole("button", { name: "Run Folder tree scan" })).toHaveAttribute("aria-haspopup", "menu");
   });
 
+  it("styles the outdated full-scan label in warning color when scan is amber", () => {
+    const oldScan = new Date();
+    oldScan.setDate(oldScan.getDate() - 45);
+
+    render(
+      <LastDataScanCard
+        scanFreshness={scanFreshness({
+          oldestFolderScanCompletedAt: oldScan.toISOString(),
+          folderTreeQuickScan: baseQuickScan({
+            newFileCount: 0,
+            modifiedFileCount: 0,
+          }),
+        })}
+        dateFormat="DD.MM.YYYY"
+        outdatedAfterDays={30}
+      />,
+    );
+
+    const label = screen.getByText("Full scan older than 30 days");
+    expect(label).toHaveClass("text-warning");
+  });
+
   it("shows quick-scan folder coverage as 99% when pending file updates round to 100%", () => {
     const { container } = render(
       <LastDataScanCard

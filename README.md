@@ -65,7 +65,7 @@ While currently desktop-only, it is built with the possibility to extend to mult
 | Platform | Status | Notes |
 | :--- | :--- | :--- |
 | **Desktop Windows** | Beta | [Download](https://github.com/EMK-solutions/ai-media-library/releases/latest) |
-| **Desktop Linux** | Planned | - |
+| **Desktop Linux** | Beta | [Download](https://github.com/EMK-solutions/ai-media-library/releases/latest) (AppImage or .deb) |
 | **Desktop MacOS** | Planned | - |
 | **Local web server for TV browsers** | Planned | - |
 | **Android / iOS mobile apps** | - | If desktop app gets traction |

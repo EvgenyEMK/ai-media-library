@@ -42,7 +42,7 @@ function settingsOptionSurfaceClass(
   return SETTINGS_FIELD_SURFACE_CLASS;
 }
 
-function AdvancedSettingsStar(): ReactElement {
+export function AdvancedSettingsStar(): ReactElement {
   return (
     <svg
       aria-label="Advanced setting"

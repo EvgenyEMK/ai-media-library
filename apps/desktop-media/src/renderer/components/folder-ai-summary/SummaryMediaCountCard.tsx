@@ -83,7 +83,7 @@ export function LastDataScanCard({
   actionPending = false,
   /** Disables Play without showing this card's spinner (e.g. geo-location flow running). */
   lockInteraction = false,
-  outdatedAfterDays = 7,
+  outdatedAfterDays = 30,
   hasSubfolders = true,
   onRunFolderScan,
   onInfoClick,
@@ -186,6 +186,7 @@ export function LastDataScanCard({
   if (!loading && isAmber && isFullScanOutdated) {
     metricItems.push({
       label: `Full scan older than ${formatGroupedInt(outdatedAfterDays)} days`,
+      labelClassName: "text-warning",
       value: formatOldestScanLabel(scanFreshness.oldestFolderScanCompletedAt, dateFormat),
       valueClassName: "text-warning",
     });

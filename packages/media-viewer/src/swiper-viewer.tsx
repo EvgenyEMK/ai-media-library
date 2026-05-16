@@ -457,13 +457,29 @@ export function MediaSwiperViewer<TItem extends MediaSwiperViewerItem>({
               {resolvedItems.map((item, index) => {
                 const stripNeighbor =
                   Math.abs(index - currentIndex) <= THUMB_STRIP_VIDEO_PRIORITY_DISTANCE;
+                const isActive = index === currentIndex;
                 return (
-                  <SwiperSlide key={`${item.id}-thumb`} style={{ ...styles.thumbSlide, height: slideHeight }}>
+                  <SwiperSlide
+                    key={`${item.id}-thumb`}
+                    style={{
+                      ...styles.thumbSlide,
+                      ...(isActive ? styles.thumbSlideActive : {}),
+                      height: slideHeight,
+                    }}
+                  >
                     <button
                       type="button"
-                      style={{ border: "none", padding: 0, background: "transparent", width: "100%", height: "100%" }}
+                      style={{
+                        border: "none",
+                        padding: 0,
+                        background: "transparent",
+                        width: "100%",
+                        height: "100%",
+                        ...(isActive ? styles.thumbButtonActive : {}),
+                      }}
                       onClick={() => handleThumbClick(index)}
                       aria-label={`Go to item ${index + 1}`}
+                      aria-current={isActive ? "true" : undefined}
                     >
                       {item.mediaType === "video" ? (
                         <LazyStripVideoThumb

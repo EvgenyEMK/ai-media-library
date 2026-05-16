@@ -353,6 +353,10 @@ function sanitizeFaceDetectionSettings(candidate: unknown): FaceDetectionSetting
       "age-gender",
       DEFAULT_FACE_DETECTION_SETTINGS.faceAgeGenderDetection,
     ),
+    showAiAgeGenderInFaceTagsPanel:
+      typeof value.showAiAgeGenderInFaceTagsPanel === "boolean"
+        ? value.showAiAgeGenderInFaceTagsPanel
+        : DEFAULT_FACE_DETECTION_SETTINGS.showAiAgeGenderInFaceTagsPanel,
   };
 }
 

@@ -160,9 +160,11 @@ export function App(): ReactElement {
   const [documentsSubSection, setDocumentsSubSection] = useState<DocumentsSidebarSubSection | null>(null);
   const [insightsDuplicateFilesHubOpen, setInsightsDuplicateFilesHubOpen] = useState(false);
   const [insightsFolderAnalysisHubOpen, setInsightsFolderAnalysisHubOpen] = useState(false);
+  const [insightsWronglyRotatedHubOpen, setInsightsWronglyRotatedHubOpen] = useState(false);
   const [folderAiSummaryPathOverride, setFolderAiSummaryPathOverride] = useState<string | null>(null);
   const folderAiSummaryOpenedFromInsightsRef = useRef(false);
   const duplicateScanLaunchedFromInsightsRef = useRef(false);
+  const rotationReviewOpenedFromInsightsRef = useRef(false);
 
   const {
     actionsMenuOpen,
@@ -424,9 +426,14 @@ export function App(): ReactElement {
     setInsightsSubSection(null);
     setInsightsDuplicateFilesHubOpen(false);
     setInsightsFolderAnalysisHubOpen(false);
+    setInsightsWronglyRotatedHubOpen(false);
     setFolderAiSummaryPathOverride(null);
     folderAiSummaryOpenedFromInsightsRef.current = false;
-    setMainPaneViewMode((mode) => (mode === "folderAiSummary" ? "media" : mode));
+    rotationReviewOpenedFromInsightsRef.current = false;
+    setRotationReviewScope(null);
+    setMainPaneViewMode((mode) =>
+      mode === "folderAiSummary" || mode === "imageEditSuggestions" ? "media" : mode,
+    );
   }, []);
 
   const openInsightsDuplicateFilesFlow = useCallback((): void => {
@@ -435,9 +442,14 @@ export function App(): ReactElement {
     closeDuplicateFilesView();
     setFolderAiSummaryPathOverride(null);
     folderAiSummaryOpenedFromInsightsRef.current = false;
-    setMainPaneViewMode((m) => (m === "folderAiSummary" ? "media" : m));
+    rotationReviewOpenedFromInsightsRef.current = false;
+    setRotationReviewScope(null);
+    setMainPaneViewMode((m) =>
+      m === "folderAiSummary" || m === "imageEditSuggestions" ? "media" : m,
+    );
     setInsightsSubSection("duplicate-files");
     setInsightsFolderAnalysisHubOpen(false);
+    setInsightsWronglyRotatedHubOpen(false);
     setExpandedSidebarSection("insights");
     if (sidebarCollapsed) {
       store.getState().setSidebarCollapsed(false);
@@ -474,9 +486,14 @@ export function App(): ReactElement {
     closeDuplicateFilesView();
     setFolderAiSummaryPathOverride(null);
     folderAiSummaryOpenedFromInsightsRef.current = false;
-    setMainPaneViewMode((m) => (m === "folderAiSummary" ? "media" : m));
+    rotationReviewOpenedFromInsightsRef.current = false;
+    setRotationReviewScope(null);
+    setMainPaneViewMode((m) =>
+      m === "folderAiSummary" || m === "imageEditSuggestions" ? "media" : m,
+    );
     setInsightsSubSection("folder-analysis-status");
     setInsightsDuplicateFilesHubOpen(false);
+    setInsightsWronglyRotatedHubOpen(false);
     setExpandedSidebarSection("insights");
     if (sidebarCollapsed) {
       store.getState().setSidebarCollapsed(false);
@@ -527,6 +544,62 @@ export function App(): ReactElement {
     setFolderAiSummaryPathOverride(folderPath);
     setMainPaneViewMode("folderAiSummary");
   }, []);
+
+  const openRotationReviewFromInsights = useCallback((folderPath: string, includeSubfolders: boolean): void => {
+    rotationReviewOpenedFromInsightsRef.current = true;
+    setInsightsWronglyRotatedHubOpen(false);
+    setMainPaneViewMode((current) => {
+      if (current !== "imageEditSuggestions") {
+        mainPaneReturnTargetRef.current = current;
+      }
+      return "imageEditSuggestions";
+    });
+    setRotationReviewScope({ folderPath, includeSubfolders });
+  }, []);
+
+  const openInsightsWronglyRotatedFlow = useCallback((): void => {
+    resetDocumentsFlow();
+    closeSimilarImagesView();
+    closeDuplicateFilesView();
+    setFolderAiSummaryPathOverride(null);
+    folderAiSummaryOpenedFromInsightsRef.current = false;
+    rotationReviewOpenedFromInsightsRef.current = false;
+    setRotationReviewScope(null);
+    setMainPaneViewMode((m) =>
+      m === "folderAiSummary" || m === "imageEditSuggestions" ? "media" : m,
+    );
+    setInsightsSubSection("wrongly-rotated-images");
+    setInsightsDuplicateFilesHubOpen(false);
+    setInsightsFolderAnalysisHubOpen(false);
+    setExpandedSidebarSection("insights");
+    if (sidebarCollapsed) {
+      store.getState().setSidebarCollapsed(false);
+    }
+    if (libraryRoots.length === 1) {
+      setInsightsWronglyRotatedHubOpen(false);
+      const root = libraryRoots[0].trim();
+      if (root) {
+        openRotationReviewFromInsights(root, true);
+      }
+      return;
+    }
+    setInsightsWronglyRotatedHubOpen(true);
+  }, [
+    closeDuplicateFilesView,
+    closeSimilarImagesView,
+    libraryRoots,
+    openRotationReviewFromInsights,
+    resetDocumentsFlow,
+    sidebarCollapsed,
+    store,
+  ]);
+
+  const handleOpenWronglyRotatedFromInsightsHub = useCallback(
+    (folderPath: string): void => {
+      openRotationReviewFromInsights(folderPath, true);
+    },
+    [openRotationReviewFromInsights],
+  );
 
   const handleFolderAiSummaryClosed = useCallback((): void => {
     setFolderAiSummaryPathOverride(null);
@@ -651,6 +724,7 @@ export function App(): ReactElement {
   }, []);
 
   const openRotationReview = useCallback((folderPath: string, includeSubfolders: boolean): void => {
+    rotationReviewOpenedFromInsightsRef.current = false;
     setMainPaneViewMode((current) => {
       if (current !== "imageEditSuggestions") {
         mainPaneReturnTargetRef.current = current;
@@ -661,8 +735,14 @@ export function App(): ReactElement {
   }, []);
 
   const closeSpecialMainPaneView = useCallback((): void => {
+    const fromInsights = rotationReviewOpenedFromInsightsRef.current;
     setRotationReviewScope(null);
     setMainPaneViewMode(mainPaneReturnTargetRef.current ?? "media");
+    if (fromInsights) {
+      rotationReviewOpenedFromInsightsRef.current = false;
+      setInsightsSubSection("wrongly-rotated-images");
+      setInsightsWronglyRotatedHubOpen(true);
+    }
   }, []);
 
   const handleFindSimilar = useCallback((sourcePath: string): void => {
@@ -683,6 +763,7 @@ export function App(): ReactElement {
   const isAlbumsSectionOpen = primarySidebarSection === "albums";
   const isInsightsDuplicateFilesHubOpen = insightsDuplicateFilesHubOpen;
   const isInsightsFolderAnalysisHubOpen = insightsFolderAnalysisHubOpen;
+  const isInsightsWronglyRotatedHubOpen = insightsWronglyRotatedHubOpen;
   const isSettingsSectionOpen = primarySidebarSection === "settings";
 
   return (
@@ -713,9 +794,11 @@ export function App(): ReactElement {
         onShowAlbumList={handleShowAlbumListFromSidebar}
         onOpenInsightsDuplicateFiles={openInsightsDuplicateFilesFlow}
         onOpenInsightsFolderAnalysis={openInsightsFolderAnalysisFlow}
+        onOpenInsightsWronglyRotatedImages={openInsightsWronglyRotatedFlow}
         onOpenInvoicesReceipts={openInvoicesReceiptsFromSidebar}
         insightsDuplicateFilesActive={insightsSubSection === "duplicate-files"}
         insightsFolderAnalysisActive={insightsSubSection === "folder-analysis-status"}
+        insightsWronglyRotatedImagesActive={insightsSubSection === "wrongly-rotated-images"}
         invoicesReceiptsActive={isInvoicesReceiptsWorkspaceOpen}
         sidebarHighlightedSmartAlbumKind={
           isAlbumsSectionOpen && albumWorkspaceMode === "smart" ? smartAlbumRootKind : null
@@ -759,9 +842,11 @@ export function App(): ReactElement {
         mainPaneViewMode={mainPaneViewMode}
         isInsightsDuplicateFilesHubOpen={isInsightsDuplicateFilesHubOpen}
         isInsightsFolderAnalysisHubOpen={isInsightsFolderAnalysisHubOpen}
+        isInsightsWronglyRotatedHubOpen={isInsightsWronglyRotatedHubOpen}
         libraryRoots={libraryRoots}
         onCheckDuplicateFilesFromInsightsHub={handleCheckDuplicateFilesFromInsightsHub}
         onOpenFolderAiSummaryFromInsightsHub={handleOpenFolderAiSummaryFromInsightsHub}
+        onOpenWronglyRotatedFromInsightsHub={handleOpenWronglyRotatedFromInsightsHub}
         albumWorkspaceMode={albumWorkspaceMode}
         setAlbumWorkspaceMode={setAlbumWorkspaceMode}
         smartAlbumRootKind={smartAlbumRootKind}

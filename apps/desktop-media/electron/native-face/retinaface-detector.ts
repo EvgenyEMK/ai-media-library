@@ -334,6 +334,9 @@ function resolveSettings(
     faceAgeGenderDetection:
       settings?.faceAgeGenderDetection ??
       DEFAULT_FACE_DETECTION_SETTINGS.faceAgeGenderDetection,
+    showAiAgeGenderInFaceTagsPanel:
+      settings?.showAiAgeGenderInFaceTagsPanel ??
+      DEFAULT_FACE_DETECTION_SETTINGS.showAiAgeGenderInFaceTagsPanel,
   };
 }
 

@@ -13,31 +13,42 @@ function insightsSubRowClassName(selected: boolean): string {
 }
 
 export function DesktopSidebarInsightsSection({
-  isDuplicateFilesActive,
   isFolderAnalysisActive,
-  onOpenDuplicateFiles,
+  isWronglyRotatedImagesActive,
+  isDuplicateFilesActive,
   onOpenFolderAnalysis,
+  onOpenWronglyRotatedImages,
+  onOpenDuplicateFiles,
 }: {
-  isDuplicateFilesActive: boolean;
   isFolderAnalysisActive: boolean;
-  onOpenDuplicateFiles: () => void;
+  isWronglyRotatedImagesActive: boolean;
+  isDuplicateFilesActive: boolean;
   onOpenFolderAnalysis: () => void;
+  onOpenWronglyRotatedImages: () => void;
+  onOpenDuplicateFiles: () => void;
 }): ReactElement {
   return (
     <div className="space-y-0.5 pb-1">
-      <button
-        type="button"
-        onClick={onOpenDuplicateFiles}
-        className={insightsSubRowClassName(isDuplicateFilesActive)}
-      >
-        {UI_TEXT.insightsDuplicateFilesNav}
-      </button>
       <button
         type="button"
         onClick={onOpenFolderAnalysis}
         className={insightsSubRowClassName(isFolderAnalysisActive)}
       >
         {UI_TEXT.insightsFolderAnalysisStatusNav}
+      </button>
+      <button
+        type="button"
+        onClick={onOpenWronglyRotatedImages}
+        className={insightsSubRowClassName(isWronglyRotatedImagesActive)}
+      >
+        {UI_TEXT.insightsWronglyRotatedImagesNav}
+      </button>
+      <button
+        type="button"
+        onClick={onOpenDuplicateFiles}
+        className={insightsSubRowClassName(isDuplicateFilesActive)}
+      >
+        {UI_TEXT.insightsDuplicateFilesNav}
       </button>
     </div>
   );

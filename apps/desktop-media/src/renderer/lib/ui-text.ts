@@ -35,6 +35,7 @@ export const UI_TEXT = {
   sectionSettings: "Settings",
   insightsDuplicateFilesNav: "Duplicate files",
   insightsFolderAnalysisStatusNav: "Folder analysis status",
+  insightsWronglyRotatedImagesNav: "Wrongly rotated images",
   duplicateFilesInsightHubEmpty:
     "Please add folders first and run full scan",
   noFolder: "Select a folder to view media",

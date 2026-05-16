@@ -32,6 +32,12 @@ async function expandInsightsAndOpenFolderAnalysis(mainWindow: Page): Promise<vo
   await sidebar.getByRole("button", { name: "Folder analysis status" }).click();
 }
 
+async function expandInsightsAndOpenWronglyRotated(mainWindow: Page): Promise<void> {
+  const sidebar = mainDesktopSidebar(mainWindow);
+  await sidebar.getByRole("button", { name: "Insights", exact: true }).click();
+  await sidebar.getByRole("button", { name: "Wrongly rotated images" }).click();
+}
+
 async function clickDuplicateFlowBack(mainWindow: Page): Promise<void> {
   const main = mainWindow.locator(MAIN_PANEL);
   await main
@@ -135,6 +141,76 @@ test.describe("Insights section", () => {
       timeout: 15_000,
     });
     await expect(main.getByText(path.normalize(singleLibraryFolder))).toBeVisible();
+  });
+
+  test("Insights sub-nav lists folder analysis before wrongly rotated before duplicate files", async ({
+    mainWindow,
+  }) => {
+    const sidebar = mainDesktopSidebar(mainWindow);
+    await sidebar.getByRole("button", { name: "Insights", exact: true }).click();
+
+    const subNavButtons = sidebar.locator("button").filter({
+      hasText: /^(Folder analysis status|Wrongly rotated images|Duplicate files)$/,
+    });
+    await expect(subNavButtons).toHaveCount(3);
+    await expect(subNavButtons.nth(0)).toHaveText("Folder analysis status");
+    await expect(subNavButtons.nth(1)).toHaveText("Wrongly rotated images");
+    await expect(subNavButtons.nth(2)).toHaveText("Duplicate files");
+  });
+
+  test("Wrongly rotated images: single library opens review list", async ({ electronApp, mainWindow }) => {
+    await mockFolderDialog(electronApp, singleLibraryFolder);
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
+    await expect(
+      mainDesktopSidebar(mainWindow).getByRole("button", {
+        name: path.normalize(singleLibraryFolder),
+        exact: true,
+      }),
+    ).toBeVisible({ timeout: 10_000 });
+
+    await expandInsightsAndOpenWronglyRotated(mainWindow);
+
+    const main = mainWindow.locator(MAIN_PANEL);
+    await expect(main.getByRole("heading", { name: "Wrongly rotated images" })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(
+      main.getByRole("heading", { level: 1, name: "Wrongly rotated images", exact: true }),
+    ).toBeHidden();
+  });
+
+  test("Wrongly rotated images: two libraries shows hub, pick one opens review", async ({
+    electronApp,
+    mainWindow,
+  }) => {
+    const normA = path.normalize(singleLibraryFolder);
+    const normB = path.normalize(secondLibraryFolder);
+
+    await mockFolderDialog(electronApp, singleLibraryFolder);
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
+    await expect(mainDesktopSidebar(mainWindow).getByRole("button", { name: normA, exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
+
+    await mockFolderDialog(electronApp, secondLibraryFolder);
+    await mainWindow.getByRole("button", { name: "Add library folder" }).click();
+    await expect(mainDesktopSidebar(mainWindow).getByRole("button", { name: normB, exact: true })).toBeVisible({
+      timeout: 10_000,
+    });
+
+    await expandInsightsAndOpenWronglyRotated(mainWindow);
+
+    const main = mainWindow.locator(MAIN_PANEL);
+    await expect(
+      main.getByRole("heading", { level: 1, name: "Wrongly rotated images", exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    await main.getByTitle(normA, { exact: true }).click();
+
+    await expect(main.getByRole("heading", { name: "Wrongly rotated images" })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(main.getByText("Include subfolders")).toBeVisible();
   });
 
   test("Duplicate files from Insights with no libraries shows empty guidance", async ({ mainWindow }) => {
