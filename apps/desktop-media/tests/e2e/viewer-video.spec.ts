@@ -39,6 +39,28 @@ async function currentViewerVideoPaused(mainWindow: import("@playwright/test").P
   });
 }
 
+async function advanceUntilVideo(
+  mainWindow: import("@playwright/test").Page,
+  options: { expectedPaused: boolean; maxSteps?: number; timeoutPerStepMs?: number },
+): Promise<void> {
+  const maxSteps = options.maxSteps ?? 6;
+  const timeoutPerStepMs = options.timeoutPerStepMs ?? 5_000;
+
+  for (let i = 0; i < maxSteps; i += 1) {
+    await mainWindow.getByRole("button", { name: "Next item" }).click();
+    try {
+      await expect
+        .poll(async () => currentViewerVideoPaused(mainWindow), { timeout: timeoutPerStepMs })
+        .toBe(options.expectedPaused);
+      return;
+    } catch {
+      // The next item can be another image. Continue until a video slide becomes active.
+    }
+  }
+
+  throw new Error(`Did not reach a video slide after ${maxSteps} Next item clicks`);
+}
+
 async function setAutoPlayVideoOnSelection(
   mainWindow: import("@playwright/test").Page,
   enabled: boolean,
@@ -132,17 +154,7 @@ test.describe("Viewer mixed media", () => {
     await openViewerFromListRow(mainWindow, imageNames[0]);
     await expect(mainWindow.locator(".media-swiper-theme .swiper-slide-active img[data-emk-fit-mode]")).toBeVisible();
 
-    let reachedVideo = false;
-    for (let i = 0; i < 6; i += 1) {
-      await mainWindow.getByRole("button", { name: "Next item" }).click();
-      const paused = await currentViewerVideoPaused(mainWindow);
-      if (paused !== null) {
-        reachedVideo = true;
-        expect(paused).toBe(false);
-        break;
-      }
-    }
-    expect(reachedVideo).toBe(true);
+    await advanceUntilVideo(mainWindow, { expectedPaused: false });
   });
 
   test("clicking video in viewer strip auto-plays when setting is enabled", async ({ electronApp, mainWindow }) => {
@@ -188,19 +200,7 @@ test.describe("Viewer mixed media", () => {
     await openViewerFromListRow(mainWindow, imageNames[0]);
     await expect(mainWindow.locator(".media-swiper-theme .swiper-slide-active img[data-emk-fit-mode]")).toBeVisible();
 
-    let reachedVideo = false;
-    for (let i = 0; i < 6; i += 1) {
-      await mainWindow.getByRole("button", { name: "Next item" }).click();
-      const paused = await currentViewerVideoPaused(mainWindow);
-      if (paused !== null) {
-        reachedVideo = true;
-        await expect
-          .poll(async () => currentViewerVideoPaused(mainWindow), { timeout: 25_000 })
-          .toBe(true);
-        break;
-      }
-    }
-    expect(reachedVideo).toBe(true);
+    await advanceUntilVideo(mainWindow, { expectedPaused: true, timeoutPerStepMs: 25_000 });
   });
 
   test("slideshow mode advances after video playback ends", async ({ electronApp, mainWindow }) => {
