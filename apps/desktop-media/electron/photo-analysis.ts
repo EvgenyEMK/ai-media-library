@@ -9,6 +9,7 @@ import {
   PHOTO_ANALYSIS_PROMPT,
   PHOTO_ANALYSIS_PROMPT_VERSION,
 } from "../src/shared/photo-analysis-prompt";
+import { assertOllamaModelInstalled } from "./ollama-model-resolve";
 import { parseAnalysisJson } from "./photo-analysis-parser";
 
 const DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434";
@@ -87,6 +88,8 @@ export async function warmupOllamaVisionModel(params: {
   if (!model) {
     throw new Error("Warmup requires a model name");
   }
+
+  await assertOllamaModelInstalled(model, { signal: params.signal });
 
   const existing = warmupByModel.get(model);
   if (existing) {

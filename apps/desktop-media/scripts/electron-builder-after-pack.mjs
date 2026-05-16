@@ -68,6 +68,39 @@ function unpackedNodeModulesPath(appOutDir) {
   return path.join(appOutDir, "resources", "app.asar.unpacked", "node_modules");
 }
 
+function exifToolPackageNames(platformName) {
+  return {
+    vendorPackageName: platformName === "win32" ? "exiftool-vendored.exe" : "exiftool-vendored.pl",
+    executableName: platformName === "win32" ? "exiftool.exe" : "exiftool",
+  };
+}
+
+async function findPnpmPackageRoot(projectDir, packageName) {
+  const candidates = [
+    path.join(projectDir, "node_modules", packageName),
+    path.join(projectDir, "node_modules", "exiftool-vendored", "node_modules", packageName),
+  ];
+  const monorepoPnpmRoot = path.resolve(projectDir, "..", "..", "node_modules", ".pnpm");
+  let entries = [];
+  try {
+    entries = await fs.readdir(monorepoPnpmRoot, { withFileTypes: true });
+  } catch {
+    entries = [];
+  }
+  for (const entry of entries) {
+    if (entry.isDirectory() && entry.name.startsWith(`${packageName}@`)) {
+      candidates.push(path.join(monorepoPnpmRoot, entry.name, "node_modules", packageName));
+    }
+  }
+
+  for (const candidate of candidates) {
+    if (await pathExists(path.join(candidate, "package.json"))) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
 async function pruneOnnxForWindowsPack(unpackedRoot) {
   const onnxRoot = path.join(unpackedRoot, "onnxruntime-node", "bin", "napi-v3");
   await removePath(path.join(onnxRoot, "darwin"));
@@ -116,6 +149,38 @@ async function assertLinuxSharpLibvipsUnpacked(unpackedRoot) {
   }
 }
 
+async function assertExifToolBinaryUnpacked(unpackedRoot, platformName) {
+  const { vendorPackageName, executableName } = exifToolPackageNames(platformName);
+  const binaryPath = path.join(unpackedRoot, vendorPackageName, "bin", executableName);
+  if (!(await pathExists(binaryPath))) {
+    throw new Error(
+      `Missing ExifTool runtime binary in app.asar.unpacked: ${binaryPath}`,
+    );
+  }
+}
+
+async function ensureExifToolBinaryUnpacked(context, unpackedRoot) {
+  const { vendorPackageName, executableName } = exifToolPackageNames(context.electronPlatformName);
+  const binaryPath = path.join(unpackedRoot, vendorPackageName, "bin", executableName);
+  if (await pathExists(binaryPath)) {
+    return;
+  }
+
+  const sourceRoot = await findPnpmPackageRoot(context.packager.projectDir, vendorPackageName);
+  if (!sourceRoot) {
+    throw new Error(
+      `Missing ExifTool package ${vendorPackageName}. Run pnpm install for this platform, then rebuild.`,
+    );
+  }
+
+  await fs.mkdir(unpackedRoot, { recursive: true });
+  await fs.cp(sourceRoot, path.join(unpackedRoot, vendorPackageName), {
+    recursive: true,
+    force: true,
+    dereference: true,
+  });
+}
+
 async function embedWindowsExecutableIcon(context) {
   const productFilename = context.packager?.appInfo?.productFilename;
   if (!productFilename) {
@@ -133,12 +198,16 @@ export default async function afterPack(context) {
 
   if (context.electronPlatformName === "win32" && isX64Arch) {
     await embedWindowsExecutableIcon(context);
+    await ensureExifToolBinaryUnpacked(context, unpackedRoot);
+    await assertExifToolBinaryUnpacked(unpackedRoot, context.electronPlatformName);
     await pruneOnnxForWindowsPack(unpackedRoot);
     await pruneBetterSqliteBuildArtifacts(unpackedRoot);
     return;
   }
 
   if (context.electronPlatformName === "linux" && isX64Arch) {
+    await ensureExifToolBinaryUnpacked(context, unpackedRoot);
+    await assertExifToolBinaryUnpacked(unpackedRoot, context.electronPlatformName);
     await pruneOnnxForLinuxPack(unpackedRoot);
     await pruneBetterSqliteBuildArtifacts(unpackedRoot);
     await assertLinuxSharpLibvipsUnpacked(unpackedRoot);

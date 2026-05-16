@@ -27,7 +27,7 @@ test("cancel during warmup resets running menu state", async ({ electronApp, mai
   await aiRow.locator('button.face-detect-play-btn[title="Start image AI analysis"]').click();
 
   // Warmup should be visible in background operations (model name is included in copy).
-  await expect(mainWindow.getByText(/Loading AI model .*it may take 1-2min/)).toBeVisible({
+  await expect(mainWindow.getByText(/Loading AI model .+ - it may take 1-2min/)).toBeVisible({
     timeout: 10_000,
   });
 

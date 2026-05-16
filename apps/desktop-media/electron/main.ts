@@ -47,7 +47,7 @@ import {
   type AppSettings,
   type FaceModelDownloadProgressEvent,
 } from "../src/shared/ipc";
-import { exiftool } from "exiftool-vendored";
+import { exiftool } from "./lib/exiftool-runtime";
 import { resolveInstalledUserDataPath } from "./install-config";
 import { resolveOnnxModelsPath, resolveSessionDataPath } from "./app-paths";
 import { migrateAiModelsLayout } from "./migrate-ai-models-layout";

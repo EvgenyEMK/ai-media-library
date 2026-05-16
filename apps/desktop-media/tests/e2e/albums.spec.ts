@@ -8,9 +8,9 @@ test.describe("Albums", () => {
     const mainPanel = mainWindow.locator("main.main-panel");
     await expect(mainPanel.getByRole("heading", { name: "Albums" })).toBeVisible();
 
-    await mainPanel.getByRole("button", { name: "Create album" }).click();
+    // Empty library: inline title field + Create (no separate "Create album" button).
     await mainPanel.getByPlaceholder("New album title").fill(albumTitle);
-    await mainPanel.getByRole("button", { name: "Create" }).click();
+    await mainPanel.getByRole("button", { name: "Create", exact: true }).click();
 
     await expect(mainPanel.getByRole("heading", { name: albumTitle })).toBeVisible();
     await expect(mainPanel.getByText("This album is empty.")).toBeVisible();

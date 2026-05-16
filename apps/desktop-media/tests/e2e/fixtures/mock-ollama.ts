@@ -99,6 +99,14 @@ function e2eAnalysisPayloadForFilename(basename: string): Record<string, unknown
   };
 }
 
+/** Models reported by mock `GET /api/tags` (must include the default vision model). */
+export const MOCK_OLLAMA_INSTALLED_MODELS = [
+  "qwen3.5:9b",
+  "qwen2.5vl:3b",
+  "qwen2.5:3b",
+  "llava:latest",
+] as const;
+
 const GENERIC_TEST_ANALYSIS: Record<string, unknown> = {
   image_category: "other",
   title: "test-title",
@@ -127,6 +135,14 @@ export async function startMockOllamaServer(
   const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? "/", "http://127.0.0.1");
+
+      if (req.method === "GET" && url.pathname === "/api/tags") {
+        json(res, 200, {
+          models: MOCK_OLLAMA_INSTALLED_MODELS.map((name) => ({ name })),
+        });
+        return;
+      }
+
       if (req.method !== "POST") {
         json(res, 404, { error: "not found" });
         return;

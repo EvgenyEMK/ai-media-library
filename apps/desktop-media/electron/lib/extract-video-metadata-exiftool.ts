@@ -1,4 +1,3 @@
-import { exiftool } from "exiftool-vendored";
 import {
   inferMimeTypeFromPath,
   mergeStarRating,
@@ -6,6 +5,7 @@ import {
   rawTagToString,
 } from "@emk/media-metadata-core";
 import type { DesktopPhotoTakenPrecision } from "../../src/shared/ipc";
+import { exiftool } from "./exiftool-runtime";
 
 const READ_TIMEOUT_MS = 120_000;
 

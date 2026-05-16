@@ -1,9 +1,58 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  assertOllamaModelInstalled,
+  isOllamaModelInTagList,
   OLLAMA_TEXT_FALLBACK_MODEL,
   OLLAMA_TEXT_PRIMARY_MODEL,
   resolveOllamaTextChatModel,
 } from "./ollama-model-resolve";
+
+describe("isOllamaModelInTagList", () => {
+  it("matches exact model ids from /api/tags", () => {
+    expect(isOllamaModelInTagList("qwen3.5:9b", ["llava:latest", "qwen3.5:9b"])).toBe(true);
+  });
+
+  it("does not match missing models", () => {
+    expect(isOllamaModelInTagList("qwen3.5:9c", ["qwen3.5:9b"])).toBe(false);
+  });
+});
+
+describe("assertOllamaModelInstalled", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("resolves when the model is listed in /api/tags", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ models: [{ name: "qwen3.5:9b" }] }),
+      }),
+    );
+    await expect(assertOllamaModelInstalled("qwen3.5:9b")).resolves.toBeUndefined();
+  });
+
+  it("throws immediately when the model is not installed", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ models: [{ name: "qwen3.5:9b" }] }),
+      }),
+    );
+    await expect(assertOllamaModelInstalled("qwen3.5:9c")).rejects.toThrow(
+      'Ollama does not have model "qwen3.5:9c" installed.',
+    );
+  });
+
+  it("throws when Ollama is unreachable", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("ECONNREFUSED")));
+    await expect(assertOllamaModelInstalled("qwen3.5:9b")).rejects.toThrow(
+      'Cannot reach Ollama to verify model "qwen3.5:9b".',
+    );
+  });
+});
 
 describe("resolveOllamaTextChatModel", () => {
   afterEach(() => {
