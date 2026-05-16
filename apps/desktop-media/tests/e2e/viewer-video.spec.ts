@@ -40,13 +40,21 @@ async function currentViewerVideoPaused(mainWindow: import("@playwright/test").P
 
 async function advanceUntilVideo(
   mainWindow: import("@playwright/test").Page,
-  options: { expectedPaused: boolean; maxSteps?: number; timeoutPerStepMs?: number },
+  options: {
+    direction?: "next" | "prev";
+    expectedPaused: boolean;
+    maxSteps?: number;
+    timeoutPerStepMs?: number;
+  },
 ): Promise<void> {
+  const direction = options.direction ?? "next";
   const maxSteps = options.maxSteps ?? 6;
   const timeoutPerStepMs = options.timeoutPerStepMs ?? 5_000;
 
   for (let i = 0; i < maxSteps; i += 1) {
-    await mainWindow.getByRole("button", { name: "Next item" }).click();
+    await mainWindow
+      .getByRole("button", { name: direction === "next" ? "Next item" : "Previous item" })
+      .click();
     try {
       await expect
         .poll(async () => currentViewerVideoPaused(mainWindow), { timeout: timeoutPerStepMs })
@@ -60,13 +68,13 @@ async function advanceUntilVideo(
     }
   }
 
-  throw new Error(`Did not reach a video slide after ${maxSteps} Next item clicks`);
+  throw new Error(`Did not reach a video slide after ${maxSteps} ${direction} item clicks`);
 }
 
 async function selectImageBeforeVideoInViewer(
   mainWindow: import("@playwright/test").Page,
-): Promise<void> {
-  const selected = await mainWindow.evaluate(() => {
+): Promise<"next" | "prev" | null> {
+  const direction = await mainWindow.evaluate(() => {
     const buttons = Array.from(
       document.querySelectorAll<HTMLButtonElement>('.media-swiper-theme button[aria-label^="Go to item"]'),
     );
@@ -74,19 +82,26 @@ async function selectImageBeforeVideoInViewer(
       (button) => button.querySelector("video") || button.textContent?.includes("Video"),
     );
     if (videoIndex < 0) {
-      return false;
+      return null;
     }
-    for (let offset = 1; offset < buttons.length; offset += 1) {
-      const candidate = buttons[(videoIndex - offset + buttons.length) % buttons.length];
-      if (candidate?.querySelector("img")) {
-        candidate.click();
-        return true;
-      }
+
+    const previous = buttons[videoIndex - 1];
+    if (previous?.querySelector("img")) {
+      previous.click();
+      return "next";
     }
-    return false;
+
+    const next = buttons[videoIndex + 1];
+    if (next?.querySelector("img")) {
+      next.click();
+      return "prev";
+    }
+
+    return null;
   });
-  expect(selected).toBe(true);
+  expect(direction).not.toBeNull();
   await expect(mainWindow.locator(".media-swiper-theme .swiper-slide-active img[data-emk-fit-mode]")).toBeVisible();
+  return direction;
 }
 
 async function setAutoPlayVideoOnSelection(
@@ -178,9 +193,9 @@ test.describe("Viewer mixed media", () => {
     const { imageNames } = await readMixedMediaNames(mainWindow);
     expect(imageNames.length).toBeGreaterThan(0);
     await openViewerFromListRow(mainWindow, imageNames[0]);
-    await selectImageBeforeVideoInViewer(mainWindow);
+    const direction = await selectImageBeforeVideoInViewer(mainWindow);
 
-    await advanceUntilVideo(mainWindow, { expectedPaused: false, maxSteps: 1 });
+    await advanceUntilVideo(mainWindow, { direction: direction ?? "next", expectedPaused: false, maxSteps: 1 });
   });
 
   test("clicking video in viewer strip auto-plays when setting is enabled", async ({ electronApp, mainWindow }) => {
@@ -222,9 +237,14 @@ test.describe("Viewer mixed media", () => {
     const { imageNames } = await readMixedMediaNames(mainWindow);
     expect(imageNames.length).toBeGreaterThan(0);
     await openViewerFromListRow(mainWindow, imageNames[0]);
-    await selectImageBeforeVideoInViewer(mainWindow);
+    const direction = await selectImageBeforeVideoInViewer(mainWindow);
 
-    await advanceUntilVideo(mainWindow, { expectedPaused: true, maxSteps: 1, timeoutPerStepMs: 25_000 });
+    await advanceUntilVideo(mainWindow, {
+      direction: direction ?? "next",
+      expectedPaused: true,
+      maxSteps: 1,
+      timeoutPerStepMs: 25_000,
+    });
   });
 
   test("slideshow mode advances after video playback ends", async ({ electronApp, mainWindow }) => {
@@ -263,7 +283,8 @@ test.describe("Viewer mixed media", () => {
     const { imageNames } = await readMixedMediaNames(mainWindow);
     expect(imageNames.length).toBeGreaterThan(0);
     await openViewerFromListRow(mainWindow, imageNames[0]);
-    await selectImageBeforeVideoInViewer(mainWindow);
+    const direction = await selectImageBeforeVideoInViewer(mainWindow);
+    test.skip(direction !== "next", "Mixed media order cannot reach a video via forward slideshow");
     await mainWindow.getByRole("button", { name: "Play slideshow" }).click();
 
     await expect
