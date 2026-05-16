@@ -50,6 +50,9 @@ async function advanceUntilVideo(
     try {
       await expect
         .poll(async () => currentViewerVideoPaused(mainWindow), { timeout: timeoutPerStepMs })
+        .not.toBeNull();
+      await expect
+        .poll(async () => currentViewerVideoPaused(mainWindow), { timeout: timeoutPerStepMs })
         .toBe(options.expectedPaused);
       return;
     } catch {
