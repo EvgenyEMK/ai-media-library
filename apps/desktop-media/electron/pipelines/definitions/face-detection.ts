@@ -27,6 +27,7 @@ import {
   ensureFaceEmbeddingModelLoaded,
 } from "../../face-embed-for-media-item";
 import { embedFaceEmbeddingJobsByImage } from "../../face-embedding-batch";
+import { refreshPersonSuggestionsAfterEmbeddings } from "../../face-embedding-suggestions-sync";
 
 export interface FaceDetectionParams {
   folderPath: string;
@@ -258,6 +259,19 @@ export const faceDetectionDefinition: PipelineDefinition<
         catchUpEmbeddedFaces = catchUpResult.embedded;
         catchUpFailedFaceEmbeddings = catchUpResult.failed;
         cancelledFaceEmbeddings += catchUpResult.cancelled;
+      }
+    }
+
+    const totalEmbedded = embeddedFaces + catchUpEmbeddedFaces;
+    if (!ctx.signal.aborted && totalEmbedded > 0) {
+      try {
+        const suggestionCount = await refreshPersonSuggestionsAfterEmbeddings();
+        console.log(
+          `[face-detection] refreshed person suggestions after embedding (${totalEmbedded} face(s), ${suggestionCount} suggestion row(s))`,
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[face-detection] person suggestion refresh failed: ${message}`);
       }
     }
 

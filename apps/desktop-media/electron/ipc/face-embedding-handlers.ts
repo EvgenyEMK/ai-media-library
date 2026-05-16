@@ -28,7 +28,8 @@ import {
   getEmbeddingModelInfo,
   type FaceForEmbedding,
 } from "../face-embedding";
-import { embedFacesForMediaItem } from "../face-embed-for-media-item";
+import { embedFacesForMediaItem, type FaceEmbeddingSummary } from "../face-embed-for-media-item";
+import { refreshPersonSuggestionsAfterEmbeddings } from "../face-embedding-suggestions-sync";
 import {
   assignClusterToPersonTag,
   getFaceClusterSummariesPage,
@@ -495,14 +496,21 @@ export async function autoChainEmbeddings(
   signal?: AbortSignal,
   preferredRotationClockwise?: 0 | 90 | 180 | 270,
   embeddingOverride?: { imagePath: string; faces: FaceDetectionOutput; cleanup?: () => Promise<void> },
-): Promise<void> {
-  await embedFacesForMediaItem({
+): Promise<FaceEmbeddingSummary> {
+  const summary = await embedFacesForMediaItem({
     mediaItemId,
     imagePath,
     signal,
     preferredRotationClockwise,
     embeddingOverride,
   });
+  if (summary.embedded > 0) {
+    void refreshPersonSuggestionsAfterEmbeddings().catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[face-embedding] person suggestion refresh failed: ${message}`);
+    });
+  }
+  return summary;
 }
 
 async function runFaceEmbeddingJob(

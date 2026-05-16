@@ -712,9 +712,35 @@ export function upsertFaceDetectionResult(
         estimated_gender,
         age_gender_confidence,
         age_gender_model,
+        embedding_json,
+        embedding_status,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, 'auto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, 'auto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'pending', ?, ?)`,
+    );
+
+    const updateMatchedFace = db.prepare(
+      `UPDATE media_face_instances
+       SET confidence = ?,
+           bbox_x = ?,
+           bbox_y = ?,
+           bbox_width = ?,
+           bbox_height = ?,
+           bbox_ref_width = ?,
+           bbox_ref_height = ?,
+           bbox_area_image_ratio = ?,
+           bbox_short_side_ratio_to_largest = ?,
+           subject_role = ?,
+           detector_model = ?,
+           landmarks_json = ?,
+           estimated_age_years = ?,
+           estimated_gender = ?,
+           age_gender_confidence = ?,
+           age_gender_model = ?,
+           embedding_json = NULL,
+           embedding_status = 'pending',
+           updated_at = ?
+       WHERE id = ? AND library_id = ?`,
     );
 
     const refW = result.imageSizeForBoundingBoxes?.width ?? null;
@@ -732,17 +758,14 @@ export function upsertFaceDetectionResult(
       const preservedRow = preservedEntry
         ? existingAutoRows[preservedEntry.item.idx]
         : null;
-      insertFace.run(
-        randomUUID(),
-        libraryId,
-        mediaItem.id,
-        preservedRow?.tag_id ?? null,
-        preservedRow?.cluster_id ?? null,
+      const bboxWidth = Math.max(0, right - left);
+      const bboxHeight = Math.max(0, bottom - top);
+      const faceGeometry = [
         face.score,
         left,
         top,
-        Math.max(0, right - left),
-        Math.max(0, bottom - top),
+        bboxWidth,
+        bboxHeight,
         refW,
         refH,
         face.bboxAreaImageRatio ?? null,
@@ -754,6 +777,20 @@ export function upsertFaceDetectionResult(
         face.ageGender?.gender ?? null,
         face.ageGender?.genderConfidence ?? null,
         face.ageGender?.model ?? null,
+      ] as const;
+
+      if (preservedRow) {
+        updateMatchedFace.run(...faceGeometry, now, preservedRow.id, libraryId);
+        continue;
+      }
+
+      insertFace.run(
+        randomUUID(),
+        libraryId,
+        mediaItem.id,
+        null,
+        null,
+        ...faceGeometry,
         now,
         now,
       );
